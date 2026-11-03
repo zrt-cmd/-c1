@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-02 · 交通标志与红绿灯识别 | CASE-05 机器人小车智慧交通综合案例</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+  :root{
+    --theme:#4f46e5;
+    --theme-deep:#4338ca;
+    --theme-bg:#eef2ff;
+    --theme-bd:#c7d2fe;
+  }
+  figure.fig img{max-height:430px;object-fit:contain}
+  .tag.hl{background:var(--theme-bg);border-color:var(--theme-bd);color:var(--theme-deep)}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="bar-in" style="display:flex;align-items:center;justify-content:space-between;width:100%">
+    <a class="logo" href="../index.html"><b>CASE-05</b>智慧交通</a>
+    <nav class="crumb"><a href="../../../index.html#case">总首页</a> / <a href="../index.html#case">CASE-05 机器人小车智慧交通综合案例</a> / EXP-02</nav>
+  </div>
+</header>
+
+<div class="wrap">
+  <aside class="side">
+    <h4>本页目录</h4>
+    <a href="#s1">01 本节目标</a>
+    <a href="#s2">02 核心原理</a>
+    <a href="#s3">03 硬件与场景</a>
+    <a href="#s4">04 操作步骤</a>
+    <a href="#s5">05 关键命令</a>
+    <a href="#s6">06 原理动画</a>
+    <a href="#s7">07 互动实验</a>
+    <a href="#s8">08 常见问题</a>
+    <a href="#s9">09 拓展阅读</a>
+    <a href="#s10">10 思考题</a>
+    <h4>兄弟实验</h4>
+    <a href="../exp-01-sandbox-mapping/index.html">EXP-01 沙盘认知与建图导航</a>
+    <a href="../exp-03-lane-signal/index.html">EXP-03 车道保持与路口通行</a>
+    <a href="../exp-04-smart-parking/index.html">EXP-04 智慧泊车与综合路测</a>
+  </aside>
+
+  <main class="content">
+    <div class="exp-head">
+      <div class="code">EXP-02 · 8 学时（2 理论 + 6 实践）</div>
+      <h1>交通标志与红绿灯识别</h1>
+      <p class="desc">把 HP60C 拍到的画面变成两路标准话题：HSV 颜色分割判定红绿灯红/黄/绿三态发 /traffic/light，NPU 上的 YOLO 检测直行/转向/停车/注意行人四类标志发 /traffic/sign——验收标准：三态灯识别准确率 ≥95%、四类标志 mAP 达标且置信度可调，光照变化后 5 分钟内完成重标定。</p>
+      <div class="meta"><span class="tag hl">理论2+实践6</span><span class="tag">OpenCV HSV</span><span class="tag">NPU / YOLOv8 RKNN</span><span class="tag">/traffic/light · /traffic/sign</span><span class="tag">光照鲁棒性</span></div>
+    </div>
+
+    <section class="blk" id="s1">
+      <h2><span class="no">01</span>本节目标</h2>
+      <ul class="check">
+        <li>启动 HP60C 相机驱动，核对 <code>/ascamera_hp60c/**</code> 话题树，明确 0.5m 近盲区对识别距离的约束（识别距离应保持 0.3~0.8m）。</li>
+        <li>讲清 HSV 颜色分割为什么能判灯态：H 通道与色调的对应关系、阈值窗口、形态学去噪三件套。</li>
+        <li>完成红绿灯三态（红/黄/绿）识别节点，输出 <code>/traffic/light</code> 话题（data: R/Y/G）。</li>
+        <li>完成四类交通标志（直行/转向/停车/注意行人）NPU 检测，输出 <code>/traffic/sign</code> 话题（类别 + 置信度）。</li>
+        <li>会做阈值与置信度调优：换光照/夜晚灯光下重新标定 HSV 区间，理解 mAP@0.5 与置信度阈值的取舍。</li>
+        <li>牢记：<b>识别是 EXP-03 控制的输入——话题断 1 帧，路口状态机就少一分把握</b>。</li>
+      </ul>
+      <div class="tip amber"><b>素材说明：</b>本实验无实拍素材，示意图与交互动画为准；红绿灯与标志牌两幅参照图抓自 Hiwonder 官方产品页（公开图），仅作规格参考，<b>以现场沙盘实际元素为准</b>。</div>
+    </section>
+
+    <section class="blk" id="s2">
+      <h2><span class="no">02</span>核心原理：光如何变成话题——HSV 判灯与 NPU 检测双通道</h2>
+      <p><b>把识别想成交通协管员：</b>他盯灯用"颜色直觉"（这盏灯发红光——色相对了就是红灯，亮不亮只是阈值问题），认标志用"图形记忆"（圆形蓝底带箭头=直行）。第一条通道 <b>HSV 颜色分割</b>正对应"直觉"：RGB 三通道把亮度和颜色搅在一起，转到 HSV 后 <b>H（色调）单独承载"是什么颜色"</b>——红灯 H≈0-10 或 170-180（红环抱 0°），绿灯 H≈35-85，黄灯 H≈20-35，各留 ±10 窗口吸收 LED 色偏与白平衡漂移；S、V 通道卡"够不够饱和、够不够亮"排除反光与暗影，再用开运算去掉标线反光的碎斑，取连通域最大者判定灯态。</p>
+      <p>第二条通道 <b>YOLO + NPU</b> 对应"图形记忆"：四类标志长得像（都是牌面），靠颜色会翻车——直行/转向是蓝底白图案，停车是红圈白底，注意行人是黄三角。yolov8n 在 PC 上训好 → 转 <b>RKNN INT8</b> → 塞进 C1 的 <b>6 TOPS NPU</b>，前向推理吃掉大头 CPU；输出框经 NMS 去重后按置信度过滤，封装成 <code>std_msgs/String</code> JSON 发 <code>/traffic/sign</code>。两路话题合流，EXP-03 的状态机才有"灯态 + 交规牌"两本经。</p>
+      <figure class="fig">
+        <svg viewBox="0 0 720 320" role="img" aria-label="红绿灯状态机自制示意图">
+          <defs>
+            <marker id="e02a1" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#a5b4fc"/></marker>
+          </defs>
+          <g font-family="Noto Sans CJK SC, sans-serif" font-size="13" text-anchor="middle">
+            <text x="360" y="26" fill="#c7d2fe" font-weight="bold">灯态判定状态机（HSV 输出驱动，周期 48s 同 EXP-01 模拟器）</text>
+            <circle cx="150" cy="120" r="52" fill="#450a0a" stroke="#ef4444" stroke-width="3"/>
+            <text x="150" y="114" fill="#fca5a5" font-weight="bold" font-size="16">红灯 R</text>
+            <text x="150" y="138" fill="#f87171" font-size="11">HSV: H 0-10/170-180</text>
+            <circle cx="370" cy="120" r="52" fill="#422006" stroke="#f59e0b" stroke-width="3"/>
+            <text x="370" y="114" fill="#fcd34d" font-weight="bold" font-size="16">黄灯 Y</text>
+            <text x="370" y="138" fill="#fbbf24" font-size="11">H 20-35 · 过渡 5s</text>
+            <circle cx="590" cy="120" r="52" fill="#052e16" stroke="#22c55e" stroke-width="3"/>
+            <text x="590" y="114" fill="#86efac" font-weight="bold" font-size="16">绿灯 G</text>
+            <text x="590" y="138" fill="#4ade80" font-size="11">H 35-85 · 25s</text>
+            <path d="M202,100 C260,72 300,72 318,98" fill="none" stroke="#a5b4fc" stroke-width="2.5" marker-end="url(#e02a1)"/>
+            <text x="260" y="62" fill="#a5b4fc" font-size="11">黄灯 5s</text>
+            <path d="M422,98 C470,72 520,72 540,98" fill="none" stroke="#a5b4fc" stroke-width="2.5" marker-end="url(#e02a1)"/>
+            <text x="481" y="62" fill="#a5b4fc" font-size="11">绿灯 25s</text>
+            <path d="M590,172 C560,236 380,246 190,176" fill="none" stroke="#a5b4fc" stroke-width="2.5" stroke-dasharray="8 6" marker-end="url(#e02a1)"/>
+            <text x="390" y="262" fill="#a5b4fc" font-size="11">红灯 3s（含全红清空）</text>
+            <rect x="70" y="276" width="580" height="30" rx="8" fill="#0b0f17" stroke="#1e293b"/>
+            <text x="360" y="296" fill="#94a3b8" font-size="12">判定输出 /traffic/light: R|Y|G —— 稳定 3 帧一致才发布，防闪烁</text>
+          </g>
+        </svg>
+        <figcaption>图 2-1｜<b>自制示意图</b>：红绿灯状态机——HSV 分割输出经三帧稳定滤波后驱动 R→Y→G 周期迁移，与 EXP-01 配时模拟器共用 48s 周期参数。</figcaption>
+      </figure>
+      <table>
+        <thead><tr><th>话题</th><th>类型</th><th>频率</th><th>消费方</th></tr></thead>
+        <tbody>
+          <tr><td><code>/traffic/light</code></td><td>std_msgs/String：R / Y / G</td><td>10 Hz（三帧稳定后发布）</td><td>EXP-03 路口状态机、EXP-04 路测评分</td></tr>
+          <tr><td><code>/traffic/sign</code></td><td>std_msgs/String：{cls, conf, dist}</td><td>15 Hz（NPU 推理节流）</td><td>EXP-03 转向决策、EXP-04 按标志改道</td></tr>
+          <tr><td><code>/ascamera_hp60c/color_image</code></td><td>sensor_msgs/Image</td><td>30 fps</td><td>识别节点唯一输入源</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="blk" id="s3">
+      <h2><span class="no">03</span>硬件与场景</h2>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">HP60C 深度相机</div><div class="kt">话题 /ascamera_hp60c/**；<b>0.5m 近盲区</b>——识别机位保持 0.3~0.8m，贴太近画面丢失；曝光设为自动+锁定参考帧。</div></div> <div class="kcard"><div class="kd">6 TOPS NPU</div><div class="kt">yolov8n→RKNN INT8 部署，推理 &lt;15ms/帧；NPU 忙时先降分辨率 640→416，不降置信度。</div></div> <div class="kcard"><div class="kd">红绿灯模型</div><div class="kt">立式三色灯（参照规格高约 24cm），LED 直射易过曝——HSV 的 V 上限留 255，S 下限提到 60 滤白反光。</div></div> <div class="kcard"><div class="kd">四类交通标志</div><div class="kt">直行×2、转向、停车、注意行人（参照规格牌面 8×8cm）；训练集覆盖 0.3/0.5/0.8m 三档距离与 30° 侧视角。</div></div>
+      </div>
+      <table>
+        <thead><tr><th>先决检查</th><th>标准</th><th>不达标后果</th></tr></thead>
+        <tbody>
+          <tr><td>相机画面</td><td><code>ros2 topic hz /ascamera_hp60c/color_image</code> ≈30Hz</td><td>识别节点空转，/traffic/* 无输出</td></tr>
+          <tr><td>模型文件</td><td>traffic_sign.rknn 校验和与版本记录</td><td>类别错位，四类混淆</td></tr>
+          <tr><td>光照基线</td><td>开灯状态拍 10 帧存参考图</td><td>换灯后无对照，误判"识别坏了"</td></tr>
+          <tr><td>NPU 占用</td><td>rknpu2 服务在跑、无其他模型抢占</td><td>推理排队、帧率掉到 5Hz</td></tr>
+        </tbody>
+      </table>
+      <figure class="fig">
+        <img src="./images/fig-signal-light.jpg" alt="沙盘红绿灯模型参照图" loading="lazy">
+        <figcaption>图 2-2｜红绿灯模型参照（<b>网抓自 Hiwonder 官方产品页</b>，非本教室实拍）：立式三色灯，红/黄/绿三窗垂直排列——HSV 分割先框定灯窗 ROI 再在窗内判色，可显著降低误检。</figcaption>
+      </figure>
+      <figure class="fig">
+        <img src="./images/fig-sign-turn.jpg" alt="交通标志牌参照图" loading="lazy">
+        <figcaption>图 2-3｜交通标志牌参照（<b>网抓自 Hiwonder 官方产品页</b>，非本教室实拍）：转向标志牌面约 8×8cm、杆高约 16cm——蓝底黄白箭头是转向类的主特征，检测框中心到杆底的投影距离可反推"远近"供改道决策用。</figcaption>
+      </figure>
+    </section>
+
+    <section class="blk" id="s4">
+      <h2><span class="no">04</span>操作步骤</h2>
+      <div class="flow">
+        <div class="step"><b class="n">S1</b>起相机<br><small>hp60c.launch.py → 确认话题树与帧率</small></div> <div class="arr">→</div>
+        <div class="step"><b class="n">S2</b>HSV 标定<br><small>截三态灯帧 → trackbar 拖阈值 → 存 hsv_config.yaml</small></div> <div class="arr">→</div>
+        <div class="step"><b class="n">S3</b>灯态节点<br><small>分割+形态学+最大连通域 → 三帧稳定 → 发 /traffic/light</small></div> <div class="arr">→</div>
+        <div class="step"><b class="n">S4</b>NPU 标志检测<br><small>yolov8n 数据增强 → RKNN INT8 → 部署 → 发 /traffic/sign</small></div> <div class="arr">→</div>
+        <div class="step"><b class="n">S5</b>调优与鲁棒性<br><small>置信度滑杆、换光照重标定 → 20 轮三态+四类回归测试</small></div>
+      </div>
+      <ol style="margin:14px 0 6px;padding-left:22px;line-height:1.9">
+        <li><b>HSV 标定：</b>分别在红/黄/绿亮灯时截帧，开 trackbar 拖 H/S/V 三组上下限，直到掩膜只剩灯窗、文字反光被 S≥60 滤掉；把均值写入 <code>hsv_config.yaml</code>，<b>禁止把阈值硬编码进节点</b>。</li>
+        <li><b>三帧稳定：</b>连续 3 帧判定一致才发布，防 LED 频闪与压缩噪点造成 R/Y/G 抖动；发布后 <code>ros2 topic echo /traffic/light</code> 人工对表 10 轮。</li>
+        <li><b>NPU 链路：</b>PC 上用 1500+ 张四类增强数据（旋转/亮度/侧角）训 yolov8n → export ONNX → rknn-toolkit2 转 INT8（校准集 200 张）→ 拷贝到 C1 加载，<code>rknpu2_server</code> 占用确认。</li>
+        <li><b>性能核对：</b>NPU 推理延迟打印 &lt;15ms，端到端 /traffic/sign 频率 ≥15Hz；置信度阈值初始 0.55，误检多升 0.05，漏检多降 0.05——<b>每次调整记录在调参表</b>。</li>
+        <li><b>光照鲁棒：</b>关顶灯/开台灯/夜晚三种光照各跑 20 轮回归，绿灯误判红灯 ≤1 次；换光照后 5 分钟内完成重标定是验收硬指标。</li>
+        <li><b>留痕：</b>保存 hsv_config.yaml、rknn 版本、20 轮混淆矩阵截图，作为准确率 ≥95% 的证据。</li>
+      </ol>
+    </section>
+
+    <section class="blk" id="s5">
+      <h2><span class="no">05</span>关键命令</h2>
+      <p class="dim">相机与 YOLO 部署口径与《培训方案》xlsx 一致（ascamera hp60c.launch.py、python src/app.py、--model rknn）。</p>
+      <pre><span class="c"># ① 启动 HP60C 相机并核对话题树（EXP-01 用不到相机，本实验起全程在线）</span>
+ros2 launch ascamera hp60c.launch.py
+ros2 topic list | grep <span class="y">ascamera_hp60c</span>
+ros2 topic hz /ascamera_hp60c/color_image        <span class="c"># ≈30Hz</span>
+
+<span class="c"># ② 截帧做 HSV 标定（三态灯各一张）+ 运行灯态识别节点</span>
+ros2 run image_tools cam2image --ros-args -p output_image:=/tmp/red.png
+python3 src/light_node.py --config config/hsv_config.yaml
+ros2 topic echo /traffic/light                   <span class="c"># 期望 R / Y / G 稳定输出</span>
+
+<span class="c"># ③ 手动发布一条灯态供 EXP-03 联调（无相机时的替身）</span>
+ros2 topic pub --once /traffic/light std_msgs/String <span class="y">"{data: 'R'}"</span>
+
+<span class="c"># ④ YOLO 训练→NPU 部署（PC 训练，C1 推理）</span>
+yolo train model=yolov8n.yaml data=traffic_sign.yaml epochs=120 imgsz=640
+python3 src/export_rknn.py --model best.pt --quantize int8 --platform rk3588
+python3 src/app.py --model models/traffic_sign.rknn --topic /ascamera_hp60c/color_image
+
+<span class="c"># ⑤ 观察检测输出 / 端到端延迟</span>
+ros2 topic echo /traffic/sign                    <span class="c"># {cls, conf, dist}</span>
+ros2 topic hz /traffic/sign                      <span class="c"># ≥15Hz</span></pre>
+      <div class="tip amber"><b>验收标准（写入 s4 打卡）：</b>① 三态灯 20 轮 ×3 光照准确率 ≥95%；② 四类标志在 0.3/0.5/0.8m 三档距离均检出、置信度中位数 ≥0.6；③ 换光照 5 分钟内重标定完成并复测通过。<b>易错点：识别距离小于 0.3m 进近盲区白屏、忘记三帧稳定导致灯态抖动、INT8 校准集没覆盖夜晚帧。</b></div>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">HSV 为什么不直接用 RGB</div><div class="kt">V 变化会同时拉动 R/G/B；H 对亮度不敏感，换灯、过曝时更稳。</div></div> <div class="kcard"><div class="kd">置信度阈值的两难</div><div class="kt">0.55 是起点：升→漏 (注意行人)、降→幻觉 (转向误报)；用 PR 曲线找拐点而非拍脑袋。</div></div> <div class="kcard"><div class="kd">灯 vs 牌 谁先判</div><div class="kt">灯走 ROI 颜色（毫秒级），牌走 NPU（十毫秒级）；路口先看灯，灯绿再消费标志改道。</div></div> <div class="kcard"><div class="kd">/traffic/* 为何用 String</div><div class="kt">跨节点接口越简单越稳：JSON 字段 cls/conf/dist 够 EXP-03/04 用，避免自定义 msg 的编译耦合。</div></div>
+      </div>
+    </section>
+
+    <section class="blk" id="s6">
+      <h2><span class="no">06</span>原理动画：HSV 判灯链路与 NPU 检测管线</h2>
+      <div class="anim-box">
+        <svg viewBox="0 0 720 250" width="100%" role="img" aria-label="HSV颜色分割判灯动画">
+          <defs>
+            <marker id="e02a2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#818cf8"/></marker>
+          </defs>
+          <g font-family="Noto Sans CJK SC, sans-serif" font-size="12" text-anchor="middle">
+            <text x="360" y="26" fill="#c7d2fe" font-weight="bold">一帧画面 → 掩膜 → 最大连通域 → 灯态话题</text>
+            <rect x="20" y="46" width="110" height="150" rx="8" fill="#020617" stroke="#334155"/>
+            <text x="75" y="66" fill="#94a3b8" font-size="11">原帧 ROI</text>
+            <circle cx="75" cy="95" r="16" fill="#3f3f46"/><circle cx="75" cy="95" r="11" fill="#52525b"/>
+            <circle cx="75" cy="128" r="16" fill="#3f3f46"/><circle cx="75" cy="128" r="11" fill="#52525b"/>
+            <circle cx="75" cy="161" r="16" fill="#3f3f46"/>
+            <circle cx="75" cy="161" r="11" fill="#ef4444">
+              <animate attributeName="fill" values="#ef4444;#f59e0b;#22c55e;#ef4444" dur="6s" repeatCount="indefinite"/>
+            </circle>
+            <line x1="134" y1="120" x2="176" y2="120" stroke="#818cf8" stroke-width="2" marker-end="url(#e02a2)"/>
+            <rect x="184" y="46" width="110" height="150" rx="8" fill="#020617" stroke="#334155"/>
+            <text x="239" y="66" fill="#94a3b8" font-size="11">HSV 掩膜</text>
+            <circle cx="239" cy="95" r="14" fill="#111827"/><circle cx="239" cy="128" r="14" fill="#111827"/>
+            <circle cx="239" cy="161" r="14" fill="#111827"/>
+            <circle cx="239" cy="161" r="11" fill="#4ade80" opacity="0.85">
+              <animate attributeName="fill" values="#4ade80;#fbbf24;#34d399;#4ade80" dur="6s" repeatCount="indefinite"/>
+            </circle>
+            <line x1="298" y1="120" x2="340" y2="120" stroke="#818cf8" stroke-width="2" marker-end="url(#e02a2)"/>
+            <rect x="348" y="46" width="130" height="150" rx="8" fill="#020617" stroke="#334155"/>
+            <text x="413" y="66" fill="#94a3b8" font-size="11">形态学 + 连通域</text>
+            <rect x="378" y="130" width="70" height="44" fill="none" stroke="#fbbf24" stroke-width="2" stroke-dasharray="5 4">
+              <animate attributeName="stroke" values="#fbbf24;#f87171;#4ade80;#fbbf24" dur="6s" repeatCount="indefinite"/>
+            </rect>
+            <circle cx="413" cy="152" r="13" fill="#ef4444">
+              <animate attributeName="fill" values="#ef4444;#f59e0b;#22c55e;#ef4444" dur="6s" repeatCount="indefinite"/>
+            </circle>
+            <text x="413" y="100" fill="#fbbf24" font-size="11">开运算去碎斑</text>
+            <text x="413" y="118" fill="#94a3b8" font-size="10">取面积最大者</text>
+            <line x1="482" y1="120" x2="524" y2="120" stroke="#818cf8" stroke-width="2" marker-end="url(#e02a2)"/>
+            <rect x="532" y="46" width="168" height="150" rx="8" fill="#1e1b4b" stroke="#818cf8" stroke-width="2"/>
+            <text x="616" y="72" fill="#c7d2fe" font-weight="bold">/traffic/light</text>
+            <text x="616" y="112" fill="#fca5a5" font-size="20" font-weight="bold">R</text>
+            <text x="616" y="142" fill="#fcd34d" font-size="20" font-weight="bold">Y</text>
+            <text x="616" y="172" fill="#86efac" font-size="20" font-weight="bold">G</text>
+            <text x="666" y="112" fill="#64748b" font-size="10">红 3s</text>
+            <text x="666" y="142" fill="#64748b" font-size="10">黄 5s</text>
+            <text x="666" y="172" fill="#64748b" font-size="10">绿 25s</text>
+            <circle r="6" fill="#fbbf24">
+              <animateMotion dur="6s" repeatCount="indefinite" path="M75,161 H413 H616"/>
+            </circle>
+            <text x="360" y="226" fill="#94a3b8" font-size="11">黄点流=当前帧颜色样本；三帧一致才把 R/Y/G 发布出去，防频闪抖动</text>
+          </g>
+        </svg>
+        <div class="anim-cap">动画 2-1：原帧 ROI 中三窗只有一窗过阈值 → 掩膜亮斑 → 开运算滤碎斑 → 最大连通域定灯态 → 稳定三帧后发布 /traffic/light。</div>
+      </div>
+      <div class="anim-box">
+        <svg viewBox="0 0 720 230" width="100%" role="img" aria-label="NPU检测管线动画">
+          <defs>
+            <marker id="e02a3" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#818cf8"/></marker>
+          </defs>
+          <g font-family="Noto Sans CJK SC, sans-serif" font-size="12" text-anchor="middle">
+            <g>
+              <rect x="16" y="40" width="120" height="60" rx="10" fill="#1e1b4b" stroke="#818cf8" stroke-width="2"/>
+              <text x="76" y="64" fill="#c7d2fe" font-weight="bold">HP60C 帧</text><text x="76" y="86" fill="#a5b4fc" font-size="10">640×640 letterbox</text>
+              <rect x="176" y="40" width="120" height="60" rx="10" fill="#1e1b4b" stroke="#818cf8" stroke-width="2"/>
+              <text x="236" y="64" fill="#c7d2fe" font-weight="bold">yolov8n 骨干</text><text x="236" y="86" fill="#a5b4fc" font-size="10">CSPDarknet 特征</text>
+              <rect x="336" y="40" width="120" height="60" rx="10" fill="#1e1b4b" stroke="#a5b4fc" stroke-width="2"/>
+              <text x="396" y="64" fill="#e0e7ff" font-weight="bold">NPU INT8</text><text x="396" y="86" fill="#a5b4fc" font-size="10">6 TOPS · &lt;15ms</text>
+              <rect x="496" y="40" width="100" height="60" rx="10" fill="#1e1b4b" stroke="#818cf8" stroke-width="2"/>
+              <text x="546" y="64" fill="#c7d2fe" font-weight="bold">NMS</text><text x="546" y="86" fill="#a5b4fc" font-size="10">IoU 去重</text>
+              <rect x="636" y="40" width="70" height="60" rx="10" fill="#052e16" stroke="#4ade80" stroke-width="2"/>
+              <text x="671" y="64" fill="#86efac" font-weight="bold">sign</text><text x="671" y="86" fill="#4ade80" font-size="10">话题</text>
+              <line x1="136" y1="70" x2="172" y2="70" stroke="#818cf8" stroke-width="2" marker-end="url(#e02a3)"/>
+              <line x1="296" y1="70" x2="332" y2="70" stroke="#818cf8" stroke-width="2" marker-end="url(#e02a3)"/>
+              <line x1="456" y1="70" x2="492" y2="70" stroke="#818cf8" stroke-width="2" marker-end="url(#e02a3)"/>
+              <line x1="596" y1="70" x2="632" y2="70" stroke="#818cf8" stroke-width="2" marker-end="url(#e02a3)"/>
+              <circle r="6" fill="#fbbf24">
+                <animateMotion dur="2.5s" repeatCount="indefinite" path="M76,70 H236 H396 H546 H671"/>
+              </circle>
+            </g>
+            <g transform="translate(30,130)">
+              <rect x="0" y="0" width="660" height="84" rx="10" fill="#020617" stroke="#1e293b"/>
+              <text x="330" y="24" fill="#94a3b8" font-size="11">检测帧视窗（动态盒）：置信度阈值 0.55，低于线的框直接丢弃</text>
+              <rect x="60" y="36" width="84" height="40" rx="6" fill="none" stroke="#4ade80" stroke-width="2.5"/>
+              <text x="102" y="32" fill="#4ade80" font-size="10">直行 0.87</text>
+              <rect x="230" y="40" width="70" height="36" rx="6" fill="none" stroke="#60a5fa" stroke-width="2.5">
+                <animate attributeName="stroke" values="#60a5fa;#f87171;#60a5fa" dur="3s" repeatCount="indefinite"/>
+              </rect>
+              <text x="265" y="34" fill="#60a5fa" font-size="10">转向 0.72</text>
+              <rect x="420" y="38" width="66" height="38" rx="6" fill="none" stroke="#fbbf24" stroke-width="2.5" stroke-dasharray="6 5"/>
+              <text x="453" y="32" fill="#fbbf24" font-size="10">停车 0.41 弃</text>
+              <rect x="560" y="40" width="72" height="36" rx="6" fill="none" stroke="#4ade80" stroke-width="2.5"/>
+              <text x="596" y="34" fill="#4ade80" font-size="10">注意行人 0.79</text>
+            </g>
+          </g>
+        </svg>
+        <div class="anim-cap">动画 2-2：帧进 NPU 出框——0.87 的直行与 0.79 的注意行人稳过阈值，0.41 的停车框在线下被丢弃；这就是"置信度调优"实际在调的闸门。</div>
+      </div>
+      <div class="tip violet"><span class="lab">观察</span>灯走 HSV、牌走 YOLO，为什么不统一用 YOLO？——灯态是<b>三分类颜色问题</b>，HSV 毫秒级、零训练数据、可解释；牌是<b>四类形状问题</b>，颜色重叠严重才需要深度模型。<b>能用简单规则解决的，不要喂数据</b>——工程里这叫模型选型的最小充分原则。</div>
+    </section>
+
+    <section class="blk" id="s7">
+      <h2><span class="no">07</span>互动实验：四类标志识别小测</h2>
+      <div class="ix-panel">
+        <div class="ix-title">抽题识别：把"你看到的牌"翻译成 /traffic/sign 消息，对拍置信度</div>
+        <div class="ctl-row">
+          <button class="btn" onclick="quizDraw()">抽题 / 下一题 →</button>
+<label class="ctl">置信度阈值 <span id="thLab">0.55</span> <input type="range" id="thN" min="30" max="90" value="55" step="5" oninput="quizTh()"> </label>
+          <span class="ctl" style="color:#94a3b8">得分 <b id="scLab" style="color:#4ade80">0/0</b></span>
+          <button class="btn ghost" onclick="quizReset()">重置</button>
+        </div>
+        <svg viewBox="0 0 720 130" width="100%" role="img" aria-label="交通标志抽题卡">
+          <g font-family="Noto Sans CJK SC, sans-serif" text-anchor="middle">
+            <rect x="10" y="10" width="700" height="110" rx="10" fill="#0b0f17" stroke="#1e293b"/>
+            <g id="sgA" opacity="1"><rect x="60" y="30" width="70" height="70" rx="8" fill="#1d4ed8" stroke="#e2e8f0" stroke-width="4"/>
+              <path d="M95 82 V48 M95 48 l-14 14 M95 48 l14 14" stroke="#fff" stroke-width="7" fill="none" stroke-linecap="round"/></g>
+            <g id="sgB" opacity="0"><rect x="60" y="30" width="70" height="70" rx="8" fill="#1d4ed8" stroke="#e2e8f0" stroke-width="4"/>
+              <path d="M78 80 V54 h30 M108 54 l-12 -10 M108 54 l-12 10" stroke="#fbbf24" stroke-width="7" fill="none" stroke-linecap="round"/></g>
+            <g id="sgC" opacity="0"><circle cx="95" cy="65" r="34" fill="#dc2626" stroke="#fff" stroke-width="6"/>
+              <rect x="67" y="57" width="56" height="18" fill="#fff"/></g>
+            <g id="sgD" opacity="0"><path d="M95 26 L134 100 H56 Z" fill="#facc15" stroke="#111" stroke-width="4"/>
+              <circle cx="95" cy="56" r="6" fill="#111"/><path d="M95 62 v14 M88 70 h14 M95 76 l-7 14 M95 76 l7 14" stroke="#111" stroke-width="4"/></g>
+            <text id="qTx" x="360" y="46" fill="#e2e8f0" font-size="15">点击「抽题」开始：识别正确类别并估计置信度</text>
+            <text id="qSub" x="360" y="76" fill="#94a3b8" font-size="12">四类：直行(蓝圆↑) / 转向(蓝底弯箭头) / 停车(红圈白杠) / 注意行人(黄三角)</text>
+          </g>
+        </svg>
+        <div class="ctl-row" style="margin-top:10px">
+          <button class="btn ghost" onclick="quizGuess(0)">直行</button>
+          <button class="btn ghost" onclick="quizGuess(1)">转向</button>
+          <button class="btn ghost" onclick="quizGuess(2)">停车</button>
+          <button class="btn ghost" onclick="quizGuess(3)">注意行人</button>
+        </div>
+        <div class="io" id="quizIo"></div>
+      </div>
+      <p style="margin-top:10px">答题时留意阈值滑杆：把它推到 0.90 后再抽 5 题——现实中过高的置信度门槛会让 <b>"注意行人"这类小目标最先漏检</b>；推到 0.30 又会把阴影当成"停车"。0.45~0.65 是本沙盘的甜点区。</p>
+    </section>
+
+    <section class="blk" id="s8">
+      <h2><span class="no">08</span>常见问题</h2>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">Q 红灯常被认成绿灯？</div><div class="kt">红 H 环抱 0°/180°：两个窗口都要开（0-10 与 170-180）；再把 S 下限提到 60 排除白反光。</div></div> <div class="kcard"><div class="kd">Q 接近 0.3m 画面突然花？</div><div class="kt">HP60C 0.5m 近盲区边缘：识别机位保持 0.3~0.8m，别把相机怼到灯上标定。</div></div> <div class="kcard"><div class="kd">Q /traffic/light 一直闪？</div><div class="kt">缺三帧稳定滤波，或曝光在频繁抖：锁定曝光参考帧 + 连续 3 帧一致才发布。</div></div> <div class="kcard"><div class="kd">Q NPU 推理没生效还是 CPU 跑？</div><div class="kt">查 rknpu2_server 是否加载了 rknn 文件；日志无 "model loaded" 或延迟 &gt;100ms 即掉回 CPU。</div></div> <div class="kcard"><div class="kd">Q 换灯后全部失灵？</div><div class="kt">按验收流程 5 分钟重标定：三态各截一帧 → trackbar 重拖 → 存 hsv_config.yaml，别改代码。</div></div> <div class="kcard"><div class="kd">Q 置信度调到多少合适？</div><div class="kt">以 PR 曲线拐点为锚，本沙盘经验值 0.55；四类样本不均衡时按"注意行人"召回率定下限。</div></div> <div class="kcard"><div class="kd">Q 检测帧率掉到 5Hz？</div><div class="kt">NPU 被占或分辨率过大：640→416 降档；确认无其他模型进程抢占。</div></div> <div class="kcard"><div class="kd">Q /traffic/sign 没消费方？</div><div class="kt">正常——EXP-01 阶段它只是生产者；EXP-03 状态机上线后才会被订阅，先用 echo 验收。</div></div>
+      </div>
+    </section>
+
+    <section class="blk" id="s9">
+      <h2><span class="no">09</span>拓展阅读</h2>
+      <ul class="check">
+        <li><b>OpenCV 官方 HSV 教程</b>：inRange + morphologyEx 开闭运算的标准姿势——本课灯态节点的全部原型。</li>
+        <li><b>rknn-toolkit2 文档</b>：INT8 量化校准集怎么选（本课：三光照 × 200 张）——校准集差，mAP 掉一半的故事每天都在发生。</li>
+        <li><b>YOLOv8 官方仓库</b>：--conf/--iou 推理参数与 PR 曲线绘制，配合本页互动面板的阈值直觉一起看。</li>
+        <li><b>C1 产品页</b>：6 TOPS NPU 与 HP60C 规格原始口径（仓库 products/c1-car）。</li>
+        <li><b>上一实验</b>：<a href="../exp-01-sandbox-mapping/index.html">EXP-01 的语义点位</a>——灯口坐标就是本实验相机预置机位的取点来源。</li>
+      </ul>
+    </section>
+
+    <section class="blk" id="s10">
+      <h2><span class="no">10</span>思考题 · 自测</h2>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">✅ 完成成果</div><div class="kt">/traffic/light 三态 20 轮 ≥95% + /traffic/sign 四类三距离全检出 + 重标定 ≤5 分钟。</div></div> <div class="kcard"><div class="kd">🧠 原理收获</div><div class="kt">讲清 HSV 选型理由、三帧稳定的作用、INT8 校准集与 mAP 的关系。</div></div> <div class="kcard"><div class="kd">🛠 技能收获</div><div class="kt">独立完成 HSV 标定、RKNN 转换部署、阈值-置信度双调优一轮完整回归。</div></div> <div class="kcard"><div class="kd">📐 评分速览</div><div class="kt">灯态准确率 35% + 标志检出 35% + 重标定效率 20% + 话题规范 10%。</div></div>
+      </div>
+      <div class="tip violet"><span class="lab">思考 1</span>为什么灯态判定要"三帧一致"而标志检测每帧即发？两类输出的下游消费方式（状态机 vs 改道决策）有何不同，导致了这种差异？</div>
+      <div class="tip violet"><span class="lab">思考 2</span>若把识别距离压到 0.3m 以内会发生什么？结合 HP60C 近盲区与透镜最小对焦距离，说明"感知硬件约束如何反过来规定战术动作"。</div>
+    </section>
+
+    <nav class="expnav">
+      <a class="prev" href="../exp-01-sandbox-mapping/index.html">← 上一个：EXP-01 沙盘认知与建图导航</a>
+      <a class="next" href="../exp-03-lane-signal/index.html">下一个：EXP-03 车道保持与路口通行 →</a>
+    </nav>
+    <footer>
+      <div>CASE-05 · 机器人小车智慧交通综合案例（小车 C1）· EXP-02 交通标志与红绿灯识别</div>
+      <div>8 学时 · 2 理论 + 6 实践 · 参照图网抓自 Hiwonder 官方产品页，本实验无实拍素材，示意图与交互动画为准</div>
+    </footer>
+  </main>
+</div>
+
+<script>
+var QS=[
+  {cls:'直行', idx:0, hint:'蓝底白色向上箭头，圆形指令标志'},
+  {cls:'转向', idx:1, hint:'蓝底黄白弯箭头，指示向左/右转弯'},
+  {cls:'停车', idx:2, hint:'红圈白底红横杠，禁令标志'},
+  {cls:'注意行人', idx:3, hint:'黄底黑边三角形，警告标志'}
+];
+var qi=-1, qOK=0, qAll=0;
+function quizTh(){document.getElementById('thLab').textContent=(parseInt(document.getElementById('thN').value,10)/100).toFixed(2);io0();}
+function quizDraw(){qi=Math.floor(Math.random()*4);['sgA','sgB','sgC','sgD'].forEach(function(id,i){document.getElementById(id).setAttribute('opacity',i===qi?'1':'0');});
+  document.getElementById('qTx').textContent='第 '+(qAll+1)+' 题：这块牌是什么标志？';
+  document.getElementById('qSub').textContent='在下方四个按钮中选择类别（对照 '+QS[idx(qi)].hint+'）';
+  document.getElementById('quizIo').innerHTML='';}
+function idx(i){return i;}
+function quizGuess(g){
+  if(qi<0){document.getElementById('quizIo').innerHTML='<span class="warn">先点「抽题」。</span>';return;}
+  var th=parseInt(document.getElementById('thN').value,10)/100;
+  var conf=(0.5+Math.random()*0.45), pass=conf>=th;
+  var right=(g===qi); qAll++;
+  if(right&&pass)qOK++;
+  var line = right
+    ? '<span class="ok">类别正确 ✓ conf='+conf.toFixed(2)+'</span>'
+    : '<span class="bad">类别错误 ✗ 你选 '+QS[g].cls+'，真值 '+QS[qi].cls+'</span>';
+  var thr = pass ? '<span class="ok">conf≥'+th.toFixed(2)+' → 发布</span>' : '<span class="warn">conf&lt;'+th.toFixed(2)+' → 被闸门丢弃（漏检）</span>';
+  document.getElementById('quizIo').innerHTML=line+'\n'+thr+'\n<span class="dim">'+QS[qi].hint+'</span>\n得分 '+qOK+'/'+qAll+'（类别对且过阈值才计分）';
+  document.getElementById('scLab').textContent=qOK+'/'+qAll;
+}
+function quizReset(){qi=-1;qOK=0;qAll=0;document.getElementById('scLab').textContent='0/0';
+  ['sgA','sgB','sgC','sgD'].forEach(function(id){document.getElementById(id).setAttribute('opacity','0');});
+  document.getElementById('qTx').textContent='点击「抽题」开始：识别正确类别并估计置信度';
+  document.getElementById('quizIo').innerHTML='';}
+function io0(){}
+</script>
+<script src="../shared/tutorial.js" defer></script>
+</body>
+</html>

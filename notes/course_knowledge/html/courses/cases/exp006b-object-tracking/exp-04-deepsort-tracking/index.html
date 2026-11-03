@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-04 · DeepSORT 追踪底座 — 通用目标追踪综合项目</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+:root{--theme:#0e7490;--theme-deep:#155e75;--theme-bg:#cffafe;--theme-bd:#a5f3fc}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit" title="返回课程首页">🎓 具身智能课程 · <i>通用目标追踪</i></a>
+  <div class="crumb"><a href="../../../index.html#case">综合项目</a> / <a href="../index.html">通用目标追踪</a> / EXP-04</div>
+</div>
+
+<div class="wrap">
+
+<aside class="side">
+  <h4>本页目录</h4>
+  <a href="#s1" class="now">01 问题引入：遮挡一帧就换 ID</a>
+  <a href="#s2">02 原理通俗讲解：工牌+运动记忆的保安</a>
+  <a href="#s3">03 关联知识点：DeepSORT 九要点</a>
+  <a href="#s4">04 实验目标</a>
+  <a href="#s5">05 实验环境与准备</a>
+  <a href="#s6">06 动画讲解：预测-更新与 ID 保持</a>
+  <a href="#s7">07 互动讲解：IoU 阈值匹配实验</a>
+  <a href="#s8">08 实操步骤：pytest 回归与 ID 底座验证</a>
+  <a href="#s9">09 重点与易错点</a>
+  <a href="#s10">10 总结与思考</a>
+  <h4>CASE-04 · 通用目标追踪</h4>
+  <a href="../exp-01-requirements/index.html">EXP-01 需求分析</a>
+  <a href="../exp-02-track-engine/index.html">EXP-02 TrackEngine 架构</a>
+  <a href="../exp-03-config/index.html">EXP-03 配置详解</a>
+  <a href="../exp-04-deepsort-tracking/index.html">EXP-04 DeepSORT 底座</a>
+  <a href="../exp-05-llm-gating/index.html">EXP-05 LLM 门控</a>
+  <a href="../exp-06-vlm-selection/index.html">EXP-06 VLM 选目标</a>
+  <a href="../exp-07-voice-interrupt/index.html">EXP-07 语音与 TTS</a>
+  <a href="../exp-08-events-degrade/index.html">EXP-08 日志与降级</a>
+  <a href="../exp-09-full-verify/index.html">EXP-09 全功能验证</a>
+</aside>
+
+<main class="content">
+
+<div class="exp-head">
+  <span class="code">EXP-04 · 第 2 章 · 综合性 · 8 学时</span>
+  <h1>DeepSORT 追踪底座：车被挡住三秒，ID 依然不换</h1>
+  <p class="desc">纯 IoU 关联的 SORT 只要目标被遮挡几帧，轨迹即断、换新 ID。本项目的 <code>tracking/</code> 模块是 DeepSORT 标准结构的<b>纯 numpy 自实现</b>（零新增依赖）：<b>卡尔曼常速模型</b>（8 维状态、按框高缩放噪声、CHI2INV95 马氏门控）负责"猜目标下一帧在哪"，<b>级联匹配</b>按 <code>time_since_update</code> 排优先级，<b>ReID 外观特征</b>（deepsort.rknn，64×128 ImageNet 归一化、cosine ≤ max_dist=0.2）让遮挡后的同一辆车认回来，<b>min_box=32 / max_stale=15</b> 负责净场。本实验跑 97 项 pytest 回归 + track_demo ID 底座验证。</p>
+  <div class="meta">
+    <span class="tag hl">难度 ⭐⭐⭐ · 8 学时</span>
+    <span class="tag">Kalman 8 维</span><span class="tag">级联匹配</span>
+    <span class="tag">ReID 64×128</span><span class="tag">CHI2INV95</span>
+  </div>
+</div>
+
+<!-- 01 -->
+<section class="blk" id="s1">
+  <h2><span class="no">01</span>问题引入：遮挡一帧就换 ID</h2>
+  <p>地下车道里一辆白车被货车挡了两秒——再出现时，如果系统给它发了个新号，"追踪 id3"就永远追不到它了：</p>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>纯 IoU 关联：两帧框重叠才算"同一个人" → 被遮挡 IoU 归零 → <b>轨迹断，换新 ID</b></div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>没有运动记忆：目标被挡时连"它大概会从哪冒出来"都不知道 → 重逢不相识</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>没有外观记忆：白色皮卡 vs 白色轿车在低分辨率下长得很像 → 胡乱认亲</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span>目标太小 / 早已消失的幽灵轨迹还占着 ID 名额 → 画面乱画、VLM 被误导</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">5</span>对策：<b>预测先跟上 + 外观来认人 + 净场扫幽灵</b> = DeepSORT 三件套</div>
+  </div>
+  <div class="tip amber"><span class="lab">💡 为什么是 R3 的核心</span>R3 要求"追踪 ID 连续"。ID 一跳，上游的"追 id3"、下游的 follow 过滤、VLM 选车全部失效——所以追踪底座是全链路的地基，本实验 8 学时打这个地基。</div>
+</section>
+
+<!-- 02 -->
+<section class="blk" id="s2">
+  <h2><span class="no">02</span>原理通俗讲解：工牌+运动记忆的保安</h2>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">比喻一</div><div class="kt">卡尔曼 = 根据旧轨迹猜新位置</div><p>保安盯着一个人，他突然被货架挡住——保安不会站着发呆，而是<b>顺着他的走向往前多看两步</b>："他应该快从那头出来了"。这就是 <code>predict()</code>：8 维状态 <code>[cx, cy, aspect, h, vx, vy, va, vh]</code>（中心、宽高比、高 + 各自速度），常速模型 <code>x' = Fx</code> 即"位置 += 速度"；人一露头，<b>再用观测框修正猜测</b>（<code>update()</code>）。猜错不要紧，观测会把它拉回正轨。</p></div>
+    <div class="kcard"><div class="kd">比喻二</div><div class="kt">级联匹配 = 先给刚见过的人发号</div><p>发号窗口同时排着"一秒钟前刚见过"和"五分钟没见"的两张旧凭证——先认刚见过的。级联按 <code>time_since_update</code> 从 1 到 max_age 逐层分配：刚更新过的 track 优先匹配，<b>长期遮挡的旧 track 预测已经不可靠，不许它抢新目标的检测框</b>。</p></div>
+    <div class="kcard"><div class="kd">比喻三</div><div class="kt">ReID = 衣着认人</div><p>光靠"往哪走"还是会认错（两辆车并排拐弯）。ReID 给每个检测框拍张<b>标准证件照</b>（crop 缩到 64×128、ImageNet 归一化）提成特征向量，用余弦距离比对："衣着发型对得上，就是刚才那个人"（≤ max_dist=0.2 才认）。特征库存的是<b>历史平均外观</b>而非单帧快照，抗抖动。</p></div>
+    <div class="kcard"><div class="kd">比喻四</div><div class="kt">min_box / max_stale = 门卫净场</div><p>监控角落里闪现的小噪点（框宽或高 &lt; 32 像素）不发工牌；人早走了还留在寻人启事上的照片（连续 <b>15 帧</b>没命中）就撤下来——但和"档案彻底注销"（max_age=70 帧）是两码事：先撤下启事（不画但留档），70 帧还没回来才注销档案。</p></div>
+  </div>
+  <div class="tip tealb"><span class="lab">🎯 合起来一句话</span>DeepSORT = <b>运动记忆（Kalman）+ 排队优先权（级联）+ 衣着认人（ReID）+ 净场规则（min_box/max_stale）</b>。本项目 <code>tracker.update()</code>（tracking/tracker.py L72-75）每帧三步：预测 → 级联匹配 → 剩余 detection 与未确认 track 做 IoU 匹配。</div>
+</section>
+
+<!-- 03 -->
+<section class="blk" id="s3">
+  <h2><span class="no">03</span>关联知识点：DeepSORT 九要点</h2>
+  <table>
+    <thead><tr><th style="width:24%">知识点</th><th>要点与位置</th></tr></thead>
+    <tbody>
+      <tr><td>3.1.1 结构</td><td>卡尔曼预测 + IoU/外观级联关联 + 确认框；Track 生命周期 Tentative→Confirmed（hits≥n_init）→Deleted（tracking/track.py）（前置 1.2.2）</td></tr>
+      <tr><td>3.1.2 常速模型</td><td>8 维均值 + 4 维协方差、噪声按框高缩放（σ_pos=1/20、σ_vel=1/160）、CHI2INV95 门控（df2→5.9915）（tracking/kalman.py）</td></tr>
+      <tr><td>3.1.3 双闸剔除</td><td>min_box_w/h=32 小框剔除 + max_stale=15 超龄剔除（tracking/pipeline.py L53-62）（前置 3.1.1）</td></tr>
+      <tr><td>3.2.1 外观特征</td><td>deepsort.rknn 64×128 ImageNet 归一化，消除单帧漏检换 ID（tracking/reid.py preprocess_crop L20-29）（前置 3.1.1）</td></tr>
+      <tr><td>3.2.2 异步池</td><td>ReIDPool 4 worker（RKNN 非线程安全，每线程独立实例）、extract 超时 timeout=10 → features=None 走纯 IoU（tracking/reidpool.py L24-67）</td></tr>
+      <tr><td>3.2.3 ID 调参</td><td>min_confidence=0.3 与 ID 稳定性（pipeline.py L20-21 两级置信过滤，与 detect.score_thr=0.25 配合）（前置 3.1.1）</td></tr>
+      <tr><td>3.3.1 类别限定</td><td>class_filter=[car]，COCO 80 类通用检测（前置 1.1.1）</td></tr>
+      <tr><td>3.3.2 底座验证</td><td>track_demo --list / --text 验证 ID 底座，无 LLM、stdin 直达 engine（前置 3.2.3）</td></tr>
+      <tr><td>3.3.3 丢失恢复</td><td>遮挡丢失后同 ID 恢复靠 ReID；unlock_on_loss 全丢则恢复全显示（前置 3.2.1）</td></tr>
+    </tbody>
+  </table>
+  <div class="tip"><span class="lab">💡 与 SORT 的差别</span>SORT = 卡尔曼 + IoU，快但怕遮挡；DeepSORT 在其上补了<b>外观特征与级联匹配</b>两项。本模块对照 nwojke/deep_sort 的 BSD 参考实现，用纯 numpy 重写（kalman.py / matching.py），不引入 torch/GPU 依赖。</div>
+</section>
+
+<!-- 04 -->
+<section class="blk" id="s4">
+  <h2><span class="no">04</span>实验目标</h2>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">目标 1</div><div class="kt">掌握追踪原理</div><p>掌握卡尔曼预测 + 级联关联的多目标追踪原理，能画出 DeepSORT 结构与 8 维常速模型示意。</p></div>
+    <div class="kcard"><div class="kd">目标 2</div><div class="kt">理解 ReID 的作用</div><p>理解外观重识别如何消除"单帧漏检换 ID"，以及 extract 超时时降级纯 IoU 而不崩线程的容错契约。</p></div>
+    <div class="kcard"><div class="kd">目标 3</div><div class="kt">掌握过滤与调参</div><p>掌握 min_box/max_stale 过滤语义；把 min_confidence 0.3 调低到 0.1 观察 ID 跳变，再恢复 tuned 值。</p></div>
+    <div class="kcard"><div class="kd">目标 4</div><div class="kt">独立完成验证</div><p>独立完成 <code>python3 -m pytest tests/ -v</code> 纯逻辑回归（97 项）+ <code>track_demo --list</code> 验证 ID 底座。</p></div>
+    <div class="kcard"><div class="kd">目标 5</div><div class="kt">迁移</div><p>把 DeepTrack（卡尔曼 + ReID）追踪模式迁移到其他多目标场景（车 / 人 / 箱）。</p></div>
+  </div>
+</section>
+
+<!-- 05 -->
+<section class="blk" id="s5">
+  <h2><span class="no">05</span>实验环境与准备</h2>
+  <table>
+    <thead><tr><th>类别</th><th>内容</th></tr></thead>
+    <tbody>
+      <tr><td>硬件</td><td>具身智能实验箱 B2 / 具身智能机器人小车 C1 + 深度相机（实时模式可选；pytest 与 track_demo 视频模式可无实机）</td></tr>
+      <tr><td>OS / 语言</td><td>Ubuntu 22.04 + ROS 2 Humble · Python 3.10</td></tr>
+      <tr><td>核心库</td><td>numpy（<b>追踪核心纯 numpy，零新增依赖</b>）· pytest（纯逻辑 x86 可跑，无 RKNN/ROS 依赖）</td></tr>
+      <tr><td>模型</td><td>yolov8n.rknn / deepsort.rknn / coco_classes.json（板端）</td></tr>
+      <tr><td>源码路径</td><td><code>~/ros2_ws/src/xflz_eai_car1/app/object_tracking/</code>（tracking/kalman.py · tracker.py · track.py · matching.py · reid.py · reidpool.py · pipeline.py）</td></tr>
+      <tr><td>参考视频</td><td><code>/home/iflytek/ros2_ws/src/xflz_eai_car1/vision/07_multi_object_tracking/test.mp4</code></td></tr>
+      <tr><td>测试用例</td><td><code>docs/08_视觉测试用例.md</code> 的 O2（多车 ID 稳定）/ O3（遮挡 ReID 恢复）/ O4（小框剔除）</td></tr>
+    </tbody>
+  </table>
+  <div class="tip amber"><span class="lab">⚠️ 顺序纪律</span>pytest 纯逻辑验证（无需 rknn/rclpy）<b>先于任何硬件验证</b>；实验结束后恢复 min_confidence=0.3、class_filter=[car] tuned 值。</div>
+</section>
+
+<!-- 06 -->
+<section class="blk" id="s6">
+  <h2><span class="no">06</span>动画讲解：预测-更新与 ID 保持</h2>
+  <p class="lead">追踪器每帧做"两步舞"：<b>预测</b>（虚线框按速度前移）→ <b>更新</b>（实测框把虚线拉回真实位置并修正速度）。中间一段遮挡期只有预测在飞，ReID 外观负责把重逢的目标接回<b>同一个 ID</b>：</p>
+  <div class="anim-box">
+    <svg viewBox="0 0 720 310" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="卡尔曼预测更新与ReID保持ID动画">
+      <rect x="8" y="8" width="704" height="294" rx="12" fill="#111827" stroke="#334155"/>
+      <text x="360" y="34" text-anchor="middle" font-size="14" font-weight="700" fill="#67e8f9">预测（虚线）→ 更新（实线实测）→ 遮挡后 ReID 认回同一 ID</text>
+      <!-- 时间轴 -->
+      <line x1="40" y1="240" x2="690" y2="240" stroke="#334155" stroke-width="2"/>
+      <g font-size="10" fill="#64748b" text-anchor="middle">
+        <text x="90" y="262">t 帧</text><text x="220" y="262">t+1 预测</text><text x="350" y="262">t+1 更新</text>
+        <text x="480" y="262">t+2…t+4 遮挡</text><text x="630" y="262">t+5 重逢</text>
+      </g>
+      <!-- 阶段一：t帧实测框 -->
+      <g>
+        <rect x="60" y="150" width="60" height="44" fill="none" stroke="#38bdf8" stroke-width="2"/>
+        <text x="90" y="177" text-anchor="middle" font-size="12" font-weight="700" fill="#38bdf8">id3</text>
+        <text x="90" y="210" text-anchor="middle" font-size="10" fill="#94a3b8">观测框 · 速度记入 8 维状态</text>
+      </g>
+      <!-- 阶段二：预测虚线框（向右平移动画） -->
+      <rect x="190" y="150" width="60" height="44" fill="none" stroke="#fbbf24" stroke-width="2" stroke-dasharray="6 4">
+        <animate attributeName="x" values="190;228" dur="2.4s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="1;1" dur="2.4s" repeatCount="indefinite"/>
+      </rect>
+      <text x="220" y="210" text-anchor="middle" font-size="10" fill="#fbbf24">x' = F·x（位置 += 速度）</text>
+      <!-- 阶段三：更新，观测把预测拉回 -->
+      <g>
+        <rect x="320" y="144" width="60" height="44" fill="none" stroke="#fbbf24" stroke-width="1.6" stroke-dasharray="5 4"/>
+        <rect x="330" y="152" width="60" height="44" fill="none" stroke="#38bdf8" stroke-width="2.2"/>
+        <text x="360" y="178" text-anchor="middle" font-size="12" font-weight="700" fill="#38bdf8">id3</text>
+        <text x="350" y="212" text-anchor="middle" font-size="10" fill="#94a3b8">马氏距离 ≤ 5.9915 才接受</text>
+      </g>
+      <!-- 阶段四：遮挡，只有预测ghost在飘（闪烁） -->
+      <g>
+        <rect x="450" y="150" width="60" height="44" fill="none" stroke="#64748b" stroke-width="1.6" stroke-dasharray="3 4" opacity="0.4">
+          <animate attributeName="opacity" values="0.15;0.7;0.15" dur="1.2s" repeatCount="indefinite"/>
+          <animate attributeName="x" values="450;478" dur="1.2s" repeatCount="indefinite"/>
+        </rect>
+        <rect x="446" y="146" width="68" height="52" fill="#1e293b" stroke="#475569"/>
+        <text x="480" y="172" text-anchor="middle" font-size="11" fill="#94a3b8">遮挡</text>
+        <text x="480" y="212" text-anchor="middle" font-size="10" fill="#94a3b8">time_since_update +1/帧</text>
+      </g>
+      <!-- 阶段五：重逢，ReID 认回 -->
+      <g>
+        <rect x="600" y="150" width="60" height="44" fill="none" stroke="#34d399" stroke-width="2.4"/>
+        <text x="630" y="177" text-anchor="middle" font-size="12" font-weight="700" fill="#34d399">id3</text>
+        <text x="630" y="212" text-anchor="middle" font-size="10" fill="#34d399">cos ≤ 0.2 认回 · 不换号</text>
+      </g>
+      <!-- 底部状态条 -->
+      <rect x="40" y="274" width="650" height="24" rx="7" fill="#0b2530" stroke="#155e75"/>
+      <text x="365" y="290" text-anchor="middle" font-size="11" fill="#a5f3fc">Tentative（hits≥n_init 才确认）· max_age=70 帧未更新才删除 · max_stale=15 帧不画但留档</text>
+      <!-- 数据包流动 -->
+      <circle cx="40" cy="120" r="7" fill="#a5f3fc">
+        <animate attributeName="cx" values="90;220;350;480;630" dur="5s" repeatCount="indefinite"/>
+        <animate attributeName="fill" values="#38bdf8;#fbbf24;#38bdf8;#64748b;#34d399" dur="5s" repeatCount="indefinite"/>
+      </circle>
+      <text x="360" y="124" text-anchor="middle" font-size="10" fill="#475569">轨迹生命周期：蓝=正常观测 · 黄=纯预测 · 灰=遮挡 · 绿=ReID 认回</text>
+    </svg>
+    <div class="anim-cap">动画：预测-更新两步舞——虚线框是卡尔曼按速度前移的猜测，实线实测框在更新步把猜测拉回（马氏距离超 5.9915 的观测直接拒收）；遮挡期只有灰点预测在飘，重逢时余弦距离 ≤0.2 被判为同一外观，id3 原号接回。</div>
+  </div>
+</section>
+
+<!-- 07 -->
+<section class="blk" id="s7">
+  <h2><span class="no">07</span>互动讲解：IoU 阈值匹配实验</h2>
+  <p>选一组两帧框的重叠场景与匹配阈值，判定台复算 IoU 并给出"是否指派为同一目标"——体验 IoU 关联的敏感与马氏/外观门控的必要性：</p>
+  <div class="ix-panel">
+    <div class="ix-title">🎯 IoU 匹配判定实验（互动台）</div>
+    <div class="ctl-row">
+      <button class="btn" onclick="iouCase('big')">重叠 82%</button>
+      <button class="btn" onclick="iouCase('mid')">追尾级 45%</button>
+      <button class="btn" onclick="iouCase('edge')">擦边 12%</button>
+      <button class="btn" onclick="iouCase('none')">已离开 0%</button>
+      <button class="btn" onclick="iouCase('occ')">遮挡后重逢（无 IoU）</button>
+      <button class="btn" onclick="iouCase('reset')">重置</button>
+    </div>
+    <pre id="iou-io" class="io"><span class="y">← 依次点按：先感受纯 IoU 判定，再看遮挡场景下 ReID 如何救场</span></pre>
+  </div>
+  <p>对照源码：<code>max_iou_distance=0.8</code>（级联完剩余未确认 track 用 IoU 匹配，代价 1−IoU 需 ≤0.8，即 IoU ≥0.2）；<code>_appearance_cost</code> 用余弦距离、经 <code>gate_cost_matrix</code> 把马氏超阈项置 1e5 大值，匈牙利算法就不会选它。<b>三道闸各管一段：</b>短时靠运动、重逢靠外观、太远直接拒收。</p>
+</section>
+
+<!-- 08 -->
+<section class="blk" id="s8">
+  <h2><span class="no">08</span>实操步骤：pytest 回归与 ID 底座验证</h2>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>纯逻辑 pytest 全绿（约 90min）：ID 分配/follow 过滤/显隐、ReID 遮挡保 ID、越界 crop 与超时哨兵、min_box/stale 剔除、门控路由、录音自愈</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>精读卡尔曼 + 级联（约 150min）：kalman.py L29-65、track.py 生命周期、tracker.py L68-90；记录 8 维状态与 F=I₄ 置块的常速映射</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>精读 ReID（约 100min）：reid.py 预处理四步、reidpool 异步池、test_reid_tracking 对照 use_reid 开/关差异</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span>净场与调参（约 90min）：test_pipeline_tracker 的 min_box/max_stale 用例；min_confidence 0.3→0.1 看 ID 跳变再恢复</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">5</span>track_demo ID 底座（约 80min）：--list 每帧打印当前确认目标；按 docs/08 跑 O2 多车稳定 / O3 遮挡恢复 / O4 小框剔除</div>
+  </div>
+
+  <p><b>步骤 1 · 纯逻辑回归（x86 可跑，无 RKNN/ROS 依赖）</b>：</p>
+  <pre><span class="g">cd ~/ros2_ws/src/xflz_eai_car1/app/object_tracking</span>
+<span class="g">python3 -m pytest tests/ -v</span>
+<span class="y">platform linux -- Python 3.10.12, pytest-6.2.5 ...</span>
+<span class="y">rootdir: /home/iflytek/ros2_ws/src/xflz_eai_car1/app/object_tracking</span>
+<span class="y">collected 97 items</span>
+<span class="y">tests/test_tracker_session.py::... PASSED    # ID 分配 / follow 过滤 / 显隐</span>
+<span class="y">tests/test_reid_tracking.py::... PASSED     # use_reid=true 遮挡保原 ID vs false 新建</span>
+<span class="y">tests/test_reid_crop_heal.py::... PASSED    # 越界 crop 不喂错特征 / extract 超时零哨兵</span>
+<span class="y">tests/test_pipeline_tracker.py::... PASSED  # min_box 剔除 / stale 超龄剔除</span>
+<span class="y">tests/test_native_wiring.py::... PASSED     # 门控路由（EXP-05 复用）</span>
+<span class="c"># 全部 PASSED 即通过——这是后续所有实验的行为基线</span></pre>
+
+  <p><b>步骤 4 · min_confidence 调低看 ID 跳变</b>：</p>
+  <pre><span class="g">cp config/track_config.yaml /tmp/tc.bak</span>
+<span class="g">sed -i 's/min_confidence: 0.3 /min_confidence: 0.1 /' config/track_config.yaml</span>
+<span class="g">python3 apps/track_demo.py --video /home/iflytek/ros2_ws/src/xflz_eai_car1/vision/07_multi_object_tracking/test.mp4 --text --list --mjpeg</span>
+<span class="y"># 现象：低置信噪声进 tracker，大量 Tentative 新建 → ID 频繁跳变</span>
+<span class="g">cp /tmp/tc.bak config/track_config.yaml</span>   <span class="c"># 恢复 0.3，验证 ID 恢复稳定</span></pre>
+
+  <p><b>步骤 5 · track_demo 验证 ID 底座</b>（无 VoiceLoop、无 LLM，stdin 直达 engine，<b>无唤醒词</b>）：</p>
+  <pre><span class="g">printf '追踪 id3\n' | python3 apps/track_demo.py --video /home/iflytek/ros2_ws/src/xflz_eai_car1/vision/07_multi_object_tracking/test.mp4 --text --list --mjpeg</span>
+<span class="y">[命令] 追踪 id3</span>
+<span class="y">当前目标： （当前无确认目标）</span>
+<span class="y">id3 已消失</span>
+<span class="y">全部跟随目标已消失，恢复全显示</span>
+<span class="c"># --list 每帧打印 scene_summary；锁定 → 仅绘该 ID；丢失 → lost + unlock_on_loss 恢复全显示</span></pre>
+</section>
+
+<!-- 09 -->
+<section class="blk" id="s9">
+  <h2><span class="no">09</span>重点与易错点</h2>
+  <ul class="check">
+    <li><b>别用手工 IoU 替代级联</b>：级联按 time_since_update 排优先级，保证长期遮挡的旧 track 不夺走新目标的匹配；纯 IoU 会让长时遮挡后误关联。</li>
+    <li><b>区分 max_stale=15 与 max_age=70</b>：前者是"不画但保留轨道"的软阈值，后者是轨道生命周期上限（超了直接 DELETED）——先撤启事，再注销档案。</li>
+    <li><b>ReID 不是万能</b>：目标外观剧烈变化（背转面）时余弦距离兜不住，需要 max_stale 配合剔除真消失目标。</li>
+    <li><b>超时降级不抛异常</b>：ReIDPool.extract 超时（timeout=10）→ 整帧 features=None 走纯 IoU、失败 crop 用零向量哨兵补齐——任何一步失败都回到纯 IoU，<b>主循环绝不挂死</b>。</li>
+    <li><b>纯 numpy 不加依赖</b>：Kalman/匹配核心勿引入 torch/GPU 依赖；pytest 纯逻辑 x86 可跑，先于硬件验证。</li>
+    <li><b>tuned 值复原</b>：min_confidence 调参后务必恢复 0.3（可接受 0.25–0.6）；class_filter 保持 [car]。</li>
+    <li><b>track_demo 无唤醒词</b>：stdin 直达 engine，比 track_app 少一层语音；--list 是验证 ID 底座的核心调试开关。</li>
+  </ul>
+  <table>
+    <thead><tr><th>问题</th><th>原因</th><th>解决</th></tr></thead>
+    <tbody>
+      <tr><td>追踪 ID 跳变</td><td>min_confidence 过低 / class_filter 扩类</td><td>恢复 0.3 / [car] tuned 值</td></tr>
+      <tr><td>长遮挡后新 ID</td><td>无外观特征（use_reid=false）</td><td>开启 use_reid + ReID 特征</td></tr>
+      <tr><td>小目标乱画框</td><td>min_box_w/h 过低</td><td>用 32 像素阈值剔除噪点</td></tr>
+      <tr><td>pytest 失败</td><td>改了默认配置值</td><td>对照 tests 断言与配置基线恢复</td></tr>
+    </tbody>
+  </table>
+  <div class="tip tealb"><span class="lab">🎯 数值手感</span>h=100 像素时位置噪声标准差 = h/20 = 5px、速度噪声 = h/160 ≈ 0.625px/帧；新建 track 首帧速度完全未知，初值协方差放得更大（位置 2σ·h=10px、速度 10σ·h=6.25px/帧）——猜得越没底，越要等观测来教。</div>
+</section>
+
+<!-- 10 -->
+<section class="blk" id="s10">
+  <h2><span class="no">10</span>总结与思考</h2>
+  <p>本实验打通了追踪底座的四层机制：卡尔曼给出"运动记忆"（8 维常速预测 + 按框高缩放噪声 + 马氏门控），级联匹配给出"排队公平"（刚见过的先认），ReID 给出"衣着认人"（64×128 特征、cosine ≤0.2、历史均值抗噪），min_box/max_stale 给出"净场规则"（32 像素与 15 帧两道闸）。97 项 pytest 是行为基线，track_demo --list 是肉眼验证。产出：pytest 全绿记录、卡尔曼+级联示意图、ReID 遮挡恢复观察、调参笔记、ID 底座验证结果。</p>
+  <div class="tip violet">
+    <span class="lab">🤔 思考题 1</span>
+    卡尔曼常速模型如何用 8 维状态 + 框高缩放噪声预测下一帧？级联匹配为什么按 <code>time_since_update</code> 从 1 到 max_age 逐层分配——如果改成"全都一起抢"会发生什么？
+  </div>
+  <div class="tip violet">
+    <span class="lab">🤔 思考题 2</span>
+    ReID 如何消除"单帧漏检换 ID"？为什么 extract 超时要<b>降级纯 IoU 而非抛异常</b>崩线程？再想想：min_box/max_stale 各剔除掉哪些目标，调低 min_confidence 为什么导致 ID 跳变？
+  </div>
+</section>
+
+<nav class="expnav">
+  <a class="prev" href="../exp-03-config/index.html">← EXP-03 track_config.yaml 配置详解</a>
+  <a class="next" href="../exp-05-llm-gating/index.html">EXP-05 LLM 指令门控 →</a>
+</nav>
+
+</main>
+</div>
+
+<footer>
+  <span>CASE-04 · 通用目标追踪综合项目 · EXP-04 DeepSORT 追踪底座</span>
+  <span>8 学时 · 综合性 · 基于 object_tracking 实验讲义改编</span>
+</footer>
+
+<script>
+function iouCase(k){
+  var out=document.getElementById('iou-io');
+  var m={
+    big:'<span class="g">IoU = 0.82</span>（交 82%）\nmax_iou_distance=0.8 → 代价 1-0.82=0.18 ≤ 0.8 <span class="y">✓ 指派给同一目标</span>\n<span class="c"># 两帧几乎重叠：纯 IoU 就能认——这是 SORT 的舒适区</span>',
+    mid:'<span class="g">IoU = 0.45</span>（快出画/形变）\n代价 1-0.45=0.55 ≤ 0.8 <span class="y">✓ 仍匹配</span>，但注意：IoU 随速度/遮挡急剧下降\n<span class="c"># 速度一快、遮挡一来，这个数会雪崩</span>',
+    edge:'<span class="g">IoU = 0.12</span>（仅擦边相交）\n代价 1-0.12=0.88 &gt; 0.8 <span class="y">✗ 拒绝</span> → 轨迹断，旧 ID 变 stale，新检测另开新 ID\n<span class="c"># 纯 IoU 的痛点：明明是同一辆车，只因帧间位移大就换号</span>',
+    none:'<span class="g">IoU = 0</span>（完全错开）\n代价 1.0 &gt; 0.8 <span class="y">✗ 拒绝</span>\n<span class="c"># 若只靠 IoU：目标被遮挡的每一帧都是这个 0——ID 必断</span>',
+    occ:'<span class="g">IoU = 0（挡住了根本没有检测框）</span>\n卡尔曼兜底：预测框还在漂移，time_since_update 每帧 +1（≤15 不撤启事）\n重逢时三道闸接管：\n  ① 马氏距离 ≤ 5.9915（df2 的 95% 置信椭圆）：<span class="y">位置还对得上</span>\n  ② ReID cosine ≤ max_dist=0.2：<span class="y">外观也对得上 → id3 原号接回 ✓</span>\n  ③ max_stale=15 / max_age=70 兜底：<span class="y">超期才撤启事/注销</span>\n<span class="c"># 运动记忆撑住空窗，衣着认人完成重逢——这就是 DeepSORT 三件套协作</span>',
+    reset:'<span class="y">← 依次点按：先感受纯 IoU 判定，再看遮挡场景下 ReID 如何救场</span>'
+  };
+  out.innerHTML=m[k];
+}
+</script>
+<script src="../shared/tutorial.js" defer></script>
+</body>
+</html>

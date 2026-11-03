@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>电机演示：只管转，不知在哪</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:transparent;
+  font-family:'Noto Sans CJK SC','Microsoft YaHei',sans-serif;color:#334155;-webkit-font-smoothing:antialiased}
+.wrap{padding:8px 6px 6px;display:flex;flex-direction:column;align-items:center;gap:6px}
+.hint{font-size:12.5px;color:#64748b;line-height:1.55;text-align:center;max-width:380px}
+.hint b{color:#b91c1c}
+.stage{position:relative;width:100%;max-width:320px}
+.stage canvas{display:block;width:100%;border-radius:10px;cursor:crosshair}
+.hud{position:absolute;top:6px;left:8px;font-size:11px;font-weight:700;
+  font-family:Consolas,'Courier New',monospace;color:#b91c1c;background:rgba(255,255,255,.85);
+  border:1px solid #fecaca;border-radius:6px;padding:1px 7px;pointer-events:none}
+.state{position:absolute;top:6px;right:8px;font-size:10.5px;font-weight:700;
+  font-family:Consolas,'Courier New',monospace;color:#475569;background:rgba(255,255,255,.85);
+  border:1px solid #e2e8f0;border-radius:6px;padding:1px 7px;pointer-events:none}
+.ctrl{display:flex;gap:8px}
+button{font-family:inherit;font-size:12.5px;font-weight:700;border-radius:8px;
+  padding:6px 16px;cursor:pointer;border:1px solid transparent;line-height:1.5}
+#btn{background:#dc2626;color:#fff}
+#btn:hover{background:#b91c1c}
+#btn.run{background:#0f766e}
+#btn.run:hover{background:#115e59}
+#rst{background:#fff;color:#475569;border-color:#cbd5e1}
+#rst:hover{background:#f1f5f9}
+.verdict{font-size:12.5px;min-height:44px;display:flex;align-items:center;justify-content:center;
+  text-align:center;line-height:1.55;background:#fff;border:1px dashed #cbd5e1;border-radius:8px;
+  padding:7px 10px;width:100%;max-width:380px;color:#475569;transition:border-color .2s,color .2s}
+.verdict.ok{border-color:#16a34a;color:#15803d;font-weight:700}
+.verdict.no{border-color:#fca5a5;color:#b91c1c;font-weight:700}
+.lesson{font-size:12.5px;font-weight:700;color:#0f172a;text-align:center;line-height:1.5}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hint" id="hint">点刻度设定<b>目标角度</b> → 按"转动"，盯着红指针按"<b>停止</b>"，看能不能停在目标上</div>
+  <div class="stage" id="stage">
+    <canvas id="cv"></canvas>
+    <div class="hud" id="hud">目标 90°</div>
+    <div class="state" id="state">停</div>
+  </div>
+  <div class="ctrl">
+    <button id="btn">▶ 转动</button>
+    <button id="rst">↺ 复位</button>
+  </div>
+  <div class="verdict" id="verdict">还没转。先想好停在哪个角度，再按"转动"。</div>
+  <div class="lesson">只解决转动的问题，但不知道转动到哪里。</div>
+</div>
+
+<script src="../../../../../assets/modules/servo-lab/three.min.js"></script>
+<script>
+(function(){
+'use strict';
+/* ---------- 状态 ---------- */
+var angleDeg = 0;          /* 外部刻度读出的指针角（数学角：0°朝右，逆时针增） */
+var targetDeg = 90;        /* 目标角（默认演示值 90°） */
+var running = false;
+var runTime = 0;
+var SPEED = 240;           /* 恒定转速 deg/s——电机只有转速 */
+var markerTween = 0;       /* 目标三角滑动的当前角 */
+
+var stage = document.getElementById('stage');
+var btn = document.getElementById('btn');
+var rst = document.getElementById('rst');
+var hud = document.getElementById('hud');
+var stateEl = document.getElementById('state');
+var verdict = document.getElementById('verdict');
+
+/* ---------- three 基础 ---------- */
+var renderer = new THREE.WebGLRenderer({canvas:document.getElementById('cv'),antialias:true,alpha:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 2));
+var scene = new THREE.Scene();
+var camera = new THREE.PerspectiveCamera(42, 1, 0.1, 50);
+/* 相机对准刻度盘心（盘随电机侧转后盘心偏离世界原点），视线沿 -Z 直看 */
+var lookPt = new THREE.Vector3(0,0,1.19);
+camera.position.set(0,0,5.4);
+camera.lookAt(lookPt);
+
+scene.add(new THREE.AmbientLight(0xffffff,0.62));
+var dl = new THREE.DirectionalLight(0xffffff,0.9); dl.position.set(2.3,3,4); scene.add(dl);
+var dl2 = new THREE.DirectionalLight(0xcfe4ff,0.4); dl2.position.set(-3,-1.5,2.5); scene.add(dl2);
+
+var DIAL_Z = 1.19;   /* 刻度盘面 */
+var R_RING = 1.02;   /* 刻度环半径 */
+
+/* ---------- 电机body（静止） ---------- */
+function cylZ(r1,r2,h,seg,mat){
+  var g = new THREE.CylinderGeometry(r1,r2,h,seg);
+  g.rotateX(Math.PI/2);
+  return new THREE.Mesh(g,mat);
+}
+var motor = new THREE.Group();
+motor.rotation.y = -0.33;      /* 轻微侧转，显出 3D 体感 */
+motor.rotation.x = 0.13;
+scene.add(motor);
+/* 侧转后盘心的世界坐标，相机对准它 */
+lookPt.set(0,0,1.19).applyQuaternion(motor.quaternion);
+camera.position.set(lookPt.x, lookPt.y, lookPt.z + 5.3);
+camera.lookAt(lookPt);
+
+var matBody  = new THREE.MeshStandardMaterial({color:0x7c8ba1,metalness:0.55,roughness:0.45});
+var matCap   = new THREE.MeshStandardMaterial({color:0x56657a,metalness:0.6,roughness:0.4});
+var matShaft = new THREE.MeshStandardMaterial({color:0xd8dee8,metalness:0.9,roughness:0.25});
+var matRed   = new THREE.MeshStandardMaterial({color:0xdc2626,metalness:0.2,roughness:0.5});
+
+var body = cylZ(0.6,0.6,1.3,48,matBody); body.position.z=-0.30;
+var capF = cylZ(0.63,0.63,0.10,48,matCap); capF.position.z=0.40;
+var capR = cylZ(0.63,0.63,0.10,48,matCap); capR.position.z=-1.00;
+/* 后盖小轴，暗示里面还有电机轴 */
+var rearNub = cylZ(0.16,0.16,0.22,20,matShaft); rearNub.position.z=-1.16;
+/* 四颗安装螺丝 */
+for(var s=0;s<4;s++){
+  var a = Math.PI/4 + s*Math.PI/2;
+  var scr = cylZ(0.05,0.05,0.06,10,matShaft);
+  scr.position.set(Math.cos(a)*0.46, Math.sin(a)*0.46, 0.47);
+  motor.add(scr);
+}
+motor.add(body,capF,capR,rearNub);
+
+/* ---------- 转子：轴 + 红指针（会转） ---------- */
+var rotor = new THREE.Group(); motor.add(rotor);
+var shaft = cylZ(0.10,0.10,0.78,20,matShaft); shaft.position.z=0.80;
+var hub   = cylZ(0.16,0.16,0.10,24,matCap);   hub.position.z=1.12;
+var handG = new THREE.BoxGeometry(0.80,0.055,0.045);
+handG.translate(0.40,0,0);                     /* 从圆心指向 +X */
+var hand = new THREE.Mesh(handG,matRed);       hand.position.z=1.155;
+var tipG = new THREE.SphereGeometry(0.05,16,12);
+var tip = new THREE.Mesh(tipG,matRed); tip.position.set(0.80,0,1.155);
+rotor.add(shaft,hub,hand,tip);
+
+/* ---------- 刻度盘（静止，属 body） ---------- */
+var dial = new THREE.Group(); motor.add(dial);
+var ring = new THREE.Mesh(
+  new THREE.RingGeometry(R_RING-0.014, R_RING, 128),
+  new THREE.MeshBasicMaterial({color:0x94a3b8,side:THREE.DoubleSide})
+);
+ring.position.z = DIAL_Z; dial.add(ring);
+
+for(var i=0;i<24;i++){
+  var deg = i*15;
+  var major = (deg % 30 === 0);
+  var len = major ? 0.12 : 0.06;
+  var t = new THREE.Mesh(
+    new THREE.BoxGeometry(0.022, len, 0.012),
+    new THREE.MeshBasicMaterial({color: major ? 0x475569 : 0x94a3b8, side:THREE.DoubleSide})
+  );
+  var rr = R_RING - len/2 - 0.012;
+  var rad = deg*Math.PI/180;
+  t.position.set(Math.cos(rad)*rr, Math.sin(rad)*rr, DIAL_Z);
+  t.rotation.z = rad - Math.PI/2;   /* 长边沿半径方向 */
+  dial.add(t);
+}
+function makeLabel(text){
+  var c = document.createElement('canvas'); c.width=128; c.height=72;
+  var x = c.getContext('2d');
+  x.font='bold 42px Arial'; x.fillStyle='#475569';
+  x.textAlign='center'; x.textBaseline='middle';
+  x.fillText(text+'\u00B0', 64, 40);
+  var sp = new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),transparent:true}));
+  sp.scale.set(0.30,0.17,1);
+  return sp;
+}
+[0,60,120,180,240,300].forEach(function(d){
+  var lab = makeLabel(String(d));
+  var rad = d*Math.PI/180;
+  lab.position.set(Math.cos(rad)*1.24, Math.sin(rad)*1.24, DIAL_Z);
+  dial.add(lab);
+});
+
+/* ---------- 目标三角（红，滑动到目标角） ---------- */
+var tgtGrp = new THREE.Group();
+tgtGrp.position.z = DIAL_Z + 0.01;
+var shp = new THREE.Shape();
+shp.moveTo(-0.075, 0.055); shp.lineTo(0.075, 0.055); shp.lineTo(0, -0.085); shp.lineTo(-0.075, 0.055);
+var tgtMesh = new THREE.Mesh(new THREE.ShapeGeometry(shp),
+  new THREE.MeshBasicMaterial({color:0xdc2626,side:THREE.DoubleSide}));
+tgtMesh.position.y = 1.36;   /* 指向盘心 */
+tgtGrp.add(tgtMesh);
+motor.add(tgtGrp);
+
+/* 目标连到盘心的虚线（细长半透明，一眼看出"差多少"） */
+var lineG = new THREE.PlaneGeometry(0.012, 1.0);
+lineG.translate(0, 0.5, 0);   /* 从圆心向 +Y 到 r=1.0 */
+var tgtLine = new THREE.Mesh(lineG,
+  new THREE.MeshBasicMaterial({color:0xdc2626,transparent:true,opacity:0.35,side:THREE.DoubleSide}));
+tgtLine.position.z = 0;   /* tgtGrp 已带 z 偏移，这里绝不能再加 */
+tgtGrp.add(tgtLine);
+
+/* ---------- 逻辑 ---------- */
+function norm360(d){ d = d % 360; return d < 0 ? d + 360 : d; }
+function fmt(d){ var v = Math.round(norm360(d)); return v === 360 ? 0 : v; }
+
+function updHud(){
+  hud.textContent = '目标 ' + fmt(targetDeg) + '\u00B0';
+}
+function startStop(){
+  running = !running;
+  runTime = 0;
+  if(running){
+    btn.textContent = '⏸ 停止'; btn.classList.add('run');
+    stateEl.textContent = '转速 ' + SPEED + '\u00B0/s';
+    verdict.className = 'verdict';
+    verdict.textContent = '在转！谁都能让它转——现在考验你：看准刻度，按下停止。';
+  }else{
+    btn.textContent = '▶ 转动'; btn.classList.remove('run');
+    stateEl.textContent = '停 ' + fmt(angleDeg) + '\u00B0';
+    judge();
+  }
+}
+function judge(){
+  var diff = Math.abs(norm360(angleDeg - targetDeg));
+  if(diff > 180) diff = 360 - diff;
+  var dd = diff.toFixed(0);
+  if(diff <= 4){
+    verdict.className = 'verdict ok';
+    verdict.innerHTML = '\u2714 停在 ' + fmt(angleDeg) + '\u00B0，目标 ' + fmt(targetDeg) +
+      '\u00B0，差 ' + dd + '\u00B0——可这全靠你的眼睛盯刻度，电机内部没人记这个数。再试一次？';
+  }else{
+    verdict.className = 'verdict no';
+    verdict.innerHTML = '\u2718 停在 ' + fmt(angleDeg) + '\u00B0，目标 ' + fmt(targetDeg) +
+      '\u00B0，差 ' + dd + '\u00B0——外部刻度 + 你的眼睛在当"编码器"，电机自己毫不知情。';
+  }
+}
+function resetAll(){
+  running = false;
+  angleDeg = 0; targetDeg = 90; markerTween = 90;
+  rotor.rotation.z = 0;
+  btn.textContent = '▶ 转动'; btn.classList.remove('run');
+  stateEl.textContent = '停';
+  verdict.className = 'verdict';
+  verdict.textContent = '还没转。先想好停在哪个角度，再按"转动"。';
+  updHud();
+}
+
+btn.addEventListener('click', startStop);
+rst.addEventListener('click', resetAll);
+
+/* 点刻度圈 → 设目标角（射线求交到盘面） */
+var ray = new THREE.Raycaster();
+var ndc = new THREE.Vector2();
+stage.addEventListener('pointerdown', function(e){
+  if(e.target !== stage.querySelector('canvas')) return;
+  var r = renderer.domElement.getBoundingClientRect();
+  ndc.x = ((e.clientX - r.left) / r.width) * 2 - 1;
+  ndc.y = -((e.clientY - r.top) / r.height) * 2 + 1;
+  ray.setFromCamera(ndc, camera);
+  var n = new THREE.Vector3(0,0,1).applyQuaternion(motor.quaternion);
+  var p0 = new THREE.Vector3(0,0,DIAL_Z).applyMatrix4(motor.matrixWorld);
+  var plane = new THREE.Plane().setFromNormalAndCoplanarPoint(n, p0);
+  var hit = new THREE.Vector3();
+  if(ray.ray.intersectPlane(plane, hit)){
+    var local = motor.worldToLocal(hit.clone());
+    var d = Math.atan2(local.y, local.x) * 180 / Math.PI;
+    var rr = Math.sqrt(local.x*local.x + local.y*local.y);
+    if(rr < 0.7) return;            /* 太靠内不算点到刻度 */
+    targetDeg = norm360(d);
+    updHud();
+    if(!running){
+      verdict.className = 'verdict';
+      verdict.textContent = '目标改成 ' + fmt(targetDeg) + '\u00B0。按"转动"试试。';
+    }
+  }
+});
+
+/* ---------- 主循环 ---------- */
+var last = performance.now();
+function loop(now){
+  var dt = Math.min((now - last) / 1000, 0.05); last = now;
+  if(running){
+    runTime += dt;
+    var spd = Math.min(SPEED, runTime * 1600);    /* 通电后迅速到位的转速 */
+    angleDeg = norm360(angleDeg + spd * dt);
+    rotor.rotation.z = angleDeg * Math.PI / 180;
+  }
+  /* 目标三角滑向目标 */
+  var want = targetDeg - 90;
+  var cur = markerTween;
+  var delta = ((want - cur + 540) % 360) - 180;
+  var step = 400 * dt;
+  if(Math.abs(delta) <= step){ markerTween = want; }
+  else { markerTween = cur + Math.sign(delta) * step; }
+  tgtGrp.rotation.z = markerTween * Math.PI / 180;
+
+  renderer.render(scene, camera);
+  requestAnimationFrame(loop);
+}
+
+function resize(){
+  var w = stage.clientWidth || 230;
+  var h = Math.round(w * 1.0);
+  renderer.setSize(w, h, false);
+  renderer.domElement.style.height = h + 'px';
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+if(window.ResizeObserver){ new ResizeObserver(resize).observe(stage); }
+window.addEventListener('resize', resize);
+resize(); updHud();
+
+/* 截图参数：?shot=1 → 直接呈现"停止后判定"状态，便于目检 */
+var q = new URLSearchParams(location.search);
+if(q.get('shot') === '1'){
+  angleDeg = 137; targetDeg = 90;
+  rotor.rotation.z = angleDeg * Math.PI / 180; markerTween = -0;
+  markerTween = targetDeg - 90;
+  stateEl.textContent = '停 137\u00B0';
+  judge(); updHud();
+}
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

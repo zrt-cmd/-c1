@@ -1,0 +1,29 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp003-ros2-application/exp-15-rviz2/diagrams/fig-15-3-display-flow.html
+TITLE: 图 15-3 · display.launch.py 节点数据流
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+图 15-3 · display.launch.py 节点数据流
+图 15-3 · display.launch.py 节点数据流：滑块 → 画面
+本图回答的问题：拖一下关节滑块，到模型动起来中间经过哪几步？断在中间会怎样？
+拖动关节滑块
+产生关节角
+joint_state_publisher_gui
+把滑块值发成关节状态
+/joint_states
+robot_state_publisher
+关节角 + URDF → 各 link 变换
+（固定偏移进 /tf_static 只发一次）
+/tf（动态）
+rviz2 · TF/RobotModel 图层
+拿最新 TF 重画部件与坐标轴
+部件在画面里实时转动
+rsp 没起来（风险）
+/tf 不存在 → 黄字
+滑块动而模型不动
+/joint_states 停更（风险）
+gui 关掉 → 模型冻结
+冻结在最后姿态
+✅ 结论：滑块 → /joint_states → rsp 算变换 → /tf → rviz2 重绘，逐环相扣
+⚠️ 风险：中间任一环缺失，现象都是"滑块动、模型不动"
+🔍 验证：04 节第 7 步拖滑块 + 第 6 步 tf2_echo 实测 0.029m 偏移
+EXP-15 · rviz2 三维可视化

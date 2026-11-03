@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 340" font-family="'Noto Sans CJK SC','WenQuanYi Micro Hei',sans-serif">
+  <rect width="960" height="340" rx="12" fill="#ffffff"/>
+  <rect x="4" y="4" width="952" height="332" rx="10" fill="none" stroke="#e2e8f0"/>
+
+  <!-- 标题 -->
+  <text x="28" y="42" font-size="18" font-weight="700" fill="#0f172a">SLAM 建图数据流管线</text>
+  <text x="28" y="66" font-size="12.5" fill="#94a3b8">传感器输入 → 前端匹配 → 后端优化 → 地图输出</text>
+
+  <!-- 阶段一：输入 -->
+  <g>
+    <rect x="40"  y="120" width="180" height="66" rx="10" fill="#eef4ff" stroke="#2563eb"/>
+    <text x="130" y="148" text-anchor="middle" font-size="15" font-weight="600" fill="#2563eb">激光雷达</text>
+    <text x="130" y="170" text-anchor="middle" font-size="12" fill="#64748b">/scan · 10Hz</text>
+
+    <rect x="40"  y="216" width="180" height="66" rx="10" fill="#eef4ff" stroke="#2563eb"/>
+    <text x="130" y="244" text-anchor="middle" font-size="15" font-weight="600" fill="#2563eb">里程计 IMU</text>
+    <text x="130" y="266" text-anchor="middle" font-size="12" fill="#64748b">/odom · 50Hz</text>
+  </g>
+
+  <!-- 箭头 -->
+  <g stroke="#94a3b8" stroke-width="2" fill="none" marker-end="url(#ar)">
+    <path d="M232 153 C 270 153, 270 165, 306 165"/>
+    <path d="M232 249 C 270 249, 270 200, 306 200"/>
+    <path d="M470 183 L 512 183"/>
+    <path d="M676 183 L 716 183"/>
+  </g>
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#94a3b8"/>
+    </marker>
+  </defs>
+
+  <!-- 阶段二：前端 -->
+  <g>
+    <rect x="308" y="122" width="162" height="122" rx="10" fill="#f0fdfa" stroke="#0d9488"/>
+    <text x="389" y="152" text-anchor="middle" font-size="15" font-weight="600" fill="#0d9488">前端匹配</text>
+    <text x="389" y="180" text-anchor="middle" font-size="12.5" fill="#334155">帧间配准</text>
+    <text x="389" y="202" text-anchor="middle" font-size="12.5" fill="#334155">Scan-to-Map</text>
+    <text x="389" y="224" text-anchor="middle" font-size="12.5" fill="#334155">位姿初值</text>
+  </g>
+
+  <!-- 阶段三：后端 -->
+  <g>
+    <rect x="514" y="122" width="162" height="122" rx="10" fill="#f0fdfa" stroke="#0891b2"/>
+    <text x="595" y="152" text-anchor="middle" font-size="15" font-weight="600" fill="#0891b2">后端优化</text>
+    <text x="595" y="180" text-anchor="middle" font-size="12.5" fill="#334155">图优化 / Ceres</text>
+    <text x="595" y="202" text-anchor="middle" font-size="12.5" fill="#334155">回环检测</text>
+    <text x="595" y="224" text-anchor="middle" font-size="12.5" fill="#334155">位姿图矫正</text>
+  </g>
+
+  <!-- 阶段四：输出 -->
+  <g>
+    <rect x="718" y="140" width="200" height="86" rx="10" fill="#eef4ff" stroke="#2563eb"/>
+    <text x="818" y="172" text-anchor="middle" font-size="15" font-weight="600" fill="#2563eb">占据栅格地图</text>
+    <text x="818" y="198" text-anchor="middle" font-size="12" fill="#64748b">/map · 0.05m 分辨率</text>
+  </g>
+</svg>

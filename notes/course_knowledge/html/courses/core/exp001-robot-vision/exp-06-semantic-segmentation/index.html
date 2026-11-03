@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-06 · 语义分割与背景替换 — 机器人视觉入门课</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<link rel="stylesheet" href="../shared/beginner.css">
+<style>:root{--theme:#7c3aed;--theme-deep:#6d28d9;--theme-bg:#ede9fe;--theme-bd:#ddd6fe}</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit">🧠 具身智能课程 · <i>机器人视觉入门</i></a>
+  <div class="crumb"><a href="../../../index.html#core">核心课程</a> / <a href="../index.html">视觉入门课</a> / EXP-06</div>
+</div>
+
+<div class="wrap">
+
+<aside class="side">
+  <h4>本页步骤</h4>
+  <a href="#s1" class="now">01 这个实验解决什么问题</a>
+  <a href="#s2">02 三分钟讲懂：从"框住人"到"抠出人"</a>
+  <a href="#s3">03 先认识 4 个词</a>
+  <a href="#s4">04 它吃什么、吐什么</a>
+  <a href="#s5">05 三步跑起来</a>
+  <a href="#s6">06 你该看到的画面</a>
+  <a href="#s7">07 改一个参数看变化</a>
+  <a href="#s8">08 踩坑速查</a>
+  <a href="#s9">09 进阶（可选）</a>
+  <a href="#s10">10 随堂小测</a>
+  <h4>本课程实验</h4>
+  <a href="../exp-01-color-hsv/index.html">EXP-01 颜色识别</a>
+  <a href="../exp-02-qrcode/index.html">EXP-02 二维码</a>
+  <a href="../exp-03-contour-polygon/index.html">EXP-03 多边形轮廓</a>
+  <a href="../exp-04-industrial-defect/index.html">EXP-04 工业缺陷检测</a>
+  <a href="../exp-05-garbage-classification/index.html">EXP-05 垃圾分类</a>
+  <a href="../exp-06-semantic-segmentation/index.html" style="color:#0f766e;font-weight:700">EXP-06 语义分割</a>
+  <a href="../exp-07-deepsort-tracking/index.html">EXP-07 多目标跟踪</a>
+  <a href="../exp-08-face-landmarks/index.html">EXP-08 人脸关键点</a>
+  <a href="../exp-09-pose-landmark/index.html">EXP-09 骨骼关键点</a>
+  <a href="../exp-10-depth-3d/index.html">EXP-10 深度 3D</a>
+  <a href="../exp-11-pose-control/index.html">EXP-11 体感控制</a>
+  <a href="../exp-12-hand-control/index.html">EXP-12 手势识别</a>
+</aside>
+
+<main class="content">
+
+<div class="exp-head">
+  <span class="code">EXP-06 · 第 3 阶段 · 语义分割 · 设计性 · 4 学时</span>
+  <h1>语义分割：不只框住人，还要把人的每一根头发抠出来</h1>
+  <p class="desc">视频会议里的虚拟背景是怎么做的？它不是给人套一个方框，而是<b>精确到每个像素</b>地判断"这个点是人的皮肤还是背后的书架"。这个实验就干这件事：把人从画面里抠出来，然后换成黑背景、纯色背景、或者一张自定义图片。</p>
+  <div class="meta">
+    <span class="tag hl">难度 ⭐⭐ · 4 学时</span>
+    <span class="tag">yolov8n-seg</span><span class="tag">掩码解码</span>
+    <span class="tag">Alpha 合成</span><span class="tag">多线程池</span>
+  </div>
+</div>
+
+<div class="pathline">
+  <span>01 颜色</span><span>02 二维码</span><span>03 轮廓</span><span>04 检测</span><span>05 分类</span><span class="cur">06 分割</span><span>07 跟踪</span><span>08 人脸</span><span>09 骨骼</span><span>10 3D</span><span>11 体感</span><span>12 手势</span>
+</div>
+
+<section class="blk" id="s1">
+  <h2><span class="no">01</span>这个实验解决什么问题</h2>
+
+  <div class="idea">
+    <span class="tag1">CORE IDEA · 一句话原理</span>
+    <p class="big">检测给的是<b>一个方框</b>，分割给的是<b>一张黑白蒙版</b>——蒙版上每个白色像素就是"这是人"。</p>
+    <p class="analogy"><b>打个比方：</b>检测是"用便利贴框住照片里的人"，分割是"用剪刀沿着人的轮廓剪下来"。<b>剪下来之后，你想贴到任何背景上都行</b> —— 这就是虚拟背景的全部原理。</p>
+  </div>
+
+  <p>来看两者的差别有多大：</p>
+
+  <table>
+    <thead><tr><th style="width:20%">任务</th><th style="width:24%">输出是什么</th><th style="width:20%">数据量</th><th>能干什么</th></tr></thead>
+    <tbody>
+      <tr><td>目标检测（EXP-04/02）</td><td>4 个数字：框的左上右下</td><td>极小</td><td>知道"有人在画面里，大概在哪个位置"</td></tr>
+      <tr><td><b>语义分割（本实验）</b></td><td>一张和原图一样大的黑白图</td><td>几十万个像素</td><td>知道"这一根头发是人的，这一片墙不是"</td></tr>
+    </tbody>
+  </table>
+
+  <p>为什么需要精确到像素？因为很多任务是"框"做不到的：</p>
+  <ul>
+    <li><b>换背景</b>：框内框外一刀切，人的轮廓会变成方的，一眼假</li>
+    <li><b>测量面积</b>：想知道伤口的面积，得知道它的边界</li>
+    <li><b>避障</b>：机器人要知道地面上哪些区域能走，哪些是障碍</li>
+  </ul>
+
+  <div class="oneline"><span>本实验的目标：<b>相机对着自己，画面里的人被完整抠出来，背景变成黑色 / 纯色 / 一张风景图。</b></span></div>
+</section>
+
+<section class="blk" id="s2">
+  <h2><span class="no">02</span>三分钟讲懂：从"框住人"到"抠出人"</h2>
+
+  <p class="lead">分割模型比检测模型多输出一样东西：<b>一张"模板图"</b>。理解这张模板图，你就理解了分割。</p>
+
+  <div class="anim-box">
+    <svg viewBox="0 0 760 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="语义分割流程：检测得框 提取掩码系数 与原型图相乘 得到逐像素蒙版 背景合成">
+      <rect x="6" y="6" width="748" height="248" rx="12" fill="#111827" stroke="#334155"/>
+
+      <text x="88" y="30" text-anchor="middle" font-size="11.5" font-weight="700" fill="#c4b5fd" font-family="sans-serif">① 检测出框</text>
+      <rect x="24" y="44" width="128" height="94" rx="5" fill="#1e293b" stroke="#475569"/>
+      <rect x="52" y="54" width="66" height="74" rx="4" fill="none" stroke="#22d3ee" stroke-width="1.8"/>
+      <circle cx="85" cy="70" r="10" fill="#475569"/>
+      <rect x="70" y="82" width="30" height="44" rx="5" fill="#475569"/>
+      <text x="88" y="158" text-anchor="middle" font-size="9.5" fill="#64748b" font-family="sans-serif">person 0.94</text>
+
+      <path d="M162 91 L194 91" stroke="#475569" stroke-width="2" stroke-dasharray="5 4" fill="none">
+        <animate attributeName="stroke-dashoffset" values="0;-18" dur="1s" repeatCount="indefinite"/>
+      </path>
+
+      <text x="262" y="30" text-anchor="middle" font-size="11.5" font-weight="700" fill="#c4b5fd" font-family="sans-serif">② 32 个"系数"</text>
+      <rect x="200" y="44" width="124" height="94" rx="6" fill="#1e293b" stroke="#a78bfa" stroke-width="1.4"/>
+      <g font-size="8.5" fill="#ddd6fe" font-family="monospace">
+        <text x="210" y="62">mc = [0.8, -0.3,</text>
+        <text x="210" y="76">      1.2,  0.5,</text>
+        <text x="210" y="90">      -0.9, ...]</text>
+      </g>
+      <text x="262" y="112" text-anchor="middle" font-size="9" fill="#a78bfa" font-family="monospace">32 个数</text>
+      <text x="262" y="158" text-anchor="middle" font-size="9.5" fill="#64748b" font-family="sans-serif">每个物体配一组</text>
+
+      <text x="262" y="228" text-anchor="middle" font-size="10" fill="#f472b6" font-family="monospace">×</text>
+
+      <path d="M334 91 L366 91" stroke="#475569" stroke-width="2" stroke-dasharray="5 4" fill="none">
+        <animate attributeName="stroke-dashoffset" values="0;-18" dur="1s" repeatCount="indefinite"/>
+      </path>
+
+      <text x="446" y="30" text-anchor="middle" font-size="11.5" font-weight="700" fill="#c4b5fd" font-family="sans-serif">③ 32 张"模板图"(proto)</text>
+      <rect x="376" y="44" width="140" height="94" rx="5" fill="#0f172a" stroke="#475569"/>
+      <g opacity=".85">
+        <rect x="384" y="52" width="30" height="30" rx="3" fill="#334155"/>
+        <rect x="420" y="52" width="30" height="30" rx="3" fill="#475569"/>
+        <rect x="456" y="52" width="30" height="30" rx="3" fill="#1e293b" stroke="#334155"/>
+        <rect x="384" y="88" width="30" height="30" rx="3" fill="#1e293b" stroke="#334155"/>
+        <rect x="420" y="88" width="30" height="30" rx="3" fill="#334155"/>
+        <rect x="456" y="88" width="30" height="30" rx="3" fill="#475569"/>
+      </g>
+      <text x="446" y="158" text-anchor="middle" font-size="9.5" fill="#64748b" font-family="sans-serif">模型的通用"形状积木"</text>
+
+      <path d="M524 91 L556 91" stroke="#475569" stroke-width="2" stroke-dasharray="5 4" fill="none">
+        <animate attributeName="stroke-dashoffset" values="0;-18" dur="1s" repeatCount="indefinite"/>
+      </path>
+
+      <text x="646" y="30" text-anchor="middle" font-size="11.5" font-weight="700" fill="#6ee7b7" font-family="sans-serif">④ 拼出这一只人的蒙版</text>
+      <rect x="566" y="44" width="160" height="94" rx="5" fill="#0f172a" stroke="#34d399" stroke-width="1.6"/>
+      <!-- 蒙版：黑色底 + 白色人形 -->
+      <circle cx="646" cy="66" r="11" fill="#fff"/>
+      <path d="M628,86 q18,-6 36,0 l4,40 q-22,8 -44,0 z" fill="#fff"/>
+      <text x="646" y="158" text-anchor="middle" font-size="9.5" fill="#64748b" font-family="sans-serif">白=人，黑=背景</text>
+
+      <text x="380" y="196" text-anchor="middle" font-size="11.5" fill="#c4b5fd" font-family="sans-serif">用这组系数去"混合"那 32 张模板图 → 得到这个物体专属的精确轮廓</text>
+
+      <path d="M646 148 L646 168" stroke="#34d399" stroke-width="2" stroke-dasharray="4 3" fill="none"/>
+
+      <g transform="translate(566,176)">
+        <rect x="0" y="0" width="72" height="46" rx="4" fill="#1e3a8a"/>
+        <text x="36" y="20" text-anchor="middle" font-size="9" fill="#bfdbfe" font-family="sans-serif">新背景图</text>
+        <text x="36" y="34" text-anchor="middle" font-size="8.5" fill="#93c5fd" font-family="monospace">background</text>
+        <text x="82" y="28" font-size="14" fill="#34d399" font-family="monospace">=</text>
+        <rect x="98" y="0" width="68" height="46" rx="4" fill="#111827" stroke="#34d399"/>
+        <circle cx="132" cy="14" r="7" fill="#fff"/>
+        <path d="M120,28 q12,-4 24,0 l3,14 q-15,5 -30,0 z" fill="#fff"/>
+        <text x="132" y="60" text-anchor="middle" font-size="8.5" fill="#6ee7b7" font-family="monospace">合成结果</text>
+      </g>
+    </svg>
+  </div>
+  <div class="cap">图 6-1｜关键在第②③步：模型不直接画蒙版，而是给"32 个系数"去组合"32 张通用模板图"。这个设计叫 <b>proto-mask</b>。</div>
+
+  <h3>为什么不直接让模型输出蒙版？</h3>
+  <p>因为直接输出一张 640×640 的蒙版，数据量太大、算不过来。<b>proto-mask 的思路是：预先准备 32 张通用的"形状积木"，每个物体只需要说出"用哪几块、按什么比例组合"（32 个系数），就能拼出自己专属的轮廓。</b></p>
+  <p>这就像画人头像：给你 32 种眼睛、32 种鼻子、32 种嘴型，你只要列出编号清单，就能描述任何一张脸 —— 而不用画出整张脸。</p>
+
+  <table>
+    <thead><tr><th style="width:24%">步骤</th><th style="width:26%">术语</th><th>干什么</th></tr></thead>
+    <tbody>
+      <tr><td>框 + 类别</td><td>检测头</td><td>和 EXP-04 完全一样：找出人的位置和分数。</td></tr>
+      <tr><td>32 个系数</td><td><code>mc</code>（mask coefficients）</td><td>每个检测到的物体配一组数，描述"它长什么样"。</td></tr>
+      <tr><td>模板图</td><td><code>proto</code></td><td>32 张 160×160 的灰度图，是模型学到的"通用形状"。</td></tr>
+      <tr><td>拼蒙版</td><td><code>mc @ proto</code></td><td>系数和模板图做加权求和，得到一张低分辨率蒙版，再放大到原尺寸。</td></tr>
+      <tr><td>二值化</td><td><code>mask_thr</code></td><td>算出来的蒙版是灰度（0~255），要按阈值切成黑白（0 或 1）。</td></tr>
+      <tr><td>合成</td><td>Alpha 合成</td><td>蒙版白的地方用原图，黑的地方用背景图。</td></tr>
+    </tbody>
+  </table>
+
+  <div class="oneline"><span><b>一句话记住：</b>分割 = 检测 + 蒙版。<b>检测告诉你"有几个人、在哪"，蒙版告诉你"每一个像素算不算人"。</b>两件事合起来，才能把人精确地剪下来。</span></div>
+</section>
+
+<section class="blk" id="s3">
+  <h2><span class="no">03</span>先认识 4 个词</h2>
+  <div class="terms">
+    <div class="term"><div class="w">掩码 / 蒙版 <em>mask</em></div><p class="m">和原图一样大（或按比例缩放）的黑白图。白 = 保留，黑 = 换成背景。</p></div>
+    <div class="term"><div class="w">proto <em>原型</em></div><p class="m">32 张通用"形状积木"，模型训练时学到的公共模板。所有物体共用它们。</p></div>
+    <div class="term"><div class="w">Alpha 合成</div><p class="m">图像叠加的标准做法：<code>结果 = 前景×α + 背景×(1-α)</code>。α 是蒙版（0 或 1）。</p></div>
+    <div class="term"><div class="w">mask_thr</div><p class="m">二值化阈值。算出来的蒙版是灰度，超过这个值就算"是人"。设太高 → 只剩核心区域；设太低 → 边缘糊到背景上。</p></div>
+  </div>
+
+  <details class="deep">
+    <summary>为什么掩码是低分辨率再放大？<em>选读 40 秒</em></summary>
+    <div class="deep-body">
+      <p>32 张 proto 图是 160×160，而原图是 640×640。所以拼出来的蒙版只有原图的 1/4 大小，需要放大。</p>
+      <p>放大时边缘会变成模糊的过渡带（不是硬边），这其实<b>是件好事</b> —— 稍微模糊的边缘看起来更自然，不像剪刀剪的。真实的抠图软件也都会对边缘做羽化处理。</p>
+    </div>
+  </details>
+</section>
+
+<section class="blk" id="s4">
+  <h2><span class="no">04</span>它吃什么、吐什么</h2>
+
+  <div class="io2">
+    <div class="cellbox in">
+      <span class="lb">INPUT · 喂进去</span>
+      <div class="v">相机画面</div>
+      <p class="d">640×640 RGB。模型是 <code>yolov8n-seg.rknn</code>（约 7MB），配置里只保留 <code>classes: [0]</code> 即 person 类。</p>
+    </div>
+    <div class="arw">→</div>
+    <div class="cellbox out">
+      <span class="lb">OUTPUT · 吐出来</span>
+      <div class="v">抠出来的人 + 新背景</div>
+      <p class="d">三种背景模式可选：<b>black</b>（黑）、<b>solid</b>（纯色）、<b>image</b>（自定义图片）。</p>
+    </div>
+  </div>
+
+  <pre><span class="c"># 关键配置（config/seg_config.yaml）</span>
+<span class="b">model:</span>
+  rknn: models/yolov8n-seg.rknn
+  <span class="y">classes: [0]</span>          <span class="c"># 0=person；空列表 = 全部 80 类</span>
+  <span class="y">mask_thr: 0.5</span>         <span class="c"># 蒙版二值化阈值</span>
+
+<span class="b">background:</span>
+  <span class="y">mode: black</span>           <span class="c"># black | solid | image</span>
+  color: [0, 0, 0]        <span class="c"># solid 模式的颜色（BGR 顺序！）</span>
+  image: ""
+
+<span class="b">pool:</span>
+  workers: 3              <span class="c"># 多线程推理，板上有几个核就开几个</span></pre>
+</section>
+
+<section class="blk" id="s5">
+  <h2><span class="no">05</span>三步跑起来</h2>
+
+  <ol class="steps3">
+    <li>
+      <span class="st">先用一张现成图试，别急着开相机<em>约 1 分钟</em></span>
+      <p>实验自带 <code>bus.jpg</code>（COCO 的经典测试图，有行人）。先跑它最容易看到效果。</p>
+      <pre><span class="g">cd</span> ~/ros2_ws/src/xflz_eai_car1/vision/06_semantic_segmentation
+<span class="g">ls</span> models/ images/
+<span class="g">python</span> src/app.py --image models/bus.jpg --save out.jpg</pre>
+      <div class="expect">models/:  yolov8n-seg.rknn   yolov8n-seg.onnx
+images/:  bus.jpg 和其他测试图
+
+seg=1  person 0.92  mask_area=18420
+saved -&gt; out.jpg</div>
+      <p>打开 <code>out.jpg</code>，看背景有没有被换掉。</p>
+    </li>
+
+    <li>
+      <span class="st">切换三种背景模式<em>约 3 分钟</em></span>
+      <p>改配置里的 <code>mode</code>，各看一次：</p>
+      <pre><span class="g">nano</span> config/seg_config.yaml</pre>
+      <pre><span class="b">background:</span>
+  mode: <span class="y">black</span>       <span class="c"># ① 全黑，最容易看出抠图边缘</span>
+  mode: <span class="y">solid</span>       <span class="c"># ② 纯色，颜色在 color 里改（BGR）</span>
+  color: [0, 200, 0]  <span class="c">#    BGR → 这是绿色</span>
+  mode: <span class="y">image</span>       <span class="c"># ③ 换成一张自己的图</span>
+  image: "images/bg.jpg"</pre>
+      <p>每改一次重跑一遍单图命令。<b>先试 black 模式</b>，因为纯黑最容易暴露问题 —— 边缘有没有毛边、有没有把背景残片带进来，一眼就看清。</p>
+    </li>
+
+    <li>
+      <span class="st">实时模式 + 三线程加速<em>约 4 分钟</em></span>
+      <p>终端 1 起相机：</p>
+      <pre><span class="g">source</span> /opt/ros/humble/setup.bash &amp;&amp; <span class="g">source</span> ~/ros2_ws/install/setup.bash
+<span class="g">export</span> ROS_DOMAIN_ID=2
+<span class="g">ros2</span> launch ascamera hp60c.launch.py</pre>
+      <p>终端 2 跑分割。先设 <code>pool.workers: 1</code> 跑一遍记下帧率，再改 3 跑一遍对比：</p>
+      <pre><span class="g">cd</span> ~/ros2_ws/src/xflz_eai_car1/vision/06_semantic_segmentation
+<span class="g">python</span> src/app.py --ros</pre>
+      <div class="expect">workers=1  →  avg_fps ≈ 20~40
+workers=3  →  avg_fps ≈ 40~60   <i>← 多线程把三个 NPU 核都用上了</i>
+
+<i>浏览器：http://&lt;板子IP&gt;:8080/seg.mjpg</i></div>
+      <p>对着镜头挥挥手、抓抓头发 —— 看边缘跟不跟得住。<b>头发是最难的</b>，如果头发边缘也抠得干净，说明效果很好。</p>
+    </li>
+  </ol>
+
+  <div class="oneline"><span>三步跑完你就做出了一台"虚拟背景机"。<b>下一步只是换个背景素材而已，核心原理已经全部走通了。</b></span></div>
+</section>
+
+<section class="blk" id="s6">
+  <h2><span class="no">06</span>你该看到的画面</h2>
+
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">画面 A · black 模式</div><div class="kt">人浮在纯黑里</div><p>人形完整，边缘略有过渡（正常）。如果边缘有明显的一圈"光晕"或背景残片，说明蒙版不够准。</p></div>
+    <div class="kcard"><div class="kd">画面 B · solid 模式</div><div class="kt">纯色背景</div><p>适合做证件照效果。注意 <code>color</code> 是 <b>BGR</b> 顺序 —— 想要红色（255,0,0 BGR）别写成 (0,0,255)。</p></div>
+    <div class="kcard"><div class="kd">画面 C · image 模式</div><div class="kt">换成风景照</div><p>背景图会被缩放到画面大小。人站在风景里，效果最接近视频会议的虚拟背景。</p></div>
+  </div>
+
+  <div class="tip tealb"><span class="lab">🔍 为什么这个实验比检测慢这么多？</span>因为要算几十万个像素的蒙版。检测只输出几个框，分割要输出一整张图 —— <b>数据量差了几万倍</b>。所以这里必须用多线程推理池来抢回帧率（3 个 worker 比 1 个快近一倍）。</div>
+</section>
+
+<section class="blk" id="s7">
+  <h2><span class="no">07</span>改一个参数看变化</h2>
+  <p class="lead"><code>mask_thr</code> 是这个实验里最能"看出原理"的参数。拖它，你能看到蒙版从"碎片"变成"整块"再变成"糊出去"。</p>
+
+  <div class="lab2">
+    <div class="lh">⚡ 参数实验台 · mask_thr 与掩码边缘</div>
+    <div class="lr">
+      <label>mask_thr</label>
+      <input id="mt" type="range" min="10" max="90" step="5" value="50">
+      <output id="mt_o">0.50</output>
+    </div>
+    <div class="vis">
+      <svg viewBox="0 0 420 170" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="mask阈值变化时蒙版从碎片到膨胀的变化">
+        <rect x="0" y="0" width="420" height="170" rx="8" fill="#0b1220"/>
+        <!-- 蒙版示意：人形 -->
+        <g id="maskg" transform="translate(30,16)">
+          <rect x="0" y="0" width="130" height="130" rx="4" fill="#000"/>
+          <g fill="#fff" id="person">
+            <circle cx="65" cy="34" r="20"/>
+            <path d="M38,64 q27,-10 54,0 l6,54 q-33,11 -66,0 z"/>
+          </g>
+          <rect id="halo" x="34" y="8" width="62" height="116" rx="26" fill="#fff" opacity="0"/>
+        </g>
+        <!-- 说明区 -->
+        <text x="186" y="30" font-size="10.5" fill="#94a3b8" font-family="sans-serif">白 = 判定为"人"，黑 = 判定为背景</text>
+        <g font-size="10" font-family="monospace">
+          <text x="186" y="56" fill="#4ade80" >white px ↑ = 越多</text>
+          <rect x="186" y="64" width="200" height="12" rx="6" fill="#1e293b"/>
+          <rect id="wbar" x="186" y="64" width="100" height="12" rx="6" fill="#34d399"/>
+          <text x="186" y="94" fill="#64748b">灰色过渡带（真实情况）</text>
+        </g>
+        <text x="210" y="124" font-size="9.5" fill="#475569" font-family="sans-serif">阈值把灰度蒙版切成黑白 —— 就像调对比度</text>
+      </svg>
+    </div>
+    <div class="say" id="say"></div>
+  </div>
+
+  <h3>三种典型设置</h3>
+  <table>
+    <thead><tr><th style="width:20%">mask_thr</th><th style="width:30%">你会看到</th><th>什么时候用</th></tr></thead>
+    <tbody>
+      <tr><td>0.3（低）</td><td>白区变大，人的边缘往外糊，头发丝都算进来了，但背景也沾了一点</td><td>想要"完整包含"目标时，比如测量伤口面积</td></tr>
+      <tr><td><b>0.5</b></td><td>适中，边界大致落在真实边缘上</td><td><b>默认值，大多数场景够用</b></td></tr>
+      <tr><td>0.8（高）</td><td>白区收缩，只剩身体核心，头发和手指边缘丢失</td><td>只要"一定有把握的区域"时，比如确认"这里确实有人"</td></tr>
+    </tbody>
+  </table>
+
+  <p><b>还有一个更值得玩的方向：把 <code>classes</code> 从 <code>[0]</code> 改成空列表 <code>[]</code>。</b>这样模型会把画面里所有 80 类东西都分割出来 —— 你会看到桌子、椅子、杯子各自被抠出来配上不同颜色。这能让你直观感受到"分割"和"检测"的差别有多大。</p>
+
+  <div class="oneline"><span><b>mask_thr 的本质是"有多确定才算"。</b>和检测里的 <code>score_thr</code> 是同一类问题 —— 只是作用对象从"整个框"变成了"每个像素"。</span></div>
+</section>
+
+<section class="blk" id="s8">
+  <h2><span class="no">08</span>踩坑速查</h2>
+
+  <table class="pit2">
+    <thead><tr><th>现象</th><th>原因</th><th>怎么办</th></tr></thead>
+    <tbody>
+      <tr><td>人抠出来了但边缘一圈"绿边/黑边"</td><td>蒙版比实际轮廓大了一点，把背景边缘带进来了</td><td>把 <code>mask_thr</code> 从 0.5 调到 0.6~0.7</td></tr>
+      <tr><td>人只剩个身体，头和手没了</td><td><code>mask_thr</code> 太高</td><td>降到 0.4 左右</td></tr>
+      <tr><td>换背景后画面里出现了别人的残影</td><td>蒙版把背景的一部分也判定成人了</td><td>调高 <code>mask_thr</code>；确保背景不要太杂乱</td></tr>
+      <tr><td>帧率只有十几</td><td>只开了 1 个 worker</td><td>把 <code>pool.workers</code> 设成 3（板上有多核 NPU）</td></tr>
+      <tr><td>纯色背景颜色不对</td><td><code>color</code> 是 <b>BGR</b> 顺序，不是 RGB</td><td>想要红就写 <code>[0,0,255]</code>，绿写 <code>[0,255,0]</code></td></tr>
+      <tr><td>背景图片不显示</td><td>路径是相对<b>项目根目录</b>的</td><td>写 <code>images/bg.jpg</code>，并确认文件存在、尺寸不要太怪</td></tr>
+      <tr><td>人没被认出来（什么都没抠）</td><td>人太小、太远，或者坐着被挡住</td><td>靠近镜头，露出上半身；或把 <code>score_thr</code> 降到 0.15</td></tr>
+    </tbody>
+  </table>
+
+  <div class="tip amber"><span class="lab">💡 排查口诀</span><b>先看"有没有蒙版"，再看"蒙版准不准"。</b>没蒙版 = 检测失败（人太小 / 阈值太高）；蒙版有但边缘脏 = <code>mask_thr</code> 或分辨率问题。</div>
+</section>
+
+<section class="blk" id="s9">
+  <h2><span class="no">09</span>进阶（可选）</h2>
+
+  <details class="deep">
+    <summary>进阶 1 · 背景虚化（而不是替换）<em>约 20 分钟</em></summary>
+    <div class="deep-body">
+      <p>比换背景更自然的效果是<b>把背景模糊掉</b>——人清晰，背景柔化。很多视频会议软件用的就是这个。</p>
+      <pre>背景部分 = cv2.GaussianBlur(原图, (25,25), 0)
+结果 = 人物区域用原图 + 背景区域用模糊图</pre>
+      <p>代码改动很小：在合成那一步，把"背景源"从新图换成"模糊后的原图"就行。</p>
+    </div>
+  </details>
+
+  <details class="deep">
+    <summary>进阶 2 · 把蒙版存成透明 PNG<em>约 20 分钟</em></summary>
+    <div class="deep-body">
+      <p>把蒙版当作 Alpha 通道存进 PNG，就得到一张"透明背景的人像"。这是设计工作流的标准产物 —— 可以直接贴进 PPT 或海报。</p>
+      <pre>BGRA = 原图 + alpha 通道（蒙版）
+cv2.imwrite('cutout.png', BGRA)</pre>
+      <p>注意必须用 <code>.png</code>，JPG 不支持透明。</p>
+    </div>
+  </details>
+
+  <details class="deep">
+    <summary>进阶 3 · 为什么这个任务不能只用阈值解决<em>选读 1 分钟</em></summary>
+    <div class="deep-body">
+      <p>学过 EXP-01 的颜色阈值后，你可能会想：能不能用颜色把人的皮肤挑出来？</p>
+      <p>不行，原因有三个：</p>
+      <ul>
+        <li><b>衣服颜色什么都可能有</b> —— 红色衣服、蓝色衣服、格子衬衫，无法用一组 HSV 范围覆盖。</li>
+        <li><b>头发不是皮肤色</b> —— 黑发、棕发、金发，而且和背景的深色区域分不开。</li>
+        <li><b>背景里也有人</b> —— 一张海报上印着人，颜色阈值会把它一起挑出来。</li>
+      </ul>
+      <p>分割模型学的是"语义"而不是"颜色"：它知道"这张椅子是椅子"，哪怕椅子是木色、灰色还是红色。<b>这就是深度学习相对传统视觉的根本优势 —— 它理解的是概念，不是数值。</b></p>
+      <p>代价就是：慢、要模型、要数据。<b>能不用就不用，不得不用时才用</b> —— 这是本课程反复强调的判断标准。</p>
+    </div>
+  </details>
+</section>
+
+<section class="blk" id="s10">
+  <h2><span class="no">10</span>随堂小测</h2>
+
+  <div class="quiz2">
+    <div class="qq"><span class="qn">Q1</span>检测和分割最根本的差别是什么？</div>
+    <div class="opt" data-right="0">分割的模型更大</div>
+    <div class="opt" data-right="1">检测输出一个框，分割输出每个像素的归属（一张蒙版）</div>
+    <div class="opt" data-right="0">分割不需要相机</div>
+    <div class="fb"><b>对。</b>检测说"人在这个矩形里"，分割说"这 18420 个像素是人，其余都不是"。前者数据量几个数字，后者几十万个数 —— 这是它们速度差这么多的根本原因。</div>
+  </div>
+
+  <div class="quiz2">
+    <div class="qq"><span class="qn">Q2</span>人抠出来了，但边缘有一圈背景的残影。该怎么调？</div>
+    <div class="opt" data-right="0">把 mask_thr 调到 0.3</div>
+    <div class="opt" data-right="1">把 mask_thr 调到 0.6~0.7，让蒙版收紧一点</div>
+    <div class="opt" data-right="0">把 workers 改成 1</div>
+    <div class="fb"><b>对。</b>残影说明蒙版比真实轮廓大了一圈。提高阈值会让"白区"收缩，边缘收紧。反过来调低会让手指、头发都算进来 —— 让边缘更"糊"。</div>
+  </div>
+
+  <div class="quiz2">
+    <div class="qq"><span class="qn">Q3</span>想把背景设成红色，<code>color</code> 应该写什么？</div>
+    <div class="opt" data-right="0">[255, 0, 0]</div>
+    <div class="opt" data-right="1">[0, 0, 255]</div>
+    <div class="opt" data-right="0">[0, 255, 0]</div>
+    <div class="fb"><b>对。</b>OpenCV 的颜色顺序是 <b>BGR</b>（蓝绿红），不是 RGB。红色 = 蓝 0、绿 0、红 255 → <code>[0,0,255]</code>。这个坑几乎每个人都会踩一次。</div>
+  </div>
+</section>
+
+<nav class="expnav">
+  <a href="../exp-05-garbage-classification/index.html"><span class="lb">← 上一个</span>EXP-05 垃圾分类</a>
+  <a class="next" href="../exp-07-deepsort-tracking/index.html"><span class="lb">下一个实验 →</span>EXP-07 多目标跟踪</a>
+</nav>
+
+<footer>
+  <span>机器人视觉入门 · EXP-06 语义分割</span>
+  <span>4 学时 · 3~7 FPS 单线程 / 40~60 FPS 三线程 · 基于 vision/06_semantic_segmentation 源码</span>
+</footer>
+
+</main>
+</div>
+
+<script src="../shared/tutorial.js" defer></script>
+<script src="../shared/beginner.js" defer></script>
+<script>
+(function(){
+  var mt=document.getElementById('mt'); if(!mt) return;
+  var halo=document.getElementById('halo'), wbar=document.getElementById('wbar');
+  var person=document.getElementById('person'), say=document.getElementById('say');
+  function upd(){
+    var v=parseInt(mt.value,10)/100;
+    document.getElementById('mt_o').textContent=v.toFixed(2);
+    /* 阈值低 → 白区膨胀；阈值高 → 白区收缩 */
+    var expand=(0.5-v)*2;   /* -0.8 ~ +0.8 */
+    var r=20+expand*10;
+    var w=Math.max(6,26+expand*16);
+    person.setAttribute('opacity', v>0.8?0.55:1);
+    halo.setAttribute('opacity', Math.max(0, (0.5-v)*1.4));
+    halo.setAttribute('x', 65-42-Math.max(0,expand*8));
+    halo.setAttribute('width', 84+Math.max(0,expand*16));
+    wbar.setAttribute('width', Math.round(30+v*170));
+    var m='';
+    if(v<=0.3) m='<b>阈值 '+v.toFixed(2)+'（低）</b>：蒙版往外膨胀，头发丝、手指边缘都算成人了 —— 但同时背景也被吃进来一圈（图上那层淡白）。<b>宁滥勿缺</b>。';
+    else if(v<=0.6) m='<b>阈值 '+v.toFixed(2)+'</b>：边界大致落在真实轮廓上。这是默认值 0.5 附近 —— 工程上的常用起点。';
+    else if(v<=0.75) m='<b>阈值 '+v.toFixed(2)+'（偏高）</b>：蒙版开始收缩，轮廓变得"瘦"一点。头发边缘会开始丢。';
+    else m='<b>阈值 '+v.toFixed(2)+'（太高）</b>：只剩身体核心区域，手脚边缘大量丢失（图上人形变淡）。<b>宁缺勿滥</b>。';
+    say.innerHTML=m;
+  }
+  mt.addEventListener('input',upd); upd();
+})();
+</script>
+</body>
+</html>

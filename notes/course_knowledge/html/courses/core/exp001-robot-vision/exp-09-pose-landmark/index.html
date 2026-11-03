@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-09 · 骨骼关键点（33 点姿态）— 机器人视觉入门课</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<link rel="stylesheet" href="../shared/beginner.css">
+<style>:root{--theme:#4f46e5;--theme-deep:#4338ca;--theme-bg:#e0e7ff;--theme-bd:#c7d2fe}</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit">🧠 具身智能课程 · <i>机器人视觉入门</i></a>
+  <div class="crumb"><a href="../../../index.html#core">核心课程</a> / <a href="../index.html">视觉入门课</a> / EXP-09</div>
+</div>
+
+<div class="wrap">
+
+<aside class="side">
+  <h4>本页步骤</h4>
+  <a href="#s1" class="now">01 这个实验解决什么问题</a>
+  <a href="#s2">02 三分钟讲懂：33 个点连成一根火柴人</a>
+  <a href="#s3">03 先认识 4 个词</a>
+  <a href="#s4">04 它吃什么、吐什么</a>
+  <a href="#s5">05 三步跑起来</a>
+  <a href="#s6">06 你该看到的画面</a>
+  <a href="#s7">07 改一个参数看变化</a>
+  <a href="#s8">08 踩坑速查</a>
+  <a href="#s9">09 进阶（可选）</a>
+  <a href="#s10">10 随堂小测</a>
+  <h4>本课程实验</h4>
+  <a href="../exp-01-color-hsv/index.html">EXP-01 颜色识别</a>
+  <a href="../exp-02-qrcode/index.html">EXP-02 二维码</a>
+  <a href="../exp-03-contour-polygon/index.html">EXP-03 多边形轮廓</a>
+  <a href="../exp-04-industrial-defect/index.html">EXP-04 工业缺陷检测</a>
+  <a href="../exp-05-garbage-classification/index.html">EXP-05 垃圾分类</a>
+  <a href="../exp-06-semantic-segmentation/index.html">EXP-06 语义分割</a>
+  <a href="../exp-07-deepsort-tracking/index.html">EXP-07 多目标跟踪</a>
+  <a href="../exp-08-face-landmarks/index.html">EXP-08 人脸关键点</a>
+  <a href="../exp-09-pose-landmark/index.html" style="color:#0f766e;font-weight:700">EXP-09 骨骼关键点</a>
+  <a href="../exp-10-depth-3d/index.html">EXP-10 深度 3D</a>
+  <a href="../exp-11-pose-control/index.html">EXP-11 体感控制</a>
+  <a href="../exp-12-hand-control/index.html">EXP-12 手势识别</a>
+</aside>
+
+<main class="content">
+
+<div class="exp-head">
+  <span class="code">EXP-09 · 第 4 阶段 · 人体感知 · 设计性 · 4 学时</span>
+  <h1>骨骼关键点：把一个人简化成 33 个点和 35 根线</h1>
+  <p class="desc">要判断"你在举手"还是"你在下蹲"，机器不需要看清你的脸和衣服 —— 它只需要知道你的关节在哪。这个实验把整个人压缩成 33 个关节点，画成一具火柴人骨架，实时跟着你动。</p>
+  <div class="meta">
+    <span class="tag hl">难度 ⭐⭐ · 4 学时</span>
+    <span class="tag">BlazePose 33 点</span><span class="tag">骨架拓扑</span>
+    <span class="tag">可见度 vis</span><span class="tag">单模型整图</span>
+  </div>
+</div>
+
+<div class="pathline">
+  <span>01 颜色</span><span>02 二维码</span><span>03 轮廓</span><span>04 检测</span><span>05 分类</span><span>06 分割</span><span>07 跟踪</span><span>08 人脸</span><span class="cur">09 骨骼</span><span>10 3D</span><span>11 体感</span><span>12 手势</span>
+</div>
+
+<section class="blk" id="s1">
+  <h2><span class="no">01</span>这个实验解决什么问题</h2>
+
+  <div class="idea">
+    <span class="tag1">CORE IDEA · 一句话原理</span>
+    <p class="big">把人体压缩成 <b>33 个关节坐标</b>，再用 35 根线连起来 —— 就成了一个能判断动作的"火柴人"。</p>
+    <p class="analogy"><b>打个比方：</b>就像皮影戏。观众看不清演员的脸，但光看关节怎么摆，就知道他在走路、在举手、还是在蹲下。<b>33 个点已经足够表达所有动作了。</b></p>
+  </div>
+
+  <p>为什么不直接用人脸或分割来做动作识别？因为<b>数据量差了几个数量级</b>：</p>
+
+  <table>
+    <thead><tr><th style="width:26%">方案</th><th style="width:22%">每帧数据量</th><th>判断"举手"要做什么</th></tr></thead>
+    <tbody>
+      <tr><td>原始图像</td><td>640×480×3 ≈ 92 万个数</td><td>没法直接判断，得先理解图像</td></tr>
+      <tr><td>语义分割掩码</td><td>640×480 ≈ 30 万个数</td><td>要分析轮廓形状，很麻烦</td></tr>
+      <tr><td><b>33 个关节点</b></td><td><b>33×3 ≈ 100 个数</b></td><td><b>比一下手腕 y 和肩膀 y 就行了</b></td></tr>
+    </tbody>
+  </table>
+
+  <p>这就是关键点检测的价值：<b>把"理解图像"这个难题，转化成"比较几个坐标"这个简单问题。</b></p>
+
+  <div class="oneline"><span>本实验的目标：<b>站在相机前，屏幕上出现一具跟着你动的骨架（红点 + 绿线），右栏黑底上只有骨架、没有真人。</b></span></div>
+</section>
+
+<section class="blk" id="s2">
+  <h2><span class="no">02</span>三分钟讲懂：33 个点连成一根火柴人</h2>
+
+  <p class="lead">和人脸实验不同，这个模型<b>只有一个网络</b>，直接看整图。先认清 33 个点的编号，你就掌握了全部。</p>
+
+  <div class="anim-box">
+    <svg viewBox="0 0 760 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="BlazePose 33 个关键点编号与骨架连线示意">
+      <rect x="6" y="6" width="748" height="308" rx="12" fill="#111827" stroke="#334155"/>
+      <text x="380" y="26" text-anchor="middle" font-size="13" font-weight="700" fill="#a5b4fc" font-family="sans-serif">BlazePose 的 33 个点（编号是固定的，必须记住常用的几个）</text>
+
+      <!-- 骨架图 -->
+      <g stroke="#4ade80" stroke-width="2" fill="none" opacity=".9">
+        <!-- 脸 -->
+        <path d="M300,58 L340,58"/>
+        <path d="M300,58 L296,74"/><path d="M340,58 L344,74"/>
+        <path d="M296,74 L320,78"/><path d="M344,74 L320,78"/>
+        <!-- 躯干 -->
+        <path d="M320,80 L320,148"/>
+        <path d="M290,90 L320,92"/><path d="M350,90 L320,92"/>
+        <path d="M290,90 L270,148"/><path d="M350,90 L370,148"/>
+        <path d="M270,148 L256,206"/><path d="M370,148 L384,206"/>
+        <path d="M256,206 L250,246"/><path d="M384,206 L390,246"/>
+        <path d="M290,90 L290,150"/><path d="M350,90 L350,150"/>
+        <path d="M290,150 L288,216"/><path d="M350,150 L352,216"/>
+        <path d="M288,216 L286,262"/><path d="M352,216 L354,262"/>
+        <path d="M320,148 L312,208"/><path d="M320,148 L328,208"/>
+        <path d="M312,208 L308,278"/><path d="M328,208 L332,278"/>
+        <path d="M308,278 L298,296"/><path d="M332,278 L342,296"/>
+        <path d="M312,208 L310,286"/><path d="M328,208 L330,286"/>
+        <path d="M310,286 L330,286"/>
+      </g>
+
+      <!-- 关键点 -->
+      <g fill="#f472b6">
+        <circle cx="300" cy="58" r="3.4"/><circle cx="340" cy="58" r="3.4"/>
+        <circle cx="296" cy="74" r="3.4"/><circle cx="344" cy="74" r="3.4"/>
+        <circle cx="320" cy="78" r="3.4"/>
+        <circle cx="290" cy="90" r="4"/><circle cx="350" cy="90" r="4"/>
+        <circle cx="290" cy="150" r="3.6"/><circle cx="350" cy="150" r="3.6"/>
+        <circle cx="288" cy="216" r="3.6"/><circle cx="352" cy="216" r="3.6"/>
+        <circle cx="286" cy="262" r="3.6"/><circle cx="354" cy="262" r="3.6"/>
+        <circle cx="270" cy="148" r="3.6"/><circle cx="370" cy="148" r="3.6"/>
+        <circle cx="256" cy="206" r="3.6"/><circle cx="384" cy="206" r="3.6"/>
+        <circle cx="250" cy="246" r="3.6"/><circle cx="390" cy="246" r="3.6"/>
+        <circle cx="320" cy="148" r="3.6"/>
+        <circle cx="312" cy="208" r="3.6"/><circle cx="328" cy="208" r="3.6"/>
+        <circle cx="308" cy="278" r="3.6"/><circle cx="332" cy="278" r="3.6"/>
+        <circle cx="298" cy="296" r="3.6"/><circle cx="342" cy="296" r="3.6"/>
+        <circle cx="310" cy="286" r="3.6"/><circle cx="330" cy="286" r="3.6"/>
+      </g>
+
+      <!-- 编号（只标最常用的） -->
+      <g font-size="9.5" font-family="monospace" fill="#fbcfe8">
+        <text x="272" y="54">0</text><text x="348" y="54">1</text>
+        <text x="352" y="88">2</text><text x="356" y="150">4</text>
+        <text x="262" y="88">3</text><text x="266" y="150">5</text>
+        <text x="358" y="216">6</text><text x="266" y="216">7</text>
+        <text x="360" y="266">8</text><text x="264" y="266">9</text>
+        <text x="326" y="80">10</text><text x="318" y="146">11</text>
+        <text x="332" y="212">12</text><text x="334" y="282">14</text><text x="300" y="282">13</text>
+        <text x="386" y="150">20</text><text x="238" y="150">15</text>
+        <text x="392" y="208">16</text><text x="228" y="208">17</text>
+        <text x="394" y="250">18</text><text x="222" y="250">19</text>
+        <text x="336" y="210">23</text><text x="288" y="210">24</text>
+        <text x="340" y="280">26</text><text x="278" y="280">25</text>
+        <text x="352" y="302">30</text><text x="268" y="302">31</text>
+      </g>
+
+      <!-- 右侧说明 -->
+      <g font-family="sans-serif" font-size="11">
+        <text x="440" y="62" fill="#a5b4fc" font-weight="700">最常用的 8 个点</text>
+        <g font-size="10.5" fill="#cbd5e1">
+          <text x="440" y="84"><tspan fill="#f9a8d4" font-family="monospace">0</tspan>   鼻尖 —— 用来判断"人在画面哪里"</text>
+          <text x="440" y="104"><tspan fill="#f9a8d4" font-family="monospace">11/12</tspan> 左右髋 —— 身体的"原点"</text>
+          <text x="440" y="124"><tspan fill="#f9a8d4" font-family="monospace">13/14</tspan> 左右膝</text>
+          <text x="440" y="144"><tspan fill="#f9a8d4" font-family="monospace">15/16</tspan> 左右脚踝</text>
+          <text x="440" y="164"><tspan fill="#f9a8d4" font-family="monospace">19/20</tspan> 左右食指 —— 手举到哪</text>
+        </g>
+        <line x1="436" y1="186" x2="690" y2="186" stroke="#334155"/>
+        <text x="440" y="208" fill="#a5b4fc" font-weight="700">判断"举手"只要一行代码</text>
+        <text x="440" y="230" font-size="10.5" fill="#6ee7b7" font-family="monospace">if 手腕.y &lt; 肩膀.y:</text>
+        <text x="454" y="248" font-size="10.5" fill="#cbd5e1">手举起来了</text>
+        <text x="440" y="272" font-size="10" fill="#64748b">（注意：图像 y 轴向下，所以 y 更小 = 更高）</text>
+        <text x="440" y="294" font-size="10" fill="#64748b">这一行就是下一个实验 EXP-11 的核心。</text>
+      </g>
+    </svg>
+  </div>
+  <div class="cap">图 10-1｜33 个点。不需要背全部编号，<b>但一定要记住 11/12（髋）、15/16（手腕）、19/20（食指）</b> —— 后面做动作判断全靠它们。</div>
+
+  <h3>和上个人脸实验有什么不同</h3>
+  <table>
+    <thead><tr><th style="width:22%">对比项</th><th style="width:30%">EXP-08 人脸</th><th>EXP-09 骨骼（本实验）</th></tr></thead>
+    <tbody>
+      <tr><td>模型数量</td><td><b>2 个</b>（先找脸，再找点）</td><td><b>1 个</b>（直接看整图，一次输出 33 点）</td></tr>
+      <tr><td>输入尺寸</td><td>128×128（脸）+ 192×192（点）</td><td>256×256（整图）</td></tr>
+      <tr><td>点数</td><td>468</td><td>33</td></tr>
+      <tr><td>输入格式</td><td>float32，0~1（要 /255）</td><td><b>uint8 直喂</b>（归一化由模型内部处理，均值 127.5 / 标准差 128）</td></tr>
+      <tr><td>多了什么</td><td>只有 x, y</td><td>每个点还有 <b>z（相对深度）</b> 和 <b>vis（可见度）</b></td></tr>
+    </tbody>
+  </table>
+
+  <div class="tip amber"><span class="lab">⚠️ 最容易踩的坑：输入格式和人脸实验不一样！</span>人脸实验要 <b>float32 [0,1]</b>，需要手动 <code>/255</code>。骨骼实验要 <b>uint8 直喂</b>，归一化（<code>(x−127.5)/128</code>）由模型内部完成。<b>如果你照抄人脸实验的预处理，骨架会乱飞</b> —— 这是本实验第一大坑，也是第 08 节的第一条。</div>
+
+  <h3>多出来的两个字段：z 和 vis</h3>
+  <table>
+    <thead><tr><th style="width:14%">字段</th><th style="width:26%">含义</th><th>怎么用</th></tr></thead>
+    <tbody>
+      <tr><td><code>x, y</code></td><td>像素坐标</td><td>画骨架、算位置</td></tr>
+      <tr><td><code>z</code></td><td>相对深度（不准确，只是"比髋部近还是远"）</td><td>判断手臂是向前伸还是向后伸。<b>不能当真实距离用</b> —— 要真实距离得用 EXP-10 的深度相机</td></tr>
+      <tr><td><code>vis</code></td><td>可见度 0~1。这个点被挡住没有、模型有多确信</td><td><b>过滤脏数据。</b>vis &lt; 0.5 的点直接不画、不参与判断 —— 否则会出现"骨架乱飞"</td></tr>
+    </tbody>
+  </table>
+
+  <div class="oneline"><span><b>一句话记住：</b>33 个关节坐标 + 35 根连线 = 一具火柴人。<b>vis 决定"这个点可不可信"</b>，而可信度过滤是让骨架不抖的关键。</span></div>
+</section>
+
+<section class="blk" id="s3">
+  <h2><span class="no">03</span>先认识 4 个词</h2>
+  <div class="terms">
+    <div class="term"><div class="w">姿态估计 <em>pose</em></div><p class="m">从图像里估算人体关节位置的任务。输出的是坐标，不是类别。</p></div>
+    <div class="term"><div class="w">拓扑 <em>topology</em></div><p class="m">"哪两个点之间要连线"的清单。本实验有 35 条边，定义在代码里的连接表里。</p></div>
+    <div class="term"><div class="w">可见度 <em>visibility</em></div><p class="m">0~1，表示"这个关节能不能看到"。手插在口袋里，手腕的 vis 就会很低。</p></div>
+    <div class="term"><div class="w">letterbox</div><p class="m">等比缩放 + 补边（EXP-04 学过）。骨骼模型也是这么预处理的，所以坐标要按同样比例映射回原图。</p></div>
+  </div>
+</section>
+
+<section class="blk" id="s4">
+  <h2><span class="no">04</span>它吃什么、吐什么</h2>
+
+  <div class="io2">
+    <div class="cellbox in">
+      <span class="lb">INPUT · 喂进去</span>
+      <div class="v">整张画面（含一个人）</div>
+      <p class="d">模型 <code>pose_landmark_full.rknn</code>（约 7MB）。要求：<b>人要尽量完整地在画面里</b>，别只露半个身子。</p>
+    </div>
+    <div class="arw">→</div>
+    <div class="cellbox out">
+      <span class="lb">OUTPUT · 吐出来</span>
+      <div class="v">33 × (x, y, z, vis)</div>
+      <p class="d">左栏原图 + 骨架叠加 + FPS 红字；右栏黑底 + 红点绿线骨架 + 状态栏 <code>Pose: OK/--</code>。</p>
+    </div>
+  </div>
+
+  <pre><span class="c"># 关键配置（config/pose_config.yaml）</span>
+<span class="b">model:</span>
+  pose_model: models/pose_landmark_full.rknn
+  <span class="y">min_detection_confidence: 0.5</span>   <span class="c"># 低于这个分数的姿态直接丢弃</span>
+
+<span class="b">source:</span>
+  mode: image                      <span class="c"># image | ros | camera</span>
+  rgb_path: images/pose_demo.jpg
+
+<span class="b">server:</span>
+  port: 8082                       <span class="c"># 09=8081、10=8082、11=8083、12=8084</span>
+  stream_name: pose.mjpg</pre>
+
+  <div class="tip tealb"><span class="lab">🔍 端口怎么记？</span>从实验 09 开始，每个实验占一个端口：<b>09→8081、10→8082、11→8083、12→8084</b>。这样四个实验可以同时跑，互不干扰。01~08 大多用 8080。</div>
+</section>
+
+<section class="blk" id="s5">
+  <h2><span class="no">05</span>三步跑起来</h2>
+
+  <ol class="steps3">
+    <li>
+      <span class="st">先用一张全身照跑通<em>约 2 分钟</em></span>
+      <pre><span class="g">cd</span> ~/ros2_ws/src/xflz_eai_car1/vision/10_pose_landmark/car1_pose_landmark
+<span class="g">python</span> -m pose_landmark_core.demo_image --config config/pose_config.yaml --save out.jpg</pre>
+      <div class="expect">pose=1  score=0.91  landmarks=33
+<i>左栏：原图 + 骨架叠加</i>
+<i>右栏：黑底 + 红点绿线骨架</i>
+saved -&gt; out.jpg</div>
+      <p style="color:#b45309;font-size:13.5px">⚠️ 注意路径：要在 <code>car1_pose_landmark/</code> 目录下运行（配置和 images 都在这里）。</p>
+      <p><b>如果骨架乱七八糟：</b>先不要怀疑模型，<b>99% 是输入格式喂错了</b>（见第 08 节第一条）。</p>
+    </li>
+
+    <li>
+      <span class="st">开实时画面<em>约 3 分钟</em></span>
+      <p>终端 1 起相机：</p>
+      <pre><span class="g">source</span> /opt/ros/humble/setup.bash &amp;&amp; <span class="g">source</span> ~/ros2_ws/install/setup.bash
+<span class="g">export</span> ROS_DOMAIN_ID=2
+<span class="g">ros2</span> launch ascamera hp60c.launch.py</pre>
+      <p>终端 2 跑姿态检测：</p>
+      <pre><span class="g">cd</span> ~/ros2_ws/src/xflz_eai_car1/vision/10_pose_landmark/car1_pose_landmark
+<span class="g">python</span> -m pose_landmark_core.camera_demo --config config/pose_config.yaml --ros</pre>
+      <div class="expect">pose=1  fps=11.8
+<i>浏览器：http://&lt;板子IP&gt;:8082/pose.mjpg</i></div>
+    </li>
+
+    <li>
+      <span class="st">做三个动作实验，体会 vis 的作用<em>约 8 分钟</em></span>
+      <p><b>A. 站远一点，让全身进画面。</b>骨架应该完整，状态栏显示 <code>Pose: OK</code>。</p>
+      <p><b>B. 走近，只露上半身。</b>观察腿部的点 —— 它们会消失（vis 太低被过滤）。<b>这是正确的行为，不是 bug。</b></p>
+      <p><b>C. 把手放到背后。</b>看手腕那段的线怎么处理 —— 应该断开，而不是画一条穿过后背的线。<b>这就是 vis 过滤的价值</b>：宁可少画，也不要画错的。</p>
+      <div class="expect">状态栏：FPS: 12  Pose: OK       <i>← 检测到完整人形</i>
+状态栏：FPS: 12  Pose: --       <i>← 人走出了画面或置信度不够</i></div>
+    </li>
+  </ol>
+
+  <div class="oneline"><span>三步跑完，你就有了一个"人体压缩器"：<b>不管画面多复杂，输出永远只有 33 个坐标</b>。下一个实验直接拿这 33 个坐标做动作判断。</span></div>
+</section>
+
+<section class="blk" id="s6">
+  <h2><span class="no">06</span>你该看到的画面</h2>
+
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">画面 A · 左栏</div><div class="kt">真人 + 骨架叠加</div><p>你的身体上叠着红色圆点和绿色连线。左上角有 FPS 红字。这是"看跟不跟得住"最直观的方式。</p></div>
+    <div class="kcard"><div class="kd">画面 B · 右栏</div><div class="kt">纯骨架，没有真人</div><p>黑底 + 红点（半径 6）+ 绿线（2px）+ 状态栏。<b>把人体抽离出来，你能更清楚地看到"机器眼中的你"是什么样</b>。</p></div>
+    <div class="kcard"><div class="kd">画面 C · 部分缺失</div><div class="kt">某些点/线消失</div><p>被遮挡的部位（手在身后、腿在桌下）会缺。这是 vis 过滤的结果，正常且正确。</p></div>
+  </div>
+
+  <div class="tip tealb"><span class="lab">🔍 为什么右栏要用黑底？</span>这是本课程一贯的设计：<b>左栏给你看"效果"，右栏给你看"数据"</b>。黑底骨架让你不被真实画面干扰，直接评估"33 个点准不准"。调试时右栏比左栏有用得多。</div>
+</section>
+
+<section class="blk" id="s7">
+  <h2><span class="no">07</span>改一个参数看变化</h2>
+  <p class="lead">这个实验最该理解的是 <code>vis</code> 阈值。它决定了骨架是"完整但可能画错"，还是"残缺但都可靠"。</p>
+
+  <div class="lab2">
+    <div class="lh">⚡ 参数实验台 · vis 阈值与骨架完整性</div>
+    <div class="lr">
+      <label>vis 阈值</label>
+      <input id="vis" type="range" min="10" max="90" step="5" value="50">
+      <output id="vis_o">0.50</output>
+    </div>
+    <div class="vis">
+      <svg viewBox="0 0 420 190" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="可见度阈值变化时骨架中保留的关节点">
+        <rect x="0" y="0" width="420" height="190" rx="8" fill="#0b1220"/>
+        <g id="sk" transform="translate(150,14)">
+          <!-- 连线 -->
+          <g stroke="#4ade80" stroke-width="2" fill="none">
+            <path id="e0" d="M40,26 L62,26"/>
+            <path id="e1" d="M26,44 L40,46"/><path id="e2" d="M76,44 L62,46"/>
+            <path id="e3" d="M40,46 L46,96"/><path id="e4" d="M62,46 L56,96"/>
+            <path id="e5" d="M46,96 L36,142"/><path id="e6" d="M56,96 L66,142"/>
+            <path id="e7" d="M36,142 L32,176"/><path id="e8" d="M66,142 L70,176"/>
+            <path id="e9" d="M40,46 L18,74"/><path id="e10" d="M62,46 L84,74"/>
+            <path id="e11" d="M18,74 L10,104"/><path id="e12" d="M84,74 L92,104"/>
+            <path id="e13" d="M10,104 L6,126"/><path id="e14" d="M92,104 L96,126"/>
+          </g>
+          <!-- 关节点（带 vis 值） -->
+          <g id="pts">
+            <circle data-v="0.99" cx="40" cy="26" r="4" fill="#f472b6"/>
+            <circle data-v="0.98" cx="62" cy="26" r="4" fill="#f472b6"/>
+            <circle data-v="0.97" cx="26" cy="44" r="4.4" fill="#f472b6"/>
+            <circle data-v="0.97" cx="76" cy="44" r="4.4" fill="#f472b6"/>
+            <circle data-v="0.99" cx="46" cy="96" r="5" fill="#f472b6"/>
+            <circle data-v="0.99" cx="56" cy="96" r="5" fill="#f472b6"/>
+            <circle data-v="0.95" cx="36" cy="142" r="4.4" fill="#f472b6"/>
+            <circle data-v="0.94" cx="66" cy="142" r="4.4" fill="#f472b6"/>
+            <circle data-v="0.20" cx="32" cy="176" r="4" fill="#fbbf24"/>
+            <circle data-v="0.15" cx="70" cy="176" r="4" fill="#fbbf24"/>
+            <circle data-v="0.82" cx="18" cy="74" r="4" fill="#f472b6"/>
+            <circle data-v="0.35" cx="84" cy="74" r="4" fill="#fbbf24"/>
+            <circle data-v="0.72" cx="10" cy="104" r="4" fill="#f472b6"/>
+            <circle data-v="0.28" cx="92" cy="104" r="4" fill="#fbbf24"/>
+            <circle data-v="0.55" cx="6" cy="126" r="4" fill="#f472b6"/>
+            <circle data-v="0.12" cx="96" cy="126" r="4" fill="#fbbf24"/>
+          </g>
+        </g>
+        <g font-size="9.5" fill="#64748b" font-family="sans-serif">
+          <text x="290" y="30">黄色点 = 可见度偏低</text>
+          <text x="290" y="48">（脚被桌子挡住、右手在身后）</text>
+          <text x="290" y="76" fill="#4ade80" font-family="monospace" id="okn">保留 11 个点</text>
+          <text x="290" y="96" fill="#f87171" font-family="monospace" id="noN">丢弃 5 个点</text>
+        </g>
+        <text x="210" y="184" text-anchor="middle" font-size="10" fill="#5eead4" font-family="monospace" id="txt">阈值 0.50 → 骨架完整度 11/16</text>
+      </svg>
+    </div>
+    <div class="say" id="say"></div>
+  </div>
+
+  <h3>三档阈值的取舍</h3>
+  <table>
+    <thead><tr><th style="width:20%">vis 阈值</th><th style="width:30%">骨架长什么样</th><th>什么时候用</th></tr></thead>
+    <tbody>
+      <tr><td>0.2（低）</td><td>点几乎都画，包括那些"其实看不清"的</td><td>只看整体形状，不在乎抖动。但会出现"穿过身体"的乱线</td></tr>
+      <tr><td><b>0.5</b></td><td>只画比较可信的点</td><td><b>默认值</b>，也是 MediaPipe 的推荐值</td></tr>
+      <tr><td>0.8（高）</td><td>只画非常确信的点，骨架会残缺</td><td>做动作判断时用 —— <b>宁可判断不出来，也不要判断错</b></td></tr>
+    </tbody>
+  </table>
+
+  <p><b>另一个值得改的参数：<code>min_detection_confidence</code>。</b>它控制"整个姿态算不算数"。设太高（0.8），人稍微侧身就检测不到；设太低（0.2），模型会把椅子上的一堆杂物当成人体。默认 0.5 是常用的平衡点。</p>
+
+  <div class="oneline"><span><b>vis 阈值的本质是一个"敢不敢用"的判断。</b>下游做控制时，一个错误的关节坐标可能导致车撞墙 —— <b>所以在控制类任务里，vis 阈值要设得比单纯可视化时更高。</b></span></div>
+</section>
+
+<section class="blk" id="s8">
+  <h2><span class="no">08</span>踩坑速查</h2>
+
+  <table class="pit2">
+    <thead><tr><th>现象</th><th>原因</th><th>怎么办</th></tr></thead>
+    <tbody>
+      <tr><td><b>骨架乱飞、点到处散</b></td><td><b>输入格式错了</b> —— 这个模型要 uint8 直喂，你做了手动归一化</td><td>去掉手动 <code>/255</code>；归一化（127.5/128）由模型内部做</td></tr>
+      <tr><td>完全检测不到人</td><td>人太小 / 只露半个身子 / 光线太暗</td><td>退后让全身进画面；开灯</td></tr>
+      <tr><td>腿部点消失</td><td>腿被挡住或在画面外，vis 太低</td><td>正常现象。或用 vis 阈值 0.3 放宽</td></tr>
+      <tr><td>骨架整体偏移</td><td>letterbox 逆映射算错（比例或补边量）</td><td>检查逆映射：<code>px = (norm×256 − pad)/scale</code></td></tr>
+      <tr><td>画面里有多人，只画了一个</td><td>该模型是单人的</td><td>正常。多人姿态要用别的模型</td></tr>
+      <tr><td>浏览器打不开 :8080/pose.mjpg</td><td>端口记错</td><td>本实验是 <b>8082</b>，流名 <code>pose.mjpg</code></td></tr>
+      <tr><td>报模块找不到</td><td>运行目录不对</td><td>在 <code>car1_pose_landmark/</code> 下运行</td></tr>
+      <tr><td>帧率只有 10 左右</td><td>整图 256×256 推理 + 骨架绘制</td><td>正常水平。可用 <code>core_mask</code> 分核优化</td></tr>
+    </tbody>
+  </table>
+
+  <div class="tip amber"><span class="lab">💡 排查口诀</span><b>骨架乱飞 → 查输入格式；骨架完整但位置偏 → 查逆映射；骨架残缺 → 查 vis / 遮挡。</b>这三类现象对应三个完全不同的原因，按现象分类查就不会走弯路。</div>
+</section>
+
+<section class="blk" id="s9">
+  <h2><span class="no">09</span>进阶（可选）</h2>
+
+  <details class="deep">
+    <summary>进阶 1 · 自己写一个"举手检测"<em>约 20 分钟</em></summary>
+    <div class="deep-body">
+      <p>只需要比较两个 y 坐标：</p>
+      <pre><span class="c"># 关键点索引（MediaPipe 约定）</span>
+L_SHOULDER, R_SHOULDER = 11, 12
+L_WRIST,    R_WRIST    = 15, 16
+
+<span class="c"># 图像 y 轴向下，所以 y 更小 = 更高</span>
+左手举起 = 手腕15.y &lt; 肩膀11.y  and  手腕15.vis &gt; 0.5
+右手举起 = 手腕16.y &lt; 肩膀12.y  and  手腕16.vis &gt; 0.5</pre>
+      <p><b>别忘了 vis 判断</b> —— 手放在背后时，手腕坐标可能是瞎猜的，不加 vis 判断会误判。</p>
+      <p>这个 20 行的函数，就是下一个实验（EXP-11 体感控制）的核心。你可以现在就试着写出来。</p>
+    </div>
+  </details>
+
+  <details class="deep">
+    <summary>进阶 2 · 用髋部做归一化，让人站远站近都一样<em>约 30 分钟</em></summary>
+    <div class="deep-body">
+      <p>问题：直接比较 y 坐标，人站远了点都会往上挤，"举手"的判断会失效。</p>
+      <p>解决办法：<b>用身体自身的尺寸做单位</b>。比如用"髋到肩的距离"作为 1，其他距离都除以它：</p>
+      <pre>身长 = |肩中点 − 髋中点|
+归一化手腕高度 = (髋中点y − 手腕y) / 身长</pre>
+      <p>这样不管人站多远，这个比值都不变。<b>这是所有姿态判断的标准做法</b>，下一个实验会详细讲。</p>
+    </div>
+  </details>
+
+  <details class="deep">
+    <summary>进阶 3 · 为什么 33 点而不是更多<em>选读 50 秒</em></summary>
+    <div class="deep-body">
+      <p>因为动作判断不需要更细。手部有 21 个点（EXP-12）、脸部有 468 个点（EXP-08），但<b>身体动作（走、跑、跳、举、蹲）主要靠大关节</b>。</p>
+      <p>33 点覆盖了：脸（5 点）、肩肘腕（各 3×2）、髋膝踝（各 3×2）、手（每手 4 点，含指尖）、脚（每脚 3 点）。<b>这个划分是经过大量动作识别任务验证的"够用最小集"。</b></p>
+      <p>点越多 → 越精细但也越慢越容易抖。<b>选择点数的原则和选模型大小一样：够用就好。</b></p>
+    </div>
+  </details>
+</section>
+
+<section class="blk" id="s10">
+  <h2><span class="no">10</span>随堂小测</h2>
+
+  <div class="quiz2">
+    <div class="qq"><span class="qn">Q1</span>骨架上的点到处乱飞，最可能是什么原因？</div>
+    <div class="opt" data-right="0">相机帧率太低</div>
+    <div class="opt" data-right="1">输入格式错了 —— 这个模型要 uint8 直喂，不该手动 /255 归一化</div>
+    <div class="opt" data-right="0">模型文件损坏</div>
+    <div class="fb"><b>对。</b>这是本实验第一大坑，而且特别容易犯 —— 因为上一个实验（人脸）正好要手动 <code>/255</code>。"乱飞"说明模型收到了错误的输入数值范围，输出自然毫无意义。</div>
+  </div>
+
+  <div class="quiz2">
+    <div class="qq"><span class="qn">Q2</span>手放在背后时，手腕的关键点为什么会消失？</div>
+    <div class="opt" data-right="0">程序 bug</div>
+    <div class="opt" data-right="1">手腕的可见度 vis 太低，被阈值过滤掉了 —— 这是正确行为</div>
+    <div class="opt" data-right="0">模型不支持这种姿势</div>
+    <div class="fb"><b>对。</b>看不到的关节，模型宁可给低分让程序丢掉，也不要瞎猜一个位置。如果不过滤，你会看到一条从肩膀穿过后背的乱线 —— 那才是真正的问题。</div>
+  </div>
+
+  <div class="quiz2">
+    <div class="qq"><span class="qn">Q3</span>要判断"这个人举手了"，最直接的写法是什么？</div>
+    <div class="opt" data-right="0">用分割模型把手的区域抠出来分析</div>
+    <div class="opt" data-right="1">比较手腕 y 和肩膀 y（图像里 y 更小 = 更高），并检查 vis</div>
+    <div class="opt" data-right="0">训练一个"举手/没举手"分类器</div>
+    <div class="fb"><b>对。</b>33 个坐标已经把问题简化到这个程度了 —— 一次数值比较就够。这就是关键点检测最大的价值：<b>把"图像理解"这个难题，变成"比大小"这个简单问题。</b>（第二个选项能做但没必要，第三个选项更是杀鸡用牛刀。）</div>
+  </div>
+</section>
+
+<nav class="expnav">
+  <a href="../exp-08-face-landmarks/index.html"><span class="lb">← 上一个</span>EXP-08 人脸关键点</a>
+  <a class="next" href="../exp-10-depth-3d/index.html"><span class="lb">下一个实验 →</span>EXP-10 深度 3D</a>
+</nav>
+
+<footer>
+  <span>机器人视觉入门 · EXP-09 骨骼关键点</span>
+  <span>4 学时 · 基于 vision/10_pose_landmark 源码</span>
+</footer>
+
+</main>
+</div>
+
+<script src="../shared/tutorial.js" defer></script>
+<script src="../shared/beginner.js" defer></script>
+<script>
+(function(){
+  var v=document.getElementById('vis'); if(!v) return;
+  var pts=document.querySelectorAll('#pts circle');
+  var edges=document.querySelectorAll('#sk path');
+  var say=document.getElementById('say'), txt=document.getElementById('txt');
+  var okn=document.getElementById('okn'), noN=document.getElementById('noN');
+  /* 每条边依赖的两个点（用索引近似） */
+  var EDGE_PTS=[[0,1],[2,0],[3,1],[0,2],[1,3],[4,5],[4,6],[5,7],[4,8],[5,8],[8,9],[9,10],[10,11],[11,12],[12,13]];
+  function upd(){
+    var t=parseInt(v.value,10)/100;
+    document.getElementById('vis_o').textContent=t.toFixed(2);
+    var ok=0,bad=0,st=[];
+    for(var i=0;i<pts.length;i++){
+      var pv=parseFloat(pts[i].getAttribute('data-v'));
+      var on=pv>=t;
+      pts[i].setAttribute('opacity', on?1:0.1);
+      st.push(on);
+      if(on) ok++; else bad++;
+    }
+    for(var k=0;k<edges.length;k++){
+      var dep=EDGE_PTS[k];
+      var show = dep ? (st[dep[0]] && st[dep[1]]) : true;
+      edges[k].setAttribute('opacity', show?1:0.06);
+    }
+    txt.textContent='阈值 '+t.toFixed(2)+' → 骨架完整度 '+ok+'/16';
+    okn.textContent='保留 '+ok+' 个点';
+    noN.textContent='丢弃 '+bad+' 个点';
+    var m='';
+    if(t<=0.2) m='<b>阈值 '+t.toFixed(2)+'（低）</b>：几乎所有的点都画出来，包括脚（0.20 以下）和右手（0.12）。<b>结果是骨架看着完整，但有几条线是"瞎猜"的</b> —— 反而误导判断。';
+    else if(t<=0.6) m='<b>阈值 '+t.toFixed(2)+'</b>：保住可信的关节，丢掉明显被遮挡的。默认 0.5 就在这个区间 —— 视觉上最好看。';
+    else if(t<=0.8) m='<b>阈值 '+t.toFixed(2)+'（偏高）</b>：只剩高可信度的点。骨架开始残缺，但每个留下的点都是可靠的。';
+    else m='<b>阈值 '+t.toFixed(2)+'（很高）</b>：只有最确信的几个点留下，骨架断裂严重。做动作判断时会大量出现"判断不出来"—— <b>但这比判断错更安全</b>。';
+    say.innerHTML=m;
+  }
+  v.addEventListener('input',upd); upd();
+})();
+</script>
+</body>
+</html>

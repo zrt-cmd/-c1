@@ -1,0 +1,279 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/cases/exp006a-elderly-companion/exp-04-voice/index.html
+TITLE: EXP-04 · 语音交互子系统 — 老人跌倒监护综合项目
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+EXP-04 · 语音交互子系统 — 老人跌倒监护综合项目
+🧠 具身智能课程 ·
+教程首页
+综合项目
+/
+老人跌倒监护
+/ EXP-04
+本页目录
+01 问题引入：抢在唤醒前开麦为什么会"哑掉"
+02 原理通俗讲解：语音链路像"值班接线员"
+03 关联知识点：六个语音知识块
+04 实验目标
+05 实验环境与准备
+06 动画讲解：三状态机与唤醒对话闭环
+07 互动讲解：语音事件调度台
+08 实操步骤：文本模式 → 单点 → 全链路
+09 重点与易错点
+10 总结与思考
+CH1 · 需求与配置
+EXP-01 需求分析
+EXP-02 分层架构
+EXP-03 配置详解
+CH2 · 感知与交互
+EXP-04 语音交互
+EXP-05 检测与姿态
+EXP-06 跌倒状态机
+CH3 · 告警与验证
+EXP-07 告警证据链
+EXP-08 LLM·VLM
+EXP-09 全功能验证
+EXP-04 · 第 2 章 · 综合性 · 6 学时
+语音交互子系统：唤醒 → 聆听 → 播报的闭环
+语音是老人与系统之间最自然的沟通方式：跌倒后系统问一句"您还好吗？"，老人答"救命"或"没事"，整条监护链路才能善意收尾。本实验吃透
+VoiceLoop 三状态机（IDLE / LISTENING / SPEAKING）
+、
+XFM 六麦唤醒后才开录音
+的 ALSA 时序、
+双次排空防回声
+、
+ASK 2s 兜底快答
+与
+epoch 版本号防重复
+，按 docs/07 用例从文本模式一路验证到硬件全链路。
+难度 ⭐⭐ · 6 学时
+sherpa-onnx KWS
+zipformer ASR
+Matcha-TTS
+XFM 六麦
+01
+问题引入：抢在唤醒前开麦为什么会"哑掉"
+新手接语音的第一反应往往是"先把麦克风打开等着"。结果 XFM 六麦（/dev/ttyACM0）录到的全是稀疏帧 —— 每 5 秒只有约 10 帧，
+而且真正唤醒之后也不恢复
+。这不是驱动 bug，而是硬件的工作方式：六麦阵列被唤醒词"点亮"之前，故意只吐稀疏监听流。
+1
+提前打开 ALSA → 设备停在监听态稀疏流（docs/07 T7-4 实测），唤醒后不恢复
+2
+正确时序：唤醒事件 → notify_wake()（L119-L123）→ _ensure_capture() 才启动录音线程
+3
+再解决第二个坑：TTS 播完的回声残帧会被 KWS 误当唤醒词 → 双次排空 + reset_stream
+4
+最后收口 ASK：老人只喊一声"救命"，不能干等 4.5s 端点静音 → 2s 兜底快答
+💡 一个类比
+语音链路像
+值班接线员
+：平时坐着不动（IDLE），电话铃响才拿起听筒（LISTENING），复述完再挂断（SPEAKING）。提前把听筒摘了放桌上（提前开 ALSA），来电反而打不进来 —— 设备"在岗方式"有时序规矩。
+02
+原理通俗讲解：一个状态机管住所有语音事件
+VoiceLoop 是单线程三态状态机（voice_loop.py L34-L35）：
+无论事件来自 XFM 硬件、软件 KWS、stdin 文本还是跌倒状态机的 trigger_ask，最终都只是推动状态迁移
+。文本模式甚至被刻意设计成"同一份代码路径"，好让你在无硬件环境下先验证交互逻辑。
+类比 · 接电话
+三状态 = 挂机 / 拿起听筒 / 通话中
+IDLE 喂 KWS、LISTENING 喂 ASR、SPEAKING 盯打断 —— 就像接线员在不同岗位间切换，一次只做一件事。
+类比 · 会议静音
+双次排空 = 撤掉别人的话筒余音
+TTS 播完先 drain 一次、等 0.2s 让在途帧落地、再 drain 一次并 reset KWS 流 —— 彻底清掉自己说话的回声，防止"自己把自己唤醒"。
+类比 · 取餐号
+epoch = 过期作废的号码牌
+每次打断 epoch+1，迟到的 LLM 回复拿着旧号码来取餐 → 直接丢弃。不加锁也能防"旧回复突然冒出来吓老人一跳"。
+类比 · 点名秒答
+ASK 2s 兜底 = 答"到"也立刻记录
+ASK 是二选一确认（救命 / 没事），语义短促；partial 出现后 2s+120ms 无变化就强制提交，不等 4.5s 长静音端点。
+🔒 人文关怀与隐私
+语音链路默认
+本地端侧推理
+（sherpa-onnx 全在板上跑），录音帧只进内存队列（maxsize=100，约 10s 缓冲），不落盘、不上云。给独居老人装监护设备，家属最在意的就是"家里说话会不会被录走"—— 我们的设计答案是：正常运行不保存任何原始音频。
+03
+关联知识点：六个语音知识块
+知识点
+内容要点
+关键参数 / 位置
+3.1.1 XFM 硬件唤醒
+串口 AIUI 协议，0xA5 同步头拆帧；eventType=4 为唤醒事件，带 ivw.beam / angle / keyword
+3s 防抖 + wakeup_lock；xfm_wake.py L109-L127
+3.1.2 软件 KWS
+sherpa-onnx KeywordSpotter + zipformer 流式打分；词表 拼音@中文，命中即 reset_stream
+threshold 0.25 / score 1.5；kws.py L62-L73
+3.1.3 流式 ASR
+zipformer 增量解码，三规则端点检测：rule1 4.5s 长静音 / rule2 1.5s 短静音 / rule3 300ms 短句
+greedy_search；asr.py L48-L62
+3.2.1 TTS 与缓存
+Matcha-TTS + Vocos；固定提示语预合成，内存 _pcm_cache + 磁盘 MD5 缓存零合成
+tts.py L204-L230；gain 3.0 tanh 软饱和
+3.2.2 唤醒后开录音
+XFM ALSA 时序约束 → _ensure_capture 幂等延迟启动；播完双次排空防回声
+voice_loop.py L124-L144、L338-L341
+3.2.3 ASK 应答窗口
+trigger_ask 两阶段等播放；2s+120ms 兜底快答；epoch 单次应答防重复
+voice_loop.py L393-L421、L307-L313、L433-L442
+04
+实验目标
+掌握
+唤醒 → 提示音 → ASR → LLM 应答 → TTS → 打断全流程，能在代码中追踪每一步状态迁移
+理解
+录音线程为何在硬件唤醒后才启动（XFM ALSA 时序），以及软件 KWS / 文本模式下常开的差异
+独立完成
+KWS / ASR / TTS 单点测试与全链路集成，按 docs/07_语音测试用例.md 逐条验证
+掌握
+ASK 2s 兜底快答、双次排空防回声、epoch 防重复三个精巧机制的设计动机
+迁移应用
+自定义唤醒词并验证端到端流程，理解唤醒词"三处同步"对双链路的影响
+05
+实验环境与准备
+1
+硬件：小车 C1（RK3576）+ XFM 六麦（/dev/ttyACM0，VID 0x1a86 PID 0x55d4）+ 扬声器 plughw:3,0；
+--text 模式无需任何硬件
+2
+系统：Ubuntu 22.04 + Python 3.10（/home/iflytek/ros2_venv），依赖 sherpa-onnx、ALSA、aplay、numpy
+3
+进入
+ros2_ws/src/xflz_eai_car1/app/elderly_companion/
+，预读 speech/ 下五个关键文件：voice_loop.py、xfm_wake.py、kws.py、asr.py、tts.py
+4
+开工前先
+pkill -9 aplay
+清理残留播放进程；查
+lsof /dev/ttyACM0
+确认串口没被 log_server 占用
+06
+动画讲解：三状态机与唤醒对话闭环
+左侧三态之间的箭头循环流动；右侧展示一次完整唤醒对话的时间轴 —— 提示音、双次排空、开听、识别各占一段：
+VoiceLoop · 三状态机
+IDLE 待机
+LISTENING 聆听
+SPEAKING 播报
+唤醒/ASK触发
+ASR final
+interrupt +1
+播完排空→IDLE
+无话10s超时
+单线程 · 事件只推动迁移 · 文本/音频同一条回调链
+唤醒对话闭环 · 时间轴
+① XFM 唤醒事件 → notify_wake() → 开 ALSA 录音
+② 播提示音（dur + 0.8s 余量）
+③ 双次排空
+④ _begin_listen：开 ASR 流 → LISTENING（记录 _listen_started）
+⑤ ASR 端点 4.5s/1.5s/300ms（ASK 再叠 2s 兜底）→ final
+⑥ LLM 回复流式 TTS（epoch 记号，打断即作废）
+⑦ 播完 → 双次排空 + reset KWS → IDLE，回声不自唤醒
+文本模式跳过 ②③，直接 _begin_listen —— 同一状态机
+动画 4-1｜左：三状态之间带流动粒子的迁移箭头（含 10s 无话超时回 IDLE）；右：一次唤醒对话的七段时间轴，收尾高亮"双次排空→IDLE"
+07
+互动讲解：语音事件调度台
+逐个投喂事件（等价于 feed_text 的输入），观察状态机与回调链的走向：
+语音事件调度台 · Voice Bench
+🔔 输入「小飞小飞」
+💬 聆听后输入「你好」
+🆘 输入「ask」再「救命」
+⏳ 10s 不说话
+⚡ 播报中再喊唤醒词
+↺ 复位
+// 初始：IDLE。事件按 feed_text / voice_loop 判定顺序推进状态机
+IDLE → 喂 KWS（每 0.1s 一帧），命中 wake_words 才开听
+🙋 为什么 IDLE 态"不理人"
+唤醒词之外的文本被静默忽略是设计行为（voice_loop L170-L177）——但
+呼救词是例外
+：救命/帮帮我 在 IDLE 态直达 on_help_kws 告警。"平时不打扰，真喊救命一定听得见"，这是监护产品的克制与担当。
+08
+实操步骤：文本模式 → 单点 → 全链路
+1
+文本模式验证状态机（60min）：唤醒/对话/ASK/呼救四条路径逐一过
+2
+子系统单点（90min）：speech_kws_test / speech_asr_test / speech_tts_test 各跑一遍
+3
+全链路集成（90min）：fall_video_demo --text 跑打断、10s 超时、epoch 丢弃
+4
+按 docs/07 执行 T7-1~T7-9（呼救直告警、ASK 单次应答、防回声逐条记录）
+5
+自定义唤醒词（30min）：kws_keywords.txt + session.wake_words + XFM set_wake_word 三处同步后复验
+# ① 文本模式状态机验证（无需任何硬件，stdin 即"音频帧"）
+cd
+/home/iflytek/ros2_ws/src/xflz_eai_car1/app/elderly_companion
+python3
+apps/speech_text_demo.py
+# 输入: 小飞小飞 → 唤醒; 你好 → LLM对话; ask → 模拟跌倒; 救命 → 告警; exit → 退出
+# 预期日志: [文本] 唤醒 → 开始聆听（mode=DIALOG） → >>> ASK 确认（ALERT）
+# ② 三个子系统单点测试（记录模型参数与实时率）
+python3
+apps/speech_kws_test.py
+# KWS 就绪（5 词）: 小飞同学/你好小飞/小飞小飞/救命/帮帮我
+python3
+apps/speech_asr_test.py
+# 逐 wav 输出 partial + 实时率（0.1x~0.3x）
+python3
+apps/speech_tts_test.py
+# 合成耗时 2.03s / RTF 0.39（<1 即实时）
+# ③ 全链路集成（--text 不做语音播报，验证状态机 + 打断 + 超时）
+python3
+apps/fall_video_demo.py --video testdata/fall_slow_x264.mp4 --text
+# 有硬件时: 换 --mjpeg，真人对六麦说"小飞小飞"验证提示音+录音线程启动
+# ④ 清理：ALSA 残留 + LLM 服务
+pkill
+-9 aplay;
+pkill
+-f llm_server
+🔍 唤醒词"三处同步"
+改自定义唤醒词必须同时改三处：
+① config/kws_keywords.txt
+（格式
+拼音 @ 中文
+，行首无空格）；
+② fall_config.yaml 的 session.wake_words
+（VoiceLoop 分流判断）；
+③ XFM set_wake_word() JSON
+（固件词表，threshold 900 是固件私有灵敏度，与 KWS 的 0.25 互不相通）。只改一处会出现"KWS 检出了但 VoiceLoop 不认"。
+09
+重点与易错点
+三状态 + 一条总原则：
+所有事件只推动状态迁移，业务逻辑都在回调里
+三个保命机制：
+双次排空防回声、ASK 2s 兜底、epoch 版本号防迟到回复
+XFM 时序是
+设备约束而非 bug
+：唤醒后才开 ALSA；软件 KWS 场景才常开
+文本模式是
+调试基座
+：与硬件走同一状态机/回调链，先逻辑正确再上硬件
+⚠️ 常见坑
+现象 → 解法
+说话唤醒无反应
+文本模式对麦克风本就无反应 → 必须 stdin 输文本；有硬件才走 --mjpeg
+唤醒后无"录音线程"日志
+/dev/ttyACM0 被 log_server 占用 → lsof 查占用、停进程、重插 USB
+录音 X/5s 仅约 10 帧
+XFM 监听态（没真正唤醒）→ 真人对麦克风说唤醒词，看"检测到唤醒"日志
+对话无回复
+llm.enabled 未开 / LLM 服务没起 → 确认配置或看 llm_server.log（首次加载 30-60s）
+自己播的话把自己唤醒
+双次排空没跑全 → 检查 _handle_speaking 两次 _drain_q + kws reset_stream（L366-L367）
+ASK 应答刷出多条
+_invoke_ask 误走 worker → 必须同步调用且 break（voice_loop L443-L461）
+播放失败 / 设备忙
+aplay 残留进程占设备 → 每次测试前 pkill -9 aplay
+TTS 合成失败
+speech.tts.model_dir 路径错 → 核对配置；首次约 1s 合成延迟属正常
+10
+总结与思考
+✅ 完成成果
+语音全链路测试报告
+文本模式四路径 + 三子系统单点 + 全链路集成 + docs/07 用例 + 自定义唤醒词记录。
+🧠 原理收获
+单状态机设计
+三态流转 + 回调注入：驱动（键盘/麦克风/硬件事件）与决策彻底解耦。
+🛠 技能收获
+时序与并发排障
+ALSA 唤醒时序、双次排空、epoch 版本号 —— 三招应对嵌入式音频的"迟到与残留"。
+❓ 排障思路
+先分层再定位
+没反应？先分"文本模式也这样"还是"只有硬件这样"，把问题收敛到状态机层或驱动层。
+📝 思考题 1
+为什么 XFM 硬件唤醒场景录音线程必须"唤醒后才启动"，而软件 KWS 场景可以常开？结合 AIUI 事件时序与 ALSA 流特性分析：如果提前打开设备，实测的"5s 仅约 10 帧"会怎样传导成全链路故障？
+📝 思考题 2
+ASK 的 2s 兜底快答与 ASR 内置的 4.5s 端点静音是两套计时，为什么 ASK 额外要一层、而 DIALOG 反而不需要？再想深一层：如果把 2s 兜底也套到 DIALOG 上，老人慢条斯理的问候会被截成什么样？
+CASE-03 · 老人跌倒监护 · EXP-04 语音交互子系统
+6 学时 · 综合性 · 基于 elderly_companion 实验讲义改编

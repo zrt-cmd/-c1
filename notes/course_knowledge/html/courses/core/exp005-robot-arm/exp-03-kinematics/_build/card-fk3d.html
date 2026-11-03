@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D 机械臂（URDF 加载）：拖关节角，看指尖落在哪</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:transparent;overflow:hidden;
+  font-family:'Noto Sans CJK SC','Microsoft YaHei',sans-serif;color:#334155;-webkit-font-smoothing:antialiased}
+.wrap{display:flex;flex-direction:column;height:100vh;padding:6px 8px 8px;gap:5px}
+
+.hint{font-size:12px;line-height:1.5;color:#64748b;text-align:center;flex:none}
+.hint b{color:#b91c1c}
+
+.stage{position:relative;flex:1;min-height:180px;border-radius:10px;overflow:hidden;
+  background:linear-gradient(180deg,#fbfcfe 0%,#f1f5f9 100%);border:1px solid #e8edf2}
+.stage canvas{display:block;width:100%;height:100%}
+
+.viewtabs{position:absolute;top:7px;left:7px;display:flex;gap:4px;align-items:center;z-index:3}
+.vt{font-family:inherit;font-size:11px;font-weight:700;color:#64748b;background:rgba(255,255,255,.92);
+  border:1px solid #d8dfe7;border-radius:6px;padding:3px 9px;cursor:pointer;line-height:1.4;transition:.15s}
+.vt:hover{background:#fff;color:#334155}
+.vt.on{background:#dc2626;border-color:#dc2626;color:#fff}
+.axchk{font-size:11px;font-weight:700;color:#64748b;background:rgba(255,255,255,.92);
+  border:1px solid #d8dfe7;border-radius:6px;padding:3px 8px;cursor:pointer;line-height:1.4;
+  display:flex;align-items:center;gap:4px;user-select:none}
+.axchk input{margin:0;cursor:pointer;accent-color:#dc2626}
+.axchk.on{color:#334155;border-color:#c3cdd8}
+
+.readout{position:absolute;top:7px;right:7px;z-index:3;background:rgba(255,255,255,.95);
+  border:1px solid #f0d6d6;border-radius:7px;padding:4px 8px;font-family:Consolas,'Courier New',monospace;
+  font-size:11px;line-height:1.55;color:#334155;pointer-events:none;text-align:right}
+.readout .k{color:#94a3b8;font-size:10px}
+.readout b{color:#b91c1c}
+
+.axkey{position:absolute;left:7px;top:31px;z-index:3;display:flex;gap:8px;align-items:center;
+  background:rgba(255,255,255,.94);border:1px solid #d8dfe7;border-radius:6px;padding:2px 8px;
+  font-size:10.5px;font-weight:700;color:#475569;pointer-events:none}
+.axkey span{display:flex;align-items:center;gap:3px}
+.axkey i{display:inline-block;width:11px;height:3px;border-radius:2px}
+
+.modehint{position:absolute;bottom:6px;left:8px;right:8px;z-index:3;font-size:10.5px;color:#64748b;
+  text-align:center;pointer-events:none;background:rgba(255,255,255,.88);border-radius:5px;padding:2px 6px}
+.modehint b{color:#334155}
+.modehint button{pointer-events:auto;font-family:inherit;font-size:10px;font-weight:700;color:#b91c1c;
+  background:#fff;border:1px solid #f1c4c4;border-radius:5px;padding:1px 7px;margin-left:8px;cursor:pointer}
+.modehint button:hover{background:#fef2f2}
+
+.jrow{flex:none;display:flex;flex-direction:column;gap:2px}
+.jitem{display:flex;align-items:center;gap:6px;height:19px}
+.jdot{width:9px;height:9px;border-radius:2px;flex:none}
+.jname{font-size:11px;font-weight:700;color:#475569;width:54px;flex:none}
+.jitem input[type=range]{flex:1;-webkit-appearance:none;height:3px;border-radius:2px;background:#d8dfe7;outline:none;margin:0}
+.jitem input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;
+  background:#dc2626;border:2px solid #fff;box-shadow:0 0 0 1px #d8dfe7;cursor:pointer}
+.jval{font-size:10.5px;font-weight:700;font-family:Consolas,'Courier New',monospace;color:#334155;
+  width:38px;text-align:right;flex:none}
+
+.lesson{flex:none;font-size:11.5px;font-weight:700;color:#0f172a;text-align:center;line-height:1.45}
+.lesson b{color:#b91c1c}
+
+/* ---- ?view=model：只看模型（讲结构用） ---- */
+body.view-model .hint,
+body.view-model .readout,
+body.view-model .jrow,
+body.view-model .lesson,
+body.view-model .viewtabs,
+body.view-model .modehint,
+body.view-model .axkey{display:none}
+body.view-model .wrap{padding:0;gap:0}
+body.view-model .stage{border:0;border-radius:0;background:linear-gradient(180deg,#fdfefe 0%,#eef3f8 100%)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hint">这个模型不是"画"出来的：页面<b>加载 <code>simple-arm.urdf</code></b>（只用圆柱 / 方块这类基本体写的），关节位置、转轴、连杆长度全部读自 URDF。拖<b>关节滑杆</b>看姿态与指尖坐标；勾<b>坐标帧</b>看每个 link 的原点与三轴（X 红 / Y 绿 / Z 蓝）；切 <b>侧视 / 俯视</b> 压成 2D 平面。</div>
+
+  <div class="stage" id="stage">
+    <canvas id="cv"></canvas>
+    <div class="viewtabs">
+      <button class="vt on" data-mode="3d">3D 透视</button>
+      <button class="vt" data-mode="side">侧视 2D</button>
+      <button class="vt" data-mode="top">俯视 2D</button>
+      <label class="axchk on" id="axWrap"><input type="checkbox" id="axChk" checked>坐标帧</label>
+    </div>
+    <div class="readout" id="ro">
+      <div class="k">指尖 tcp_link（base_link 系）</div>
+      <div><b id="roXYZ">x – · y – · z – m</b></div>
+      <div class="k">水平距离 r = <span id="roR">–</span> m · 高度 h = <span id="roH">–</span> m</div>
+    </div>
+    <div class="axkey" id="axKey">
+      <span><i style="background:#dc2626"></i>X 前</span>
+      <span><i style="background:#16a34a"></i>Y 左</span>
+      <span><i style="background:#2563eb"></i>Z 上</span>
+    </div>
+    <div class="modehint" id="panHint">3D：<b>左键拖动</b>转视角 · <b>右键 / Shift+拖动</b>平移 · <b>滚轮</b>缩放 · <b>双击</b>复位
+      <button id="btnReset">复位视角</button></div>
+  </div>
+
+  <div class="jrow" id="jrow"></div>
+
+  <div class="lesson">FK 就一件事：从 <b>base_link</b> 沿这棵 URDF 坐标树一节节往下走，<b>每到一节先按 origin 平移、再绕 axis 转发一个关节角</b>。</div>
+</div>
+
+<!-- three r128（本地文件，不走 CDN） -->
+<script src="../../../../../assets/modules/servo-lab/three.min.js"></script>
+<!-- 极简 URDF 加载器 -->
+<script src="../../../../../assets/modules/urdf-arm/urdf-arm.js"></script>
+<!-- URDF 文本（由 simple-arm.urdf 生成，file:// 下浏览器不让 fetch，只能走 script） -->
+<script src="../../../../../assets/modules/urdf-arm/simple-arm.urdf.js"></script>
+
+<script>
+(function () {
+'use strict';
+
+var S = 10;                 /* 显示比例：1 世界单位 = 0.1 m */
+var D = Math.PI / 180;
+var MODEL_MODE = false;     /* ?view=model：只显示模型，给"讲结构"的章节用 */
+
+/* 5 个可动关节的滑杆：顺序 = 从底座到指尖，id 与 URDF 的 joint name 一一对应 */
+var JOINTS = [
+  { id: 'arm_joint1', name: 'J1 航向', col: '#64748b' },
+  { id: 'arm_joint2', name: 'J2 俯仰', col: '#d93a3a' },
+  { id: 'arm_joint3', name: 'J3 俯仰', col: '#e79a20' },
+  { id: 'arm_joint4', name: 'J4 俯仰', col: '#7c5cd6' },
+  { id: 'arm_joint5', name: 'J5 转向', col: '#0f766e' }
+];
+/* 默认姿态（J2 −50° / J3 105° / J4 35°）：
+   大臂往下放、小臂往上折、工具段再往前压，
+   指尖落在 base_link 系 x +0.157 / y 0.000 / z 0.342 m ——
+   与 03 节文字里的读数配套，也和上机实操时常见的工作姿态一致。 */
+var Q0 = [0, -50, 105, 35, 0];
+
+/* ============================================================
+   1. 加载 URDF
+   ============================================================ */
+var arm = URDFArm.fromText(window.URDF_ARM_TEXT);
+
+var stage = document.getElementById('stage');
+var cv = document.getElementById('cv');
+var renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+
+var scene = new THREE.Scene();
+
+/* URDF 是 Z 向上；three 是 Y 向上。整体转 -90° 并放大到看得见的尺度。
+   注意：这一步只是“换个坐标系显示“，不影响任何几何与 FK 结果。 */
+var pivot = new THREE.Group();
+pivot.rotation.x = -Math.PI / 2;
+pivot.scale.setScalar(S);
+pivot.add(arm.root);
+scene.add(pivot);
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.66));
+var dl1 = new THREE.DirectionalLight(0xffffff, 0.92); dl1.position.set(5, 9, 7);   scene.add(dl1);
+var dl2 = new THREE.DirectionalLight(0xdce8f5, 0.40); dl2.position.set(-6, 4, -5); scene.add(dl2);
+var dl3 = new THREE.DirectionalLight(0xffffff, 0.26); dl3.position.set(0, -7, 3);  scene.add(dl3);
+
+var grid = new THREE.GridHelper(3.0, 15, 0xdde5ee, 0xeef2f7);
+scene.add(grid);
+
+/* tcp_link 在 URDF 里是空 link，这里补一个红点当“指尖“标记 */
+var tcpDot = new THREE.Mesh(
+  new THREE.SphereGeometry(0.006, 16, 12),
+  new THREE.MeshBasicMaterial({ color: 0xdc2626 })
+);
+arm.links['tcp_link'].add(tcpDot);
+
+/* ============================================================
+   2. 关节滑杆（范围直接读 URDF 的 <limit>）
+   ============================================================ */
+var q = Q0.slice();
+var jrow = document.getElementById('jrow');
+var inputs = [];
+
+JOINTS.forEach(function (J, idx) {
+  var jd = arm.joints[J.id];
+  var lo = Math.round(jd.lower / D), hi = Math.round(jd.upper / D);
+  var row = document.createElement('div');
+  row.className = 'jitem';
+  row.innerHTML =
+    '<span class="jdot" style="background:' + J.col + '"></span>' +
+    '<span class="jname">' + J.name + '</span>' +
+    '<input type="range" min="' + lo + '" max="' + hi + '" step="1" value="' + q[idx] + '">' +
+    '<b class="jval">' + q[idx] + '°</b>';
+  var inp = row.querySelector('input');
+  var val = row.querySelector('.jval');
+  inp.addEventListener('input', function () {
+    q[idx] = +inp.value;
+    val.textContent = inp.value + '°';
+    arm.setJoint(J.id, q[idx] * D);
+    updateReadout();
+  });
+  jrow.appendChild(row);
+  inputs.push({ inp: inp, val: val });
+});
+
+/* ============================================================
+   3. 坐标帧：贴在每个 link 原点上（= rviz 里打开 TF 的效果）
+   ============================================================ */
+var frames = [];
+var labels = [];
+var framesOn = true;
+var _tmp = new THREE.Vector3();        /* 标签排布用的临时向量 */
+var _tmp2 = new THREE.Vector3();
+var _tmpM = new THREE.Matrix4();
+var AX_LEN = 0.038;                    /* 轴长 38 mm ≈ 整臂高度的 6.4% */
+var AX_R = 0.0026;
+var AX_HEAD_R = 0.0072, AX_HEAD_H = 0.016;
+var AX_AXES = [
+  { d: new THREE.Vector3(1, 0, 0), c: 0xef4444, n: 'X', hex: '#dc2626' },   /* X 前 · 红 */
+  { d: new THREE.Vector3(0, 1, 0), c: 0x22c55e, n: 'Y', hex: '#16a34a' },   /* Y 左 · 绿 */
+  { d: new THREE.Vector3(0, 0, 1), c: 0x3b82f6, n: 'Z', hex: '#2563eb' }    /* Z 上 · 蓝 */
+];
+
+function makeLabel(text, color, pxScale) {
+  /* 画布宽度按文字实际宽度算 —— 固定 512 px 会把 “arm_base_link“ 这种长名字
+     两端裁掉（踩过）。字号 84px、最终按 ~17px 显示，放大后依然锐利。 */
+  var FS = 84, PAD = 28, H = 128;
+  var probe = document.createElement('canvas').getContext('2d');
+  probe.font = 'bold ' + FS + 'px Consolas,Menlo,monospace';
+  var w = Math.ceil(probe.measureText(text).width) + PAD * 2;
+
+  var c = document.createElement('canvas');
+  c.width = w; c.height = H;
+  var g = c.getContext('2d');
+  g.font = 'bold ' + FS + 'px Consolas,Menlo,monospace';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  /* 先描一圈白边再填色：标签压在彩色连杆上时也能读清 */
+  g.lineWidth = 12;
+  g.lineJoin = 'round';
+  g.strokeStyle = 'rgba(255,255,255,0.96)';
+  g.strokeText(text, w / 2, H / 2 + 2);
+  g.fillStyle = color || '#334155';
+  g.fillText(text, w / 2, H / 2 + 2);
+
+  var sp = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: new THREE.CanvasTexture(c), transparent: true, depthTest: false, depthWrite: false
+  }));
+  sp.userData.aspect = w / H;
+  sp.userData.pxScale = pxScale || 1;     /* 轴字母用 0.62 倍，比 link 名小一圈 */
+  sp.renderOrder = 20;
+  return sp;
+}
+
+/* 每个 link 的名字放在哪（link 自身坐标系，单位 m）。
+   默认统一往 -X 侧偏；底座那两个 link 只差 20 mm 高，必须一左一右分开，
+   否则两个名字会叠在一起。 */
+var LABEL_OFF = {
+  base_link:     new THREE.Vector3(-0.112, 0, -0.020),
+  arm_base_link: new THREE.Vector3( 0.086, 0,  0.052),
+  tcp_link:      new THREE.Vector3(-0.050, 0,  0.026),
+  /* J3/J4 挨得很近（0.043 m），默认都往 -X 摆会叠在一起；
+     arm_link4 改摆到 +X 侧（那一侧是 J4→J5 的工具段，上空没有东西） */
+  arm_link4:     new THREE.Vector3( 0.052, 0,  0.010),
+  arm_link3:     new THREE.Vector3(-0.056, 0, -0.022)
+};
+var LABEL_OFF_DEF = new THREE.Vector3(-0.050, 0, 0.010);
+
+function addFrame(linkName, color) {
+  var node = arm.links[linkName];
+  if (!node) return;
+  var holder = new THREE.Group();
+  holder.name = 'tf_' + linkName;
+  node.add(holder);
+
+  AX_AXES.forEach(function (a) {
+    var mat = new THREE.MeshBasicMaterial({ color: a.c, depthTest: false, depthWrite: false });
+    var shaft = new THREE.Mesh(new THREE.CylinderGeometry(AX_R, AX_R, AX_LEN, 8), mat);
+    shaft.position.copy(a.d).multiplyScalar(AX_LEN / 2);
+    shaft.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), a.d);
+    shaft.renderOrder = 18;
+    holder.add(shaft);
+    var head = new THREE.Mesh(new THREE.ConeGeometry(AX_HEAD_R, AX_HEAD_H, 9), mat);
+    head.position.copy(a.d).multiplyScalar(AX_LEN + AX_HEAD_H * 0.5 - 0.0015);
+    head.quaternion.copy(shaft.quaternion);
+    head.renderOrder = 18;
+    holder.add(head);
+    /* 轴尖上的 X / Y / Z 字母：既认颜色也认字，色弱或用黑白打印时也能分清 */
+    var axLbl = makeLabel(a.n, a.hex, 0.62);
+    axLbl.position.copy(a.d).multiplyScalar(AX_LEN + AX_HEAD_H + 0.009);
+    axLbl.userData.isAxisLabel = true;
+    holder.add(axLbl);
+    labels.push(axLbl);
+  });
+
+  var sp = makeLabel(linkName, color);
+  var off = LABEL_OFF[linkName] || LABEL_OFF_DEF;
+  sp.position.copy(off);
+  sp.userData.baseOff = off.clone();
+  /* 短名（arm_link1~5）在 3D 里往 -X 挪一点、再避开关节壳；
+     长名（base_link / arm_base_link / tcp_link）用 LABEL_OFF 给的偏移，单独放 */
+  sp.userData.isShort = !LABEL_OFF[linkName];
+  sp.userData.isLinkLabel = true;      /* 只有“link 名字“标签参与排布，轴字母不参与 */
+  sp.userData.linkName = linkName;
+  holder.add(sp);
+  labels.push(sp);
+  frames.push(holder);
+}
+
+addFrame('base_link',     '#475569');
+addFrame('arm_base_link', '#475569');
+addFrame('arm_link1',     '#b91c1c');
+addFrame('arm_link2',     '#b91c1c');
+addFrame('arm_link3',     '#b45309');
+addFrame('arm_link4',     '#b45309');
+addFrame('arm_link5',     '#6d28d9');
+addFrame('tcp_link',      '#dc2626');
+
+/* 俯视图例：俯视时各 link 的坐标帧在 X-Y 上几乎重合，贴在各自 link 上的名字
+   会跟着关节一起转、散成一片。所以俯视改用一列“钉住不动“的图例
+   （挂在 base_link 上，不受 J1~J5 影响），按从指尖到底座的顺序排。 */
+var LEGEND = ['tcp_link', 'arm_link5', 'arm_link4', 'arm_link3',
+              'arm_link2', 'arm_link1', 'arm_base_link', 'base_link'];
+var LEGEND_COLOR = {
+  tcp_link: '#dc2626', arm_link5: '#6d28d9', arm_link4: '#b45309', arm_link3: '#b45309',
+  arm_link2: '#b91c1c', arm_link1: '#b91c1c', arm_base_link: '#475569', base_link: '#475569'
+};
+var legendGroup = new THREE.Group();
+legendGroup.name = 'tf_legend';
+arm.links['base_link'].add(legendGroup);
+LEGEND.forEach(function (nm, i) {
+  var sp = makeLabel(nm, LEGEND_COLOR[nm]);
+  sp.position.set(-0.168, 0.100 - i * 0.0285, 0.006);
+  sp.userData.isLegend = true;
+  legendGroup.add(sp);
+  labels.push(sp);
+});
+legendGroup.visible = false;
+
+/* ============================================================
+   4. 相机：视线对准整机包围盒中心，距离按模型尺寸自动算
+   ============================================================ */
+var camP = new THREE.PerspectiveCamera(24, 1, 0.1, 400);
+var camO = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 400);
+var activeCam = camP;
+
+var TGT = new THREE.Vector3(0, 1.5, 0);
+var TGT_HOME = new THREE.Vector3();              /* 自动取景算出来的原始中心，用于“复位“ */
+var PAN = new THREE.Vector3(0, 0, 0);            /* 用户平移量（世界坐标），叠加在 TGT 上 */
+var MODEL = new THREE.Vector3(3.5, 4.5, 2.6);    /* 世界尺寸（已乘 S） */
+/* 默认视角：站在车的"右前侧"往中心看（方位 theta ≈ +50.6°、俯仰 ≈ 24°）。
+   这样 base_link 的 +X（车头/器械前方的"前"）在画面里指向左下，
+   Y（左）指向右下，Z 竖直向上 —— 三条轴一眼就分得开，也和"右前侧观察"的习惯一致。 */
+var view = { rBase: 15, r: 15, theta: 0.883, phi: 1.16 };
+var ZOOM = 1;
+var mode = '3d';
+var VIEW_H = 5.2;
+
+function frameModel() {
+  var box = arm.getBoundingBox();          /* URDF 系，单位 m */
+  if (box.isEmpty()) return;
+  var c = box.getCenter(new THREE.Vector3());
+  var size = box.getSize(new THREE.Vector3());
+  /* URDF(z 上) → world(y 上)：x→x, z→y, y→-z */
+  /* 取景中心往上抬一点：默认姿态整机偏"下半身重"（底座大、臂往上长出画面），
+     把中心挪到包围盒高度的 58% 处，顶部才不会贴到画布边缘。
+     model 模式容器更扁，抬得少一点，否则模型会显得靠上。 */
+  var lift = MODEL_MODE ? 0.02 : 0.08;
+  TGT_HOME.set(c.x * S, (c.z + size.z * lift) * S, -c.y * S);
+  TGT.copy(TGT_HOME).add(PAN);
+  MODEL.set(size.x * S, size.z * S, size.y * S);
+}
+
+function fit() {
+  var w = stage.clientWidth || 360, h = stage.clientHeight || 260;
+  var aspect = w / h;
+  var halfV = Math.tan(camP.fov * Math.PI / 360);
+  var needV = (MODEL.y * 0.5) / halfV;
+  var needH = (MODEL.x * 0.5) / (halfV * aspect);
+  /* model 模式下容器又窄又矮，但用户希望"镜头近一点"，
+     所以边距只比默认略宽（1.46 → 1.52），不要 1.78 那么远 */
+  var pad = MODEL_MODE ? 1.52 : 1.46;
+  view.rBase = Math.max(needV, needH) * pad;
+  VIEW_H = Math.max(MODEL.y, MODEL.x / aspect) * (MODEL_MODE ? 1.32 : 1.28);
+}
+
+function updateCamera() {
+  view.r = view.rBase * ZOOM;
+  if (mode === '3d') {
+    var sp = Math.sin(view.phi), cp = Math.cos(view.phi);
+    camP.position.set(
+      TGT.x + view.r * sp * Math.sin(view.theta),
+      TGT.y + view.r * cp,
+      TGT.z + view.r * sp * Math.cos(view.theta)
+    );
+    camP.up.set(0, 1, 0);
+    camP.lookAt(TGT);
+    activeCam = camP;
+  } else if (mode === 'side') {
+    setOrtho();
+    camO.position.set(TGT.x, TGT.y, TGT.z + 60);
+    camO.up.set(0, 1, 0);
+    camO.lookAt(TGT);
+    activeCam = camO;
+  } else {
+    setOrtho();
+    camO.position.set(TGT.x, TGT.y + 60, TGT.z);
+    camO.up.set(0, 0, -1);
+    camO.lookAt(TGT);
+    activeCam = camO;
+  }
+  layoutLabels();
+  updateLabelScales();
+}
+
+/* 相机取景中心 = 自动中心 + 用户平移；两种视图共用 */
+function applyTarget() {
+  TGT.copy(TGT_HOME).add(PAN);
+}
+
+/* 平移：把屏幕像素位移换算成相机平面里的世界位移。
+   两个轴取相机自身的 right / up 向量 —— 3D 里就是“沿屏幕上下左右挪“，
+   2D 正交视图里同理，所以三种视图都能用同一套拖拽手势。 */
+var _right = new THREE.Vector3();
+var _up = new THREE.Vector3();
+function panBy(dxPx, dyPx) {
+  var cam = activeCam;
+  cam.updateMatrixWorld();
+  _right.setFromMatrixColumn(cam.matrixWorld, 0).normalize();   /* 屏幕右 */
+  _up.setFromMatrixColumn(cam.matrixWorld, 1).normalize();      /* 屏幕上 */
+  var worldPerPx;
+  if (mode === '3d') {
+    var d = cam.position.distanceTo(TGT);
+    worldPerPx = (2 * Math.tan(cam.fov * Math.PI / 360) * d) / canvasH;
+  } else {
+    worldPerPx = VIEW_H / canvasH;
+  }
+  PAN.addScaledVector(_right, -dxPx * worldPerPx);
+  PAN.addScaledVector(_up, dyPx * worldPerPx);
+  applyTarget();
+  updateCamera();
+}
+
+/* 复位：双击画布，或点提示条右侧的“复位视角“ */
+function resetView() {
+  PAN.set(0, 0, 0);
+  ZOOM = 1;
+  view.theta = 0.883;
+  view.phi = 1.16;
+  applyTarget();
+  updateCamera();
+}
+/* 正交取景：侧视看 X-Z（高度用 MODEL.y），俯视看 X-Y（进深用 MODEL.z）。
+   两种模式的纵向尺寸不是同一个量，混用会让俯视里的模型缩成一小团。 */
+function setOrtho() {
+  var w = stage.clientWidth || 360, h = stage.clientHeight || 260;
+  var aspect = w / h;
+  var depth = (mode === 'top') ? MODEL.z : MODEL.y;
+  VIEW_H = Math.max(depth, MODEL.x / aspect) * 1.35 * ZOOM;   /* ZOOM<1 = 放大，2D 视图同样生效 */
+  camO.top = VIEW_H / 2;
+  camO.bottom = -VIEW_H / 2;
+  camO.left = -VIEW_H * aspect / 2;
+  camO.right = VIEW_H * aspect / 2;
+  /* 侧视只把“上边界“多留一点：顶上那两个标签（arm_link5 / tcp_link）
+     放在连杆上方的空白里，不留白会顶到画布边缘的按钮上；下边界不动，底盘才不会被挤出画面 */
+  if (mode === 'side') {
+    camO.top = VIEW_H / 2 + VIEW_H * 0.03;
+    camO.bottom = -VIEW_H / 2;
+  }
+  camO.updateProjectionMatrix();
+}
+
+/* 标签排布：
+     3D   —— 短名（arm_linkN）贴在自己 link 原点的 -X 侧，长名用 LABEL_OFF 单独放；
+     侧视 —— “钉“在画面左侧的一列（x 固定），竖向对齐各 link 原点当前的真实高度；
+     俯视 —— 关掉这批、改用左侧那一列固定图例（link 会跟着关节转，贴上去会散开）。 */
+/* 侧视那一列的竖向刻度（URDF 米，各 link 在零位时的高度）——
+   数值来自 simple-arm.urdf：J1 0.1295 / J2 0.1890 / J3 0.3151 / J4 0.4413 /
+   J5 0.5157 / TCP 0.5919。标签放在“下半个格“里，正好落在两个关节之间的空白处。 */
+var SIDE_HEIGHT = {
+  base_link:     -0.010,
+  arm_base_link:  0.074,
+  arm_link1:      0.158,
+  arm_link2:      0.250,
+  arm_link3:      0.376,
+  arm_link4:      0.448,
+  arm_link5:      0.520,
+  tcp_link:       0.578
+};
+
+function layoutLabels() {
+  var top = (mode === 'top');
+  var side = (mode === 'side');
+  legendGroup.visible = top && framesOn;
+
+  /* 侧视那一列：世界 x 距画布左缘约 92 px；竖向用“零位时各 link 的高度表“。
+     之所以不每帧去读实时高度：getLinkWorldPosition 会给世界 Y-up 坐标，
+     和 pivot 的旋转/缩放来回换算很容易错（已经踩过一次），而侧视本来就是给学生
+     看“各段在整机里的位置“的，用固定刻度反而更稳、换姿态也不跳。 */
+  var w = stage.clientWidth || 360;
+  var halfW = (camO.right - camO.left) / 2;
+  var worldPerPx = (2 * halfW) / w;
+  var colX = (camO.left + 92 * worldPerPx) / S;    /* 换算回 URDF 米 */
+
+  for (var i = 0; i < labels.length; i++) {
+    var sp = labels[i];
+    if (sp.userData.isLegend) continue;
+    if (!sp.userData.isLinkLabel) continue;   /* 轴字母跟着轴尖走，永远不重排 */
+    sp.visible = framesOn && !top;
+    if (side) {
+      var hz = SIDE_HEIGHT[sp.userData.linkName];
+      if (hz === undefined) continue;
+      /* pivot 转了 -90°，link 局部的 +Z 就是屏幕的上方 */
+      sp.position.set(colX, 0, hz);
+    } else if (MODEL_MODE) {
+      /* 只看模型时整条臂是竖直的（零位），标签统一往 -X 侧让开，
+         相邻两个不会叠在一起；长名（base_link / arm_base_link / tcp_link）
+         再往外多让一点。 */
+      var nm = sp.userData.linkName || '';
+      var near = (nm === 'arm_link1' || nm === 'arm_link2' || nm === 'arm_link3' ||
+                  nm === 'arm_link4' || nm === 'arm_link5');
+      sp.position.set(near ? -0.062 : -0.088, 0, 0.004);
+    } else if (sp.userData.isShort) {
+      sp.position.set(-0.052, 0, 0.012);
+    } else {
+      sp.position.copy(sp.userData.baseOff);
+    }
+  }
+}
+
+/* 标签恒定 ~17px 高，不随远近 / 缩放变化 */
+var canvasH = 400;
+function updateLabelScales() {
+  if (!labels.length || !framesOn) return;
+  var worldPerPx;
+  if (mode === '3d') {
+    var d = camP.position.distanceTo(TGT);
+    worldPerPx = (2 * Math.tan(camP.fov * Math.PI / 360) * d) / canvasH;
+  } else {
+    worldPerPx = VIEW_H / canvasH;
+  }
+  var hLocal = (17 * worldPerPx) / S;
+  for (var i = 0; i < labels.length; i++) {
+    var sp = labels[i];
+    var k = hLocal * (sp.userData.pxScale || 1);
+    sp.scale.set(k * sp.userData.aspect, k, 1);
+  }
+}
+
+/* ============================================================
+   5. 读数：tcp_link 在 base_footprint 系下的坐标（直接取 URDF 变换）
+   ============================================================ */
+var roXYZ = document.getElementById('roXYZ');
+var roR = document.getElementById('roR');
+var roH = document.getElementById('roH');
+var _v = new THREE.Vector3();
+var _inv = new THREE.Matrix4();
+
+function updateReadout() {
+  scene.updateMatrixWorld(true);
+  arm.getLinkWorldPosition('tcp_link', _v);
+  _v.applyMatrix4(_inv.copy(pivot.matrixWorld).invert());   /* 世界 → URDF 系 */
+  var x = _v.x, y = _v.y, z = _v.z;
+  roXYZ.textContent = 'x ' + x.toFixed(3) + ' · y ' + y.toFixed(3) + ' · z ' + z.toFixed(3) + ' m';
+  roR.textContent = Math.hypot(x, y).toFixed(3);
+  roH.textContent = z.toFixed(3);
+}
+
+function reapply(vals) {
+  q = vals.slice();
+  for (var i = 0; i < inputs.length; i++) {
+    inputs[i].inp.value = q[i];
+    inputs[i].val.textContent = q[i] + '°';
+  }
+  JOINTS.forEach(function (J, i) { arm.setJoint(J.id, q[i] * D); });
+  updateReadout();
+}
+
+/* ============================================================
+   6. 视角切换 + 坐标帧开关
+   ============================================================ */
+var modeHint = document.getElementById('panHint');
+var HINTS = {
+  '3d'  : '3D：<b>左键拖动</b>转视角 · <b>右键 / Shift+拖动</b>平移 · <b>滚轮</b>缩放 · <b>双击</b>复位',
+  'side': '侧视 2D（正交）＝ X-Z 平面 · <b>拖动平移</b> · <b>滚轮</b>缩放 · <b>双击</b>复位 —— 横向"伸多远"、纵向"抬多高"，J2/J3/J4 的俯仰角这里最清楚',
+  'top' : '俯视 2D（正交）＝ X-Y 平面 · <b>拖动平移</b> · <b>滚轮</b>缩放 · <b>双击</b>复位 —— J1 的航向角只有这里才看得出来'
+};
+var BTN_RESET_HTML = '<button id="btnReset">复位视角</button>';
+Array.prototype.forEach.call(document.querySelectorAll('.vt'), function (btn) {
+  btn.addEventListener('click', function () {
+    mode = btn.getAttribute('data-mode');
+    Array.prototype.forEach.call(document.querySelectorAll('.vt'), function (b) {
+      b.classList.toggle('on', b === btn);
+    });
+    modeHint.innerHTML = HINTS[mode] + BTN_RESET_HTML;
+    updateCamera();
+  });
+});
+
+var axChk = document.getElementById('axChk');
+var axWrap = document.getElementById('axWrap');
+function setFrames(on) {
+  framesOn = on;
+  for (var i = 0; i < frames.length; i++) frames[i].visible = on;
+  updateLabelScales();
+}
+axChk.addEventListener('change', function () {
+  setFrames(axChk.checked);
+  axWrap.classList.toggle('on', axChk.checked);
+});
+
+/* URL 参数：?pose=zero|flat  ?mode=side|top  ?axes=0  —— 方便截图与外部引用 */
+var qs = new URLSearchParams(location.search);
+var pose = qs.get('pose');
+if (pose === 'zero') Q0 = [0, 0, 0, 0, 0];
+else if (pose === 'flat') Q0 = [0, 90, 0, 0, 0];
+
+var initMode = qs.get('mode');
+if (initMode && HINTS[initMode]) {
+  mode = initMode;
+  Array.prototype.forEach.call(document.querySelectorAll('.vt'), function (b) {
+    b.classList.toggle('on', b.getAttribute('data-mode') === initMode);
+  });
+  modeHint.innerHTML = HINTS[initMode] + BTN_RESET_HTML;
+}
+if (qs.get('axes') === '0') { axChk.checked = false; setFrames(false); axWrap.classList.remove('on'); }
+
+/* ---------------------------------------------------------------
+   ?view=model —— 只看模型
+   给"讲结构"的章节用：只留 3D 模型 + 坐标轴 + link 名字，
+   滑杆、读数、底部说明、视图切换按钮全部隐藏。
+   保留旋转/平移/缩放，方便学生转到任意角度对照 2D 示意图。
+   --------------------------------------------------------------- */
+if (qs.get('view') === 'model') {
+  MODEL_MODE = true;
+  document.body.classList.add('view-model');
+  /* 用默认姿态展示（斜着伸出去），和课程页左边的 2D 拆解图一致。
+     ?q=0,0,0,0,0 可以换成零位（整条臂竖直）。 */
+  Q0 = [0, -50, 105, 35, 0];
+  if (qs.get('q')) {
+    var _q = qs.get('q').split(',').map(function (s) { return parseFloat(s) || 0; });
+    if (_q.length === 5) Q0 = _q;
+  }
+  if (qs.get('axes') !== '0') { axChk.checked = true; setFrames(true); axWrap.classList.add('on'); }
+}
+
+/* ============================================================
+   7. 鼠标 / 触屏交互
+      · 左键拖动      → 3D 里旋转视角（2D 里只能平移）
+      · 右键 / 中键拖动 → 平移（3D / 侧视 / 俯视 都能用）
+      · 左键 + Shift   → 平移（触控板没有右键时的替代）
+      · 滚轮           → 缩放（三种视图都生效）
+      · 双击           → 复位
+   ============================================================ */
+var dragging = false, lx = 0, ly = 0, dragMode = 'rotate';   /* rotate | pan */
+var PAN_HINT = document.getElementById('panHint');
+
+cv.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+
+cv.addEventListener('pointerdown', function (e) {
+  dragging = true;
+  lx = e.clientX; ly = e.clientY;
+  var wantPan = (e.button === 2 || e.button === 1 || e.shiftKey);
+  /* 2D 视图没有“旋转“这回事，左键拖动直接当平移用 */
+  dragMode = (wantPan || mode !== '3d') ? 'pan' : 'rotate';
+  try { cv.setPointerCapture(e.pointerId); } catch (err) {}
+  cv.style.cursor = (dragMode === 'pan') ? 'move' : 'grabbing';
+});
+
+cv.addEventListener('pointermove', function (e) {
+  if (!dragging) return;
+  var dx = e.clientX - lx, dy = e.clientY - ly;
+  lx = e.clientX; ly = e.clientY;
+  if (dragMode === 'pan') {
+    panBy(dx, dy);
+  } else {
+    view.theta -= dx * 0.0075;
+    view.phi -= dy * 0.0075;
+    view.phi = Math.max(0.16, Math.min(1.54, view.phi));
+    updateCamera();
+  }
+});
+
+function endDrag() { dragging = false; cv.style.cursor = ''; }
+cv.addEventListener('pointerup', endDrag);
+cv.addEventListener('pointercancel', endDrag);
+cv.addEventListener('pointerleave', endDrag);
+
+cv.addEventListener('dblclick', resetView);
+
+cv.addEventListener('wheel', function (e) {
+  e.preventDefault();
+  ZOOM *= (1 + (e.deltaY > 0 ? 1 : -1) * 0.085);
+  ZOOM = Math.max(0.32, Math.min(3.4, ZOOM));
+  updateCamera();
+}, { passive: false });
+
+if (PAN_HINT) {
+  PAN_HINT.addEventListener('click', function (e) {
+    if (e.target && e.target.id === 'btnReset') resetView();
+  });
+}
+/* ============================================================
+   8. 尺寸自适应 + 启动
+   ============================================================ */
+function resize() {
+  var w = stage.clientWidth || 360, h = stage.clientHeight || 260;
+  canvasH = h;
+  renderer.setSize(w, h, false);
+
+  camP.aspect = w / h;
+  camP.updateProjectionMatrix();
+
+  fit();
+  setOrtho();
+  updateCamera();
+}
+if (window.ResizeObserver) { new ResizeObserver(resize).observe(stage); }
+window.addEventListener('resize', resize);
+
+/* 先摆好默认姿态再量包围盒 —— 顺序反了会按零位（竖直）的尺寸取景，
+   默认姿态下模型就只占画面四成。 */
+reapply(Q0);
+frameModel();
+resize();
+updateCamera();
+
+function loop() {
+  renderer.render(scene, activeCam);
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+/* 调试出口：控制台可读当前 FK 结果 / 相机参数 */
+window.__fk = {
+  arm: arm,
+  pose: function () {
+    var v = new THREE.Vector3();
+    scene.updateMatrixWorld(true);
+    arm.getLinkWorldPosition('tcp_link', v);
+    v.applyMatrix4(_inv.copy(pivot.matrixWorld).invert());
+    return { x: v.x, y: v.y, z: v.z };
+  }
+};
+
+})();
+</script>
+</body>
+</html>

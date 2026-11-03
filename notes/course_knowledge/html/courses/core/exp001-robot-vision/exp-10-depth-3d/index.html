@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-10 · 深度相机与 3D 定位 — 机器人视觉入门课</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<link rel="stylesheet" href="../shared/beginner.css">
+<style>:root{--theme:#0891b2;--theme-deep:#0e7490;--theme-bg:#cffafe;--theme-bd:#a5f3fc}</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit">🧠 具身智能课程 · <i>机器人视觉入门</i></a>
+  <div class="crumb"><a href="../../../index.html#core">核心课程</a> / <a href="../index.html">视觉入门课</a> / EXP-10</div>
+</div>
+
+<div class="wrap">
+
+<aside class="side">
+  <h4>本页步骤</h4>
+  <a href="#s1" class="now">01 这个实验解决什么问题</a>
+  <a href="#s2">02 三分钟讲懂：怎么从一张图算出距离</a>
+  <a href="#s3">03 先认识 4 个词</a>
+  <a href="#s4">04 它吃什么、吐什么</a>
+  <a href="#s5">05 三步跑起来</a>
+  <a href="#s6">06 你该看到的画面</a>
+  <a href="#s7">07 改一个参数看变化</a>
+  <a href="#s8">08 踩坑速查</a>
+  <a href="#s9">09 进阶（可选）</a>
+  <a href="#s10">10 随堂小测</a>
+  <h4>本课程实验</h4>
+  <a href="../exp-01-color-hsv/index.html">EXP-01 颜色识别</a>
+  <a href="../exp-02-qrcode/index.html">EXP-02 二维码</a>
+  <a href="../exp-03-contour-polygon/index.html">EXP-03 多边形轮廓</a>
+  <a href="../exp-04-industrial-defect/index.html">EXP-04 工业缺陷检测</a>
+  <a href="../exp-05-garbage-classification/index.html">EXP-05 垃圾分类</a>
+  <a href="../exp-06-semantic-segmentation/index.html">EXP-06 语义分割</a>
+  <a href="../exp-07-deepsort-tracking/index.html">EXP-07 多目标跟踪</a>
+  <a href="../exp-08-face-landmarks/index.html">EXP-08 人脸关键点</a>
+  <a href="../exp-09-pose-landmark/index.html">EXP-09 骨骼关键点</a>
+  <a href="../exp-10-depth-3d/index.html" style="color:#0f766e;font-weight:700">EXP-10 深度 3D</a>
+  <a href="../exp-11-pose-control/index.html">EXP-11 体感控制</a>
+  <a href="../exp-12-hand-control/index.html">EXP-12 手势识别</a>
+</aside>
+
+<main class="content">
+
+<div class="exp-head">
+  <span class="code">EXP-10 · 第 4 阶段 · 人体感知 · 设计性 · 4 学时</span>
+  <h1>深度相机：让机器知道「那东西离我多远」</h1>
+  <p class="desc">前面所有实验都只知道「东西在画面的哪个位置」，但不知道「它在多远」。这个实验给机器人加上第三只眼 —— 深度相机。点一下画面上的任意像素，程序就能告诉你「这个点离你 0.48 米」，还能算出它在真实空间里的三维坐标。</p>
+  <div class="meta">
+    <span class="tag hl">难度 ⭐⭐ · 4 学时</span>
+    <span class="tag">HP60C 深度相机</span><span class="tag">反投影公式</span>
+    <span class="tag">相机内参</span><span class="tag">点云</span>
+  </div>
+</div>
+
+<div class="pathline">
+  <span>01 颜色</span><span>02 二维码</span><span>03 轮廓</span><span>04 检测</span><span>05 分类</span><span>06 分割</span><span>07 跟踪</span><span>08 人脸</span><span>09 骨骼</span><span class="cur">10 3D</span><span>11 体感</span><span>12 手势</span>
+</div>
+
+<section class="blk" id="s1">
+  <h2><span class="no">01</span>这个实验解决什么问题</h2>
+
+  <div class="idea">
+    <span class="tag1">CORE IDEA · 一句话原理</span>
+    <p class="big">普通相机只给你<b>方向</b>（在画面哪个位置），深度相机还给你<b>距离</b>。有了这两样，就能算出三维坐标。</p>
+    <p class="analogy"><b>打个比方：</b>你在房间里听到有人喊你名字。光靠耳朵，你只知道「声音从右前方传来」。如果对方同时告诉你「我离你 3 米」，你就能准确指出他的位置。<b>深度相机就是那个会说距离的相机。</b></p>
+  </div>
+
+  <p>为什么机器人必须有深度？看三个真实任务：</p>
+
+  <table>
+    <thead><tr><th style="width:24%">任务</th><th style="width:30%">只有 2D 会怎样</th><th>有了深度</th></tr></thead>
+    <tbody>
+      <tr><td>机械臂抓杯子</td><td>知道杯子在画面中间，但不知道要伸多远 —— 可能抓空，可能撞翻</td><td>算出杯子的 (X, Y, Z)，直接过去</td></tr>
+      <tr><td>小车避障</td><td>看到前面有个东西，不知道是 30cm 还是 3m —— 该停还是该走？</td><td>小于 50cm 就停，稳</td></tr>
+      <tr><td>3D 建模</td><td>只能得到一张照片，没有立体信息</td><td>每个像素都变成一个空间点，拼成点云</td></tr>
+    </tbody>
+  </table>
+
+  <div class="oneline"><span>本实验的目标：<b>双栏看到彩色图和深度图；点画面上任意一点，程序报出「距离多少米 + 三维坐标 (X, Y, Z)」。</b></span></div>
+</section>
+
+<section class="blk" id="s2">
+  <h2><span class="no">02</span>三分钟讲懂：怎么从一张图算出距离</h2>
+
+  <p class="lead">核心只有一个公式，而且很好理解。先把「相机怎么把三维世界拍成二维图」想清楚，反着推就是答案。</p>
+
+  <div class="anim-box">
+    <svg viewBox="0 0 760 270" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="针孔相机模型与反投影：三维点投影到像素，再由像素和深度反推三维坐标">
+      <rect x="6" y="6" width="748" height="258" rx="12" fill="#111827" stroke="#334155"/>
+      <text x="380" y="28" text-anchor="middle" font-size="13" font-weight="700" fill="#67e8f9" font-family="sans-serif">针孔相机模型：一个三角形相似就够</text>
+
+      <!-- 相机 -->
+      <g>
+        <rect x="60" y="112" width="54" height="44" rx="6" fill="#1e293b" stroke="#22d3ee" stroke-width="1.6"/>
+        <text x="87" y="140" text-anchor="middle" font-size="10" fill="#67e8f9" font-family="monospace">相机</text>
+        <circle cx="150" cy="134" r="4" fill="#22d3ee"/>
+        <text x="150" y="158" text-anchor="middle" font-size="9" fill="#64748b" font-family="sans-serif">光心</text>
+      </g>
+
+      <!-- 成像平面 -->
+      <line x1="230" y1="64" x2="230" y2="204" stroke="#475569" stroke-width="2"/>
+      <text x="230" y="56" text-anchor="middle" font-size="9.5" fill="#94a3b8" font-family="sans-serif">成像平面（照片）</text>
+      <circle cx="230" cy="128" r="4" fill="#f472b6"/>
+      <text x="244" y="126" font-size="9" fill="#f9a8d4" font-family="monospace">像素 (u,v)</text>
+
+      <!-- 物体 -->
+      <circle cx="560" cy="94" r="9" fill="#4ade80"/>
+      <text x="560" y="76" text-anchor="middle" font-size="9.5" fill="#6ee7b7" font-family="monospace">物体</text>
+      <text x="560" y="118" text-anchor="middle" font-size="10" fill="#6ee7b7" font-family="monospace">(X, Y, Z)</text>
+
+      <!-- 光线 -->
+      <line x1="150" y1="134" x2="560" y2="94" stroke="#facc15" stroke-width="1.4" stroke-dasharray="5 3" opacity=".7"/>
+      <line x1="150" y1="134" x2="230" y2="128" stroke="#facc15" stroke-width="1.2" stroke-dasharray="4 3"/>
+
+      <!-- 光轴 -->
+      <line x1="150" y1="134" x2="620" y2="134" stroke="#334155" stroke-width="1" stroke-dasharray="6 4"/>
+      <text x="600" y="150" font-size="9" fill="#475569" font-family="monospace">Z 轴（光轴）</text>
+
+      <!-- f 标注 -->
+      <path d="M150,178 L230,178" stroke="#22d3ee" stroke-width="1.2" marker-end="url(#ar)"/>
+      <text x="190" y="194" text-anchor="middle" font-size="10" fill="#67e8f9" font-family="monospace">f 焦距</text>
+      <defs><marker id="ar" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto"><path d="M0,0 L6,3.5 L0,7 z" fill="#22d3ee"/></marker></defs>
+
+      <!-- Z 标注 -->
+      <path d="M150,214 L560,214" stroke="#fbbf24" stroke-width="1.2" marker-end="url(#ar2)"/>
+      <defs><marker id="ar2" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto"><path d="M0,0 L6,3.5 L0,7 z" fill="#fbbf24"/></marker></defs>
+      <text x="355" y="230" text-anchor="middle" font-size="10" fill="#fbbf24" font-family="monospace">Z 深度（深度相机直接测出来的）</text>
+
+      <!-- 公式 -->
+      <rect x="400" y="40" width="340" height="18" rx="4" fill="#0b1220"/>
+      <text x="404" y="185" font-size="11" fill="#67e8f9" font-family="monospace">u = fx·(X/Z) + cx</text>
+      <text x="404" y="202" font-size="11" fill="#67e8f9" font-family="monospace">v = fy·(Y/Z) + cy</text>
+      <text x="404" y="224" font-size="10" fill="#94a3b8" font-family="sans-serif">↑ 正向：世界 → 照片（相机在干的事）</text>
+      <text x="404" y="242" font-size="10" fill="#4ade80" font-family="sans-serif">↓ 反向：照片 + Z → 世界（本实验要干的事）</text>
+
+      <!-- 反投影 -->
+      <rect x="24" y="238" width="330" height="26" rx="6" fill="#0f172a" stroke="#22d3ee" stroke-width="1.2"/>
+      <text x="36" y="255" font-size="11" fill="#6ee7b7" font-family="monospace">X = (u − cx)·Z / fx</text>
+    </svg>
+  </div>
+  <div class="cap">图 8-1｜上半是「拍照」，下半是「反推」。本实验做的就是下半那个反向过程。</div>
+
+  <h3>反投影公式，逐个字母看懂</h3>
+
+  <div class="tip tealb" style="font-size:15px">
+    <span class="lab">📐 三个公式</span>
+    <code style="font-size:15px">X = (u − cx) × Z / fx</code><br>
+    <code style="font-size:15px">Y = (v − cy) × Z / fy</code><br>
+    <code style="font-size:15px">Z = 深度值 ÷ 1000</code>（相机给的单位是毫米，换成米）
+  </div>
+
+  <table>
+    <thead><tr><th style="width:12%">符号</th><th style="width:26%">叫什么</th><th>本实验的实际值 / 含义</th></tr></thead>
+    <tbody>
+      <tr><td><code>u, v</code></td><td>像素坐标</td><td>你点的那一点在画面里的行列号。范围是 u ∈ [0, 639]、v ∈ [0, 479]（640×480 图）</td></tr>
+      <tr><td><code>Z</code></td><td>深度</td><td><b>深度相机直接测出来的</b>，不是算出来的。单位毫米 → 除以 1000 变米</td></tr>
+      <tr><td><code>fx, fy</code></td><td>焦距（内参之一）</td><td>这块相机标定出来的值：<code>fx=608.40</code>、<code>fy=611.21</code>。<b>单位是像素</b>，不是毫米</td></tr>
+      <tr><td><code>cx, cy</code></td><td>主点（内参之一）</td><td>光轴打在画面上的位置：<code>cx=328.30</code>、<code>cy=226.46</code>。不是正好 320/240，因为镜头装配有偏差</td></tr>
+      <tr><td><code>X, Y</code></td><td>横 / 纵坐标</td><td>算出来的结果，单位米。<b>X 向右为正，Y 向下为正</b>（相机光学坐标系约定，不是数学课本的 y 向上）</td></tr>
+    </tbody>
+  </table>
+
+  <div class="tip amber"><span class="lab">⚠️ 关键认知：Z 不是算出来的</span>很多人以为深度是「算」出来的。<b>不是。</b>深度相机有一路专门的红外发射+接收（结构光或 ToF），<b>直接测量</b>每个点的距离。反投影公式只是把这个测量值配合像素位置，换算成三维坐标。<b>没有深度相机的普通相机，永远算不出绝对距离</b> —— 它只能从「同一个物体在不同距离下看起来大小不同」做单目估计，误差很大。</div>
+
+  <h3>为什么 fx 是 608 而不是「50 毫米焦距」？</h3>
+  <p>这是初学者最容易被卡住的一点。相机规格书上写着焦距 3.6mm 之类的数字，但配置里 fx=608 —— <b>两者不是同一个单位</b>：</p>
+  <div class="kv" style="font-size:.85rem">
+    <b>fx = f（物理焦距，毫米）÷ 单个像素的边长（毫米）</b><br>
+    所以 fx 的单位是<b>像素</b>。它回答的问题是：「当物体离我 1 米、横向偏 1 米时，它在画面里偏离中心多少像素？」
+  </div>
+  <p>把 fx 换算成「看多宽」会更直观 —— 这就是<b>视场角 FOV</b>：</p>
+  <pre><span class="c"># 水平视场角（度）</span>
+FOV ≈ 2 × arctan(width / (2·fx)) = 2 × arctan(640 / (2×608.4)) ≈ <span class="y">54.9°</span>
+<span class="c"># 垂直视场角</span>
+FOV_v ≈ 2 × arctan(480 / (2×611.2)) ≈ <span class="y">43.0°</span></pre>
+  <p>所以这台相机大概能看「正前方左右各 27°、上下各 21.5°」的范围。<b>fx 越大 = 视角越窄 = 看得越远越清楚</b>（长焦）；<b>fx 越小 = 视角越宽</b>（广角）。<b>同一个像素偏移，fx 越大算出的实际偏移越小</b> —— 这就是下面参数实验台要你亲手验证的事。</p>
+
+  <div class="oneline"><span><b>为什么要标定？</b>因为 fx、fy、cx、cy 由镜头的<b>实际制造</b>决定，不是算出来的。cx=328.30 而不是 320，说明镜头装配有约 8 个像素的偏心。<b>这几个数错了，所有三维坐标都会系统性偏移</b> —— 这正是本实验最重要的收获。</span></div>
+
+  <h3>算一遍给你看</h3>
+  <p>假设你点了画面正中心偏右一点的位置 <code>(u=400, v=240)</code>，深度相机测到 Z = 0.5 米：</p>
+  <pre><span class="c"># 已知内参</span>
+fx = 608.39958    fy = 611.20714
+cx = 328.30096    cy = 226.46483
+
+<span class="c"># 反投影</span>
+X = (400 − 328.30) × 0.5 / 608.40 = <span class="y">0.0589 米</span>   ← 往右 5.9 厘米
+Y = (240 − 226.46) × 0.5 / 611.21 = <span class="y">0.0111 米</span>   ← 往下 1.1 厘米
+Z = <span class="y">0.5 米</span>                     ← 前方 50 厘米</pre>
+  <p>结果：那个点在你前方 50cm、右边 5.9cm、下方 1.1cm 的位置。<b>机械臂可以直接朝这个坐标伸过去。</b></p>
+
+  <div class="oneline"><span><b>一句话记住：</b>像素告诉你「朝哪个方向看」，深度告诉你「看多远」，内参告诉你「镜头的几何长相」。<b>三者合起来，就能从一张照片定位空间中的一点。</b></span></div>
+</section>
+
+<section class="blk" id="s3">
+  <h2><span class="no">03</span>先认识 4 个词</h2>
+  <div class="terms">
+    <div class="term"><div class="w">深度图 <em>depth</em></div><p class="m">一张只有距离信息的图。每个像素存的是「这个点离我多少毫米」，不是颜色。用 16 位无符号整数（uint16）存，理论上限 65535mm ≈ 65 米。<b>0 表示「测不到」</b>。</p></div>
+    <div class="term"><div class="w">内参 <em>intrinsics</em></div><p class="m">相机的「身份参数」：焦距 fx/fy（像素单位）+ 主点 cx/cy（光轴落在画面的哪个像素）。每台相机出厂都不一样，必须标定才知道。</p></div>
+    <div class="term"><div class="w">反投影</div><p class="m">从 2D 像素 + 深度，反推出 3D 坐标的过程。就是上面那三个公式。</p></div>
+    <div class="term"><div class="w">点云</div><p class="m">把所有像素都反投影一遍，得到几十万个三维点。用 MeshLab / CloudCompare 打开能转着看物体的立体形状。</p></div>
+  </div>
+
+  <details class="deep">
+    <summary>深度图为什么用伪彩色显示？<em>选读 40 秒</em></summary>
+    <div class="deep-body">
+      <p>因为深度值（0~65535 毫米）直接显示成灰度图，人眼根本分不出层次 —— 近处和稍远处都是一片灰糊，这也是灰度图对比度天生不够的问题。</p>
+      <p>所以程序先做一件事：<b>把有效深度值线性拉到 0~255</b>（min-max 归一化，无效的 0 值不参与统计），再套上 <code>JET</code> 色表。<code>JET</code> 的约定是 <b>数值低 = 蓝，数值高 = 红</b>。归一化后「近 = 数值低」，所以：</p>
+      <div class="kv" style="font-size:.85rem;margin:.6rem 0"><b>JET 在本实验的读法：蓝 / 青 = 近 → 绿 = 中 → 黄 / 红 = 远</b></div>
+      <p><b>为什么近处是蓝不是红？</b>因为归一化把较小的深度（近）映射到较小的灰度值，而 <code>JET</code> 又把较小的灰度值映射到蓝色。这条链路决定了方向 —— <b>是「先归一化再套色表」这两步共同决定的，不是色表单独决定的</b>。</p>
+      <p>配置里 <code>colormap: jet</code> 就是干这个，也可以改成 <code>gray</code> 看灰度版（灰度版近处暗、远处亮，方向反过来，更难读）。</p>
+      <p><b>注意：伪彩色只是给人看的</b>。程序内部做计算用的始终是原始的毫米数值 —— 颜色和真实距离之间还隔着一次 min-max 归一化，两者不是固定对应关系（场景一变，同一个蓝色可能代表不同距离）。</p>
+      <div class="tip amber" style="margin-top:.6rem"><span class="lab">⚠️ 一个容易踩的坑</span>无效像素（深度=0）归一化后也是 0，<b>在 JET 里显示为深蓝</b> —— 和「最近处」撞色了。所以看画面时要结合形状判断：<b>大片纯深蓝的斑块通常是「测不到」，不是「贴到镜头上」</b>。这也是「画面 B」要专门讲的原因。</div>
+    </div>
+  </details>
+</section>
+
+<section class="blk" id="s4">
+  <h2><span class="no">04</span>它吃什么、吐什么</h2>
+
+  <div class="io2">
+    <div class="cellbox in">
+      <span class="lb">INPUT · 喂进去</span>
+      <div class="v">HP60C 两路画面</div>
+      <p class="d"><b>彩色</b>（RGB，普通相机）+ <b>深度</b>（uint16 毫米）。两路从同一个 ROS2 话题来。</p>
+    </div>
+    <div class="arw">→</div>
+    <div class="cellbox out">
+      <span class="lb">OUTPUT · 吐出来</span>
+      <div class="v">双栏画面 + 点击处 (X,Y,Z)</div>
+      <p class="d">左栏彩色 + 右栏伪彩深度。点一下，终端和一个信息框显示该点的距离与三维坐标。</p>
+    </div>
+  </div>
+
+  <pre><span class="c"># 关键配置（config/depth3d_config.yaml）</span>
+<span class="b">depth:</span>
+  scale: 0.001           <span class="c"># 毫米 → 米（÷1000）</span>
+  <span class="y">invalid_value: 0</span>        <span class="c"># 0 = 测不到（平台事实）</span>
+  colormap: jet
+  <span class="y">display_scale: 0.666</span>    <span class="c"># 显示时缩到 2/3 → 点击坐标要除以它还原</span>
+
+<span class="b">cam3d:</span>
+  <span class="y">fx: 608.39958</span>          <span class="c"># ← 内参，反投影用的</span>
+  <span class="y">fy: 611.20714</span>
+  <span class="y">cx: 328.30096</span>
+  <span class="y">cy: 226.46483</span>
+  width: 640
+  height: 480
+
+<span class="b">source:</span>
+  mode: ros              <span class="c"># ros | image</span>
+
+<span class="b">server:</span>
+  port: 8083
+  stream_name: depth.mjpg</pre>
+</section>
+
+<section class="blk" id="s5">
+  <h2><span class="no">05</span>三步跑起来</h2>
+
+  <ol class="steps3">
+    <li>
+      <span class="st">认清四个内参值<em>约 2 分钟</em></span>
+      <pre><span class="g">cd</span> ~/ros2_ws/src/xflz_eai_car1/vision/08_depth_3d_detection
+<span class="g">cat</span> config/depth3d_config.yaml | <span class="g">head</span> -20</pre>
+      <div class="expect">cam3d:
+  fx: 608.39958    <i>← 横向焦距</i>
+  fy: 611.20714    <i>← 纵向焦距</i>
+  cx: 328.30096    <i>← 主点 x（不是 320！）</i>
+  cy: 226.46483    <i>← 主点 y（不是 240！）</i>
+  width: 640
+  height: 480</div>
+      <p><b>记住一点：这些数是这台相机标定出来的，不能随便改，换相机就得重标。</b></p>
+    </li>
+
+    <li>
+      <span class="st">看双栏画面<em>约 3 分钟</em></span>
+      <p>终端 1 起相机：</p>
+      <pre><span class="g">source</span> /opt/ros/humble/setup.bash &amp;&amp; <span class="g">source</span> ~/ros2_ws/install/setup.bash
+<span class="g">export</span> ROS_DOMAIN_ID=2
+<span class="g">ros2</span> launch ascamera hp60c.launch.py</pre>
+      <p>终端 2 跑深度查看器：</p>
+      <pre><span class="g">cd</span> ~/ros2_ws/src/xflz_eai_car1/vision/08_depth_3d_detection
+<span class="g">python</span> src/app.py --ros</pre>
+      <div class="expect">frame 30  depth_valid=91.2%  avg_fps=28
+<i>浏览器：http://&lt;板子IP&gt;:8083/depth.mjpg</i>
+<i>左=彩色，右=伪彩深度（蓝近 → 红远）</i></div>
+      <p><b>看右栏：</b>你手伸得近的地方应该是<b>蓝色</b>，远处的墙是<b>黄红色</b>。<b>如果手移近了颜色不变，说明深度通道没数据</b>（此时整片可能是同一种颜色，或大片深蓝代表「测不到」）。</p>
+    </li>
+
+    <li>
+      <span class="st">点击读深度，手算验证<em>约 8 分钟</em></span>
+      <p>这个实验需要<b>本地显示器</b>（因为要鼠标点击）。如果有接显示器：</p>
+      <pre><span class="g">python</span> src/app.py --ros --display</pre>
+      <div class="expect">在画面上点一下，终端打印：
+click (u=412, v=238)  Z = 0.483 m
+3D:  X = 0.0663 m   Y = 0.0091 m   Z = 0.4830 m</div>
+      <p><b>无显示器怎么办？</b>先跑 <code>--ros</code> 看推流熟悉流程，再去有显示器的机器上做点击这一步。<code>--display</code> 必须在有 X 显示的会话里跑，SSH 纯终端下会报 <code>cv2.error: NULL window</code>。</p>
+      <p><b>关键练习：手算验证。</b>把终端打印的 u、v、Z 抄下来，用上面的公式自己算一遍 X、Y。如果和你算的差不多（差几毫米是正常的），说明你真的懂了这个公式。</p>
+      <pre><span class="c"># 手算模板（拿计算器也行）</span>
+X = (u − 328.30096) × Z / 608.39958
+Y = (v − 226.46483) × Z / 611.20714</pre>
+      <p><b>验算一下上面的例子</b>，确认你真的理解了符号：</p>
+      <pre>u=412 → X = (412 − 328.30) × 0.483 / 608.40 = <span class="y">0.0664 m</span>   <i>← u&gt;cx，所以 X&gt;0（在右侧）</i>
+v=238 → Y = (238 − 226.46) × 0.483 / 611.21 = <span class="y">0.0091 m</span>   <i>← v&gt;cy，所以 Y&gt;0（在下方）</i></pre>
+    </li>
+  </ol>
+
+  <div class="oneline"><span>三步跑完，你就从「看图」升级到了「量空间」。<b>这一步是 2D 视觉和 3D 视觉的分界线</b> —— 也是机器人能真正动手操作的前提。</span></div>
+</section>
+
+<section class="blk" id="s6">
+  <h2><span class="no">06</span>你该看到的画面</h2>
+
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">画面 A · 双栏正常</div><div class="kt">左彩色 右伪彩</div><p>右栏颜色随距离连续变化（蓝 → 青 → 绿 → 黄 → 红）。<b>平滑的渐变 = 深度测量正常</b>；如果右栏大片纯色或颜色跳变，说明有问题。</p></div>
+    <div class="kcard"><div class="kd">画面 B · 深蓝或纯黑斑块</div><div class="kt">深度 = 0（无效）</div><p>这些是「测不到」的地方：玻璃、镜面、太远、太近、或者物体表面太黑吸收了红外。<b>深蓝 ≠ 「最近」，这里是无效像素恰好也是深蓝</b> —— 结合形状判断。</p></div>
+    <div class="kcard"><div class="kd">画面 C · 边缘模糊</div><div class="kt">物体轮廓处颜色渐变</div><p>这是深度相机的固有特性 —— 物体边缘处红外光会有一部分打到背景上，测出的深度是「混着的」。所以边缘的深度值不可靠。</p></div>
+  </div>
+
+  <div class="tip tealb"><span class="lab">🔍 为什么无效像素不能当「距离 0 米」？</span>深度值 0 是一个<b>约定</b>，表示「这个像素没有有效测量」。如果程序把 0 当成「距离 0 米」，反投影算出来的点会全部堆在相机位置上 —— 这就是点云图里常见的「一团乱点」来源。<b>正确处理：反投影前跳过 Z=0 的像素。</b></div>
+</section>
+
+<section class="blk" id="s7">
+  <h2><span class="no">07</span>改一个参数看变化</h2>
+  <p class="lead">这个实验最值得玩的是<b>把内参故意改错</b>，看坐标怎么跟着错。亲眼看到「内参错了会怎样」，你才会重视标定。</p>
+
+  <div class="lab2">
+    <div class="lh">⚡ 参数实验台 · 输入 u, Z，拖动 fx 看 X 怎么变</div>
+    <div class="lr">
+      <label>像素 u</label>
+      <input id="pu" type="range" min="0" max="640" step="10" value="400">
+      <output id="pu_o">400</output>
+    </div>
+    <div class="lr">
+      <label>深度 Z（米）</label>
+      <input id="pz" type="range" min="10" max="200" step="5" value="50">
+      <output id="pz_o">0.50</output>
+    </div>
+    <div class="lr">
+      <label>fx（内参）</label>
+      <input id="pf" type="range" min="300" max="900" step="10" value="608">
+      <output id="pf_o">608</output>
+    </div>
+    <div class="vis">
+      <svg viewBox="0 0 420 150" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="内参fx变化时同一像素对应的三维点横向偏移">
+        <rect x="0" y="0" width="420" height="150" rx="8" fill="#0b1220"/>
+        <!-- 俯视图 -->
+        <circle cx="40" cy="100" r="9" fill="#1e293b" stroke="#22d3ee" stroke-width="1.6"/>
+        <text x="40" y="126" text-anchor="middle" font-size="9" fill="#475569" font-family="sans-serif">相机</text>
+        <line x1="52" y1="100" x2="400" y2="100" stroke="#334155" stroke-width="1" stroke-dasharray="5 4"/>
+        <text x="380" y="116" font-size="9" fill="#475569" font-family="monospace">光轴</text>
+        <!-- 视锥 -->
+        <path id="cone" d="" fill="#22d3ee" opacity=".12"/>
+        <!-- 射线 -->
+        <line id="ray" x1="40" y1="100" x2="200" y2="60" stroke="#4ade80" stroke-width="2"/>
+        <circle id="pt" cx="200" cy="60" r="5" fill="#4ade80"/>
+        <text id="ptt" x="200" y="46" font-size="9.5" fill="#6ee7b7" font-family="monospace" text-anchor="middle">X=0.06</text>
+        <!-- Z 标记 -->
+        <line id="zline" x1="200" y1="100" x2="200" y2="60" stroke="#fbbf24" stroke-width="1" stroke-dasharray="3 3"/>
+        <text id="zt" x="200" y="112" font-size="9" fill="#fbbf24" font-family="monospace" text-anchor="middle">Z</text>
+        <text x="210" y="24" font-size="10" fill="#94a3b8" font-family="sans-serif">俯视图：从上往下看相机和这个点</text>
+      </svg>
+    </div>
+    <div class="say" id="say"></div>
+  </div>
+
+  <h3>改错内参会有什么后果</h3>
+  <table>
+    <thead><tr><th style="width:22%">改错哪个</th><th style="width:30%">现象</th><th>实际影响</th></tr></thead>
+    <tbody>
+      <tr><td><code>fx</code> 改大</td><td>同样的像素算出更小的 X（点被拉向中间）</td><td>机械臂会抓偏 —— 实际在右边，算出来在中间</td></tr>
+      <tr><td><code>cx</code> 改大</td><td>所有 X 整体往负方向偏移（系统性偏移）</td><td>每个点都偏一点，看起来「都没错但就是抓不准」</td></tr>
+      <tr><td><code>cy</code> 改错</td><td>Y 坐标系统性偏移</td><td>高度放不准，抓取高度差几厘米</td></tr>
+    </tbody>
+  </table>
+
+  <p><b>另一个值得试的改动：<code>display_scale</code>。</b>它现在是 0.666，意味着画面显示时缩到了 2/3。如果程序忘记「把点击坐标除以它还原」，你点画面上的 (400, 240) 实际会去查原图 (600, 360) 的深度 —— 读到的值就完全不对了。<b>这是这个实验最隐蔽的坑</b>，因为画面看起来完全正常，只有数值不对。</p>
+
+  <div class="oneline"><span><b>内参是「硬事实」，不是「可调参数」。</b>改内参不会让效果变好，只会让结果整体偏移。<b>标定数据必须和相机一一对应。</b></span></div>
+</section>
+
+<section class="blk" id="s8">
+  <h2><span class="no">08</span>踩坑速查</h2>
+
+  <table class="pit2">
+    <thead><tr><th>现象</th><th>原因</th><th>怎么办</th></tr></thead>
+    <tbody>
+      <tr><td>一点都是「距离 0 米」或 invalid</td><td>点到了深度=0 的像素（玻璃、镜面、太远、太黑）</td><td>换一个实体表面点；程序应提示 invalid 而不是算成 0</td></tr>
+      <tr><td>读到的距离明显不对</td><td>点击坐标没按 <code>display_scale</code> 还原</td><td>窗口坐标 ÷ 0.666 才是原图坐标</td></tr>
+      <tr><td>右栏深度图全黑 / 全无变化</td><td>深度通道没有数据（只开了彩色路）</td><td>确认 <code>ros2 launch ascamera hp60c.launch.py</code> 已起且带深度路</td></tr>
+      <tr><td>右栏一片纯色没层次</td><td>场景里没有远近层次（比如对着一面墙）</td><td>放个东西在不同距离，比如一只手往前伸</td></tr>
+      <tr><td>大片深蓝色斑块</td><td>那些像素是无效值（0），归一化后也是 0，在 JET 里显示为深蓝</td><td>不是 bug。深蓝有两种含义：最近 或 测不到 —— 结合形状判断</td></tr>
+      <tr><td>物体边缘深度跳变严重</td><td>深度相机固有特性（边缘混光）</td><td>正常现象。做测量时避开物体边缘，取内部区域的中值</td></tr>
+      <tr><td>刚启动第一帧是黑的</td><td>相机还在预热，首帧无有效数据</td><td>程序已内置 <code>rgb.mean()&lt;5</code> 跳过首帧，等一秒就好</td></tr>
+      <tr><td>改了话题连不上</td><td>话题名被 remap 了</td><td>保持 <code>/ascamera_hp60c/camera_publisher/rgb0/image</code>，<b>严禁 remap</b></td></tr>
+    </tbody>
+  </table>
+
+  <div class="tip amber"><span class="lab">💡 排查口诀</span><b>先看右栏有没有层次，再看点击数值对不对。</b>右栏没有远近变化 = 采集问题（深度路没数据）；有层次但数值不对 = 换算问题（<code>display_scale</code> 或内参）。</div>
+</section>
+
+<section class="blk" id="s9">
+  <h2><span class="no">09</span>进阶（可选）</h2>
+
+  <details class="deep">
+    <summary>进阶 1 · 生成一张点云图<em>约 40 分钟</em></summary>
+    <div class="deep-body">
+      <p>把画面里每个像素都反投影一遍，得到 30 万个三维点（640×480）。存成 <code>.ply</code> 或 <code>.xyz</code> 文件，用 MeshLab 或 CloudCompare 打开，就能转着看立体形状。</p>
+      <pre>for v in range(480):
+    for u in range(640):
+        Z = depth[v,u] / 1000.0
+        if Z == 0: continue                      # 跳过无效
+        X = (u - cx) * Z / fx
+        Y = (v - cy) * Z / fy
+        points.append((X, Y, Z))</pre>
+      <p><b>注意两个性能问题：</b>① 纯 Python 双循环很慢，实际要用 NumPy 向量化；② 30 万个点里可能有大量噪点，通常要按深度范围过滤或降采样。</p>
+    </div>
+  </details>
+
+  <details class="deep">
+    <summary>进阶 2 · 抠掉背景，只算桌面的高度<em>约 30 分钟</em></summary>
+    <div class="deep-body">
+      <p>一个很实用的技巧：<b>深度图可以直接当「分割」用</b>。</p>
+      <p>比如要找一个桌上的物体，先测出桌面的深度（比如 0.8m），然后把深度 &lt; 0.78m 的像素全部取出来 —— 这些就是「比桌面高的东西」。不需要任何 AI 模型。</p>
+      <p><b>这个思路在工业上非常常用</b>：如果场景固定、光照可控、物体总是比传送带高，深度阈值比任何深度学习方案都更快更可靠。</p>
+    </div>
+  </details>
+
+  <details class="deep">
+    <summary>进阶 3 · 为什么深度相机测不到玻璃和镜子<em>选读 1 分钟</em></summary>
+    <div class="deep-body">
+      <p>HP60C 这类深度相机用的是<b>红外结构光或 ToF</b>：发出一束红外光，等它反射回来，用「飞了多久」或「花纹变形多少」算距离。</p>
+      <p><b>玻璃为什么不行？</b>红外光直接穿过去了，没反射回来 —— 相机等不到回波，只能给 0。</p>
+      <p><b>镜子为什么不行？</b>光被整片反射到别处去了，回到相机的方向是错的 —— 测出来的是一个「虚像」的距离，甚至更远。</p>
+      <p><b>黑色物体为什么不行？</b>黑色吸收红外，回波太弱，信噪比不够。</p>
+      <p>所以工业上做 3D 检测时，被测物表面通常要处理：喷哑光粉、贴哑光胶带、或者改用激光三角测量。<b>这些「物理层面的对策」，往往比调算法更有效。</b></p>
+    </div>
+  </details>
+
+  <details class="deep">
+    <summary>进阶 4 · 为什么深度相机需要「对齐」到彩色相机<em>选读 1 分钟</em></summary>
+    <div class="deep-body">
+      <p>HP60C 的彩色镜头和红外深度镜头<b>在物理上差了几厘米</b>。这意味着深度图里第 (320, 240) 个像素，和彩色图里同一个位置的像素，<b>看的不是空间中的同一个点</b>。</p>
+      <p>不做对齐会怎样？你把彩色图里检测到的目标中心 (u, v) 直接拿去查深度图，读到的可能是目标背后的墙的距离 —— <b>误差在物体边缘处最明显</b>。</p>
+      <p>解决办法是<b>深度-彩色对齐</b>（depth-to-color alignment）：用两个镜头的内参和外参（相对位置），把深度图重投影到彩色相机的视角下。对齐后两图逐像素对应，才能安全地「彩色找目标 → 深度查距离」。</p>
+      <p><b>怎么判断是否已对齐？</b>拿一个手指伸到镜头前，看彩色图和伪彩深度图里手指的轮廓是否重合。如果深度图里的手指明显偏移或错位，就是没对齐。</p>
+      <p>本实验的 <code>ascamera</code> 驱动输出的深度话题已是标定对齐过的，所以直接查值即可。<b>换用第三方深度相机时，这一步必须自己确认。</b></p>
+    </div>
+  </details>
+</section>
+
+<section class="blk" id="s10">
+  <h2><span class="no">10</span>随堂小测</h2>
+
+  <div class="quiz2">
+    <div class="qq"><span class="qn">Q1</span>反投影公式里的 Z 是从哪来的？</div>
+    <div class="opt" data-right="0">用 X 和 Y 算出来的</div>
+    <div class="opt" data-right="1">深度相机直接测量出来的，不是算的</div>
+    <div class="opt" data-right="0">从图片亮度推测的</div>
+    <div class="fb"><b>对。</b>这是最关键的认知。深度相机用红外/结构光<b>直接测距</b>，反投影只是把这个测量值配合像素位置换算成三维坐标。普通相机没有绝对距离信息，所以只能拍到 2D。</div>
+  </div>
+
+  <div class="quiz2">
+    <div class="qq"><span class="qn">Q2</span>深度图上显示 0 的像素，代表什么？</div>
+    <div class="opt" data-right="0">距离为 0 米，就在镜头前</div>
+    <div class="opt" data-right="1">这个像素测不到有效深度</div>
+    <div class="opt" data-right="0">最深的地方</div>
+    <div class="fb"><b>对。</b>0 是「无效」的约定值，常见于玻璃、镜面、太远、太黑。如果程序把 0 当成真距离去反投影，会算出一堆堆在相机位置的乱点 —— 点云图里那种「糊成一团」就是这么来的。</div>
+  </div>
+
+  <div class="quiz2">
+    <div class="qq"><span class="qn">Q3</span>显示窗口缩放到了 2/3，你在窗口里点了 (300, 150)，原图坐标是多少？</div>
+    <div class="opt" data-right="0">(300, 150)</div>
+    <div class="opt" data-right="1">约 (450, 225) —— 要除以 0.666</div>
+    <div class="opt" data-right="0">约 (200, 100) —— 要乘以 0.666</div>
+    <div class="fb"><b>对。</b>显示时缩小了，读取时就要放大还原：<code>原坐标 = 窗口坐标 ÷ display_scale</code>。<b>忘记这一步的现象很隐蔽</b>：画面看起来完全正常，只是读出的深度值不对 —— 因为它取的是另一个位置的像素。</div>
+  </div>
+</section>
+
+<nav class="expnav">
+  <a href="../exp-09-pose-landmark/index.html"><span class="lb">← 上一个</span>EXP-09 骨骼关键点</a>
+  <a class="next" href="../exp-11-pose-control/index.html"><span class="lb">下一个实验 →</span>EXP-11 体感控制</a>
+</nav>
+
+<footer>
+  <span>机器人视觉入门 · EXP-10 深度相机与 3D 定位</span>
+  <span>4 学时 · 约 28 FPS · 基于 vision/08_depth_3d_detection 源码</span>
+</footer>
+
+</main>
+</div>
+
+<script src="../shared/tutorial.js" defer></script>
+<script src="../shared/beginner.js" defer></script>
+<script>
+(function(){
+  var pu=document.getElementById('pu'), pz=document.getElementById('pz'), pf=document.getElementById('pf');
+  if(!pu) return;
+  var CX=328.30096;
+  var ray=document.getElementById('ray'), pt=document.getElementById('pt'), ptt=document.getElementById('ptt');
+  var zline=document.getElementById('zline'), zt=document.getElementById('zt'), cone=document.getElementById('cone');
+  var say=document.getElementById('say');
+  function upd(){
+    var u=parseInt(pu.value,10), Z=parseInt(pz.value,10)/100, fx=parseInt(pf.value,10);
+    document.getElementById('pu_o').textContent=u;
+    document.getElementById('pz_o').textContent=Z.toFixed(2);
+    document.getElementById('pf_o').textContent=fx;
+    var X=(u-CX)*Z/fx;                 /* 米 */
+    /* 俯视图：相机在 (40,100)，Z 映射到 x 轴，X 映射到 y 轴（向上为负） */
+    var px = 40 + Z/2.0*330;           /* Z 最大 2m → 330px */
+    var py = 100 - X/0.5*60;           /* X ±0.5m → ±60px */
+    px=Math.max(70,Math.min(400,px));
+    py=Math.max(30,Math.min(145,py));
+    ray.setAttribute('x2',px); ray.setAttribute('y2',py);
+    pt.setAttribute('cx',px); pt.setAttribute('cy',py);
+    ptt.setAttribute('x',px); ptt.setAttribute('y',py-9);
+    ptt.textContent='X='+X.toFixed(3)+'m';
+    zline.setAttribute('x1',px); zline.setAttribute('x2',px);
+    zline.setAttribute('y1',100); zline.setAttribute('y2',py);
+    zt.setAttribute('x',px); zt.setAttribute('y',112);
+    zt.textContent=Z.toFixed(2)+'m';
+    /* 视锥 */
+    var halfH = 0.28;                  /* 大约半视场角对应的比例 */
+    cone.setAttribute('d','M40,100 L'+px+','+(100-halfH*330)+' L'+px+','+(100+halfH*330)+' Z');
+    var m='';
+    if(fx>750) m='<b>fx = '+fx+' 偏大</b>：同样的像素 u 算出的 X = '+X.toFixed(3)+' 米，<b>比真实值偏小</b>（点被拉向光轴）。机械臂按这个坐标去抓，会抓偏到中间。';
+    else if(fx<450) m='<b>fx = '+fx+' 偏小</b>：算出的 X = '+X.toFixed(3)+' 米，<b>比真实值偏大</b>（点被推向外侧）。';
+    else if(Math.abs(fx-608)<25) m='<b>fx = '+fx+'，接近标定值 608.40</b>：X = '+X.toFixed(3)+' 米。这就是这台相机的正确内参 —— 不要随意改动它。';
+    else m='<b>fx = '+fx+'</b>：算出的 X = '+X.toFixed(3)+' 米。fx 每偏离标定值一点，所有点的横向坐标都会成比例地错。';
+    say.innerHTML=m;
+  }
+  pu.addEventListener('input',upd); pz.addEventListener('input',upd); pf.addEventListener('input',upd); upd();
+})();
+</script>
+</body>
+</html>

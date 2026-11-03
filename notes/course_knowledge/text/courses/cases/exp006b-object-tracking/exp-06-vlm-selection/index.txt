@@ -1,0 +1,282 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/cases/exp006b-object-tracking/exp-06-vlm-selection/index.html
+TITLE: EXP-06 · VLM 描述选目标 — 通用目标追踪综合项目
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+EXP-06 · VLM 描述选目标 — 通用目标追踪综合项目
+🎓 具身智能课程 ·
+通用目标追踪
+综合项目
+/
+通用目标追踪
+/ EXP-06
+本页目录
+01 问题引入：说颜色怎么锁 ID
+02 原理通俗讲解：先看缩略图再放大
+03 关联知识点
+04 实验目标
+05 实验环境与准备
+06 动画讲解：切格 → 选格 → 锁 ID
+07 互动讲解：网格选格演练台
+08 实操步骤：dump 网格与 VLM 选车
+09 重点与易错点
+10 总结与思考
+CH1 · 需求与架构
+EXP-01 需求分析
+EXP-02 单状态机架构
+EXP-03 配置详解
+CH2 · 感知与交互
+EXP-04 DeepSORT 底座
+EXP-05 LLM 门控
+EXP-06 VLM 选目标
+CH3 · 语音与验收
+EXP-07 语音与 TTS 打断
+EXP-08 事件与降级
+EXP-09 全功能验证
+EXP-06 · 第 2 章 · 综合性 · 4 学时
+VLM 描述选目标：一句「追踪红色小轿车」如何变成一个 ID
+用户不会总记得 ID。当门控传回「有描述、无 id」时，VLM 网格登场：把当前帧切成带编号的缩略图网格、让
+Qwen3.5-0.8B_vision
+只答一个数字、再用
+cell_ids[k-1]
+把格子映射回追踪 ID。
+cell_cap=16 的硬上限、0/99 拒答、三路径 fail-closed
+共同保证"选不准就不锁"。
+难度 ⭐⭐⭐ · 4 学时
+build_grid L175-213
+cell_cap=16
+cell_ids[k-1]
+_vlm_none
+01
+问题引入：说颜色怎么锁 ID
+你说「追踪红色小轿车」，可系统内部流通的只有
+DeepSORT 的数字 ID
+（id18、id24…）。颜色词与 ID 之间隔着一道翻译鸿沟——LLM 只负责听懂并吐出
+track_vlm
+（EXP-05 第③口），真正"看图认车"的活落在 VLM 头上：
+1
+门控判定「描述有、id 无」→ track_vlm
+2
+dump_track_grids 给当前帧打上编号标签、切网格
+3
+VLM 只答一个数字（或 0 = 没找到）
+4
+cell_ids[k-1] 映回真实 ID → submit_effect 锁定
+💡 为什么不直接报 ID
+端侧 0.8B 视觉模型读小目标数字 ID 极易看错；网格化把它简化成
+"选第几格"
+的四选一选择题——正确率高得多，还天然可校验。
+02
+原理通俗讲解：先看缩略图再放大
+VLM 网格就像先看缩略图再放大细节
+——监控室值班员不是把每辆车放大数车牌，而是先在九宫格缩略图上圈"红色那格"，再看该格里的具体目标。
+比喻一
+切网格 = 贴号码牌的缩略图
+build_grid（vlm_real.py L175-213）把帧切成 rows×cols 网格，每格标 1..n 的大号数字、空位标
+?
+，统一压到 448×448。
+格子编号是给模型看的"座位号"。
+比喻二
+_pick_grid = 先排座再定座数
+L170-185 按排序键
+(|r-c|, 格子数, min(r,c), r)
+在候选布局中挑一个——让网格尽量方正、优先 2×2 这类小布局，候选多了才升 4×4。
+比喻三
+PROMPT = 只许报座位号的考规
+「图片是 R 行 C 列的网格…只答数字 1..N，找不到答 0」（grid_select_prompt L215-240）；
+故意不提供 99 这个"逃生口"
+（L218 注释）——模型答 0/99/越界一律按拒答处理。
+比喻四
+cell_ids[k-1] = 座位号换真人 ID
+_parse_tile（L241-263）把「3」还原成 k=3，select_crops（L433-473）在 L471 取
+cell_ids[k-1]
+。
+座位号 ≠ 追踪 ID
+，这一步才是换算。
+🔍 fail-closed 三路径
+①VLM 懒加载失败 → None；②解析出 0/99/越界 → None；③候选目标 > 16（cell_cap=16）→ None。三条路殊途同归到
+_vlm_none
+（track_app.py L402-405，打 WARN + 引导话术、
+绝不 submit
+）——拿不准宁不放行。
+03
+关联知识点
+上游
+EXP-05 门控第③口
+「描述有、id 无」才走 track_vlm；有 id 走 ID 对齐、纯清除走 clear_track——VLM 只接门控筛剩下的那一类话。
+下游
+submit_effect 入队
+选中的 ID 经门控放行后进 maxsize=8 队列 → 主循环 apply → DeepSORT 按 min_confidence=0.3 等规则继续跟（EXP-04）。
+模型
+Qwen3.5-0.8B_vision 链
+llm_mgr 拉起日志
+Qwen3.5-0.8B_w4a16_g128_rk3576.rkllm … --port 8080
+，首载 30-60s；VLM 懒加载，首次选车前才实例化。
+测试锚点
+三个测试 + 配置假件
+test_vlm_grid / test_vlm_real / test_vlm_fake；track_config.yaml L33
+fake_result_id=3
+→ FakeVLMSelect（vlm_fake.py L14-18）无真模型也能全链路回归。
+04
+实验目标
+用 dump_track_grids 生成带标签网格图，读懂 JSON 里的 cell_cap / order / cells / 448×448
+跑 test_vlm_select 传入
+--color 红
+，核对 frame200（2×2，4 id）与 frame400（4×4，11 id）的选格结果
+手推公式
+cell_px=⌊448/max(rows,cols)⌋
+、
+k=r×cols+c+1
+、
+id=cell_ids[k-1]
+复现一段成功链路日志：[cmd] 描述指令 → track_vlm → [track_vlm] 锁定目标 ID
+构造一个失败场景（候选 > 16 或模型答 0），确认走 _vlm_none 引导话术、ID 不被锁定
+05
+实验环境与准备
+用视频 + 文本模式即可复现全链路（摄像头模式同理，只是帧源不同）。测试可先走 fake_result_id 假件，再换真 VLM：
+# ① 测试（假件链，不依赖真模型）
+python3
+-m pytest tests/ -q -k "vlm"
+# ② 启动文本模式（llm_server 由 ensure_running 自动拉起）
+python3
+apps/track_app.py \
+  --video /home/iflytek/ros2_ws/src/xflz_eai_car1/vision/07_multi_object_tracking/test.mp4 \
+  --text --mjpeg
+# ③ 配置确认（fake_result_id 位置）
+grep
+-n "fake_result_id" config/track_config.yaml
+# L33 默认 3
+💡 真假模型切换
+真 VLM 走 llm_mgr 懒加载、首载 30-60s；跑批量回归时留
+fake_result_id
+（FakeVLMSelect 固定返回该 ID）——把"映射逻辑对不对"与"模型认得准不准"分成两件事验证。
+06
+动画讲解：切格 → 选格 → 锁 ID
+一笔动画看完三步：帧先被切成带编号的 2×2 网格，VLM 只答一个座位号，最后换算成追踪 ID。
+红色虚线出口代表 fail-closed
+——任何一步拿不准都滑向那里：
+track_vlm：帧 → 448×448 编号网格 → 选格 → cell_ids[k-1]
+① build_grid L175-213
+?
+1
+2
+3
+4
+cell_px=⌊448/max(r,c)⌋=224 · 空位标 ?
+② VLM 只答数字
+「只答 1..N，找不到答 0」
+答：3（_parse_tile L241-263）
+cell_cap=16 上限
+候选>16 → None
+③ 映射 L471
+id = cell_ids[3-1]
+→ id32
+✔ 锁定
+[track_vlm]
+submit_effect 入队
+✘ 三条拒答路 → _vlm_none（L402-405）
+VLM 加载失败 / 答 0·99·越界 / 候选 > 16
+WARN + 引导话术，绝不 submit
+动画 6-1｜蓝框格子每 6 秒被"点名"一次（选中 3 号格 → cell_ids[2] → id32 锁定）；两条红色虚线是三条拒答路汇聚到 _vlm_none——拿不准宁不放行
+07
+互动讲解：网格选格演练台
+扮演 VLM 做一遍选择题：给定网格布局与候选 ID，选一格看映射结果，再故意触发一次 fail-closed：
+网格选格演练台 · Grid Pick Lab
+🖼 2×2 选 3 号格
+🖼 4×4 选 11 号格
+🚫 模型答 0
+🧮 候选 17 个超 cap
+↺ 复位
+// 选一格开始：k=r×cols+c+1，最终 id=cell_ids[k-1]
+提示：座位号永远不等于追踪 ID，最后那步减一换算是全实验最大陷阱
+💡 公式三连
+cell_px=⌊448/max(rows,cols)⌋
+（2×2 → 224）→
+k=r×cols+c+1
+（第 2 行第 1 列 → 3）→
+id=cell_ids[k-1]
+。三步任一错位，锁到的就是旁边那辆车。
+08
+实操步骤：dump 网格与 VLM 选车
+1
+dump_track_grids 抽帧切格，生成 grid_f200 图与 JSON（40 分钟）
+2
+test_vlm_select --color 红 跑真/假模型，核对选格与 cell_ids（40 分钟）
+3
+文本模式完整说「追踪红色小轿车」，抓五段成功链路日志（60 分钟）
+4
+换"画面里没有的描述"触发 _vlm_none，确认不锁定（40 分钟）
+5
+grep 行号锚点 + 整理三路径 fail-closed 表（40 分钟）
+# ① 抽帧切网格（frame-step 200 → 第 200/400 帧）
+python3
+apps/dump_track_grids.py \
+  --video /home/iflytek/ros2_ws/src/xflz_eai_car1/vision/07_multi_object_tracking/test.mp4 \
+  --frame-step 200
+→ runs/vlm_frames/grid_f200_rx2c2.jpg / .json（含 cell_cap、order、cells、448×448）
+# ② 指定颜色选格
+python3
+apps/test_vlm_select.py \
+  --image runs/vlm_frames/grid_f200_rx2c2.jpg \
+  --json  runs/vlm_frames/grid_f200_rx2c2.json --color 红
+frame200 n=4 ids=[29,30,32,33] grid 2×2 → PROMPT → 答 '3'（5s）→ cell_ids[2]=32
+frame400 n=11 → 4×4 网格（仍 ≤ cell_cap=16）
+# ③ 完整链路成功日志（--text 模式逐句验证）
+[cmd] 追踪红色小轿车 → native tool=track_vlm
+[cmd] track_ids 无 id 但含描述，改 VLM 选车
+[track_vlm] dump 带标签网格 → [track_vlm] 锁定目标 ID 24
+# ④ 失败链路（如「追踪火车」画面中不存在）
+[cmd] track_ids 无可用 id，回引导 —— 不锁定任何 ID
+# ⑤ 行号锚点
+grep
+-n "def build_grid\|def _pick_grid\|def _parse_tile" vision/.../vlm_real.py
+grep
+-n "_vlm_none" apps/track_app.py
+# L402-405
+grep
+-n "cell_cap" apps/track_app.py config/track_config.yaml
+⚠️ 拒答口只有一个
+PROMPT 只教模型答 1..N 或 0，
+没有 99 这个口
+（L218 注释特意说明）——解析端仍防御性处理 99，因为老模型/幻觉可能自己发明数字。
+09
+重点与易错点
+座位号 ≠ 追踪 ID
+：格子 k 是给模型看的，真正 ID 必须经
+cell_ids[k-1]
+；直接把 k 当 ID 会锁错目标
+cell_cap=16 是硬上限：候选框超过 16 个直接 None——宁可让用户换个描述，也不让模型在 16+ 格里盲选
+0/99/越界一律拒答：_parse_tile 的宽容解析不是"尽力猜"，而是把所有歧义都送进同一条 fail-closed 路
+VLM 是懒加载：第一次说颜色指令才实例化模型，首载 30-60s 内"没反应"是正常加载，不是卡死
+实验完确认锁定状态再收尾：失败链路必须停在引导话术，锁定了 ID 说明门控或映射有漏
+⚠️ 常见坑
+现象 → 解法
+选中格却锁了隔壁车
+k 与 cell_ids 下标错位 → 核对 cell_ids[k-1] 与 _pick_grid 的 order 顺序是否一致
+n=11 却仍是 2×2
+先看 _pick_grid 排序键 (|r-c|, 格子数, …) 的输出 → 必要时读 dump JSON 的 order 字段
+模型回了长句子不给数字
+_parse_tile 解析不到 1..N → 按拒答处理进 _vlm_none，检查 PROMPT 是否完整下发
+测试与真机结果不一致
+fake_result_id=3 固定返回 → 跑真链路先清掉/留档假件再验
+首载 60s 以为挂了
+llm_mgr 30-60s 属正常 → 看「Qwen3.5-0.8B…--port 8080」拉起日志
+10
+总结与思考
+✅ 完成成果
+网格 JSON + 选格记录
+grid_f200/*.json 在手，color=红 的选格结果与 cell_ids 换算过程可完整复述。
+🧠 原理收获
+选择题化繁为简
+把"从图里找 ID"降维成"四选一选格"，模型小也能做对——这是端侧 VLM 的工程智慧。
+🛠 技能收获
+真假件分层验证
+FakeVLMSelect 验映射逻辑，真模型验识别能力，两层分开跑，归因不慌。
+❓ 排障思路
+看 [track_vlm] 三段日志
+dump 带标签网格 → 锁定目标 ID / 无法识别——三段日志把"切、选、映"拆开定位。
+📝 思考题 1
+如果把格子编号从 1..N 改成 0..N-1（Python 下标友好），_parse_tile 与 cell_ids[k-1] 要怎么改才不出错？为什么原设计偏要用 1 起始——对 PROMPT 的歧义性有什么好处？
+📝 思考题 2
+当候选恰好 17 个时直接 fail-closed，是不是太保守了？结合"锁错目标的代价"与"cell_cap=16 的 RAM/显存预算"，谈谈你会怎么设计渐进策略（提示：两轮缩略？局部放大？）。
+CASE-04 · 通用目标追踪综合项目 · EXP-06 VLM 描述选目标
+4 学时 · 综合性 · 基于 object_tracking 实验讲义改编

@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-01 · 控制与巡检准备 | IND-05 工业巡检应用场景</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+  :root{
+    --theme:#059669;
+    --theme-deep:#047857;
+    --theme-bg:#ecfdf5;
+    --theme-bd:#a7f3d0;
+  }
+  figure.shot{margin:18px 0;border:1px solid var(--theme-bd);border-radius:12px;overflow:hidden;background:#fff}
+  figure.shot img{display:block;width:100%;height:auto}
+  figure.shot figcaption{padding:10px 14px;font-size:13px;color:#065f46;background:var(--theme-bg);border-top:1px solid var(--theme-bd)}
+  .vid-note{text-align:center;font-size:12.5px;color:#047857;margin-bottom:6px}
+  .tag.hl{background:var(--theme-bg);border-color:var(--theme-bd);color:var(--theme-deep)}
+/* ── 五星学习法 · 课程分段 ── */
+.fivestar-note{font-size:13px;color:#5b6b78;margin-top:12px}
+.fs-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:14px}
+.fs-cell{border:1px solid var(--theme-bd);border-radius:12px;padding:10px 8px;text-align:center;background:var(--theme-bg)}
+.fs-cell .st{font-size:12.5px;font-weight:800;color:var(--theme-deep)}
+.fs-cell .tm{font-family:var(--font-mono,monospace);font-size:11px;color:#0f766e;margin-top:3px;font-weight:700}
+.fs-cell .ds{font-size:11.5px;color:#5b6b78;margin-top:4px;line-height:1.5}
+.seg{display:inline-block;font-size:11px;font-weight:700;font-family:var(--font-mono,monospace);background:var(--theme-bg);color:var(--theme-deep);border:1px solid var(--theme-bd);border-radius:99px;padding:2px 10px;margin-left:8px;vertical-align:middle;white-space:nowrap}
+.tl{width:100%;border-collapse:collapse;font-size:13px;margin-top:14px;background:#fff}
+.tl th,.tl td{border:1px solid #e2ece9;padding:7px 10px;text-align:left;vertical-align:top}
+.tl th{background:var(--theme-bg);color:var(--theme-deep);font-size:12.5px;white-space:nowrap}
+.tl .m{font-family:var(--font-mono,monospace);color:var(--theme-deep);font-weight:700;white-space:nowrap}
+@media(max-width:900px){.fs-grid{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="bar-in">
+    <a class="logo" href="../../../index.html"><b>课程</b>巡检</a>
+    <nav class="crumb"><a href="../../../index.html#ind">总首页</a> / <a href="../index.html">IND-05 工业巡检</a> / EXP-01</nav>
+  </div>
+</header>
+
+<div class="wrap">
+  <aside class="side">
+    <h4>本页目录 · 五星学习法</h4>
+    <a href="#s0">00 课程节奏 · 8 段微课</a>
+    <a href="#s1" class="now">01 学习目标 ①聚焦问题</a>
+    <a href="#s2">02 原理 ①聚焦 ②激活</a>
+    <a href="#s3">03 硬件与材料 ③示证新知</a>
+    <a href="#s4">04 操作步骤 ④应用新知</a>
+    <a href="#s5">05 关键命令 ④应用新知</a>
+    <a href="#s6">06 动画 ③示证新知</a>
+    <a href="#s7">07 互动 ④应用新知</a>
+    <a href="#s8">08 常见问题 ⑤融会贯通</a>
+    <a href="#s9">09 拓展 ⑤融会贯通</a>
+    <a href="#s10">10 思考题 ⑤融会贯通</a>
+    <h4>兄弟实验</h4>
+    <a href="../exp-02-lidar-slam/index.html">EXP-02 3D 激光建图</a>
+    <a href="../exp-03-amcl-nav2/index.html">EXP-03 定位与多点导航</a>
+    <a href="../exp-04-vision-loop/index.html">EXP-04 视觉巡检闭环</a>
+  </aside>
+
+  <main class="content">
+    <div class="exp-head">
+      <div class="code">EXP-01 · 8 学时</div>
+      <h1>SDK 运动控制与巡检准备</h1>
+      <p class="desc">融合理论「四足运动与巡检概述」：先认识 Go2 Edu 硬件与三类巡检任务，再安装 Unitree SDK 与 ROS2 驱动，用速度指令遥控前进转向、站起趴下、读回状态——验收标准：指令驱动四足运动正常。</p>
+      <div class="meta"><span class="tag hl">实践/理论</span><span class="tag">unitree_sdk2py</span><span class="tag">unitree_ros2</span><span class="tag">低速起步</span></div>
+    </div>
+
+    <!-- 00 -->
+    <section class="blk" id="s0">
+      <h2><span class="no">00</span>课程节奏：五星学习法 · 8 段微课（每段 ≤ 15 min）</h2>
+      <p>本实验按<b>五星学习法</b>组织：先用一个真实故障<b>聚焦问题</b>，再<b>激活旧知</b>（Linux 网络 + ROS2 DDS），接着<b>示证新知</b>（Go2 硬件三大件 + 步态/指令链路动画），然后动手<b>应用新知</b>完成配网装 SDK 到遥控运动，最后借排障与拓展<b>融会贯通</b>。全程切成 <b>8 段微课、每段不超过 15 分钟</b>，段间停顿 1~2 分钟消化；纯讲授合计约 100 分钟，其余课时用于动手实操与个别辅导。</p>
+      <div class="fs-grid">
+        <div class="fs-cell"><div class="st">① 聚焦问题</div><div class="tm">课段 1 · 12 min</div><div class="ds">"指令发了狗不动"故障现场，带着问题开课</div></div>
+        <div class="fs-cell"><div class="st">② 激活旧知</div><div class="tm">课段 2 · 8 min</div><div class="ds">静态 IP · DDS 发现 · ROS2 话题发布订阅</div></div>
+        <div class="fs-cell"><div class="st">③ 示证新知</div><div class="tm">课段 3~4 · 27 min</div><div class="ds">Go2 硬件清单 + 步态相位/指令链路动画</div></div>
+        <div class="fs-cell"><div class="st">④ 应用新知</div><div class="tm">课段 5~7 · 40 min</div><div class="ds">配网→装 SDK/ROS2→读状态→遥控运动</div></div>
+        <div class="fs-cell"><div class="st">⑤ 融会贯通</div><div class="tm">课段 8 · 13 min</div><div class="ds">排障口诀 · 拓展阅读 · 思考题</div></div>
+      </div>
+      <table class="tl">
+        <tr><th>课段</th><th>五星阶段</th><th>时长</th><th>对应章节</th><th>本段任务</th></tr>
+        <tr><td class="m">课段 1</td><td>聚焦问题</td><td class="m">12 min</td><td>§01 + §02 前半</td><td>抛出现场故障"指令发了狗不动"，明确本课要解决的目标</td></tr>
+        <tr><td class="m">课段 2</td><td>激活旧知</td><td class="m">8 min</td><td>§02 后半</td><td>用静态 IP、DDS 发现、话题模型三条旧知解释故障成因</td></tr>
+        <tr><td class="m">课段 3</td><td>示证新知</td><td class="m">15 min</td><td>§03</td><td>对照实物认识 Go2 激光雷达/深度相机/足端力传感及场地要求</td></tr>
+        <tr><td class="m">课段 4</td><td>示证新知</td><td class="m">12 min</td><td>§06</td><td>看懂 trot 步态相位与"脚本→sport_request→运动服务"指令链路</td></tr>
+        <tr><td class="m">课段 5</td><td>应用新知</td><td class="m">15 min</td><td>§04 S1~S3 + §05 ①②</td><td>完成配网、装 SDK、装 ROS2 驱动（边讲边演）</td></tr>
+        <tr><td class="m">课段 6</td><td>应用新知</td><td class="m">15 min</td><td>§04 S4~S5 + §05 ③④⑤</td><td>读状态 + 站立/趴下/速度遥控低速起步——课段 1 的故障就此根除</td></tr>
+        <tr><td class="m">课段 7</td><td>应用新知</td><td class="m">10 min</td><td>§07</td><td>步态相位步进器自测，全通方可进入下一实验</td></tr>
+        <tr><td class="m">课段 8</td><td>融会贯通</td><td class="m">13 min</td><td>§08~§10</td><td>排障口诀收口，挑战题与思考题拔高迁移</td></tr>
+      </table>
+      <p class="fivestar-note">讲课提示：课段 1/2 以讲授 + 提问为主；课段 3~6 边讲边演（实物 / 动画 / 命令行）；课段 7 学员独立完成；课段 8 答疑拔高。段与段之间停顿 1~2 分钟，确认学员跟上再进下一段。</p>
+    </section>
+
+    <!-- 01 学习目标 -->
+    <section class="blk" id="s1">
+      <h2><span class="no">01</span>学习目标<span class="seg">课段 1 · 聚焦问题 · 12 min</span></h2>
+      <ul class="check">
+        <li>说出 Go2 Edu 关键硬件：3D 激光雷达、深度相机、高清相机、足端力传感、Jetson Orin 40 TOPS 机载算力。</li>
+        <li>讲清三类巡检任务：表计读数、异常检测、自主巡逻回充，以及四足运动在其中承担的角色。</li>
+        <li>完成 Unitree SDK（Python）与 ROS2 Go2 驱动安装，跑通状态读取与运动示例。</li>
+        <li>用指令遥控四足前进、转向、站起、趴下，达到「指令驱动四足运动正常」的验收线。</li>
+        <li>牢记安全铁律：<b>低速起步，避免跌落与碰撞</b>，异常时先发停止/趴下指令。</li>
+      </ul>
+      <div class="tip amber"><b>素材说明：</b>本课无本地视频素材——固定章节的动态演示自制动图 GIF（来自开源仓库 README）与 SVG 原理动画替代，不虚构实拍录像。</div>
+    </section>
+
+    <!-- 02 原理：融合理论1 -->
+    <section class="blk" id="s2">
+      <h2><span class="no">02</span>原理：四足运动与巡检概述（理论 1 融合）<span class="seg">课段 1 收尾 + 课段 2 · 激活旧知 · 8 min</span></h2>
+      <div class="tip amber"><span class="lab">❓ 聚焦问题（课段 1）</span>学员现场最常遇到的怪事：<b>SDK 脚本跑完，狗纹丝不动</b>；<code>ros2 topic list</code> 是空的，机器狗仿佛"失联"。问题出在哪？带着这个故障听完全课——到课段 6 你会亲手让它动起来。</div>
+      <p><b>把机器狗想像成一位厂区巡检员：</b>四条腿是它的「交通工具」，身上的雷达和相机是「眼睛」，脑子是机载的 Jetson Orin。它要干的活就三样——<b>抄表</b>（对着表计拍一张，后面用 YOLO 认数字）、<b>看异常</b>（跑冒滴漏、烟火、异物）、<b>自己巡逻自己充电</b>（定时出门，见桩就回）。这三样任务的共同前提：<b>狗得先听指挥、走得起、停得稳</b>——这就是本实验要打通的运动控制层。</p>
+      <h3>Go2 Edu 硬件清单与分工</h3>
+      <table>
+        <thead><tr><th>部件</th><th>关键参数（培训方案「课程5」口径）</th><th>在巡检中的角色</th></tr></thead>
+        <tbody>
+          <tr><td>3D 激光雷达</td><td>多线激光（Mid-360 / XT16 级别），点云话题 utlidar/cloud</td><td>EXP-02 建图、EXP-03 定位避障的主传感器</td></tr>
+          <tr><td>深度相机</td><td>提供近距离深度信息</td><td>近障感知、台阶/沟坎辅助判断</td></tr>
+          <tr><td>高清相机</td><td>前置彩色相机，可 OpenCV 取帧</td><td>EXP-04 拍照识别表计与异常的主相机</td></tr>
+          <tr><td>足端力传感</td><td>4 足触地力反馈（foot_force）</td><td>步态落地检测、打滑与跌倒判断</td></tr>
+          <tr><td>Jetson Orin</td><td>40 TOPS 机载算力</td><td>边缘侧跑检测模型，弱网也不断巡检</td></tr>
+        </tbody>
+      </table>
+      <h3>四足运动能力：一个运动服务管所有动作</h3>
+      <p>Go2 的运动不靠你直接拧电机——机上跑着一个<b>运动服务（sport mode）</b>，你发「请求」，它负责步态平衡。订阅 <code>/sportmodestate</code> 话题能看到它的状态字典，其中两个字段最常读：<b>mode</b>（0=默认站立、1=平衡站立、3= locomotion 运动中、5=趴下、8=恢复站立……）与 <b>gait_type</b>（0=待机、1=trot 对角小跑、2=run、3=爬楼），外加 body_height、velocity、foot_force 等。控制侧走 <code>/api/sport/request</code> 话题发 <code>unitree_api/msg/Request</code> 请求——SDK 里的站立/趴下、速度移动、姿态控制，底层都是它。</p>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">站立 / 趴下</div><div class="kt">SDK 的 StandUpDown()：起身与卧倒，是每轮实验的第一与最后一个动作。</div></div>
+        <div class="kcard"><div class="kd">速度指令</div><div class="kt">VelocityMove()：vx/vy/yaw 三元组遥控——前进、平移、原地转向都从这里来。</div></div>
+        <div class="kcard"><div class="kd">姿态指令</div><div class="kt">BalanceAttitude()：调整机身 roll/pitch/yaw，过坎抬身用得上。</div></div>
+        <div class="kcard"><div class="kd">状态回读</div><div class="kt">read_highstate / /sportmodestead：发完指令必须回读，确认狗真的动了。</div></div>
+      </div>
+      <div class="tip teal"><span class="lab">↺ 激活旧知（课段 2）</span>回忆三条旧知：① <b>静态 IP</b>（ifconfig 给网卡设 192.168.123.x）；② <b>DDS 发现机制</b>（ROS2 节点同网段才能互相发现）；③ <b>话题发布/订阅</b>（/sportmodestate 广播状态、/api/sport/request 收指令）。三条合起来，正好解释课段 1 那个故障。</div>
+      <figure class="shot">
+        <img src="./images/fig-net-config.png" alt="Unitree 官方文档：网卡手动配置 IPv4 192.168.123.99" loading="lazy">
+        <figcaption>图 1-1｜Unitree 官方配置（来自 unitree_ros2 仓库 README）：连接机器狗的网卡手动指定 IPv4 地址 192.168.123.99、掩码 255.255.255.0，这是对话的第一步。</figcaption>
+      </figure>
+      <figure class="shot">
+        <img src="./images/fig-ros2-topiclist.png" alt="ros2 topic list 显示 unitree 话题列表" loading="lazy">
+        <figcaption>图 1-2｜连接成功后的 <code>ros2 topic list</code>（来自 unitree_ros2 仓库 README）：sportmodestate、lowstate 等状态话题全部出现，说明 DDS 链路已通。</figcaption>
+      </figure>
+      <div class="tip tealb"><b>生活化类比：</b>运动服务像「驾校教练」：你（SDK 脚本）只说「起步、左转」，离合油门刹车它替你协调；但你若同时用 App 手动模式抢方向盘，两套指令就会打架——所以底层操作前要先关掉 sport_mode，一次只听一个人的。</div>
+    </section>
+
+    <!-- 03 硬件与材料 -->
+    <section class="blk" id="s3">
+      <h2><span class="no">03</span>硬件与材料<span class="seg">课段 3 · 示证新知 · 15 min</span></h2>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">Go2 Edu 整机</div><div class="kt">3D 激光雷达 + 深度相机 + 高清相机 + 足端力传感 + Jetson Orin 40 TOPS，电量 &gt;50% 再实训。</div></div>
+        <div class="kcard"><div class="kd">遥控器</div><div class="kt">原装无线遥控，随时接管；/wirelesscontroller 话题可读摇杆与键值（lx/ly/rx/ry、keys）。</div></div>
+        <div class="kcard"><div class="kd">工控/实训主机</div><div class="kt">Ubuntu 22.04 + ROS2 Humble，网线直连或与狗同网段，网卡名用 ifconfig 确认。</div></div>
+        <div class="kcard"><div class="kd">场地</div><div class="kt">平整硬至少 3×5m，四周留净空、移开易碎品；边缘/台阶外 1m 设警戒。</div></div>
+      </div>
+      <table>
+        <thead><tr><th>检查项</th><th>标准</th><th>不达标后果</th></tr></thead>
+        <tbody>
+          <tr><td>网络</td><td>网卡静态 IP 192.168.123.x，与狗互通</td><td>DDS 发现不到机器人，topic list 为空</td></tr>
+          <tr><td>网卡名</td><td>ifconfig 记下连接狗的接口名（如 enp3s0）</td><td>CYCLONEDDS_URI 指错口，通信时断时续</td></tr>
+          <tr><td>运动模式</td><td>App 高层运动服务处于默认状态</td><td>与低压指令冲突，狗动作怪异</td></tr>
+          <tr><td>电量</td><td>&gt;50%，低于 30% 立即回充</td><td>低电保护中途趴窝，巡检中断</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- 04 操作步骤 -->
+    <section class="blk" id="s4">
+      <h2><span class="no">04</span>操作步骤<span class="seg">课段 5~6 · 应用新知 · 2×15 min</span></h2>
+      <div class="flow">
+        <div class="step"><b class="n">S1</b>配网通狗<br><small>网卡静态 IP → ping 通 → 确认网卡名</small></div>
+        <div class="arr">→</div>
+        <div class="step"><b class="n">S2</b>装 SDK<br><small>unitree_sdk2py 源码安装（cyclonedds 0.10.2）</small></div>
+        <div class="arr">→</div>
+        <div class="step"><b class="n">S3</b>装 ROS2 驱动<br><small>unitree_ros2 编译 → source setup.sh</small></div>
+        <div class="arr">→</div>
+        <div class="step"><b class="n">S4</b>读状态<br><small>read_highstate / topic echo 双通道验证</small></div>
+        <div class="arr">→</div>
+        <div class="step"><b class="n">S5</b>指令遥控<br><small>站立趴下 → 速度指令低速起步 → 停止复位</small></div>
+      </div>
+      <ol style="margin:14px 0 6px;padding-left:22px;line-height:1.9">
+        <li><b>配网：</b>网线连接 Go2，网卡 IPv4 设静态（示例 192.168.123.99/24），<code>ifconfig</code> 记下接口名。</li>
+        <li><b>装 Python SDK：</b>依赖 Python≥3.8、cyclonedds==0.10.2、numpy、opencv-python；源码方式 <code>pip3 install -e .</code>（找不到 cyclonedds 时先本地编译并导出 CYCLONEDDS_HOME）。</li>
+        <li><b>装 ROS2 驱动：</b>克隆 unitree_ros2 → 安装 rmw_cyclonedds 依赖 → 编译 cyclonedds_ws 与 unitree_go/unitree_api 包 → 用 setup.sh 配置接口名与 RMW_IMPLEMENTATION。</li>
+        <li><b>验证链路：</b><code>ros2 topic echo /sportmodestate</code> 有数据滚动即通；无真机时用 <code>setup_local.sh</code>（回环口 lo）跑本地流程。</li>
+        <li><b>运动序列：</b>先 StandUpDown 站起 → VelocityMove 用最低速度档走直线与小半径转向 → 收到停止 → 趴下 → 回读状态确认 mode/gait 正常。</li>
+        <li><b>留痕：</b>录下「指令-动作」对照视频或截图状态话题，作为「指令驱动四足运动正常」的验收证据。</li>
+      </ol>
+      <figure class="shot">
+        <img src="./images/fig-sportstate-echo.png" alt="ros2 topic echo /sportmodestate 输出" loading="lazy">
+        <figcaption>图 1-3｜<code>ros2 topic echo /sportmodestate</code> 实测输出（来自 unitreerobotics/unitree_ros2 仓库 README）：position、velocity、yaw_speed、gait、foot_force 随运动实时刷新——这就是验收时要看的「心跳」。</figcaption>
+      </figure>
+      <figure class="shot">
+        <img src="./images/fig-ros2-frameid.png" alt="utlidar/cloud 话题 frame_id 查看" loading="lazy">
+        <figcaption>图 1-4｜预检激光通道：<code>ros2 topic echo --no-arr /utlidar/cloud</code> 查到 frame_id 为 utlidar_lidar（来自 unitree_ros2 仓库 README）——EXP-02 建图就靠这条话题。</figcaption>
+      </figure>
+      <figure class="shot">
+        <img src="./images/fig-go2sdk-joints.gif" alt="Go2 实时关节同步动画" loading="lazy">
+        <figcaption>图 1-5｜指令下发后四足关节实时同步效果（来自 abizovnuralem/go2_ros2_sdk 仓库 README 演示动图）：URDF 模型随真机关节 1:1 动，说明运动链路全通。</figcaption>
+      </figure>
+    </section>
+
+    <!-- 05 关键命令 -->
+    <section class="blk" id="s5">
+      <h2><span class="no">05</span>关键命令<span class="seg">随课段 5 / 6 对照使用</span></h2>
+      <p class="dim">以下命令均摘自 unitree_sdk2py 与 unitree_ros2 官方 README，网卡名按实机替换。</p>
+      <pre><span class="c"># ① 安装 Python SDK（依赖 cyclonedds==0.10.2 / numpy / opencv-python）</span>
+git clone https://github.com/unitreerobotics/unitree_sdk2py.git
+cd unitree_sdk2py && pip3 install -e .
+
+<span class="c"># ② 读高层状态（enp2s0 换成连接机器狗的网卡名）</span>
+python3 ./example/high_level/read_highstate.py enp2s0
+
+<span class="c"># ③ 运动测试：站立/趴下、速度控制、姿态控制（择一放开注释）</span>
+python3 ./example/high_level/sportmode_test.py enp2s0
+<span class="c">#   test.StandUpDown()      站立与趴下</span>
+<span class="c">#   test.VelocityMove()     速度控制（低速起步！）</span>
+<span class="c">#   test.BalanceAttitude()  姿态控制</span>
+
+<span class="c"># ④ ROS2 侧：source 环境后验证状态与状态机</span>
+source ~/unitree_ros2/setup.sh
+ros2 topic echo /sportmodestate        <span class="c"># 运动状态：mode/gait/velocity</span>
+ros2 topic echo /lowstate              <span class="c"># 底层状态：关节、IMU、电池</span>
+ros2 topic echo /wirelesscontroller    <span class="c"># 遥控器摇杆 lx/ly/rx/ry 与 keys</span>
+
+<span class="c"># ⑤ 站立示例（example 工作空间编译后）</span>
+cd ~/unitree_ros2/example && colcon build
+./install/unitree_ros2_example/bin/go2_stand_example</pre>
+      <div class="tip amber"><b>安全闸门：</b>VelocityMove 示例速度按官方写法跑即可，课堂自行改参数时<b>把线速度压到最低档、先空旷后狭窄</b>；狗出现抬腿异常/连跌趋势，立即让它趴下（lieDown 模式）再排查。任何时刻遥控器在手。</div>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">控制走哪条路</div><div class="kt">高层：SDK/Ros2SportClient 组 Request → 发到 /api/sport/request，运动服务统一执行。</div></div>
+        <div class="kcard"><div class="kd">状态走哪条路</div><div class="kt">运动服务广播 /sportmodestate 与 /lowstate，订阅即可，不用轮询。</div></div>
+        <div class="kcard"><div class="kd">为什么用 DDS</div><div class="kt">ROS2 与 Go2 底层同为 CycloneDDS，话题可以直连，不必二次封装。</div></div>
+        <div class="kcard"><div class="kd">验收判据</div><div class="kt">同一脚本三连：站起→低速直线+转向→趴下，状态话题全程无丢帧即为通过。</div></div>
+      </div>
+    </section>
+
+    <!-- 06 动画 -->
+    <section class="blk" id="s6">
+      <h2><span class="no">06</span>动画：步态相位与指令链路<span class="seg">课段 4 · 示证新知 · 12 min</span></h2>
+      <div class="anim-box">
+        <svg viewBox="0 0 720 250" width="100%" role="img" aria-label="四足对角小跑步态相位与支撑多边形动画">
+          <defs>
+            <marker id="a05g1" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#34d399"/></marker>
+          </defs>
+          <g font-size="13" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif">
+            <text x="180" y="30" fill="#6ee7b7" font-size="13" font-weight="bold">俯视 · trot 对角小跑步态（俯视图，循环往复）</text>
+            <!-- 机身 -->
+            <rect id="body" x="90" y="90" width="180" height="90" rx="18" fill="#064e3b" stroke="#34d399" stroke-width="2"/>
+            <text x="180" y="140" fill="#a7f3d0" font-weight="bold">Go2 机身</text>
+            <circle cx="180" cy="135" r="5" fill="#fbbf24"/>
+            <text x="180" y="170" fill="#fbbf24" font-size="10">重心投影</text>
+            <!-- 四足：FL(95,85) FR(265,85) RL(95,185) RR(265,185) -->
+            <text x="70" y="75" fill="#94a3b8" font-size="11">左前 FL</text>
+            <text x="280" y="75" fill="#94a3b8" font-size="11">右前 FR</text>
+            <text x="70" y="215" fill="#94a3b8" font-size="11">左后 RL</text>
+            <text x="280" y="215" fill="#94a3b8" font-size="11">右后 RR</text>
+            <circle cx="95" cy="85" r="13" fill="#34d399"><animate attributeName="fill" values="#34d399;#34d399;#475569;#475569;#34d399" dur="1.6s" repeatCount="indefinite"/></circle>
+            <circle cx="265" cy="85" r="13" fill="#475569"><animate attributeName="fill" values="#475569;#475569;#34d399;#34d399;#475569" dur="1.6s" repeatCount="indefinite"/></circle>
+            <circle cx="95" cy="185" r="13" fill="#475569"><animate attributeName="fill" values="#475569;#475569;#34d399;#34d399;#475569" dur="1.6s" repeatCount="indefinite"/></circle>
+            <circle cx="265" cy="185" r="13" fill="#34d399"><animate attributeName="fill" values="#34d399;#34d399;#475569;#475569;#34d399" dur="1.6s" repeatCount="indefinite"/></circle>
+            <!-- 支撑对角线（相位 A：FL-RR 支撑） -->
+            <line x1="95" y1="85" x2="265" y2="185" stroke="#fbbf24" stroke-width="4" stroke-linecap="round" opacity="0.9">
+              <animate attributeName="opacity" values="0.95;0.95;0;0;0.95" dur="1.6s" repeatCount="indefinite"/>
+            </line>
+            <line x1="265" y1="85" x2="95" y2="185" stroke="#f43f5e" stroke-width="4" stroke-linecap="round" opacity="0">
+              <animate attributeName="opacity" values="0;0;0.95;0.95;0" dur="1.6s" repeatCount="indefinite"/>
+            </line>
+            <text x="180" y="238" fill="#94a3b8" font-size="11">黄线=相位A 对角支撑 · 红线=相位B 对角支撑 · 绿脚=踩地 灰脚=摆动</text>
+            <!-- 右侧：支撑多边形说明 -->
+            <rect x="360" y="52" width="330" height="170" rx="12" fill="#0b1220" stroke="#1e293b"/>
+            <text x="525" y="80" fill="#6ee7b7" font-weight="bold" font-size="13">支撑多边形与重心（侧视抽象）</text>
+            <polygon points="410,190 525,120 640,190" fill="rgba(5,150,105,.18)" stroke="#34d399" stroke-width="1.5" stroke-dasharray="5 4"/>
+            <circle cx="525" cy="150" r="6" fill="#fbbf24">
+              <animate attributeName="cy" values="150;142;150;158;150" dur="1.6s" repeatCount="indefinite"/>
+            </circle>
+            <text x="525" y="212" fill="#94a3b8" font-size="11">黄色重心投影始终落在支撑区域内 → 不倒</text>
+            <text x="525" y="105" fill="#475569" font-size="10">（对角两足触地时支撑域收窄，摆动腿快速过隙）</text>
+          </g>
+        </svg>
+        <div class="anim-cap">动画 1-1：上半部为俯视 trot 步态——绿脚踩地、灰脚摆动，两条对角支撑线交替亮起；下半部显示重心投影在支撑多边形内小幅晃动却不出界，这就是四足不摔倒的全部秘密。</div>
+      </div>
+      <div class="anim-box">
+        <svg viewBox="0 0 720 200" width="100%" role="img" aria-label="速度指令到四足执行的链路动画">
+          <defs>
+            <marker id="a05g2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#34d399"/></marker>
+          </defs>
+          <g font-size="13" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif">
+            <rect x="30" y="40" width="150" height="56" rx="10" fill="#064e3b" stroke="#34d399" stroke-width="2"/>
+            <text x="105" y="64" fill="#d1fae5" font-weight="bold">脚本 / 遥控器</text>
+            <text x="105" y="86" fill="#6ee7b7" font-size="11">vx · vy · yaw 速度指令</text>
+            <rect x="270" y="40" width="180" height="56" rx="10" fill="#064e3b" stroke="#34d399" stroke-width="2"/>
+            <text x="360" y="64" fill="#d1fae5" font-weight="bold">/api/sport/request</text>
+            <text x="360" y="86" fill="#6ee7b7" font-size="11">unitree_api/msg/Request</text>
+            <rect x="540" y="40" width="150" height="56" rx="10" fill="#064e3b" stroke="#34d399" stroke-width="2"/>
+            <text x="615" y="64" fill="#d1fae5" font-weight="bold">运动服务 + 步态</text>
+            <text x="615" y="86" fill="#6ee7b7" font-size="11">mode / gait_type 执行</text>
+            <line x1="184" y1="68" x2="262" y2="68" stroke="#34d399" stroke-width="2" marker-end="url(#a05g2)"/>
+            <line x1="454" y1="68" x2="532" y2="68" stroke="#34d399" stroke-width="2" marker-end="url(#a05g2)"/>
+            <!-- 请求流 -->
+            <circle r="7" fill="#fbbf24">
+              <animateMotion dur="2.4s" repeatCount="indefinite" path="M105,68 L360,68 L615,68"/>
+            </circle>
+            <!-- 状态反馈回路 -->
+            <path id="fb05" d="M615,96 L615,140 C615,152 605,158 590,158 L160,158 C140,158 135,152 135,140 L135,100" fill="none" stroke="#34d399" stroke-width="2" stroke-dasharray="6 5" opacity="0.8" marker-end="url(#a05g2)"/>
+            <text x="375" y="178" fill="#6ee7b7" font-size="11">/sportmodestate 状态反馈：每发一条指令，回读一次 mode/gait/velocity 确认执行</text>
+            <circle r="6" fill="#38bdf8">
+              <animateMotion dur="2.4s" begin="1.2s" repeatCount="indefinite" path="M615,96 L615,140 C615,152 605,158 590,158 L160,158 C140,158 135,152 135,140 L135,100"/>
+            </circle>
+          </g>
+        </svg>
+        <div class="anim-cap">动画 1-2：黄点=下行指令流（脚本 → /api/sport/request → 运动服务执行），蓝点=上行状态流（/sportmodestate 回读验证）——控制与反馈构成完整闭环，只发不收等于蒙眼开车。</div>
+      </div>
+      <div class="tip violet"><span class="lab">观察</span>步态动画里为什么摆动腿总比支撑腿「快进快出」？摆动期间支撑域只剩一条对角线，机身重心越稳、留给纠错的时间越短——所以<b>速度越快、地面越滑，这条线越不能抖</b>，这正是「低速起步」的物理原因。</div>
+    </section>
+
+    <!-- 07 互动 -->
+    <section class="blk" id="s7">
+      <h2><span class="no">07</span>互动：步态相位步进器<span class="seg">课段 7 · 应用新知 · 10 min</span></h2>
+      <div class="ix-panel">
+        <div class="ix-title">手动步进 trot 步态四相位，观察支撑足与重心安全判据</div>
+        <div class="ctl-row">
+          <button class="btn" onclick="gaitStep(-1)">← 上一相位</button>
+          <button class="btn" onclick="gaitStep(1)">下一相位 →</button>
+          <label class="ctl">重心前后偏移
+            <input type="range" id="comX" min="-40" max="40" value="0" step="5" oninput="renderGait()">
+          </label>
+          <button class="btn ghost" onclick="gaitReset()">重置</button>
+        </div>
+        <div class="io" id="gaitIo"></div>
+      </div>
+      <p style="margin-top:10px">把相位走完一圈你会发现：trot 每个瞬间只有<b>对角两足着地</b>，支撑域是一条线段，重心投影必须压在这条线上才稳——这就是四足机器人「走路要算数学」的直观版本。</p>
+    </section>
+
+    <!-- 08 常见问题 -->
+    <section class="blk" id="s8">
+      <h2><span class="no">08</span>常见问题<span class="seg">课段 8 · 融会贯通 · 13 min</span></h2>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">Q pip 报 Could not locate cyclonedds？</div><div class="kt">cyclonedds==0.10.2 没装好：按 README 本地编译 cyclonedds，再 export CYCLONEDDS_HOME 指到 install 目录重装。</div></div>
+        <div class="kcard"><div class="kd">Q ros2 topic list 是空的？</div><div class="kt">三查：网段是否 192.168.123.x、setup.sh 里网卡名是否写对、RMW_IMPLEMENTATION 是否 rmw_cyclonedds_cpp 且已 source。</div></div>
+        <div class="kcard"><div class="kd">Q 狗不听速度指令？</div><div class="kt">先看 /sportmodestate 的 mode：处于手动/阻尼等非 locomotion 态会拒答；确认运动服务在线、无 App 抢占。</div></div>
+        <div class="kcard"><div class="kd">Q 指令一发就猛窜？</div><div class="kt">示例里残留了较大的目标速度：把 VelocityMove 参数压回最低档再跑，牢记低速起步、预留急停空间。</div></div>
+        <div class="kcard"><div class="kd">Q 没有真机怎么练？</div><div class="kt">source setup_local.sh 用回环接口跑 ROS2 流程，状态话题用录包回放；运动真操环节统一上真机。</div></div>
+        <div class="kcard"><div class="kd">Q 要用 App 额外操作吗？</div><div class="kt">高层 SDK 模式用默认运动服务即可；只有跑底层 low_level 控制前才需在 App 关闭 sport_mode，避免指令打架。</div></div>
+        <div class="kcard"><div class="kd">Q 前置相机怎么取帧？</div><div class="kt">unitree_sdk2py 提供 example/front_camera/camera_opencv.py（需图形界面，ESC 退出），EXP-04 拍照复用它。</div></div>
+        <div class="kcard"><div class="kd">Q 遥控器数据能读吗？</div><div class="kt">能：订阅 /wirelesscontroller 得 lx/ly/rx/ry 摇杆量与 keys 键值，可做手动接管的二次判据。</div></div>
+      </div>
+    </section>
+
+    <!-- 09 拓展 -->
+    <section class="blk" id="s9">
+      <h2><span class="no">09</span>拓展阅读<span class="seg">课段 8 · 融会贯通</span></h2>
+      <ul class="check">
+        <li><b>unitree_rl_gym</b>（BSD-3）： Isaac Gym 里 <code>train.py --task=go2_*</code> 训练步态策略——机器狗的「天生会走」其实是学出来的，与运动服务的「写死规则」对照着看。</li>
+        <li><b>unitree_ros / robots/go2_description</b>：官方 URDF 模型可进 RViz 看结构，但 Gazebo 仿真<b>只支持底层关节、不支持完整行走</b>——这是要讲清的局限，别指望仿真里遛狗。</li>
+        <li><b>宇树机载 unitree_slam / mid360_driver</b>：官方闭源服务，课堂可演示其 App 建图效果，但不随课分发——与本课 slime/开源方案（EXP-02）形成对比。</li>
+        <li><b>go2_ros2_sdk</b>：一个 launch 集成 pointcloud_to_laserscan、slam_toolbox、Nav2、joy 遥控与 Foxglove，EXP-02/03 的主力底座。</li>
+        <li><b>Unitree 官方开发者文档</b> sports_services / Basic_services：Request api_id 全表，做自定义指令（灯光、音量、避障开关）时回来查。</li>
+      </ul>
+    </section>
+
+    <!-- 10 思考题 -->
+    <section class="blk" id="s10">
+      <h2><span class="no">10</span>思考题 · 自测<span class="seg">课段 8 · 融会贯通</span></h2>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">✅ 完成成果</div><div class="kt">站立→低速前进转向→趴下全链路走通，/sportmodestate 数据滚动并留痕。</div></div>
+        <div class="kcard"><div class="kd">🧠 原理收获</div><div class="kt">用「驾校教练」类比讲清运动服务与底层关节的分工，以及为什么指令要配状态回读。</div></div>
+        <div class="kcard"><div class="kd">🛠 技能收获</div><div class="kt">独立完成配网、SDK/驱动安装与三类状态话题验证，排掉一次常见连不上的故障。</div></div>
+        <div class="kcard"><div class="kd">📐 评分速览</div><div class="kt">动画观察 30% + 互动步进 30% + 思考题作答 40%。</div></div>
+      </div>
+      <div class="tip violet"><span class="lab">思考 1</span>为什么控制要用「发指令 + 读状态」的闭环，而不是发完就不管？如果状态回读发现 mode 始终不进 locomotion，可能有哪三种原因？</div>
+      <div class="tip violet"><span class="lab">思考 2</span>trot 步态为什么天生比四足全支撑「难稳」？联系重心投影与支撑多边形，解释速度指令里 yaw（原地转向）为什么比直线更需要低速。</div>
+    </section>
+
+    <nav class="expnav">
+      <a class="prev" href="../index.html">← 返回课程目录</a>
+      <a class="next" href="../exp-02-lidar-slam/index.html">下一个：EXP-02 3D 激光建图 →</a>
+    </nav>
+    <footer>
+      <div>IND-05 · 工业巡检应用场景 · EXP-01 控制与巡检准备</div>
+      <div>8 学时 · 实践/理论 · 基于 培训方案"课程5" + unitree_sdk2py / unitree_ros2 改编</div>
+    </footer>
+  </main>
+</div>
+
+<script>
+var PHASES=[
+  {n:'相位 A · 左前+右后支撑',stance:['FL','RR'],swing:['FR','RL'],
+   txt:'左前 FL 与右后 RR 踩地承重，FR/RL 摆动前迈——支撑域为黄对角线。',
+   col:'#fbbf24'},
+  {n:'相位 A→B 过渡 · 双足瞬时支撑',stance:['FL','RR'],swing:['FR','RL'],
+   txt:'摆动腿快速过隙，摆动腿落地前支撑域最窄，重心必须压线——此时最怕打滑。',
+   col:'#f59e0b'},
+  {n:'相位 B · 右前+左后支撑',stance:['FR','RL'],swing:['FL','RR'],
+   txt:'右前 FR 与左后 RL 采地承重，FL/RR 摆动——支撑域切换为红对角线。',
+   col:'#f43f5e'},
+  {n:'相位 B→A 过渡 · 双足瞬时支撑',stance:['FR','RL'],swing:['FL','RR'],
+   txt:'另一组摆动腿过隙，四相位跑完即一个完整 trot 步态循环。',
+   col:'#fb7185'}
+];
+var gp=0;
+function gaitStep(d){gp=(gp+d+PHASES.length)%PHASES.length;renderGait();}
+function gaitReset(){gp=0;document.getElementById('comX').value=0;renderGait();}
+function renderGait(){
+  var p=PHASES[gp], off=parseInt(document.getElementById('comX').value,10);
+  var legs=['FL','FR','RL','RR'].map(function(l){
+    var st=p.stance.indexOf(l)>=0;
+    return l+':'+(st?'<span class="ok">支撑</span>':'<span class="dim">摆动</span>');
+  }).join('　');
+  var safe=Math.abs(off)<=25;
+  var judge=safe
+    ? '<span class="ok">重心投影落在支撑域内 ✓ 稳定</span>'
+    : '<span class="bad">重心偏离支撑域 '+off+'%！trot 状态下会侧翻</span>';
+  document.getElementById('gaitIo').innerHTML=
+    '<span style="color:'+p.col+';font-weight:bold">● '+p.n+'</span>（第 '+(gp+1)+' / 4 相位）\n'
+    + legs + '\n' + p.txt + '\n'
+    + '重心前后偏移 '+off+'% → ' + judge;
+}
+renderGait();
+</script>
+<script src="../shared/tutorial.js" defer></script>
+</body>
+</html>

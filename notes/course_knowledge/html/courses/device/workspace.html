@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>设备开发工作台 · 具身智能课程</title>
+<link rel="stylesheet" href="vendor/xterm/xterm.css">
+<link rel="stylesheet" href="workspace.css?v=20261025a">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo"><span class="dot"></span>具身智能课程 · 设备开发工作台</div>
+</div>
+
+<div class="app" id="app" hidden>
+  <aside class="side">
+    <div class="side-head">
+      <span class="side-title">会话</span>
+      <button class="side-mini" id="btnNew" title="新建会话">＋ 新建</button>
+    </div>
+    <div class="side-list" id="sideList"></div>
+    <div class="side-title mt">设备信息</div>
+    <div class="side-sys" id="sideSys"></div>
+    <div class="side-foot">
+      <button class="linkbtn" id="btnLogout">断开全部</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="workbar">
+      <span class="wb-user" id="wbUser">未连接</span>
+      <span class="wb-sep"></span>
+      <button class="wb-btn" id="btnNewTab">＋ 新建会话</button>
+      <button class="wb-btn" id="btnSplit">分屏</button>
+      <span class="wb-flex"></span>
+      <span class="wb-hint">双击标签重命名 · 右键标签更多操作 · Ctrl+Shift+T 新建会话</span>
+    </div>
+
+    <div class="split" id="split">
+      <section class="pane" data-pane="L">
+        <div class="tabbar" id="tabbarL"></div>
+        <div class="views" id="viewsL"></div>
+      </section>
+      <section class="pane" data-pane="R" id="paneR" hidden>
+        <div class="tabbar" id="tabbarR"></div>
+        <div class="views" id="viewsR"></div>
+      </section>
+    </div>
+
+    <div class="statusbar">
+      <span class="sdot" id="sbDot"></span>
+      <span id="sbText">就绪</span>
+      <span class="sb-flex"></span>
+      <span class="mono" id="sbBridge"></span>
+    </div>
+  </main>
+</div>
+
+<!-- ==================== 会话编辑（新建 / 修改） ==================== -->
+<div class="modal" id="modalNew" hidden>
+  <div class="modal-card">
+    <div class="modal-head">
+      <h3 id="mTitle">新建会话</h3>
+      <button class="x" id="mClose" title="关闭">✕</button>
+    </div>
+    <div class="types" id="mTypes">
+      <button data-kind="term" class="on"><span class="ti">⌨</span><span>SSH 终端</span><small>登录设备 shell</small></button>
+      <button data-kind="sftp"><span class="ti">📁</span><span>文件管理</span><small>浏览 / 编辑 / 上传</small></button>
+      <button data-kind="serial"><span class="ti">📡</span><span>串口</span><small>调试底层协议</small></button>
+      <button data-kind="vnc"><span class="ti">🖥</span><span>远程桌面</span><small>noVNC 图形界面</small></button>
+    </div>
+    <div class="modal-body" id="mBody"></div>
+    <div class="modal-foot">
+      <span class="modal-err" id="mErr"></span>
+      <button class="btn" id="mCancel">取消</button>
+      <button class="btn primary" id="mOk">连接</button>
+    </div>
+  </div>
+</div>
+
+<div class="ctx" id="ctx" hidden></div>
+<div class="toast" id="toast" hidden></div>
+
+<!-- ==================== 本机助手一次性初始化引导 ==================== -->
+<div class="modal" id="guideModal" hidden>
+  <div class="modal-card">
+    <div class="modal-head">
+      <h3>初始化本机助手（只需一次）</h3>
+      <button class="x" id="gClose" title="关闭">✕</button>
+    </div>
+    <div class="modal-body" id="gBody"></div>
+    <div class="modal-foot">
+      <span class="modal-err" id="gMsg"></span>
+      <button class="btn" id="gClose2">暂时关闭</button>
+      <button class="btn primary" id="gRetry">我已完成，重试检测</button>
+    </div>
+  </div>
+</div>
+
+<script src="vendor/xterm/xterm.js"></script>
+<script src="vendor/xterm/addon-fit.js"></script>
+<script src="vendor/xterm/addon-web-links.js"></script>
+<script src="entryflow.js?v=20260926d"></script>
+<script src="workspace.js?v=20261025a"></script>
+</body>
+</html>

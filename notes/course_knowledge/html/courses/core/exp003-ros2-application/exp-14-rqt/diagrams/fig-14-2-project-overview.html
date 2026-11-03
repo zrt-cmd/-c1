@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>图 14-2 · 工程全景</title>
+<style>
+:root{--bg-page:#ffffff;--bg-card:#fff;--text:#0f172a;--text2:#475569;--muted:#94a3b8;
+  --border:#e2e8f0;--teal:#0891b2;--green:#059669;--purple:#7c3aed;--orange:#ea580c;--red:#e11d48;--gray:#64748b;
+  --teal-bg:rgba(8,145,178,.08);--green-bg:rgba(5,150,105,.08);--purple-bg:rgba(124,58,237,.08);
+  --orange-bg:rgba(234,88,12,.10);--gray-bg:rgba(100,116,139,.08)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg-page);color:var(--text);font-family:system-ui,"PingFang SC","Microsoft YaHei",sans-serif;padding:16px 14px 12px}
+.hd{margin-bottom:6px}
+.hd h1{font-size:15px;margin:0 0 4px}
+.hd .q{font-size:12px;color:var(--text2);margin:0}
+svg{width:100%;height:auto;display:block}
+.t{font:600 12.5px system-ui,sans-serif;fill:var(--text)}
+.s{font:400 10.5px system-ui,sans-serif;fill:var(--text2)}
+.l{font:600 10.5px ui-monospace,Consolas,monospace;fill:var(--text2)}
+.dock{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.dock span{font-size:11.5px;border-radius:999px;padding:3px 10px;line-height:1.6}
+.ok{background:#ecfdf5;color:#047857;border:1px solid #a7f3d0}
+.warn{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca}
+.evid{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}
+.ft{font-size:10.5px;color:var(--muted);margin-top:8px;text-align:right}
+</style>
+</head>
+<body>
+<div class="hd">
+  <h1>图 14-2 · 工程全景：三终端 + 四插件盯住同一条电压话题</h1>
+  <p class="q">本图回答的问题：本实验动了哪些终端和插件，数据从哪来到哪去？</p>
+</div>
+<svg viewBox="0 0 760 540" role="img" aria-label="rqt 实验工程全景">
+  <!-- 层框 -->
+  <rect x="12" y="14" width="736" height="96" rx="10" fill="none" stroke="#bae6fd" stroke-width="1.5"/>
+  <text class="l" x="24" y="34" fill="#0891b2">入口层 · 三终端</text>
+  <rect x="12" y="132" width="736" height="96" rx="10" fill="none" stroke="#a7f3d0" stroke-width="1.5"/>
+  <text class="l" x="24" y="152" fill="#059669">插件层 · rqt 四双眼睛</text>
+  <rect x="12" y="250" width="736" height="96" rx="10" fill="none" stroke="#c4b5fd" stroke-width="1.5"/>
+  <text class="l" x="24" y="270" fill="#7c3aed">数据层 · CLI 验证与交叉验证</text>
+  <rect x="12" y="368" width="736" height="96" rx="10" fill="none" stroke="#fed7aa" stroke-width="1.5"/>
+  <text class="l" x="24" y="388" fill="#ea580c">消息层 · 本机真实话题</text>
+
+  <!-- 入口层 -->
+  <rect x="30" y="44" width="220" height="54" rx="6" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1.5"/>
+  <text class="t" x="140" y="66" text-anchor="middle">终端 1 · CLI 验话题</text>
+  <text class="s" x="140" y="86" text-anchor="middle">list / info / hz</text>
+  <rect x="270" y="44" width="220" height="54" rx="6" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1.5"/>
+  <text class="t" x="380" y="66" text-anchor="middle">终端 2 · rqt_graph</text>
+  <text class="s" x="380" y="86" text-anchor="middle">ros2 run rqt_graph</text>
+  <rect x="510" y="44" width="222" height="54" rx="6" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1.5"/>
+  <text class="t" x="621" y="66" text-anchor="middle">终端 3 · rqt_plot / console</text>
+  <text class="s" x="621" y="86" text-anchor="middle">字段级路径 · 级别过滤</text>
+
+  <!-- 插件层 -->
+  <rect x="46" y="162" width="200" height="54" rx="6" fill="var(--green-bg)" stroke="var(--green)" stroke-width="1.5"/>
+  <text class="t" x="146" y="184" text-anchor="middle">rqt_graph · 拓扑</text>
+  <text class="s" x="146" y="203" text-anchor="middle">Hide Debug 看主链路</text>
+  <rect x="274" y="162" width="210" height="54" rx="6" fill="var(--green-bg)" stroke="var(--green)" stroke-width="1.5"/>
+  <text class="t" x="379" y="184" text-anchor="middle">rqt_plot · 波形</text>
+  <text class="s" x="379" y="203" text-anchor="middle">/…/battery 曲线滚动</text>
+  <rect x="512" y="162" width="220" height="54" rx="6" fill="var(--green-bg)" stroke="var(--green)" stroke-width="1.5"/>
+  <text class="t" x="622" y="184" text-anchor="middle">rqt_image_view / console</text>
+  <text class="s" x="622" y="203" text-anchor="middle">画面 + 日志级别过滤</text>
+
+  <!-- 数据层 -->
+  <rect x="46" y="280" width="330" height="54" rx="6" fill="var(--purple-bg)" stroke="var(--purple)" stroke-width="1.5"/>
+  <text class="t" x="211" y="302" text-anchor="middle">终端 1 · echo --once 拿精确值</text>
+  <text class="s" x="211" y="321" text-anchor="middle">与曲线右端比对</text>
+  <rect x="410" y="280" width="322" height="54" rx="6" fill="var(--purple-bg)" stroke="var(--purple)" stroke-width="1.5"/>
+  <text class="t" x="571" y="302" text-anchor="middle">交叉验证 · 看图定关系</text>
+  <text class="s" x="571" y="321" text-anchor="middle">曲线冻结 ≠ 节点死 → 回 graph/hz</text>
+
+  <!-- 消息层 -->
+  <rect x="46" y="398" width="330" height="54" rx="6" fill="var(--orange-bg)" stroke="var(--orange)" stroke-width="1.5"/>
+  <text class="t" x="211" y="420" text-anchor="middle">/car1_base_driver/battery</text>
+  <text class="s" x="211" y="439" text-anchor="middle">Float32 · 1.000 Hz · 电压</text>
+  <rect x="410" y="398" width="322" height="54" rx="6" fill="var(--orange-bg)" stroke="var(--orange)" stroke-width="1.5"/>
+  <text class="t" x="571" y="420" text-anchor="middle">/camera/color/image_raw 等</text>
+  <text class="s" x="571" y="439" text-anchor="middle">Image · 30fps（image_view 用）</text>
+
+  <!-- 连线 -->
+  <line x1="140" y1="98" x2="146" y2="162" stroke="var(--green)" stroke-width="1.5"/>
+  <text class="l" x="146" y="136">先验活</text>
+  <line x1="380" y1="98" x2="379" y2="162" stroke="var(--green)" stroke-width="1.5"/>
+  <line x1="621" y1="98" x2="622" y2="162" stroke="var(--green)" stroke-width="1.5"/>
+  <line x1="211" y1="216" x2="211" y2="280" stroke="var(--purple)" stroke-width="1.5"/>
+  <text class="l" x="220" y="252">CLI 定案</text>
+  <line x1="379" y1="216" x2="379" y2="280" stroke="var(--purple)" stroke-width="1.5"/>
+  <text class="l" x="388" y="252">GUI 提速</text>
+  <line x1="211" y1="334" x2="211" y2="398" stroke="var(--orange)" stroke-width="1.5"/>
+  <text class="l" x="220" y="370">订阅</text>
+  <line x1="571" y1="334" x2="571" y2="398" stroke="var(--orange)" stroke-width="1.5" stroke-dasharray="5,4"/>
+  <text class="l" x="580" y="370">画面来源</text>
+
+  <text class="l" x="380" y="502" text-anchor="middle" fill="#94a3b8">实操顺序：验活 → graph 拓扑 → plot 波形 → image_view 画面 → 日志过滤 → Perspective 存盘</text>
+</svg>
+<div class="dock">
+  <span class="ok">✅ 结论：CLI 先验活，GUI 再看图，两边对同一话题交叉印证</span>
+  <span class="warn">⚠️ 风险：话题未验活就开插件 → 全空难判断谁的锅</span>
+  <span class="evid">🔍 验证：04 节四步 + echo --once 与曲线右端比对</span>
+</div>
+<div class="ft">EXP-14 · rqt 可视化工具箱</div>
+</body>
+</html>

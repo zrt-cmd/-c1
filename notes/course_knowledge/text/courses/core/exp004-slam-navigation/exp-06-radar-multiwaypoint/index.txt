@@ -1,0 +1,282 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp004-slam-navigation/exp-06-radar-multiwaypoint/index.html
+TITLE: EXP-06 · 激光雷达多点导航避障 — 机器人 SLAM 与自主导航
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+EXP-06 · 激光雷达多点导航避障 — 机器人 SLAM 与自主导航
+🧠 具身智能课程 ·
+教程首页
+核心课程
+/
+SLAM 与自主导航
+/ EXP-06
+本页目录
+01 问题引入
+02 原理通俗讲解
+03 关联知识点
+04 实验目标
+05 实验环境与准备
+06 动画讲解
+07 互动讲解
+08 实操步骤
+09 重点与易错点
+10 总结与思考
+CH1 · 建模与建图
+EXP-01 原理与 URDF
+EXP-02 SLAM Toolbox 建图
+CH2 · 定位与导航
+EXP-03 Nav2 导航
+EXP-04 AMCL 定位
+EXP-05 DWA/TEB 避障
+CH3 · 任务调度与三维进阶
+EXP-06 多点导航
+EXP-07 RTAB-Map 3D
+EXP-06 · 第 3 章 · 综合性 · 8 学时
+激光雷达多点导航避障
+一句话读懂：前面我们"点一个目标，到一处"。真实任务往往是"先去 A 放货，再去 B 取货，最后回 C"。这节课用两个 Nav2 导航器（NavigateToPose / NavigateThroughPoses），让小车连续完成多个目标，而且中途有障碍也能一路安全走完。
+难度 ⭐⭐⭐ · 8 学时
+综合性
+Action / 单点 / 多点
+前置：EXP-03 + EXP-04
+01
+问题引入：一个目标 vs 一串目标
+情境
+点外卖时骑手的路线是"
+先去 A 店取餐，再去 B 小区送达，最后顺路回 C 取下一样货
+"——是一串有先后语义的任务，不是单点。EXP-03 的
+/navigate_to_pose
+只能"到一处"；要连续跑三个点，你可以在脚本里连发三次，但到达判定、中途避障、某一段失败怎么办，都得自己管。Nav2 的
+/navigate_through_poses
+把这些打包好了：一次下发
+poses[] 数组
+，机器人必须依次经过每个点。
+本课用 ROS2 的
+Action
+通信（goal → feedback → result，就像"下单 → 物流跟踪 → 签收确认"）驱动两个导航器，完成单点、多点连续导航，并研究卡住时的进度检查（progress_checker）与行为树恢复动作（清代价地图 / Spin / Wait）。
+02
+原理通俗讲解：派快递、必经点与"外卖员迷路了怎么办"
+白话比喻
+Topic 像"对讲机广播"、Service 像"打电话"（一问一答就挂）、Action 像"
+派快递
+"：下单（goal）→ 实时物流跟踪（feedback，distance_remaining 越来越小）→ 签收结果（result）。导航一跑几十秒、要随时看进度、还可能中途取消——所以必须用 Action。
+导航器 1
+navigate_to_pose
+只有一个最终目标（位置+朝向）。行为树流程：算路径 → 跟踪 → 到达。适合"从甲地到乙地"。
+导航器 2
+navigate_through_poses
+一串途经点 poses[]，一次规划出一条
+依次串起所有点
+的路径再跟踪，最后停在最后一个点。适合巡检路线、多点送货。
+关键机制
+RemovePassedGoals(r=0.7 m)
+本项目行为树里有
+RemovePassedGoals radius="0.7"
+：车一进到距某途经点 0.7 m 内，该点就从队列里被剔除。所以
+"经过"是 0.7 m 半径内的掠过，不是逐点精确停车
+——这也是途经点间距必须远大于 0.7 m 的原因。
+到达判定
+general_goal_checker
+xy_goal_tolerance 0.10 m / yaw_goal_tolerance 0.1 rad——只对
+最终目标
+做精确到站判定，所以终点仍会准确地停下并转正。
+安全兜底
+progress_checker + 恢复
+10 秒没挪 10 cm（required_movement_radius 0.1 / movement_time_allowance 10.0）判定卡住 → 行为树进入恢复：
+清两张代价地图 → Spin 1.57 rad 找路 → Wait 5 秒
+，重试 6 次仍无效则 ABORTED，绝不硬闯。
+外卖员类比
+骑手迷路了先原地转一圈看看（Spin），再清空脑子重新看地图（清代价地图），还不行就等一等再试（Wait），最后报告"这单送不了"（ABORTED），而不是撞门进去——这就是恢复动作
+限次数、失败即终止
+的安全设计。本车是麦轮可横移，行为树里明确注释了不用 backup。
+03
+关联知识点
+知识点 1
+ROS2 Action 三件套
+goal / feedback / result；long-running + 可取消 + 有反馈的任务必须用 Action 而非 Service。
+知识点 2
+bt_navigator 双注册
+nav2_params.yaml navigators: ["navigate_to_pose", "navigate_through_poses"] 注册了两个导航器插件。
+知识点 3
+行为树节点
+nav2_compute_path_to_pose_action_bt_node / nav2_compute_path_through_poses_action_bt_node / nav2_follow_path_action_bt_node 已在 plugin_lib_names 注册，节点缺失会导致行为树加载失败。
+知识点 4
+frame_id 必须是 map
+目标坐标系写 map（全局系）；写成 odom 小车会去错误位置——因为 AMCL 一直在修正 map→odom，两者并不等价。
+知识点 5
+四元数朝向
+朝 +X 用 w=1；朝 -Y 用 (0,0,-0.707,0.707)；可用 tf2_echo 验证。目标点在墙内会 ABORTED（不可达）。
+知识点 6
+鲁棒性四指标
+到达率 ≥80%、路径平滑度（无急转）、避障响应 <2 s、中途停车 ≤1 次/任务——导航"好不好"用数字说话。
+知识点 7
+重规划节奏
+单点行为树 1 Hz 重规划；多点行为树降到 0.333 Hz（每 3 秒），因为长路线不必频繁重算——参数在 XML 的 RateController 里。
+04
+实验目标
+理解 ROS2 Action 通信机制与两个导航器的语义差异 ——
+原理理解
+掌握单点导航
+navigate_to_pose
+的命令行操作与反馈查看 ——
+流程掌握
+掌握多点连续导航
+navigate_through_poses
+与目标序列调度 ——
+流程掌握
+完成卡住恢复（progress_checker + behavior_server）观察与堵死通道测试 ——
+流程掌握
+用四指标评估多点导航鲁棒性并处理异常 ——
+迁移应用
+05
+实验环境与准备
+类别
+配置
+硬件
+具身智能实验箱 B2 / 小车 C1 + COIN-D6 雷达；
+地图 + 定位可用
+系统
+Ubuntu 22.04 + ROS 2 Humble
+核心库
+Nav2 bt_navigator、nav2_msgs（NavigateToPose / NavigateThroughPoses action）
+依赖
+完成 EXP-03 / EXP-04；导航 launch 正常运行
+主入口
+navigation/car1_navigation/launch/navigation.launch.py
+、
+config/nav2_params.yaml
+（bt_navigator / behavior_server / progress_checker 段）
+准备清单
+① 场地至少 3 m×4 m，途经点之间留出转弯空间（间距 >1.0 m，务必大于 0.7 m 剔除半径）；② 准备 3 个纸箱用于堵通道测试；③ 恢复动作（Spin）测试时旋转半径内不要站人；④ 单次现象不下结论——统计类测试至少跑 5 遍。
+06
+动画讲解：机器人依次访问 A→B→C 航点
+纸箱（绕行）
+A
+B
+C
+✔
+✔
+✔
+/navigate_through_poses: A → B → C（一条路线串起，0.7m 内掠过即算过）
+feedback: distance_remaining 1.9 → 1.2 → 0.5 → 0
+图 6-1：一次下发 poses[] 三个途经点，小车按 A→B→C 顺序行驶，整条路线一次规划完成，每段都靠局部规划避障（橙色弧线是绕过纸箱的调整）；途经点进入
+0.7 m 半径
+即被 RemovePassedGoals 剔除并切往下一段，最后一个点才按 0.10 m / 0.1 rad 精确到站——这就是它和"单点连发"的本质区别。
+07
+互动讲解：单点 vs 多点导航器选择台
+🎛 给小车派个任务，选导航器并推演结果
+任务① 从门口到充电桩
+任务② A 取货 → B 放货 → C 回充
+任务③ 三点巡检但 B 点被堵
+任务④ 终点前通道卡死
+↑ 点击任务卡片：先自己判断该用 navigate_to_pose 还是 navigate_through_poses、会发生什么，再看推演与讲义对照。
+维度
+navigate_to_pose（单点）
+navigate_through_poses（多点）
+goal 结构
+1 个 PoseStamped
+poses[] 数组（有序）
+中间点
+无此概念，可直接抄近路
+会被路线串起来，进 0.7 m 半径即视为已过
+重规划节奏
+1 Hz
+0.333 Hz（每 3 秒）
+典型场景
+"从甲地到乙地"
+巡检路线、多点送货
+失败处理
+重试 6 次后 ABORTED 即结束
+同左；调度层还需决定 重试 / 跳过 / 终止
+08
+实操步骤：send_goal 发送多目标并跟踪反馈
+1
+启动导航并完成定位（EXP-03/04 环境），查看 action 定义确认 goal/feedback/result 结构
+2
+单点导航到 map 系 (1.0, 0.5)，加
+--feedback
+观察 distance_remaining 逐渐减小；连发 5 个目标记录耗时与 /amcl_pose 误差
+3
+多点导航：一次下发 A(0,0.5) → B(1,1) → C(1.5,0.5)，记录 /amcl_pose 时间序列绘制轨迹，验证是否
+依次经过三点
+4
+调度测试：3 纸箱堵死必经通道 → 观察日志 "Failed to make progress" → 清图/Spin/Wait 恢复 → 6 次仍无效则 ABORTED；再只堵一半（留 60cm）观察能否绕过
+5
+鲁棒性评估：3 点路线连跑 5 遍记到达率/耗时/停车次数，再加入 1 个移动障碍跑 5 遍对比
+# ① 启动导航
+ros2 launch car1_navigation navigation.launch.py map:=map_01
+# ② 查看 action 定义（goal / feedback / result）
+ros2 interface show nav2_msgs/action/NavigateToPose
+ros2 interface show nav2_msgs/action/NavigateThroughPoses
+# goal 是 poses[] 数组
+# ③ 单点导航（frame_id 必须是 map）+ 实时反馈
+ros2 action send_goal --feedback /navigate_to_pose nav2_msgs/action/NavigateToPose \
+  "{pose: {header: {frame_id: 'map'}, pose: {position: {x: 1.0, y: 0.5}, orientation: {w: 1.0}}}}"
+# ④ 多点连续导航：A→B→C 一次下发（注意点是"掠过"而非"逐点停"）
+ros2 action send_goal /navigate_through_poses nav2_msgs/action/NavigateThroughPoses \
+  "{poses: [{header: {frame_id: 'map'}, pose: {position: {x: 0.0, y: 0.5}, orientation: {w: 1.0}}},
+            {header: {frame_id: 'map'}, pose: {position: {x: 1.0, y: 1.0}, orientation: {w: 1.0}}},
+            {header: {frame_id: 'map'}, pose: {position: {x: 1.5, y: 0.5}, orientation: {w: 1.0}}}]}" --feedback
+# ⑤ 跟踪轨迹与到达误差
+ros2 topic echo /amcl_pose
+# 时间序列可绘制成轨迹图验证"依次经过"
+# ⑥ 观察恢复动作有没有真的触发
+ros2 topic echo /behavior_tree_log
+# ⑦ 调度脚本骨架：目标序列 + 失败重试（SUCCEEDED 才继续）
+goals = [g1, g2, g3]
+for g in goals:
+    result = send_navigate_to_pose(g)
+# 阻塞等待完成
+if result == SUCCEEDED:
+        print(f"目标 {g} 完成")
+    else:
+        print(f"目标 {g} 失败 → 重试 1 次")
+        result = send_navigate_to_pose(g)
+# 仍失败则记录/跳过，禁止静默忽略
+09
+重点与易错点
+重点
+① Action 三段式与两个导航器的语义差异；② "0.7 m 掠过"与"精确到站"的区别；③ progress_checker（10 s / 10 cm）+ 恢复动作（清图 → Spin → Wait）的兜底链；④ 四指标量化评估（到达率 / 平滑度 / 避障响应 / 中途停车）。
+坑
+现象
+解决
+frame_id 写错
+小车奔向错误位置
+必须写 map 系，勿写 odom
+以为多点 = 逐点停车
+轨迹与预期不符
+途经点是 0.7 m 内掠过（RemovePassedGoals），只有终点精确到站
+途经点间距太小
+跳过中间点
+相邻点保持 >1.0 m（务必远大于 0.7 m 剔除半径）
+调度脚本不查结果
+任务"静默失败"
+必检 action result，失败记录与重试
+以为卡住会无限重试
+期待硬闯成功
+行为树 RecoveryNode 只重试 6 次，无效即 ABORTED——安全设计，堵死属正常
+一直卡住不恢复
+无行为日志
+检查 progress_checker 的 movement_time_allowance（10.0），并用
+ros2 topic echo /behavior_tree_log
+看分支
+找不到 backup 恢复
+以为少装了插件
+本车麦轮可横移，behavior_server 与行为树都没启用 backup，属设计选择
+动障测试人站住不动
+被当成静态墙
+人在雷达前别静止超 0.5 s，保持走动
+测一次就下结论
+统计无意义
+至少 5 遍取统计，导航有随机性
+四指标合格线（参考）：到达率 ≥80%、避障响应 <2 s、中途停车 ≤1 次/任务
+调度脚本先做"目标可达"预检查（costmap 判断），避免明知不可达还发
+恢复动作测试时人远离小车，Spin 旋转半径内清场
+10
+总结与思考：失败重试与进度检查
+本课收获
+掌握 Action 三段式与两个导航器语义；会用 send_goal --feedback 下发单点/多目标；理解 progress_checker（10 秒没挪 10 cm 判卡住）+ 清图/Spin/Wait 恢复链，以及 SUCCEEDED/ABORTED 两种结果下的调度策略；会用四指标跑 5 遍统计评估鲁棒性。
+思考 1
+多点导航中某个点连续失败，你的调度策略是"原地重试 / 跳过继续 / 整体终止"哪一种？三种策略分别适合什么任务（送快递 vs 巡检 vs 危险区域探测），请说明权衡。
+思考 2
+progress_checker 为什么要同时有"10 cm"和"10 秒"两个阈值、缺一不可？再想想 RemovePassedGoals 的 0.7 m 半径：如果把它改成 0.2 m，多点导航会更容易"真经过"还是更容易卡住？代价是什么？
+CORE-04 · 机器人 SLAM 与自主导航 · EXP-06 激光雷达多点导航避障
+8 学时 · 综合性 · 基于 slam_practice 实验讲义改编

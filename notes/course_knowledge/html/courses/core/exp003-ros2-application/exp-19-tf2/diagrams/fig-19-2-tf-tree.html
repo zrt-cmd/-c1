@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>图 19-2 · TF2 变换树</title>
+<style>
+:root{--bg-page:#ffffff;--text:#0f172a;--text2:#475569;--muted:#94a3b8;--border:#e2e8f0;
+  --teal:#0891b2;--green:#059669;--purple:#7c3aed;--orange:#ea580c;--red:#e11d48;--gray:#64748b;
+  --teal-bg:rgba(8,145,178,.08);--green-bg:rgba(5,150,105,.08);--purple-bg:rgba(124,58,237,.08);
+  --orange-bg:rgba(234,88,12,.10);--red-bg:rgba(225,29,72,.08);--gray-bg:rgba(100,116,139,.08)}
+*{box-sizing:border-box}
+body{margin:0;background:#fff;color:var(--text);font-family:system-ui,"PingFang SC","Microsoft YaHei",sans-serif;padding:16px 14px 12px}
+.hd h1{font-size:15px;margin:0 0 4px}
+.hd .q{font-size:12px;color:var(--text2);margin:0}
+svg{width:100%;height:auto;display:block}
+.t{font:600 12.5px system-ui,sans-serif;fill:var(--text)}
+.s{font:400 10.5px system-ui,sans-serif;fill:var(--text2)}
+.l{font:600 10.5px ui-monospace,Consolas,monospace;fill:var(--text2)}
+.bnd{font:700 11px system-ui,sans-serif;fill:var(--green)}
+.dock{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.dock span{font-size:11.5px;border-radius:999px;padding:3px 10px;line-height:1.6}
+.ok{background:#ecfdf5;color:#047857;border:1px solid #a7f3d0}
+.warn{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca}
+.evid{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}
+.ft{font-size:10.5px;color:var(--muted);margin-top:8px;text-align:right}
+</style>
+</head>
+<body>
+<div class="hd">
+  <h1>图 19-2 · TF2 变换树：一个 child 只能有一个 parent</h1>
+  <p class="q">本图回答的问题：机器人身上的坐标系怎么组织，为什么必须是一棵树？</p>
+</div>
+<svg viewBox="0 0 760 520" role="img" aria-label="TF2 变换树框架图">
+  <defs>
+    <marker id="t-p" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#7c3aed"/></marker>
+    <marker id="t-o" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#ea580c"/></marker>
+    <marker id="t-t" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#0891b2"/></marker>
+    <marker id="t-r" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#e11d48"/></marker>
+  </defs>
+
+  <!-- 树体：坐标系节点 = 紫（数据 · 坐标定义） -->
+  <rect x="300" y="30" width="160" height="50" rx="6" fill="#fff"/>
+  <rect x="300" y="30" width="160" height="50" rx="6" fill="var(--purple-bg)" stroke="var(--purple)" stroke-width="1.5"/>
+  <text class="t" x="380" y="53" text-anchor="middle">map</text>
+  <text class="s" x="380" y="72" text-anchor="middle">世界原点 · SLAM 维护</text>
+
+  <rect x="300" y="134" width="160" height="50" rx="6" fill="#fff"/>
+  <rect x="300" y="134" width="160" height="50" rx="6" fill="var(--purple-bg)" stroke="var(--purple)" stroke-width="1.5"/>
+  <text class="t" x="380" y="157" text-anchor="middle">odom</text>
+  <text class="s" x="380" y="176" text-anchor="middle">里程计原点 · 会漂移</text>
+
+  <rect x="300" y="238" width="160" height="50" rx="6" fill="#fff"/>
+  <rect x="300" y="238" width="160" height="50" rx="6" fill="var(--purple-bg)" stroke="var(--purple)" stroke-width="1.5"/>
+  <text class="t" x="380" y="261" text-anchor="middle">base_link</text>
+  <text class="s" x="380" y="280" text-anchor="middle">车体中心 · 挂载点</text>
+
+  <rect x="120" y="348" width="180" height="50" rx="6" fill="#fff"/>
+  <rect x="120" y="348" width="180" height="50" rx="6" fill="var(--purple-bg)" stroke="var(--purple)" stroke-width="1.5"/>
+  <text class="t" x="210" y="371" text-anchor="middle">laser_frame</text>
+  <text class="s" x="210" y="390" text-anchor="middle">雷达测量原点</text>
+
+  <rect x="460" y="348" width="180" height="50" rx="6" fill="#fff"/>
+  <rect x="460" y="348" width="180" height="50" rx="6" fill="var(--purple-bg)" stroke="var(--purple)" stroke-width="1.5"/>
+  <text class="t" x="550" y="371" text-anchor="middle">camera_link</text>
+  <text class="s" x="550" y="390" text-anchor="middle">相机测量原点</text>
+
+  <rect x="60" y="452" width="180" height="50" rx="6" fill="#fff"/>
+  <rect x="60" y="452" width="180" height="50" rx="6" fill="var(--purple-bg)" stroke="var(--purple)" stroke-width="1.5"/>
+  <text class="t" x="150" y="475" text-anchor="middle">arm_base</text>
+  <text class="s" x="150" y="494" text-anchor="middle">机械臂基座</text>
+
+  <!-- 动态边（橙 = 消息 /tf 高频流） -->
+  <line x1="380" y1="80" x2="380" y2="132" stroke="var(--orange)" stroke-width="1.5" marker-end="url(#t-o)"/>
+  <text class="l" x="392" y="104">/tf 动态 · 10~100Hz</text>
+  <line x1="380" y1="184" x2="380" y2="236" stroke="var(--orange)" stroke-width="1.5" marker-end="url(#t-o)"/>
+  <text class="l" x="392" y="212">/tf 动态 · 里程计</text>
+
+  <!-- 静态边（紫 = 安装位姿数据，/tf_static） -->
+  <line x1="330" y1="288" x2="230" y2="346" stroke="var(--purple)" stroke-width="1.5" marker-end="url(#t-p)"/>
+  <text class="l" x="212" y="316" text-anchor="middle">静态 /tf_static</text>
+  <line x1="430" y1="288" x2="528" y2="346" stroke="var(--purple)" stroke-width="1.5" marker-end="url(#t-p)"/>
+  <text class="l" x="540" y="316">静态 /tf_static</text>
+  <line x1="330" y1="288" x2="160" y2="450" stroke="var(--purple)" stroke-width="1.5" marker-end="url(#t-p)"/>
+  <text class="l" x="205" y="400" text-anchor="middle">静态 /tf_static</text>
+
+  <!-- 一键命令入口（青 = 交互/终端） -->
+  <rect x="470" y="452" width="270" height="56" rx="6" fill="#fff"/>
+  <rect x="470" y="452" width="270" height="56" rx="6" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1.5"/>
+  <text class="t" x="605" y="475" text-anchor="middle">static_transform_publisher</text>
+  <text class="s" x="605" y="494" text-anchor="middle">免代码发一条静态边</text>
+  <line x1="560" y1="450" x2="605" y2="404" stroke="var(--teal)" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#t-t)"/>
+  <text class="l" x="618" y="434">补一条边</text>
+
+  <!-- 风险：成环 -->
+  <path d="M300,160 C 210,180 210,220 300,250" fill="none" stroke="var(--red)" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#t-r)"/>
+  <text class="l" x="205" y="205" text-anchor="middle" fill="var(--red)">✗ 互为父子 = 成环</text>
+
+  <text class="s" x="380" y="418" text-anchor="middle">任意两个坐标系之间只有一条唯一路径 → 查变换永远有解且可终止</text>
+</svg>
+<div class="dock">
+  <span class="ok">✅ 结论：单父、无环、路径唯一，查询必有解</span>
+  <span class="warn">⚠️ 风险：两个节点抢同一 child 配不同 parent → TF2 报冲突</span>
+  <span class="evid">🔍 验证：02 节步骤 ② 生成的 frames.pdf 树形核对 · 04 节第 4 步检查要点</span>
+</div>
+<div class="ft">EXP-19 · TF2 坐标系变换</div>
+<script>
+(function(){if(window===parent)return;function send(){try{parent.postMessage({type:'figh',h:document.body.scrollHeight},'*')}catch(e){}}window.addEventListener('load',send);window.addEventListener('resize',function(){clearTimeout(window.__fighT);window.__fighT=setTimeout(send,120)});send();})();
+</script>
+</body>
+</html>

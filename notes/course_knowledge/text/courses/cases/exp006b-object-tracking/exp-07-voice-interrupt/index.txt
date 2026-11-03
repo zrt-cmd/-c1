@@ -1,0 +1,334 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/cases/exp006b-object-tracking/exp-07-voice-interrupt/index.html
+TITLE: EXP-07 · 语音交互（流式 TTS 打断） — 通用目标追踪综合项目
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+EXP-07 · 语音交互（流式 TTS 打断） — 通用目标追踪综合项目
+🎓 具身智能课程 ·
+通用目标追踪
+综合项目
+/
+通用目标追踪
+/ EXP-07
+本页目录
+01 问题引入：抢话、回声与迟到播报
+02 原理通俗讲解：三态接力与取餐号
+03 关联知识点：语音链路三段
+04 实验目标
+05 实验环境与准备
+06 动画讲解：三态流转与 epoch 打断
+07 互动讲解：语音状态机步进台
+08 实操步骤：五步语音用例
+09 重点与易错点
+10 总结与思考
+CASE-04 · 通用目标追踪
+EXP-01 需求分析
+EXP-02 TrackEngine 架构
+EXP-03 配置详解
+EXP-04 DeepSORT 底座
+EXP-05 LLM 门控
+EXP-06 VLM 选目标
+EXP-07 语音与 TTS
+EXP-08 日志与降级
+EXP-09 全功能验证
+EXP-07 · 第 3 章 · 综合性 · 6 学时
+语音交互（流式 TTS 打断）：让车听话、会插嘴也接得住
+语音链路"唤醒 → 录音 → ASR → LLM/指令 → TTS"任一环节卡壳，整台车就变哑巴或话痨。核心矛盾有三个：
+抢话
+（播报被麦克风重新识别成用户说话）、
+迟到播报
+（用户已经打断，旧回复才姗姗来迟）、
+空转
+（唤醒后没人说话，录音线程永远听下去）。解法是一台
+三态状态机 VoiceLoop
+：IDLE 等唤醒 → LISTENING 识别（10s 无话自动关窗）→ SPEAKING 播报（
+playback_event
+播报互斥防回声，新唤醒
+epoch+1
+让 LLM worker 丢弃迟到指令"epoch 已变，丢弃迟到指令"）。流式 TTS 按
+_SENTENCE_RE
+切句
+首句即播
+，不等整段合成完。
+难度 ⭐⭐⭐ · 6 学时
+VoiceLoop 三态
+playback_event
+epoch 打断
+首句即播
+01
+问题引入：抢话、回声与迟到播报
+EXP-05/06 把"话怎么变成锁定动作"讲透了，但都是键盘敲字喂进去的。接上真麦克风后，三个新麻烦立刻出现：
+1
+回声抢话
+：车自己播报"好的"，扬声器的声音又被麦克风收进去当指令识别——自己叫自己，无限循环
+2
+迟到播报
+：LLM 正在生成回复，用户不耐烦又喊了唤醒词——旧回复若还播出来，就是答非所问
+3
+空转
+：唤醒后用户没说话，录音线程一直听、ASR 一直算，白白占设备
+4
+硬件时序
+：XFM 六麦唤醒事件没来就提前开录音，设备停在监听态稀疏流，唤醒后也不恢复（asr_test 实测）
+5
+合成延迟
+：等 LLM 全部说完再合成整段 TTS，用户干等好几秒才听到半个字
+⚠️ 本实验要回答
+一台只有一个状态机的程序，如何同时处理"谁在说话、说到哪、被谁打断"？——答案全在 IDLE / LISTENING / SPEAKING 三态与两个计数器（epoch、playback_event）里。
+02
+原理通俗讲解：三态接力与取餐号
+比喻 1
+三态 = 前台接待的三种状态
+IDLE 是前台低头待机；听到"小飞小飞"像客人按铃 → 抬头接待（LISTENING，开录音听需求）；听清了要办事 → 转身去办并回复（SPEAKING，播报）。办完（播完 + 双次排空）再低头待机。一个前台同一时刻只做一件事，所以永远不会既听又说。
+比喻 2
+epoch = 取餐号，翻号旧票作废
+每次打断就
+_epoch += 1
+（voice_loop.py L398-404），如同奶茶店把取餐号往上翻一位。LLM worker 办事前抄下了入场时的号，回来一比对"号变了"（epoch_getter() != ep，track_app L256-259）——说明期间用户已经打断重来，
+这份迟到回复直接丢弃
+，绝不播出去。
+比喻 3
+playback_event = 自己说话时先闭嘴听
+类似打电话时把听筒静音：TTS 播报期间置位
+playback_event
+（_build_speech L105-115 同时传给 Speaker 与 VoiceLoop），SPEAKING 态
+不喂 ASR
+——扬声器再响麦克风也不录，回声进不了解码器；播完 interrupt() 清 event 放开。
+比喻 4
+流式 TTS = 同传边听边说
+同声传译不会等讲者全说完才开口。LLM 每吐几个 token，
+_SENTENCE_RE
+就按 。！？；，、 等标点切出一句，Matcha-TTS 立刻合成一句播一句（max_num_sentences=1）——
+首句即播
+，用户听到的第一个字提早了好几秒。
+比喻 5
+10s 无话超时 = 打电话对方不出声就挂
+开听后 10 秒没有 partial 识别结果 →
+_close_stream()
+关窗回 IDLE（_handle_listening L361-367）。类似拨通电话那头一直没声音就挂断，防止录音线程空转与误触发。
+比喻 6
+KWS 阈值 = 门卫认人的松紧
+kws.threshold=0.25
+是门卫认人脸的相似度门槛：调低（更松）容易把路人甲当熟人放进来（误报），调到 0.4（更严）误报降了但自家主人可能被拦（漏报）。端点检测 rule1=4.5s / rule2=1.5s / rule3=300ms 则像靠"停顿多久"判断话说完了，不是死等固定时长。
+🎯 一句话本质
+把"听—说—停"从随手写的 if-else 收敛成
+唯一时序控制点
+：三态互斥（不同时听说）+ epoch（时间作废旧回复）+ playback_event（声学互斥），三个机制各自解决一类竞态。
+03
+关联知识点：语音链路三段
+编号
+知识点
+本实验对应内容
+5.1.1
+唤醒词（软件 KWS / XFM 六麦 aiui 串口）→ 录音线程启动 plughw:4,0
+notify_wake L149-158 才 _ensure_capture；词表 ["小飞小飞","小飞同学"]；XfMicArray 3s 防抖
+5.1.2
+流式 ASR（zipformer_onnx）增量解码 + 端点检测
+每帧 0.1s@16k feed() 增量解码，返回 (partial, final)；[ASR 实时] 逐字回显来自 partial
+5.1.3
+流式 TTS 按句合成播放 + 播报互斥 + 打断丢弃
+_SENTENCE_RE 切句首句即播；playback_event 互斥；epoch+1 丢弃迟到回复
+—
+VoiceLoop 单状态机三态
+IDLE → LISTENING → SPEAKING；feed_text L164-196 与音频走同一回调链
+—
+热词与解码方法
+hotwords 仅 modified_beam_search 生效（asr.py L36-37/L58-59）；默认 greedy_search 不支持
+—
+录音健康自愈
+read(1600)=0.1s/帧，5s 期望 50 帧；HEALTH_LOW_FPS=30（L38）、连续 2 窗口重开、上限 3 次冷却 30s
+前置：
+EXP-02
+的 CommandWorker 与
+EXP-05
+的指令门控是本实验的下游——语音只是换了入口，喂进的仍是同一条
+_start_listening → _handle_listening → _invoke_dialog
+回调链。
+04
+实验目标
+目标 1
+掌握全流程
+跑通唤醒 → ASR → LLM 对话/指令 → TTS 流式播报闭环，完成 V1-V10 语音用例。
+目标 2
+理解两个时序
+录音线程为何必须硬件唤醒后才启动（XFM 时序硬约束）；playback_event 互斥与 epoch 打断丢弃的分工。
+目标 3
+完成专项用例
+唤醒 / 打断 / 流式 TTS / 无话超时 / 热词五个方向，逐条留日志证据。
+目标 4
+独立调参
+调整 kws.threshold 观察误报变化，理解"阈值-误差"权衡的记录方法。
+目标 5
+迁移方法论
+--text 文本模式驱动同一状态机——无麦克风先验证逻辑的"硬件后置"调试法。
+05
+实验环境与准备
+类别
+内容
+硬件
+具身智能实验箱 B2 / 机器人小车 C1 + 讯飞六麦阵列 XFM + 扬声器
+系统
+Ubuntu 22.04 + ROS 2 Humble，Python 3.10
+核心库
+sherpa_onnx（ASR/KWS）、Matcha-TTS（TTS）、RKLLM
+模型
+板端 /home/iflytek/models/{zipformer_kws, zipformer_onnx, tts}
+参考文档
+docs/07_语音测试用例.md（V1-V10）
+先做清理
+，占用播放/串口/LLM 端口的残留进程是本实验第一大坑：
+cd ~/ros2_ws/src/xflz_eai_car1/app/object_tracking
+pkill -9 aplay; pkill -f llm_server
+# 清播放设备与 8080 端口
+grep -n "kws.enabled\|threshold\|hardware_wakeup" config/track_config.yaml
+# 确认唤醒配置
+06
+动画讲解：三态流转与 epoch 打断
+VoiceLoop 三态状态机：唤醒 → 聆听 → 播报 → 待机（epoch 打断旁路）
+IDLE 待机
+等 KWS / XFM 唤醒
+LISTENING 聆听
+录音 plughw:4,0 → ASR
+SPEAKING 播报
+流式 TTS 首句即播
+唤醒词
+final 定稿
+播完 + 双次排空（防回声残留）
+10s 无 partial → _close_stream()
+新唤醒打断：epoch+1 → 杀 aplay → 迟到回复丢弃
+· playback_event：SPEAKING 期间置位，不喂 ASR → 扬声器声音进不了解码器（防回声抢话）
+· worker 入场抄号 epoch：回来对不上（_handle L256-259）→ "epoch 已变，丢弃迟到指令"
+· --text 模式：feed_text L164-196 走同一回调链，仅把录音线程换成 stdin 逐行喂入
+图：三态互斥保证"不同时听说"；底部红线是无话关窗，顶部粉线是打断折返——epoch 就在折返那一下 +1。
+07
+互动讲解：语音状态机步进台
+🎛️ 语音状态机步进台 — 按真实时序点按钮，观察状态 / epoch / playback_event 三者联动
+喊"小飞小飞"唤醒
+说话（partial 逐字）
+ASR final 定稿
+播报完成
+10s 无话
+播报中新唤醒
+开一个回声尝试
+重置
+← 按唤醒 → 说话 → 定稿 → 播报的顺序点击；再到 SPEAKING 时点"新唤醒"看 epoch 打断
+七条操作覆盖 V 用例主干：
+唤醒
+开录音（XFM 路径先收 aiui_event 再 _ensure_capture）；
+10s 超时
+无条件关窗回 IDLE；
+播报中唤醒
+epoch+1，迟到回复被 worker 拦截；
+回声尝试
+演示 playback_event 挡下自录。
+⚠️ 状态机是唯一时序控制点
+源码没有 set_enabled / active 等多开关叠加——所有音频行为都必须落在三态之一。实验中若见状态与日志对不上（如 IDLE 却在录），属线程时序 bug，重启 track_app 复验而非改日志。
+08
+实操步骤：五步语音用例
+1
+文本模式验状态机（约 90min）：--text 喂"小飞小飞"进 DIALOG，再喂追踪/闲聊/清除——无麦克风先验证逻辑
+2
+启动语音全链路（约 60min）：清残留 → 起 ROS 相机 → --camera --mjpeg，观察录音线程与 MJPEG 出流
+3
+喊"小飞小飞"验证唤醒→录音→聆听（约 70min）：核对 [diag] 录音 X 帧/5s（X≈50 正常）
+4
+说"追踪红色皮卡"验证 ASR→LLM→TTS（约 90min）：首句即出声、打断后旧回复不播
+5
+执行 V1-V10 用例 + kws 调参（约 70min）：0.25→0.4 单变量观察误报
+步骤 1 · 文本模式状态机（同一 VoiceLoop）
+：
+cd ~/ros2_ws/src/xflz_eai_car1/app/object_tracking
+python3 apps/track_app.py --video /home/iflytek/ros2_ws/src/xflz_eai_car1/vision/07_multi_object_tracking/test.mp4 --text
+小飞小飞
+→ [文本] 唤醒 → 开始聆听（mode=DIALOG）
+追踪红色皮卡
+→ LLM →（描述无 id）→ VLM 选车 ；
+你好
+→ 闲聊 ；
+清除
+→ 解除
+# _merge_args L74-93：--text 置 speech.text_mode=True，关 kws.enabled / hardware_wakeup.enabled
+步骤 2 · 语音全链路 + XFM 串口排障三板斧
+：
+pkill -9 aplay; pkill -f llm_server
+# 另终端起相机：
+source /opt/ros/humble/setup.bash && source ~/ros2_ws/install/setup.bash
+ros2 launch car1_peripherals depth_camera.launch.py
+python3 apps/track_app.py --camera --mjpeg
+# 喊 小飞小飞 → 检测到唤醒 → 录音线程: plughw:4,0
+# 报"XFM 串口无响应"时按序排查：
+sleep 120 && grep -n "XFM\|xfm_wake" runs/logs/track_app.log
+# ① 等冷启动自愈
+python /home/iflytek/ros2_ws/src/xflz_eai_car1/interaction/car1_speech/tools/xf_mic_array.py
+# ② 独立探测固件
+pkill -f log_server; ls -l /dev/ttyACM0
+# ③ 停固件 log 占用（VID:PID=1a86:55d4）
+步骤 4 · 流式 TTS 与打断断言
+：
+[ASR 结果] 追踪红色皮卡
+→
+[cmd] track_vlm
+（描述带色无 id → VLM 网格选车）
+[tts] 合成第 1 句
+→ 立即 aplay 播出"好的"（不等整段合成）
+# _SENTENCE_RE 切句、max_num_sentences=1
+# 播报中再喊"小飞小飞"：_interrupt L398-404 → epoch+=1 → 杀 aplay 清队列
+[track_app] epoch 已变，丢弃迟到指令
+# worker 在 apply 副作用前校验（L256-259）
+步骤 5 · kws 单变量调参 + 热词解码确认
+：
+cp config/track_config.yaml /tmp/tc.bak
+sed -i 's/kws.threshold: 0.25/kws.threshold: 0.4/' config/track_config.yaml
+python3 apps/track_app.py --camera --mjpeg
+# 固定场景重跑，统计误报/漏报
+grep -n "decoding_method\|hotwords" config/track_config.yaml
+# greedy_search 下热词不生效！
+cp /tmp/tc.bak config/track_config.yaml
+# 实验完还原
+09
+重点与易错点
+录音线程唤醒后才启动不是简化是硬约束
+：XFM 唤醒事件后才出可用音频流，提前常开会把设备停在监听态稀疏流且唤醒后不恢复。
+--text 首行必须喂唤醒词
+：stdin 第一行"小飞小飞"才进 DIALOG；text_mode 同时关掉 KWS/硬件唤醒，直接输指令会被当闲聊。
+播报互斥失效 = 播报被识别
+：若扬声器声音进了 ASR，说明 playback_event 未生效——重启 track_app 复验，不要在识别词表里"抵消"。
+打断丢弃靠 epoch 不靠 kill 识别
+：SPEAKING 中新唤醒 → epoch+1 → LLM worker 返回后自校验丢弃；进程还在、号已作废。
+热词先看解码方法
+：config/hotwords.txt 仅在 modified_beam_search + garbage_score 下生效，默认 greedy_search 完全忽略热词。
+录音健康阈值
+：[diag] 录音 X 帧/5s，X≈50 正常；<30 连续 2 窗口触发重开（≤3 次、冷却 30s）；X≈10 持续则查设备与 ASR 线程，[diag] 队列 0 = 消费正常。
+XFM 冷启动耐心等
+：串口无响应多为固件未就绪，后台自愈 1~2 分钟自动接管；持续不通再走 step2 三板斧。
+问题
+原因
+解决
+XFM 串口无响应（第 N 轮）
+固件冷启动/未就绪，后台自愈探测
+等几分钟自动接管；或 xf_mic_array.py 手动验证固件
+唤醒后无录音
+XFM 事件未到 / ttyACM0 被占
+pkill -f log_server 停固件 log，查串口枚举
+ASR 无实时回显
+ASR 模型/线程异常
+文本模式先确认模型文件与线程
+播报无声
+aplay 被残留进程占用
+pkill -9 aplay 后重跑
+误报多
+kws.threshold 过低（0.25 太松）
+单变量调到 0.4，统计误报/漏报取交点
+播报被识别进用户话
+playback_event 互斥失效
+重启 track_app 复验，不改词表
+🎯 数值手感
+read(1600)=1600/16000=0.1s/帧 → 5s 窗口 F=50 帧；HEALTH_LOW_FPS=30、HEALTH_BEATS=2、重开上限 3 次/冷却 30s；队列 maxsize=100 ≈ 10s 缓冲。端点 rule1=4.5s / rule2=1.5s / rule3=300ms——"说完了"是分层静音判定。
+10
+总结与思考
+本实验把语音链路从"能出声"推进到"接得住话"：三态状态机是唯一时序控制点，playback_event 解决声学回声，epoch 解决时间竞态，流式切句解决响应延迟，10s 关窗解决空转——每个机制各钉一颗钉子。--text 与音频同链的设计也演示了"逻辑先行、硬件后置"的调试方法论。产出：语音链路日志、打断丢弃观察、kws 调参记录、V1-V10 用例表。
+🤔 思考题 1
+为什么录音线程要在硬件唤醒后才启动？若 XFM 常驻持续上送音频，除了"监听态稀疏流"外，还会给 playback_event / 回声消除带来什么连锁问题？
+🤔 思考题 2
+流式 TTS 如何做到"首句即播、边出边播"？打断（epoch+1）为什么要同时"杀 aplay + 清播放队列 + 校验 epoch"三步——只做其中一步各会漏掉什么现象？再想想：热词为何在 greedy 下无效，什么时候该切 beam_search？
+CASE-04 · 通用目标追踪综合项目 · EXP-07 语音交互（流式 TTS 打断）
+6 学时 · 综合性 · 基于 object_tracking 实验讲义改编

@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>图 19-1 · 最小系统：一条 launch，一场发与收</title>
+<style>
+:root{--bg-page:#ffffff;--text:#0f172a;--text2:#475569;--muted:#94a3b8;--border:#e2e8f0;
+  --teal:#0891b2;--green:#059669;--purple:#7c3aed;--orange:#ea580c;--red:#e11d48;--gray:#64748b;
+  --teal-bg:rgba(8,145,178,.08);--green-bg:rgba(5,150,105,.08);--purple-bg:rgba(124,58,237,.08);
+  --orange-bg:rgba(234,88,12,.10);--red-bg:rgba(225,29,72,.08);--gray-bg:rgba(100,116,139,.08)}
+*{box-sizing:border-box}
+body{margin:0;background:#fff;color:var(--text);font-family:system-ui,"PingFang SC","Microsoft YaHei",sans-serif;padding:16px 14px 12px}
+.hd h1{font-size:15px;margin:0 0 4px}
+.hd .q{font-size:12px;color:var(--text2);margin:0 0 6px}
+svg{width:100%;height:auto;display:block}
+.t{font:600 12.5px system-ui,sans-serif;fill:var(--text)}
+.s{font:400 10.5px system-ui,sans-serif;fill:var(--text2)}
+.l{font:600 10.5px ui-monospace,Consolas,monospace;fill:var(--text2)}
+.dock{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.dock span{font-size:11.5px;border-radius:999px;padding:3px 10px;line-height:1.6}
+.ok{background:#ecfdf5;color:#047857;border:1px solid #a7f3d0}
+.warn{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca}
+.evid{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}
+.ft{font-size:10.5px;color:var(--muted);margin-top:8px;text-align:right}
+</style>
+</head>
+<body>
+<div class="hd">
+  <h1>图 19-1 · 最小系统：一条 launch，一场发与收</h1>
+  <p class="q">本图回答的问题：一条 launch 拉起后，TF 树从哪个节点发出、走哪条话题、被谁读走？——把刚才三步跑出的结果，对回这张链路图。</p>
+</div>
+<svg viewBox="0 0 760 344" role="img" aria-label="TF 最小系统：终端A一条 launch 拉起三节点，robot_state_publisher 发布到 /tf 与 /tf_static，终端B与 rviz 订阅读取">
+  <defs>
+    <marker id="t-t" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#0891b2"/></marker>
+    <marker id="t-o" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#ea580c"/></marker>
+    <marker id="t-g" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#64748b"/></marker>
+  </defs>
+
+  <text class="s" x="16" y="18">总览 · 一条 launch 同时拉起 3 个节点：滑块窗喂关节角 → robot_state_publisher 发布整棵 TF 树 → rviz2 / view_frames 订阅读取</text>
+
+  <!-- ① launch 入口 -->
+  <rect x="16" y="40" width="170" height="96" rx="6" fill="#fff"/>
+  <rect x="16" y="40" width="170" height="96" rx="6" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1.5"/>
+  <text class="t" x="101" y="70" text-anchor="middle">display.launch.py</text>
+  <text class="s" x="101" y="92" text-anchor="middle">终端 A · 一条命令</text>
+  <text class="l" x="101" y="116" text-anchor="middle">经 launch 拉起 3 节点</text>
+
+  <line x1="190" y1="88" x2="221" y2="88" stroke="var(--teal)" stroke-width="1.5" marker-end="url(#t-t)"/>
+  <text class="l" x="205" y="78" text-anchor="middle">拉起</text>
+
+  <!-- 发布者 -->
+  <rect x="226" y="40" width="170" height="96" rx="6" fill="#fff"/>
+  <rect x="226" y="40" width="170" height="96" rx="6" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1.5"/>
+  <text class="t" x="311" y="70" text-anchor="middle">robot_state<tspan x="311" dy="15">_publisher</tspan></text>
+  <text class="s" x="311" y="110" text-anchor="middle">树的发布者（launch 内）</text>
+  <text class="l" x="311" y="130" text-anchor="middle">读 URDF → 算边分发</text>
+
+  <line x1="400" y1="88" x2="431" y2="88" stroke="var(--orange)" stroke-width="1.5" marker-end="url(#t-o)"/>
+  <text class="l" x="415" y="78" text-anchor="middle">发边</text>
+
+  <!-- 两条话题 -->
+  <rect x="436" y="40" width="130" height="46" rx="6" fill="#fff"/>
+  <rect x="436" y="40" width="130" height="46" rx="6" fill="var(--orange-bg)" stroke="var(--orange)" stroke-width="1.5"/>
+  <text class="t" x="501" y="60" text-anchor="middle">/tf_static</text>
+  <text class="s" x="501" y="78" text-anchor="middle">fixed 边 · 一次性</text>
+
+  <rect x="436" y="100" width="130" height="46" rx="6" fill="#fff"/>
+  <rect x="436" y="100" width="130" height="46" rx="6" fill="var(--orange-bg)" stroke="var(--orange)" stroke-width="1.5"/>
+  <text class="t" x="501" y="120" text-anchor="middle">/tf</text>
+  <text class="s" x="501" y="138" text-anchor="middle">活动边 · 持续刷新</text>
+
+  <line x1="570" y1="88" x2="601" y2="88" stroke="var(--orange)" stroke-width="1.5" marker-end="url(#t-o)"/>
+  <text class="l" x="585" y="78" text-anchor="middle">订阅</text>
+
+  <!-- 订阅方 -->
+  <rect x="606" y="40" width="138" height="96" rx="6" fill="#fff"/>
+  <rect x="606" y="40" width="138" height="96" rx="6" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1.5"/>
+  <text class="t" x="675" y="66" text-anchor="middle">订阅方（谁在读）</text>
+  <text class="s" x="675" y="90" text-anchor="middle">rviz2 · 画坐标轴</text>
+  <text class="s" x="675" y="108" text-anchor="middle">view_frames · 导树图</text>
+  <text class="l" x="675" y="128" text-anchor="middle">tf2_echo · 查单边</text>
+
+  <line x1="16" y1="160" x2="744" y1="160" stroke="var(--border)" stroke-width="0.5"/>
+  <text class="s" x="16" y="186">上方 3 步怎么落到这条链路（每个框就是一个步骤）——同一条树，三份独立证据：</text>
+
+  <rect x="40" y="200" width="200" height="68" rx="6" fill="#fff"/>
+  <rect x="40" y="200" width="200" height="68" rx="6" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1.5"/>
+  <text class="t" x="140" y="228" text-anchor="middle">① 启动：一条 launch</text>
+  <text class="s" x="140" y="250" text-anchor="middle">三节点：滑块 · 发布 · 画面</text>
+
+  <rect x="270" y="200" width="200" height="68" rx="6" fill="#fff"/>
+  <rect x="270" y="200" width="200" height="68" rx="6" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1.5"/>
+  <text class="t" x="370" y="228" text-anchor="middle">② 打印：view_frames</text>
+  <text class="s" x="370" y="250" text-anchor="middle">订阅 5 s → frames.pdf 成树</text>
+
+  <rect x="500" y="200" width="200" height="68" rx="6" fill="#fff"/>
+  <rect x="500" y="200" width="200" height="68" rx="6" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1.5"/>
+  <text class="t" x="600" y="228" text-anchor="middle">③ 对照：RViz 画面</text>
+  <text class="s" x="600" y="250" text-anchor="middle">TF 图层 = 树的现场直播</text>
+
+  <line x1="245" y1="234" x2="264" y2="234" stroke="var(--gray)" stroke-width="1.5" marker-end="url(#t-g)"/>
+  <line x1="475" y1="234" x2="494" y2="234" stroke="var(--gray)" stroke-width="1.5" marker-end="url(#t-g)"/>
+
+  <text class="s" x="16" y="296">最小系统：现成 launch + 两台终端——不写一行代码，节点靠 DDS 自动发现彼此。</text>
+  <text class="s" x="16" y="316">唯一要求：终端 A 的 launch 别关——/tf 与 /tf_static 都挂在它身上，关了终端 B 全部 Waiting。</text>
+</svg>
+<div class="dock">
+  <span class="ok">✅ 结论：发布者是 robot_state_publisher——读一次 URDF、持续发整棵树，链路一图看懂</span>
+  <span class="warn">⚠️ 风险：launch 提前退出或 frame 拼错 → 查询端永远 Waiting</span>
+  <span class="evid">🔍 验证：上方 3 个步骤逐条对应图中 ① ～ ③</span>
+</div>
+<div class="ft">EXP-19 · TF2 坐标系变换</div>
+<script>
+(function(){if(window===parent)return;function send(){try{parent.postMessage({type:'figh',h:document.body.scrollHeight},'*')}catch(e){}}window.addEventListener('load',send);window.addEventListener('resize',function(){clearTimeout(window.__fighT);window.__fighT=setTimeout(send,120)});send();})();
+</script>
+</body>
+</html>

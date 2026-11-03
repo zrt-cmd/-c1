@@ -1,0 +1,29 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp003-ros2-application/exp-20-urdf/diagrams/fig-20-1-link-joint-tree.html
+TITLE: 图 20-1 · link 与 joint 结构树
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+图 20-1 · link 与 joint 结构树
+图 20-1 · link 三重属性 × joint 结构树
+本图回答的问题：一份 URDF 用什么把机器人拆成部件，又用什么把部件连回一棵树？
+link: chassis（根）
+box 0.40×0.25×0.08 · mass 3.0
+visual · 给 RViz 看外观
+collision · 给 Gazebo 碰撞
+inertial · mass + 惯性矩阵
+三属性
+continuous · axis Y
+continuous · axis Y
+fixed（零自由度）
+left_wheel
+cylinder r=0.05
+right_wheel
+cylinder r=0.05
+front_caster
+sphere r=0.025
+joint origin xyz="0.0 -0.15 -0.03" = 子轮相对父底盘的安装位姿
+把轮子偏移写进 visual origin 而不是 joint origin
+轮子原地自转却装不到车轴上——两种 origin 语义完全不同
+✅ 结论：link 装属性、joint 定自由度，单根树结构与 TF 树同构
+⚠️ 风险：两种 origin 混淆 → 轮子转圈装不上轴
+🔍 验证：04 节 check_urdf 输出 root Link: chassis has 3 child(ren)
+EXP-20 · URDF 与 Xacro 机器人建模

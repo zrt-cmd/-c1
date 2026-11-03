@@ -1,0 +1,39 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp003-ros2-application/exp-11-time/diagrams/fig-11-3-project-overview.html
+TITLE: 图 11-3 · 工程全景
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+图 11-3 · 工程全景
+图 11-3 · 本实验的工程全景：源码、话题、终端
+本图回答的问题：这节课到底动了哪些文件和话题，数据从哪流到哪？
+common.py
+读 MQ5（同目录 import）
+Gazebo / rosbag play
+外部系统 · 仅仿真/回放
+节点进程 · time_demo_node.py
+定时器1 · 1Hz 采样
+create_timer(1.0, cb)
+定时器2 · 5s 摘要
+create_timer(5.0, cb)
+Clock · 取时刻
+get_clock().now()
+to_msg() 盖 stamp
+→ publish(Header)
+状态摘要日志
+累计次数 + 总纳秒
+到点
+到点
+now()
+import
+/sensor_data 话题
+Header { stamp, frame_id }
+publish
+/clock ·仿真时
+终端 B · 测量工具
+ros2 topic echo — 看 stamp
+ros2 topic hz — 验节拍
+ros2 topic delay — 测延迟
+订阅
+✅ 结论：一个节点、两个定时器、时间全部经 Clock 一个出口
+⚠️ 风险：虚线依赖（common.py、Gazebo）缺一则对应功能不可用
+🔍 验证：02 节三条命令实测 echo/hz/delay
+EXP-11 · 时间 API 与双时钟体系

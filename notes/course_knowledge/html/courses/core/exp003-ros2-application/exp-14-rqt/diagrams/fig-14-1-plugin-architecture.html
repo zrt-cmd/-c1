@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>图 14-1 · rqt 插件架构</title>
+<style>
+:root{--bg-page:#ffffff;--bg-card:#fff;--text:#0f172a;--text2:#475569;--muted:#94a3b8;
+  --border:#e2e8f0;--teal:#0891b2;--green:#059669;--purple:#7c3aed;--orange:#ea580c;--red:#e11d48;--gray:#64748b;
+  --teal-bg:rgba(8,145,178,.08);--green-bg:rgba(5,150,105,.08);--purple-bg:rgba(124,58,237,.08);
+  --orange-bg:rgba(234,88,12,.10);--gray-bg:rgba(100,116,139,.08)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg-page);color:var(--text);font-family:system-ui,"PingFang SC","Microsoft YaHei",sans-serif;padding:16px 14px 12px}
+.hd{margin-bottom:6px}
+.hd h1{font-size:15px;margin:0 0 4px}
+.hd .q{font-size:12px;color:var(--text2);margin:0}
+svg{width:100%;height:auto;display:block}
+.t{font:600 12.5px system-ui,sans-serif;fill:var(--text)}
+.s{font:400 10.5px system-ui,sans-serif;fill:var(--text2)}
+.l{font:600 10.5px ui-monospace,Consolas,monospace;fill:var(--text2)}
+.dock{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.dock span{font-size:11.5px;border-radius:999px;padding:3px 10px;line-height:1.6}
+.ok{background:#ecfdf5;color:#047857;border:1px solid #a7f3d0}
+.warn{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca}
+.evid{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}
+.ft{font-size:10.5px;color:var(--muted);margin-top:8px;text-align:right}
+</style>
+</head>
+<body>
+<div class="hd">
+  <h1>图 14-1 · rqt 插件架构：一个容器，多双眼睛</h1>
+  <p class="q">本图回答的问题：rqt_graph / rqt_plot 们为什么共享同一套话题、切工具不用重连？</p>
+</div>
+<svg viewBox="0 0 760 520" role="img" aria-label="rqt 容器与插件架构分层">
+  <!-- 层框 -->
+  <rect x="12" y="14" width="736" height="86" rx="10" fill="none" stroke="#bae6fd" stroke-width="1.5"/>
+  <text class="l" x="24" y="34" fill="#0891b2">容器层 · Qt 主窗口</text>
+  <rect x="12" y="126" width="736" height="150" rx="10" fill="none" stroke="#a7f3d0" stroke-width="1.5"/>
+  <text class="l" x="24" y="146" fill="#059669">插件层 · rqt_* 动态加载</text>
+  <rect x="12" y="292" width="736" height="94" rx="10" fill="none" stroke="#c4b5fd" stroke-width="1.5"/>
+  <text class="l" x="24" y="312" fill="#7c3aed">数据层 · 共享同一 ROS 上下文</text>
+  <rect x="12" y="412" width="736" height="64" rx="10" fill="none" stroke="#fed7aa" stroke-width="1.5"/>
+  <text class="l" x="24" y="432" fill="#ea580c">消息层 · 话题 / 服务</text>
+
+  <!-- 容器层 -->
+  <rect x="46" y="40" width="300" height="48" rx="6" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1.5"/>
+  <text class="t" x="196" y="60" text-anchor="middle">rqt 主窗口 · 菜单 + 停靠面板</text>
+  <text class="s" x="196" y="79" text-anchor="middle">插件发现：扫描 share/rqt_*</text>
+  <rect x="396" y="40" width="318" height="48" rx="6" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1.5"/>
+  <text class="t" x="555" y="60" text-anchor="middle">Perspectives · 布局保存</text>
+  <text class="s" x="555" y="79" text-anchor="middle">组合成套 → 一键还原 · 团队共享</text>
+
+  <!-- 插件层 -->
+  <rect x="46" y="156" width="160" height="54" rx="6" fill="var(--green-bg)" stroke="var(--green)" stroke-width="1.5"/>
+  <text class="t" x="126" y="178" text-anchor="middle">rqt_graph</text>
+  <text class="s" x="126" y="197" text-anchor="middle">拓扑 · 谁连谁</text>
+  <rect x="226" y="156" width="160" height="54" rx="6" fill="var(--green-bg)" stroke="var(--green)" stroke-width="1.5"/>
+  <text class="t" x="306" y="178" text-anchor="middle">rqt_plot</text>
+  <text class="s" x="306" y="197" text-anchor="middle">波形 · 字段级路径</text>
+  <rect x="406" y="156" width="160" height="54" rx="6" fill="var(--green-bg)" stroke="var(--green)" stroke-width="1.5"/>
+  <text class="t" x="486" y="178" text-anchor="middle">rqt_image_view</text>
+  <text class="s" x="486" y="197" text-anchor="middle">图像 · 相机画面</text>
+  <rect x="586" y="156" width="142" height="54" rx="6" fill="var(--green-bg)" stroke="var(--green)" stroke-width="1.5"/>
+  <text class="t" x="657" y="178" text-anchor="middle">rqt_topic / console</text>
+  <text class="s" x="657" y="197" text-anchor="middle">数据 / 日志清单</text>
+
+  <rect x="140" y="228" width="486" height="34" rx="6" fill="#fff" stroke="var(--green)" stroke-width="1.5"/>
+  <text class="s" x="383" y="250" text-anchor="middle">进程内同一个 ROS 节点上下文 · 切插件不重连</text>
+
+  <!-- 数据层 -->
+  <rect x="46" y="322" width="300" height="52" rx="6" fill="var(--purple-bg)" stroke="var(--purple)" stroke-width="1.5"/>
+  <text class="t" x="196" y="344" text-anchor="middle">订阅 / 查询同一套系统</text>
+  <text class="s" x="196" y="364" text-anchor="middle">nodes · topics · params · logs</text>
+  <rect x="410" y="322" width="300" height="52" rx="6" fill="var(--purple-bg)" stroke="var(--purple)" stroke-width="1.5"/>
+  <text class="t" x="560" y="344" text-anchor="middle">自写插件挂进同一菜单</text>
+  <text class="s" x="560" y="364" text-anchor="middle">声明插件入口 → 动态加载</text>
+
+  <!-- 消息层 -->
+  <rect x="46" y="434" width="664" height="30" rx="6" fill="var(--orange-bg)" stroke="var(--orange)" stroke-width="1.5"/>
+  <text class="t" x="378" y="454" text-anchor="middle">DDS 话题总线 · /chatter / battery / image_raw …</text>
+
+  <!-- 连线 -->
+  <line x1="196" y1="88" x2="196" y2="156" stroke="var(--green)" stroke-width="1.5"/>
+  <text class="l" x="204" y="126">加载插件</text>
+  <line x1="555" y1="88" x2="590" y2="156" stroke="var(--teal)" stroke-width="1.5"/>
+  <text class="l" x="562" y="126">存/取布局</text>
+  <line x1="383" y1="262" x2="383" y2="322" stroke="var(--purple)" stroke-width="1.5"/>
+  <text class="l" x="392" y="296">共享上下文</text>
+  <line x1="196" y1="374" x2="196" y2="434" stroke="var(--orange)" stroke-width="1.5"/>
+  <line x1="470" y1="374" x2="470" y2="434" stroke="var(--orange)" stroke-width="1.5"/>
+
+  <text class="l" x="380" y="502" text-anchor="middle" fill="#94a3b8">GUI 预览给速度 · CLI 定案给可复现 —— 两边交叉验证</text>
+</svg>
+<div class="dock">
+  <span class="ok">✅ 结论：一个容器共享一套上下文，切换插件零重连</span>
+  <span class="warn">⚠️ 风险：未 source 同源环境 → 插件菜单缺失 / 图为空</span>
+  <span class="evid">🔍 验证：04 节启动三连 + graph/plot 交叉印证</span>
+</div>
+<div class="ft">EXP-14 · rqt 可视化工具箱</div>
+</body>
+</html>

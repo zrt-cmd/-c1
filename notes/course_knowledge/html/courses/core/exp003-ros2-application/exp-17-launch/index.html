@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-17 · Launch 启动文件 — 机器人 ROS2 应用与开发</title>
+<link rel="stylesheet" href="../shared/tutorial.css?v=20261027b">
+<style>:root{--theme:#0284c7;--theme-deep:#0369a1;--theme-bg:#e0f2fe;--theme-bd:#bae6fd}
+/* 指导书实操截图图廊 */
+.figs-guide{margin:1rem 0 .4rem;padding:.9rem 1rem;background:#f8fafc;border:1px dashed #94a3b8;border-radius:12px}
+.figs-guide h4{font-size:.88rem;margin:0 0 .7rem;color:#334155;display:flex;gap:.4rem;align-items:center}
+.figgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:.8rem}
+.fg{margin:0;background:#fff;border:1px solid var(--border,#e2e8f0);border-radius:10px;padding:.5rem;cursor:zoom-in;transition:.2s}
+.fg:hover{box-shadow:0 6px 18px rgba(13,148,136,.15);transform:translateY(-2px)}
+.fg img{width:100%;display:block;border-radius:6px;background:#fff}
+.fg figcaption{font-size:.74rem;color:#64748b;line-height:1.55;padding-top:.45rem}
+#lightbox{position:fixed;inset:0;background:rgba(15,23,42,.92);display:none;align-items:center;justify-content:center;z-index:99;cursor:zoom-out;padding:2vh 2vw}
+#lightbox.on{display:flex}
+#lightbox img{max-width:96vw;max-height:92vh;border-radius:8px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+
+/* 三问卡：是什么 / 为什么 / 怎么用 */
+.kgrid.stack{grid-template-columns:1fr}
+.kgrid.stack .kcard{max-width:none}
+.www{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:.75rem;margin:.85rem 0 1.1rem}
+.www>div{border-radius:11px;padding:.7rem .85rem;border:1px solid var(--theme-bd);background:#f8fbff}
+.www>div.w2{border-color:#fdba74;background:#fffbeb}
+.www>div.w3{border-color:#86efac;background:#f0fdf4}
+.www .wt{font-size:.78rem;font-weight:700;letter-spacing:.4px;color:var(--theme-deep);margin-bottom:.35rem;display:flex;align-items:center;gap:.35rem}
+.www>div.w2 .wt{color:#b45309}
+.www>div.w3 .wt{color:#15803d}
+.www p{margin:0;font-size:.86rem;line-height:1.72;color:#334155}
+/* 终端卡片 */
+.term{margin:.6rem 0 .95rem;border-radius:11px;overflow:hidden;border:1px solid #1e293b;background:#0b1220}
+.term .bar{display:flex;align-items:center;gap:.45rem;padding:.42rem .8rem;background:#161f30;border-bottom:1px solid #1e293b}
+.term .bar i{width:9px;height:9px;border-radius:50%;display:block;background:#475569}
+.term .bar i.r{background:#ef4444}.term .bar i.y{background:#f59e0b}.term .bar i.g{background:#22c55e}
+.term .bar b{margin-left:.4rem;font-size:.74rem;color:#94a3b8;font-weight:600;letter-spacing:.3px}
+.term pre{margin:0;padding:.75rem .95rem;overflow-x:auto;font-size:.79rem;line-height:1.68;color:#cbd5e1;font-family:ui-monospace,Menlo,Consolas,monospace;white-space:pre}
+.term pre .p{color:#7dd3fc}
+.term pre .ok{color:#6ee7b7}
+.term pre .warn{color:#fbbf24}
+.term pre .dim{color:#64748b}
+.term pre .err{color:#fca5a5}
+.term pre .hi{color:#f9a8d4}
+
+/* ===== 合并大节内的小标题（原理讲解 / 实验步骤 的 h3） ===== */
+h3.sub{margin:26px 0 12px;padding:9px 0 9px 14px;font-size:16px;font-weight:700;
+  color:var(--text-primary);line-height:1.5;
+  border-left:4px solid var(--theme);background:linear-gradient(90deg,var(--theme-bg) 0%,transparent 72%)}
+h3.sub:first-of-type{margin-top:18px}
+@media (max-width:720px){h3.sub{font-size:15px;margin:22px 0 10px}}
+
+/* ===== 图解块：编号标题 + 本图回答的问题 + iframe 图页 + 三徽标 ===== */
+.srcline{font-size:12.5px;color:var(--text-muted);margin:10px 0 0}
+.figq{font-size:12.5px;color:var(--text-secondary);margin:16px 0 6px;font-weight:600}
+.figq b{color:var(--theme-deep);font-weight:700}
+.dwrap{border:1px solid var(--border);border-radius:12px;overflow:hidden;margin:8px 0 4px;background:#fff}
+.dwrap iframe{display:block;width:100%;height:560px;border:0}
+@media(max-width:720px){.dwrap iframe{height:660px}}
+.dock{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;padding:2px 10px 10px}
+.dock span{font-size:12px;border-radius:999px;padding:3px 11px;line-height:1.65}
+.dock .ok{background:#ecfdf5;color:#047857;border:1px solid #a7f3d0}
+.dock .warn{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca}
+.dock .evid{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}
+.qrow{font-size:12.5px;color:var(--text-muted);margin:14px 0 4px;font-weight:600}
+.tip details{margin:7px 0 11px;font-size:12.5px;line-height:1.8}
+.tip details summary{cursor:pointer;color:#5b21b6;font-weight:600}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit" title="返回课程首页">🧠 具身智能课程 · <i>教程首页</i></a>
+  <div class="crumb"><a href="../../../index.html#core">核心课程</a> / <a href="../index.html">ROS2 应用与开发</a> / EXP-17</div>
+</div>
+<div class="wrap">
+<aside class="side">
+  <h4>本页目录</h4>
+    <a href="#goal" class="now">★ 课程目标</a>
+  <a href="#s1">01 问题引入：五个终端的手忙脚乱</a>
+  <a href="#s2">02 先看现象：一条命令、一次停</a>
+  <a href="#s3">03 原理讲解</a>
+  <a href="#s4">04 实验步骤</a>
+  <a href="#s5">05 注意事项与验收</a>
+  <a href="#s6">06 本课总结与验证题</a>
+  
+  <h4>CH4 · 工具链</h4>
+  <a href="../exp-14-rqt/index.html">EXP-14 rqt 工具箱</a>
+  <a href="../exp-15-rviz2/index.html">EXP-15 rviz2 可视化</a>
+  <a href="../exp-16-rosbag/index.html">EXP-16 rosbag2 数据录制</a>
+  <a href="../exp-17-launch/index.html" style="color:var(--theme);font-weight:700">EXP-17 Launch 启动系统</a>
+  <a href="../exp-18-metapackage/index.html">EXP-18 元功能包集成</a>
+</aside>
+<main class="content">
+<div class="exp-head">
+  <span class="code">EXP-17 · 第四章 · 设计性 · 2 学时</span>
+  <h1>ROS2 Launch 启动文件：一键编排多节点系统</h1>
+  <p class="desc">系统有 5 个节点，开机要开 5 个终端、按顺序 source、一个个敲 run——漏一个就是"话题没数据"的灵异现场。Launch 文件把整个系统声明成一份"启动剧本"：一条命令起全部，一次 Ctrl+C 停全部。本课直接用现成的 display.launch.py：先跑出带小车的 RViz 现象，再讲清解析、拉起、优雅退出的全过程，一个案例说透 remap / 条件 / 事件，最后把这份 37 行源码逐段拆开。</p>
+  <div class="meta"><span class="tag hl">难度 ⭐⭐</span><span class="tag">2 学时</span><span class="tag">设计性</span><span class="tag">关键词 LaunchDescription · remap · IfCondition · OnProcessExit</span></div>
+</div>
+
+<!-- 01 问题引入 -->
+<section class="blk reveal" id="goal">
+<h2><span class="no">目标</span>本课学完，你应该能做到</h2>
+<div class="kgrid">
+  <div class="kcard"><div class="kd">① 说清逻辑</div><div class="kt">launch 执行逻辑</div><p>能说清 <code>ros2 launch</code> 从解析 .launch.py、逐个拉起子进程、到一次 Ctrl+C 级联退出的完整执行链条。</p></div>
+  <div class="kcard"><div class="kd">② 看懂写法</div><div class="kt">读懂 display.launch.py</div><p>能逐段读懂 37 行源码：入口函数、<code>LaunchDescription</code> 列表、<code>Node</code> 各参数（package/executable/name/parameters/arguments/output）分别控制什么。</p></div>
+  <div class="kcard"><div class="kd">③ 分清三件套</div><div class="kt">remap / 条件 / 事件</div><p>能说出三件套各解决什么问题、怎么改：改话题名用 remap、起不起用 condition、什么时候起用事件，并牢记 remap 方向写反会静默失效。</p></div>
+  <div class="kcard"><div class="kd">④ 复现与解释</div><div class="kt">一条命令拉起小车</div><p>能用 <code>ros2 launch car1_description display.launch.py</code> 拉起 RViz 小车界面，说出三个进程的分工，一次 Ctrl+C 干净退出。</p></div>
+</div>
+<div class="tip tealb"><span class="lab">本课的重点与难点</span>
+<b>重点</b>：remap 的方向不能写反（<code>(源码名, 系统名)</code>），写反会静默失效、不报错。<br>
+<b>难点</b>：理解事件驱动编排：LaunchDescription 是静态列表，"A 退出后起 B"必须靠事件机制。</div>
+<div class="tip amber"><span class="lab">和前后的关系</span>
+本课是 <b>把前面十几个实验"打包成系统"的关键一步</b>。EXP-18 会再上一层，用元包把多个包聚起来。</div>
+</section>
+
+<section class="blk" id="s1">
+  <h2><span class="no">01</span>问题引入：五个终端的手忙脚乱</h2>
+  <div class="tip"><span class="lab">先回忆</span>EXP-05~08 每个实验都要开 2~3 个终端、逐条敲 <code>ros2 run</code>、关错一个整组全崩——这些重复劳动正是本章要消灭的对象：<b>一个命令、一份文件，拉起整支机器人队伍</b>，并且让它们同生共死。</div>
+  <div class="flow">
+    <div class="step"><div class="n">1</div><b>现状</b><p>雷达驱动、定位、规划、控制、可视化 = 5 个终端，每个都要 source、按序启动</p></div>
+    <div class="step"><div class="n">2</div><b>事故</b><p>新同学少 source 了一步，规划器收不到 /scan，排查一下午发现是"没起步"</p></div>
+    <div class="step"><div class="n">3</div><b>更糟</b><p>关机时逐个 Ctrl+C，漏关的僵尸节点还在发 cmd_vel——车突然自己动了</p></div>
+    <div class="step"><div class="n">4</div><b>正解</b><p>把 5 个节点写进一份 Launch 文件：<code>ros2 launch</code> 一条命令全起，Ctrl+C 一次全停</p></div>
+  </div>
+  <div class="tip">
+    <span class="lab">定义</span>
+    <b>Launch 文件</b>（.launch.py / .launch.xml / .launch.yaml）声明：启动哪些节点、各自带什么参数、话题怎么重映射、按什么顺序和条件编排。<code>ros2 launch</code> 解析这份声明并执行——它是从"手工业"到"一键部署"的关键一跃，也是后续 EXP-18 元功能包、EXP-19/20 模型加载的统一入口。
+  </div>
+  <div class="www">
+    <div class="w1"><div class="wt">🔎 是什么</div><p>一份<b>声明式启动剧本</b>：用代码写清"起哪些节点、带什么参数、话题怎么改名、什么条件下起、谁退出触发谁"。</p></div>
+    <div class="w2"><div class="wt">❓ 为什么</div><p>多节点系统的启动是<b>重复、易错、有顺序</b>的劳动。人肉启动无法保证一致性，也无法保证"同生共死"——这类确定性工作必须交给机器。</p></div>
+    <div class="w3"><div class="wt">🛠 怎么用</div><p>写 <code>.launch.py</code> 放进包的 <code>launch/</code> 目录 → <code>colcon build</code> → <code>source install/setup.bash</code> → <code>ros2 launch pkg file.py [key:=value]</code>。</p></div>
+  </div>
+</section>
+
+<section class="blk" id="s2">
+  <h2><span class="no">02</span>先看现象：一条命令、一次停</h2>
+  <div class="tip tealb"><span class="lab">不写任何文件，直接跑</span>car1_description 包里已经带好了 <code>launch/display.launch.py</code>：一条命令同时拉起 joint_state_publisher_gui、robot_state_publisher、rviz2 三个进程，弹出带小车的 RViz2 窗口（EXP-15 见过的界面）；一次 Ctrl+C 全部干净退出——这就是 01 节"五个终端手忙脚乱"的一键解药。</div>
+  <div class="term" style="max-width:760px">
+    <div class="bar"><i class="r"></i><i class="y"></i><i class="g"></i><b>命令 · 一条命令拉起三个进程（右上角可复制）</b></div>
+<pre data-copy="cmd"><span class="p">$</span> ros2 launch car1_description display.launch.py</pre>
+  </div>
+  <figure class="fg" onclick="lbShow(this)" style="max-width:880px;margin:8px auto 10px">
+    <img src="../exp-15-rviz2/images/display-launch.jpg" alt="02 节运行效果：rviz2 小车界面（复用 EXP-15 实拍）">
+    <figcaption>运行效果（复用 EXP-15 实拍）：左窗是 joint_state_publisher_gui 的关节滑条，右侧 RViz2 里显示小车模型与 TF——三个进程都由这一条 launch 监管。</figcaption>
+  </figure>
+  <div class="tip tealb"><span class="lab">此刻你已经亲眼确认的两件事</span>
+① <b>同生共死</b>：这一个命令带起的 3 个进程都归 launch 管，一次 Ctrl+C 全部 <code>finished cleanly</code>（终端可见）；<br>
+② <b>剧本真实存在</b>：display.launch.py 就是那份"启动剧本"——03 讲它怎么被执行，04 直接把它拆开。</div>
+</section>
+
+<section class="blk" id="s3">
+<h2><span class="no">03</span>原理讲解</h2>
+<h3 class="sub">解析、拉起、优雅退出的全过程</h3>
+  <div class="flow">
+    <div class="step"><div class="n">1</div><b>解析剧本</b><p>ros2 launch 读入 <code>.launch.py</code>，调用入口函数 <code>generate_launch_description()</code>，拿到一份 Action 列表（LaunchDescription）</p></div>
+    <div class="step"><div class="n">2</div><b>逐个拉起</b><p>按列表顺序执行 Action：先声明参数，再为每个 Node 创建子进程、注入参数与 remap；带条件的 Action 执行到它时才求值，为 False 直接跳过</p></div>
+    <div class="step"><div class="n">3</div><b>常驻监管</b><p>节点全部拉起后 <b>launch 并不退出</b>——它留在前台收信号、盯状态，各节点日志因此汇总到同一个终端</p></div>
+    <div class="step"><div class="n">4</div><b>级联退出</b><p>一次 Ctrl+C → 向所有子进程广播 SIGINT → 每个节点各一行 <code>process has finished cleanly</code>，同生共死</p></div>
+  </div>
+  <div class="tip amber">
+    <span class="lab">要点</span>
+    Launch 是<b>编排层不是运行时</b>：它负责起进程、注参数、建重映射，起完之后自己还活着做"监管员"（收信号、管退出）。所以节点崩了日志里会看到 <code>[rviz2-3] process has died</code>——这行监管日志就是 Launch 身份的最好证明。
+  </div>
+  <div class="figq"><b>图 17-1 · 解析 → Runner → 子进程 → SIGINT 级联</b>——ros2 launch 读完剧本后做了什么？一次 Ctrl+C 怎么停干净全部节点？</div>
+  <div class="dwrap"><iframe src="diagrams/fig-17-1-lifecycle.html" title="图 17-1 Launch 解析执行与退出级联" loading="lazy"></iframe></div>
+  <div class="dock"><span class="ok">✅ 一次 Ctrl+C 全停 = Runner 广播 SIGINT 级联清理</span><span class="warn">⚠️ kill 父进程留孤儿 · condition False 的 name 也占号</span><span class="evid">🔍 02 节：3 行 process started + 同终端日志</span></div>
+<h3 class="sub">remap、条件、事件三件套：一个案例说明</h3>
+  <div class="kgrid stack">
+    <div class="kcard"><div class="kd">remap · 改名字</div><div class="kt">干什么：启动那一刻把话题改名</div><p>解决什么：两个雷达驱动源码都写死发 <code>/scan</code>，同机就撞车。怎么改：Node 加一行 <code>remappings=[('/scan', '/scan_front')]</code>——<b>左边源码名、右边新名，写反会静默失效不报错</b>；源码一个字不用动。</p></div>
+    <div class="kcard"><div class="kd">条件 · 起不起</div><div class="kt">干什么：挂个开关决定节点启不启动</div><p>解决什么：一份文件既要真机跑、又要仿真跑。怎么改：加 <code>condition=IfCondition(LaunchConfiguration('use_sim'))</code>，命令行 <code>use_sim:=true</code> 才起；不写 condition 的恒启动。</p></div>
+    <div class="kcard"><div class="kd">事件 · 何时起</div><div class="kt">干什么：监听进程退出去触发下一个动作</div><p>解决什么：静态列表不知道 A 什么时候结束。怎么改：<code>RegisterEventHandler(OnProcessExit(target_action=A, on_exit=[B]))</code>——A 一退出（含崩溃）就起 B；target_action 必须传 A 的变量，不能写字符串名。</p></div>
+  </div>
+  <pre data-copy="cmd"><span class="c"># 案例：同一份 launch 管"改名 + 开关 + 接续"三件事</span>
+rear_lidar = Node(package=<span class="y">'lidar_driver'</span>, executable=<span class="y">'lidar'</span>,
+                  name=<span class="y">'rear_lidar'</span>, output=<span class="y">'screen'</span>,
+                  remappings=[(<span class="y">'/scan'</span>, <span class="y">'/scan_rear'</span>)])    <span class="g"># 1) 改名：源码发 /scan，出来叫 /scan_rear</span>
+diag       = Node(package=<span class="y">'diag_tools'</span>, executable=<span class="y">'scan_diag'</span>,
+                  name=<span class="y">'scan_diag'</span>,
+                  condition=IfCondition(
+                      LaunchConfiguration(<span class="y">'use_sim'</span>)))     <span class="g"># 2) 条件：use_sim:=true 才起</span>
+LaunchDescription([
+    DeclareLaunchArgument(<span class="y">'use_sim'</span>, default_value=<span class="y">'false'</span>),
+    rear_lidar, diag,
+    RegisterEventHandler(                                <span class="g"># 3) 事件：rear_lidar 退出 → 起补位驱动</span>
+        OnProcessExit(target_action=rear_lidar,
+                      on_exit=[Node(package=<span class="y">'lidar_driver'</span>,
+                                    name=<span class="y">'rear_lidar_backup'</span>, ...)])),
+])
+<span class="c"># 运行：ros2 launch pkg demo.launch.py use_sim:=true</span></pre>
+  <div class="tip"><span class="lab">就记一句</span>remap 改名字（源码名 → 新名，方向别反）、条件定起不起、事件定什么时候起——三句话就是三件套的全部，其余编排都建立在上半节"解析 → 拉起 → 退出"这条主干上。</div>
+</section>
+
+<section class="blk" id="s4">
+<h2><span class="no">04</span>实验步骤</h2>
+<p class="srcline">本节不新建任何文件：直接拆解 02 节运行过的 <code>car1_description/launch/display.launch.py</code>。源码 37 行，一个入口函数、三个 Node——把它逐段看懂，launch 文件的写法就看懂了。</p>
+<h3 class="sub">源码全文 · display.launch.py</h3>
+  <pre data-copy="cmd"><span class="c"># ① 导入：剧本类、节点 Action、包路径工具</span>
+<span class="b">from</span> launch <span class="b">import</span> LaunchDescription
+<span class="b">from</span> launch_ros.actions <span class="b">import</span> Node
+<span class="b">from</span> ament_index_python.packages <span class="b">import</span> get_package_share_directory
+<span class="b">import</span> os
+
+
+<span class="b">def</span> generate_launch_description():      <span class="g"># ② 入口函数：名字必须一字不差，ros2 launch 靠它找剧本</span>
+    pkg_share = get_package_share_directory(<span class="y">'car1_description'</span>)
+    urdf_file = os.path.join(pkg_share, <span class="y">'urdf'</span>, <span class="y">'car1.urdf'</span>)
+
+    <span class="b">with</span> <span class="b">open</span>(urdf_file, <span class="y">'r'</span>) <span class="b">as</span> f:
+        robot_desc = f.read()                <span class="g"># ③ 读入 URDF —— 模型就是这一大段 XML 字符串</span>
+
+    rviz_config = os.path.join(pkg_share, <span class="y">'rviz'</span>, <span class="y">'car1.rviz'</span>)   <span class="g"># rviz 布局文件</span>
+
+    <span class="b">return</span> LaunchDescription([
+        <span class="c"># ④ 节点 1：关节滑条窗口（截图左侧），发布各关节角</span>
+        Node(
+            package=<span class="y">'joint_state_publisher_gui'</span>,
+            executable=<span class="y">'joint_state_publisher_gui'</span>,
+            name=<span class="y">'joint_state_publisher_gui'</span>,
+            parameters=[{<span class="y">'robot_description'</span>: robot_desc}]
+        ),
+        <span class="c"># ⑤ 节点 2：拿 URDF + 关节角，发布 TF（车架坐标系）</span>
+        Node(
+            package=<span class="y">'robot_state_publisher'</span>,
+            executable=<span class="y">'robot_state_publisher'</span>,
+            name=<span class="y">'robot_state_publisher'</span>,
+            parameters=[{<span class="y">'robot_description'</span>: robot_desc}],
+            output=<span class="y">'screen'</span>                <span class="g"># 日志进 launch 终端，带 [robot_state_publisher-2] 前缀</span>
+        ),
+        <span class="c"># ⑥ 节点 3：按 car1.rviz 配置打开 RViz，小车画面就在里面（截图右侧）</span>
+        Node(
+            package=<span class="y">'rviz2'</span>,
+            executable=<span class="y">'rviz2'</span>,
+            name=<span class="y">'rviz2'</span>,
+            arguments=[<span class="y">'-d'</span>, rviz_config],     <span class="g"># -d：启动时加载指定配置文件</span>
+            output=<span class="y">'screen'</span>
+        )
+    ])</pre>
+  <div class="www">
+    <div class="w1"><div class="wt">🔎 是什么</div><p>若干 import + 一个固定命名的入口函数 + 一个 <code>LaunchDescription</code> 列表；列表里每个元素都是一个 Action，这个文件里是 3 个 <code>Node</code>。</p></div>
+    <div class="w2"><div class="wt">❓ 为什么</div><p>入口函数名由 <code>ros2 launch</code> 硬编码查找，<b>一个字符都不能错</b>；<code>output='screen'</code> 把子进程日志汇入同一终端，02 节看到的前缀日志就是它给的。</p></div>
+    <div class="w3"><div class="wt">🛠 怎么用</div><p>文件放在包的 <code>launch/</code> 目录，随 <code>colcon build</code> 装进 <code>share/</code>；之后 <code>ros2 launch car1_description display.launch.py</code> 一键定位（02 节已跑通）。</p></div>
+  </div>
+<h3 class="sub">逐段拆解</h3>
+  <div class="table-wrap"><table>
+    <tr><th>行号（原文件）</th><th>这一段干什么</th><th>关键点</th></tr>
+    <tr><td>1–4</td><td>导入 LaunchDescription、Node、包路径工具</td><td>Node 是最常用的 Action</td></tr>
+    <tr><td>8–9</td><td>定位包共享目录，拼出 car1.urdf 的绝对路径</td><td>拼的是 install/share 下的真实文件</td></tr>
+    <tr><td>11–12</td><td>把 URDF 全文读进 <code>robot_desc</code> 字符串</td><td>"机器人模型"在 launch 里就是一段字符串</td></tr>
+    <tr><td>14</td><td>拼出 rviz/car1.rviz 配置文件路径</td><td>rviz 显示布局也随包一起安装</td></tr>
+    <tr><td>16</td><td><code>return LaunchDescription([...])</code></td><td>剧本开始，按列表顺序逐个执行</td></tr>
+    <tr><td>17–22</td><td>起 joint_state_publisher_gui：弹出滑条窗口、发布各关节角</td><td>接收 robot_description 参数（截图左侧窗口）</td></tr>
+    <tr><td>23–29</td><td>起 robot_state_publisher：URDF + 关节角 → 发布 TF</td><td>同样接收 robot_description，带 output='screen'</td></tr>
+    <tr><td>30–36</td><td>起 rviz2：<code>-d</code> 加载 car1.rviz，显示小车</td><td>不吃 robot_description，靠 TF + RobotModel 还原画面（截图右侧）</td></tr>
+  </table></div>
+  <div class="tip amber"><span class="lab">要点</span>
+  <b>robot_description 是"参数注入"，不是话题传来传去</b>：同一个 URDF 字符串被 launch 分别塞进 gui 和 rsp 两个节点；rviz2 则通过订阅 TF + RobotModel 插件自己还原画面。三个进程互不调用，靠参数注入 + 标准话题组合成一个系统——这正是 ROS2 的组合方式。</div>
+  <div class="tip tealb"><span class="lab">对照 02 的现象</span>
+  终端里 3 行 <code>process started with pid</code>、截图里的 <code>[rviz2-3]</code>/<code>[joint_state_publisher_gui-1]</code> 前缀，与上面三个 Node 一一对应；<b>只关掉一个窗口（比如 RViz）只会死一个进程</b>——launch 作为监管员打出 <code>process has died</code> 并继续管另外两个，要整组退出只有一次 Ctrl+C。</div>
+</section>
+
+<section class="blk" id="s5">
+  <h2><span class="no">05</span>注意事项与验收</h2>
+  <div class="table-wrap"><table>
+    <tr><th>类别</th><th>注意事项</th></tr>
+    <tr><td>⚠️ 环境</td><td>Launch 文件必须放在功能包的 <code>launch/</code> 目录，并在编译时通过 <code>install(DIRECTORY launch DESTINATION share/${PROJECT_NAME})</code> 安装到 <code>share/</code></td></tr>
+    <tr><td>⚠️ 函数名</td><td>入口函数必须精确命名为 <code>generate_launch_description</code>，小写加下划线，一个字符都不能错</td></tr>
+    <tr><td>⚠️ 进程管理</td><td>Launch 是父进程，退出时会自动终止所有子节点。不要在运行期间直接 <code>kill</code> Launch 进程，用 <code>Ctrl+C</code> 优雅退出</td></tr>
+    <tr><td>⚠️ 节点命名</td><td>同一 LaunchDescription 中每个 Node 的 <code>name</code> 必须唯一（或用 namespace 区分）——条件为 False 的节点也占号</td></tr>
+    <tr><td>⚠️ 参数类型</td><td><code>LaunchConfiguration</code> 返回的是 Substitution 而非字符串，参与字符串拼接必须走 <code>PythonExpression</code> 或 <code>TextSubstitution</code></td></tr>
+    <tr><td>⚠️ 调试手段</td><td>行为不符预期时，先加 <code>LogInfo(msg=[...])</code> 把中间变量打出来，比猜快十倍</td></tr>
+  </table></div>
+  <ul class="check">
+    <li>验收 1：复现现象——一条命令拉起 RViz 小车，说出终端三行 process started 对应的三个进程，一次 Ctrl+C 后全部 finished cleanly</li>
+    <li>验收 2：口述全过程——解析剧本 → 逐个拉起 → 常驻监管 → Ctrl+C 级联退出，并解释"launch 起完为什么不退出、节点日志为何在同一终端"</li>
+    <li>验收 3：读懂源码——指出 display.launch.py 的入口函数名、robot_description 注入给了哪两个节点、rviz2 的 <code>-d</code> 参数作用</li>
+    <li>验收 4：三件套各一句——两雷达撞名怎么改（remap 与方向）、真机/仿真二选一怎么写（条件）、A 退出后接 B 怎么写（事件，target_action 传什么）</li>
+    <li>验收 5：排查与收尾——按三连定位 "No launch file found"；说清 Node 的 name 为什么要唯一、<code>output='screen'</code> 不写会怎样</li>
+  </ul>
+  <div class="tip"><span class="lab">验收口径</span>
+  "找不到 launch 文件"是最常见的验收障碍，按固定顺序排查只需 30 秒：<b>build 有没有成功 → source install/setup.bash 了没有 → CMakeLists 是否 install 了 launch 目录</b>。口述得出这个三连，本身就是对"launch 文件如何从源码走到可执行"这条链路的理解证明。</div>
+</section>
+
+<section class="blk" id="s6">
+  <h2><span class="no">06</span>本课总结与验证题</h2>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">执行逻辑</div><div class="kt">解析 → 拉起 → 级联退出</div><p>ros2 launch 解析 .launch.py 得到 Action 列表，逐个拉起子进程后常驻监管，一次 Ctrl+C 级联全停。</p></div>
+    <div class="kcard"><div class="kd">三件套</div><div class="kt">remap / 条件 / 事件</div><p>remap 不改码适配多实例；If/Unless 一文件多场景；OnProcessExit 串起流程自动化。</p></div>
+    <div class="kcard"><div class="kd">参数化</div><div class="kt">Declare + Config + := </div><p>命令行 key:=value 运行时覆盖默认值，一份文件服务调试/生产/仿真。</p></div>
+    <div class="kcard"><div class="kd">工程闭环</div><div class="kt">launch 是部署资产</div><p>install 规则 + 一键启动 + 全量退出——与 params、.rviz、bag 一样进 git。</p></div>
+  </div>
+  <div class="tip violet">
+    <span class="lab">三问一句话收束</span>
+    <p><b>是什么</b>：一份用 Python 写的声明式启动剧本（LaunchDescription + Action 列表）。<br>
+    <b>为什么</b>：多节点启动重复、易错、有顺序，人肉启动既保证不了一致性，也保证不了同生共死——这些确定性工作必须交给机器。<br>
+    <b>怎么用</b>：写 <code>.launch.py</code> 进 <code>launch/</code> → 三件套（package.xml / CMakeLists install / 入口函数名）到位 → <code>colcon build</code> + <code>source</code> → <code>ros2 launch pkg file.py key:=value</code> → 用 remap/条件/事件编排复杂度。</p>
+  </div>
+  <p class="qrow">✎ 验证题（改动型 · 做完对照得分点）——答案需动手执行后用自己的话归纳，参考答案点击展开。</p>
+  <div class="tip violet">
+    <span class="lab">验证题</span>
+    <p><b>Q1</b>（覆盖目标①④ 现象读进程）运行 <code>ros2 launch car1_description display.launch.py</code>，数一数终端里有几行 <code>process started</code>、分别是哪个节点；Ctrl+C 后又有几行 <code>finished cleanly</code>。用"解析 → 拉起 → 监管 → 级联退出"四步把这两组数字解释一遍。</p>
+    <details><summary>参考答案与得分点</summary>
+    启动 3 行 started：joint_state_publisher_gui-1、robot_state_publisher-2、rviz2-3（顺序即 LaunchDescription 列表顺序）；Ctrl+C 后 3 行 finished cleanly，RViz 窗口关闭、ros2 node list 为空。得分点：①数字与节点名对应（3 分）；②四步链条套用正确（3 分）；③说清 launch 中间一直在前台监管（2 分）。</details>
+
+    <p><b>Q2</b>（覆盖目标② 读源码）不翻文件，按顺序说出 display.launch.py 起了哪 3 个节点、各自干什么；<code>robot_description</code> 被注入给了哪两个节点？rviz2 的 <code>arguments=['-d', ...]</code> 是什么意思？</p>
+    <details><summary>参考答案与得分点</summary>
+    ① joint_state_publisher_gui 弹滑条、发关节角；② robot_state_publisher 拿 URDF+关节角发 TF；③ rviz2 按配置显示小车。robot_description 同一字符串注入前两个节点（rviz2 不吃它，走 TF + RobotModel）；-d = 启动时加载指定的 rviz 配置文件（car1.rviz）。得分点：①三节点顺序与分工（4 分）；②robot_description 注入对象（2 分）；③-d 含义（2 分）。</details>
+
+    <p><b>Q3</b>（覆盖目标③ remap）车上前后两个雷达驱动源码都写死发 <code>/scan</code>，同机必然撞名。写出 launch 里的改法：两个 Node 片段（name 各不相同 + 各带一行 remap）；再说明若写成 <code>remappings=[('/scan_front', '/scan')]</code> 会怎样、为什么不报错。</p>
+    <details><summary>参考答案与得分点</summary>
+    示例：Node(..., name='front_lidar', remappings=[('/scan','/scan_front')])；Node(..., name='rear_lidar', remappings=[('/scan','/scan_rear')])。方向=(源码名, 新名)：写成 ('/scan_front','/scan') 等于"改源码里的 /scan_front"，而源码根本没有这个名字 → 规则匹配不到，静默无效、无任何报错，两个实例仍在 /scan 上打架。得分点：①两段 Node 正确且 name 唯一（3 分）；②方向解释清楚（3 分）；③静默失效结论（2 分）。</details>
+
+    <p><b>Q4</b>（覆盖目标③ 条件+事件）对 display.launch.py 做两处"假想改造"（写在报告里即可，不用真改包）：① 让 rviz2 只在 <code>use_rviz:=true</code> 时启动，写出"声明参数 + 条件"两行；② 写出"rviz2 退出后自动打印一行收尾日志"的事件注册，并说明 <code>target_action</code> 该传什么、传字符串会怎样。</p>
+    <details><summary>参考答案与得分点</summary>
+    ① DeclareLaunchArgument('use_rviz', default_value='true') + Node(..., name='rviz2', condition=IfCondition(LaunchConfiguration('use_rviz')))；② RegisterEventHandler(OnProcessExit(target_action=rviz2_node, on_exit=[LogInfo(msg='rviz closed')]))。target_action 必须传同一 LaunchDescription 里的 Node 变量引用；传字符串匹配不到任何 Action，事件永不触发且不报错。得分点：①条件两行正确（3 分）；②事件结构正确（3 分）；③target_action=变量、传字符串失效（2 分）。</details>
+
+    <p><b>Q5</b>（覆盖目标① 单点退出 vs 整组退出）launch 运行中另开终端 <code>ros2 node list</code> 看到什么？回主终端只关掉 RViz 窗口（不 Ctrl+C），再查 node list、看 launch 终端日志各是什么？最后 Ctrl+C 一次又是什么？三步对照说明"谁在监管谁"。</p>
+    <details><summary>参考答案与得分点</summary>
+    ① 3 个节点都在；② 关 RViz 后 rviz2 消失，gui/rsp 仍在，launch 终端打出 [rviz2-3] process has died——单点退出，launch 作为监管员继续管另外两个；③ Ctrl+C 一次：剩余进程全部 finished cleanly，node list 清空。得分点：①三次状态如实（4 分）；②"died ≠ 整组退出"（3 分）；③监管员角色说清（1 分）。</details>
+  </div>
+</section>
+
+<nav class="expnav">
+  <a href="../exp-16-rosbag/index.html"><span class="lb">← 上一个实验</span>EXP-16 rosbag2 数据录制与回放</a>
+  <a class="next" href="../exp-18-metapackage/index.html"><span class="lb">下一个实验 →</span>EXP-18 元功能包集成</a>
+</nav>
+<footer>
+  <span>CORE-01 · 机器人 ROS2 应用与开发 · EXP-17 Launch 启动文件</span>
+  <span>2 学时 · 设计性</span>
+</footer>
+</main>
+</div>
+
+<script src="../shared/tutorial.js?v=20261027a" defer></script>
+
+<div id="lightbox" onclick="this.classList.remove('on')"><img alt=""></div>
+<script>
+function lbShow(fig){var lb=document.getElementById('lightbox');if(!lb)return;var im=fig.querySelector('img');if(!im)return;lb.querySelector('img').src=im.src;lb.querySelector('img').alt=im.alt||'';lb.classList.add('on');}
+document.addEventListener('keydown',function(e){if(e.key==='Escape'){var lb=document.getElementById('lightbox');if(lb)lb.classList.remove('on');}});
+</script>
+
+</body>
+</html>

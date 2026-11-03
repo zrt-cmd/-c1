@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>图 12-3 · 工程全景</title>
+<style>
+:root{--bg-page:#ffffff;--bg-card:#fff;--text:#0f172a;--text2:#475569;--muted:#94a3b8;
+  --border:#e2e8f0;--teal:#0891b2;--green:#059669;--purple:#7c3aed;--orange:#ea580c;--red:#e11d48;--gray:#64748b;
+  --teal-bg:rgba(8,145,178,.08);--green-bg:rgba(5,150,105,.08);--purple-bg:rgba(124,58,237,.08);
+  --orange-bg:rgba(234,88,12,.10);--gray-bg:rgba(100,116,139,.08)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg-page);color:var(--text);font-family:system-ui,"PingFang SC","Microsoft YaHei",sans-serif;padding:16px 14px 12px}
+.hd{margin-bottom:6px}
+.hd h1{font-size:15px;margin:0 0 4px}
+.hd .q{font-size:12px;color:var(--text2);margin:0}
+svg{width:100%;height:auto;display:block}
+.t{font:600 12.5px system-ui,sans-serif;fill:var(--text)}
+.s{font:400 10.5px system-ui,sans-serif;fill:var(--text2)}
+.l{font:600 10.5px ui-monospace,Consolas,monospace;fill:var(--text2)}
+.dock{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.dock span{font-size:11.5px;border-radius:999px;padding:3px 10px;line-height:1.6}
+.ok{background:#ecfdf5;color:#047857;border:1px solid #a7f3d0}
+.warn{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca}
+.evid{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}
+.ft{font-size:10.5px;color:var(--muted);margin-top:8px;text-align:right}
+</style>
+</head>
+<body>
+<div class="hd">
+  <h1>图 12-3 · 工程全景：本课实操动了哪些命令与底层设施</h1>
+  <p class="q">本图回答的问题：A 组 / B 组实操各自操作什么，证据落在 DDS 栈的哪一层？</p>
+</div>
+<svg viewBox="0 0 760 540" role="img" aria-label="实验步骤工程全景：命令入口、DDS 栈、底层设施三层">
+  <!-- 层框 -->
+  <rect x="12" y="14" width="736" height="96" rx="10" fill="none" stroke="#bae6fd" stroke-width="1.5"/>
+  <text class="l" x="24" y="34" fill="#0891b2">入口层 · 终端命令</text>
+  <rect x="12" y="132" width="736" height="106" rx="10" fill="none" stroke="#a7f3d0" stroke-width="1.5"/>
+  <text class="l" x="24" y="152" fill="#059669">处理层 · DDS 发现与匹配</text>
+  <rect x="12" y="260" width="736" height="130" rx="10" fill="none" stroke="#fed7aa" stroke-width="1.5"/>
+  <text class="l" x="24" y="280" fill="#ea580c">消息与传输层 · 组播 / 共享内存</text>
+  <rect x="12" y="412" width="736" height="66" rx="10" fill="none" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="6,4"/>
+  <text class="l" x="24" y="432" fill="#64748b">外部 · 依赖条件</text>
+
+  <!-- 入口层 -->
+  <rect x="30" y="44" width="168" height="54" rx="6" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1.5"/>
+  <text class="t" x="114" y="66" text-anchor="middle">talker 进程</text>
+  <text class="s" x="114" y="86" text-anchor="middle">ros2 run demo_nodes_cpp</text>
+  <rect x="214" y="44" width="150" height="54" rx="6" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1.5"/>
+  <text class="t" x="289" y="66" text-anchor="middle">组网诊断台</text>
+  <text class="s" x="289" y="86" text-anchor="middle">ss / multicast / ls</text>
+  <rect x="380" y="44" width="180" height="54" rx="6" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1.5"/>
+  <text class="t" x="470" y="66" text-anchor="middle">ROS_DOMAIN_ID=7</text>
+  <text class="s" x="470" y="86" text-anchor="middle">前缀式切域 · topic list</text>
+  <rect x="576" y="44" width="156" height="54" rx="6" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1.5"/>
+  <text class="t" x="654" y="66" text-anchor="middle">QoS 实验</text>
+  <text class="s" x="654" y="86" text-anchor="middle">topic pub / echo --qos-*</text>
+
+  <!-- 处理层 -->
+  <rect x="84" y="164" width="240" height="58" rx="6" fill="var(--green-bg)" stroke="var(--green)" stroke-width="1.5"/>
+  <text class="t" x="204" y="188" text-anchor="middle">SPDP 发现 · 同域互播</text>
+  <text class="s" x="204" y="208" text-anchor="middle">GUID + 楼号 → 花名册</text>
+  <rect x="336" y="164" width="176" height="58" rx="6" fill="var(--green-bg)" stroke="var(--green)" stroke-width="1.5"/>
+  <text class="t" x="424" y="188" text-anchor="middle">SEDP 撮合</text>
+  <text class="s" x="424" y="208" text-anchor="middle">话题+类型+QoS</text>
+  <rect x="534" y="164" width="176" height="58" rx="6" fill="var(--green-bg)" stroke="var(--green)" stroke-width="1.5"/>
+  <text class="t" x="622" y="188" text-anchor="middle">QoS 合同生效</text>
+  <text class="s" x="622" y="208" text-anchor="middle">Durability · Reliability</text>
+
+  <!-- 消息与传输层 -->
+  <rect x="84" y="294" width="240" height="52" rx="6" fill="var(--orange-bg)" stroke="var(--orange)" stroke-width="1.5"/>
+  <text class="t" x="204" y="316" text-anchor="middle">组播发现通道</text>
+  <text class="s" x="204" y="336" text-anchor="middle">UDP 239.255.0.8 / .1 · 7400+250N</text>
+  <rect x="358" y="294" width="176" height="52" rx="6" fill="var(--purple-bg)" stroke="var(--purple)" stroke-width="1.5"/>
+  <text class="t" x="446" y="316" text-anchor="middle">共享内存 /dev/shm</text>
+  <text class="s" x="446" y="336" text-anchor="middle">fastrtps_* 段文件</text>
+  <rect x="558" y="294" width="152" height="52" rx="6" fill="var(--orange-bg)" stroke="var(--orange)" stroke-width="1.5"/>
+  <text class="t" x="634" y="316" text-anchor="middle">话题数据链路</text>
+  <text class="s" x="634" y="336" text-anchor="middle">/chatter · /qos_*</text>
+  <line x1="204" y1="346" x2="204" y2="378" stroke="var(--orange)" stroke-width="1.5"/>
+  <text class="l" x="214" y="366">A 组证据：端口 / 隔离 / 组播</text>
+  <line x1="634" y1="346" x2="634" y2="378" stroke="var(--green)" stroke-width="1.5"/>
+  <text class="l" x="450" y="366" text-anchor="middle">B 组证据：收历史 / count:0</text>
+
+  <!-- 连线 入口→处理 -->
+  <line x1="114" y1="98" x2="164" y2="164" stroke="var(--green)" stroke-width="1.5"/>
+  <text class="l" x="120" y="134">启动/发现</text>
+  <line x1="289" y1="98" x2="252" y2="164" stroke="var(--green)" stroke-width="1.5"/>
+  <line x1="470" y1="98" x2="400" y2="164" stroke="var(--green)" stroke-width="1.5"/>
+  <line x1="654" y1="98" x2="640" y2="164" stroke="var(--green)" stroke-width="1.5"/>
+  <text class="l" x="560" y="134">pub/echo</text>
+  <!-- 处理→传输 -->
+  <line x1="204" y1="222" x2="204" y2="294" stroke="var(--orange)" stroke-width="1.5"/>
+  <text class="l" x="214" y="262">发 SPDP</text>
+  <line x1="410" y1="222" x2="410" y2="294" stroke="var(--purple)" stroke-width="1.5"/>
+  <text class="l" x="420" y="262">同机 SHM</text>
+  <line x1="634" y1="222" x2="634" y2="294" stroke="var(--orange)" stroke-width="1.5"/>
+  <text class="l" x="644" y="262">QoS 收发</text>
+
+  <!-- 外部 -->
+  <rect x="84" y="432" width="240" height="38" rx="6" fill="var(--gray-bg)" stroke="var(--gray)" stroke-width="1.5" stroke-dasharray="6,4"/>
+  <text class="s" x="204" y="456" text-anchor="middle">交换机 · 防火墙 · IGMP 组播开关</text>
+  <rect x="358" y="432" width="176" height="38" rx="6" fill="var(--gray-bg)" stroke="var(--gray)" stroke-width="1.5" stroke-dasharray="6,4"/>
+  <text class="s" x="446" y="456" text-anchor="middle">Fast-DDS（默认 RMW）</text>
+  <rect x="558" y="432" width="152" height="38" rx="6" fill="var(--gray-bg)" stroke="var(--gray)" stroke-width="1.5" stroke-dasharray="6,4"/>
+  <text class="s" x="634" y="456" text-anchor="middle">同域 ROS_DOMAIN_ID</text>
+  <line x1="204" y1="432" x2="204" y2="346" stroke="var(--gray)" stroke-width="1.5" stroke-dasharray="5,4"/>
+
+  <text class="l" x="380" y="512" text-anchor="middle" fill="#94a3b8">实操顺序：A-1 域端口 → A-2 组播 → A-3 共享内存 → B-1/B-2/B-3 QoS</text>
+</svg>
+<div class="dock">
+  <span class="ok">✅ 结论：所有证据都落在同一 DDS 栈的四层上</span>
+  <span class="warn">⚠️ 风险：组播被拦 / 异域 → 发现层断，现象全空</span>
+  <span class="evid">🔍 验证：04 节 A-1~A-4、B-1~B-3 验收表</span>
+</div>
+<div class="ft">EXP-12 · DDS 通信中间件剖析</div>
+</body>
+</html>

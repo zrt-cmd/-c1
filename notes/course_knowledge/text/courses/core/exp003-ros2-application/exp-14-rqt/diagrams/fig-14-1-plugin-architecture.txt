@@ -1,0 +1,37 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp003-ros2-application/exp-14-rqt/diagrams/fig-14-1-plugin-architecture.html
+TITLE: 图 14-1 · rqt 插件架构
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+图 14-1 · rqt 插件架构
+图 14-1 · rqt 插件架构：一个容器，多双眼睛
+本图回答的问题：rqt_graph / rqt_plot 们为什么共享同一套话题、切工具不用重连？
+容器层 · Qt 主窗口
+插件层 · rqt_* 动态加载
+数据层 · 共享同一 ROS 上下文
+消息层 · 话题 / 服务
+rqt 主窗口 · 菜单 + 停靠面板
+插件发现：扫描 share/rqt_*
+Perspectives · 布局保存
+组合成套 → 一键还原 · 团队共享
+rqt_graph
+拓扑 · 谁连谁
+rqt_plot
+波形 · 字段级路径
+rqt_image_view
+图像 · 相机画面
+rqt_topic / console
+数据 / 日志清单
+进程内同一个 ROS 节点上下文 · 切插件不重连
+订阅 / 查询同一套系统
+nodes · topics · params · logs
+自写插件挂进同一菜单
+声明插件入口 → 动态加载
+DDS 话题总线 · /chatter / battery / image_raw …
+加载插件
+存/取布局
+共享上下文
+GUI 预览给速度 · CLI 定案给可复现 —— 两边交叉验证
+✅ 结论：一个容器共享一套上下文，切换插件零重连
+⚠️ 风险：未 source 同源环境 → 插件菜单缺失 / 图为空
+🔍 验证：04 节启动三连 + graph/plot 交叉印证
+EXP-14 · rqt 可视化工具箱

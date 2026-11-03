@@ -1,0 +1,334 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/cases/exp006b-object-tracking/exp-09-full-verify/index.html
+TITLE: EXP-09 · 全功能验证 — 通用目标追踪综合项目
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+EXP-09 · 全功能验证 — 通用目标追踪综合项目
+🎓 具身智能课程 ·
+通用目标追踪
+综合项目
+/
+通用目标追踪
+/ EXP-09
+本页目录
+01 问题引入：最后一步为什么最难过
+02 原理通俗讲解：三档驾照与出车体检
+03 关联知识点：三模式与全链路验收
+04 实验目标
+05 实验环境与准备
+06 动画讲解：三级开发与五步验收
+07 互动讲解：五步验收步进台
+08 实操步骤：五步验证全链路
+09 重点与易错点
+10 总结与思考
+CASE-04 · 通用目标追踪
+EXP-01 需求分析
+EXP-02 TrackEngine 架构
+EXP-03 配置详解
+EXP-04 DeepSORT 底座
+EXP-05 LLM 门控
+EXP-06 VLM 选目标
+EXP-07 语音与 TTS
+EXP-08 日志与降级
+EXP-09 全功能验证
+EXP-09 · 第 3 章 · 综合性 · 8 学时
+全功能验证：五步验收，让整条链路闭环
+前八个实验各验证一段，本实验把整条链路合起来验：
+三模式入口
+--video/--image/--camera
+→
+cfg["source"]["mode"]
+（_merge_args L74-93）由 FrameSource 统一
+read()→(ok,frame)
+契约，None 帧绝不流入 pipeline（engine L88-95）；
+三级开发
+文本→语音→摄像头每级只叠一层硬件；
+五步验收
+pytest 全绿回归 → 离线文本全链路 → ROS 相机节点 → 实时摄像头 + MJPEG（
+http://<IP>:8088/track.mjpg
+）→ 五步核对 + pkill 清理，产出"完整链路闭环 + 事件日志/标注帧完整"的验收证据。
+难度 ⭐⭐⭐ · 8 学时
+三模式入口
+三级开发
+MJPEG :8088
+pytest 回归
+01
+问题引入：最后一步为什么最难过
+每个模块单测都过了，合成验收时却常遇到：
+1
+pytest 全绿，一上实机就挂——
+是框架缺陷还是环境/硬件问题？
+不分清楚会修错方向
+2
+离线视频一切正常，切
+--camera
+推流出黑屏——
+相机话题没起？8088 被占？还是 stream_name 不对？
+3
+昨天实验收尾没清理，今天启动直接失败——
+llm_server 还占着 8080、aplay 独占播放设备
+4
+实时画面 ID 乱跳——
+是运动模糊的低分噪声检测，还是门控参数被改坏了？
+5
+验收出了异常，从头到尾整链路跑一次要半小时——
+没有"缩小→复现→日志定位"的排查地图
+⚠️ 两条验收红线
+① 全功能验证前 regression 必须全绿，否则框架缺陷会混进功能问题；② 验收判据是
+"完整链路闭环 + 日志/帧完整 + 无残留进程"
+三项同时满足，任何一步失败先回退上一步排查。
+02
+原理通俗讲解：三档驾照与出车体检
+比喻 1
+三级开发 = 先操场后公路的三档驾照
+文本模式（stdin 喂 feed_text，无任何外设）→ 语音模式（+麦克风喇叭）→ 摄像头模式（+ROS 相机话题）——
+每级只叠加一层硬件依赖，前一级全部可回归
+。就像考驾照先场地再路考：逻辑先行、硬件后置，哪层出问题就退回到上一档复跑。
+比喻 2
+三模式入口 = 同一间后厨接三种订单
+堂食（--image 单帧）、外卖（--video 离线视频）、现做（--camera 实时流）——
+门脸不同，进的是同一间后厨
+。三种模式只换 FrameSource 输入源，下游 engine/pipeline/门控全部复用，所以换模式不会换出新 bug。
+比喻 3
+read() 契约 = 传送带上的空箱不上线
+输入源统一返回
+(ok, frame)
+，EOF/断流返回
+(False, None)
+——engine 主循环
+"读到一帧才进 pipeline"
+，None 帧绝不流入算法层。就像传送带上没货的空箱不往下游送，下游永远见不到"空数据"这种脏输入。
+比喻 4
+MJPEG = 行车记录仪开直播
+浏览器打开
+http://<IP>:8088/track.mjpg
+看到的不是一张张刷新的图片，而是
+JPEG 帧连发的 HTTP 持续流
+（engine 每帧 _publish → mjpeg.set_frame，L84-85）。它不需要 X11/显卡，正适合 SSH 远程的 headless 板端——"看不见屏幕也能验收画面"。
+比喻 5
+pytest 回归 = 出车前的固定体检
+tests/ 覆盖 tools/门控/VLM 虚测/单帧 pipeline/录音自愈，
+x86 可跑、无 RKNN/ROS 依赖
+。vlm_fake 固定返回 fake_result_id=3，和 vlm_real 共用同一 select_crops 契约——就像替身演员按同一剧本走位，排练不烧真模型的油。
+比喻 6
+故障排查 = 缩小地图再找路
+异常出现先缩到最小复现（单一模式/单一指令），再按分层日志定位：[diag] 录音 50 帧/5s 查音频层、[ASR 实时] 查识别层、[cmd] 查指令层、events.jsonl 查状态层——
+每层有专属锚点
+，例如 pause_timeout 指向 LLM（pending 卡 30s）、camera_stall 指向相机（30 次读帧失败）。
+🎯 一句话本质
+全功能验证 =
+分层解除硬件依赖
+（三级开发保证逻辑可回归）+
+统一输入契约
+（三模式只换输入源）+
+递进式验收
+（五步各有通过判据，环环回退）。它验证的不是某个算法，而是"这套系统敢不敢交付"。
+03
+关联知识点：三模式与全链路验收
+知识点
+内容
+位置/判据
+三模式入口
+--video/--image/--camera → cfg["source"]["mode"]
+apps/track_app.py _merge_args L74-93
+输入契约
+FrameSource.read() → (ok, frame)，EOF/断流返回 (False, None)
+common/source.py L34-80；engine L88-95 不放行 None
+实时相机
+Ros2Camera 订阅 /ascamera_hp60c/camera_publisher/rgb0/image（rclpy 惰性导入）
+ros2 launch car1_peripherals depth_camera.launch.py
+MJPEG 推流
+持续 MJPEG 流，stream_name 默认 track.mjpg，端口 8088 预检占用即报错退出
+mjpeg_server.py；config_schema L63
+ID 稳定双闸
+min_confidence=0.3 只放行 ≥0.3 检测 + class_filter:[car] 过滤非车类
+track_config.yaml；压制实时噪声 ID 跳变
+标注帧完整性
+--save → cfg["save"]["enabled"]（L88-89）落盘 runs/out（fps=10）；_compute_draw 按 follow 过滤
+有 follow 只画锁定 ID，落盘帧须与锁定状态一致
+事件日志分工
+events.jsonl 记状态变化（结构化可追责）；[diag]/[cmd] 日志记过程行为
+先 jsonl 看"发生了什么"，再按时间戳回看日志查"为什么"
+headless
+display.show 默认关 → 无 X11 窗口，帧绘制走 MJPEG 输出，吞吐更高
+SSH 远程验收别强开 --show
+04
+实验目标
+目标 1
+掌握三模式启动
+会用 --video/--image/--camera 启动 track_app，理解三级开发（文本→语音→摄像头）的分层思想。
+目标 2
+完成全链路验证
+唤醒→追踪→指令→选车→清除→事件日志，离线视频与实时摄像头各闭环一次。
+目标 3
+掌握故障排查
+用"缩小→复现→日志定位"方法排查异常，并用 pkill 正确清理残留进程。
+目标 4
+独立完成推流与回归
+MJPEG 推流验证（浏览器可见出流）+ pytest 全量回归全绿确认。
+目标 5
+迁移部署方法论
+把"三级开发 + 五步验收 + 资源清理"迁移到其他具身智能项目的部署中。
+05
+实验环境与准备
+类别
+内容
+硬件
+具身智能实验箱 B2 / 小车 C1 + 深度相机 HP60C（实时模式必需）
+系统
+Ubuntu 22.04 + ROS 2 Humble，Python 3.10
+核心库
+RKNN（YOLO/ReID）、RKLLM（LLM/VLM）、sherpa_onnx（ASR/KWS）、Matcha-TTS
+关键命令
+python3 -m pytest tests/ -v
+、
+track_app --video … --text
+、
+ros2 launch car1_peripherals depth_camera.launch.py
+、
+track_app --camera --mjpeg
+参考文档
+README（常用命令）、docs/03_开发模式与验证.md（五步验证 Step1-5）
+实验前确认没有残留进程
+——8080/播放设备/串口都是独占资源，被占会直接启动失败：
+cd ~/ros2_ws/src/xflz_eai_car1/app/object_tracking
+ps aux | grep -E "track_app|llm_server|aplay" | grep -v grep
+# 基线：应无残留
+# 若有残留：pkill -f llm_server; pkill -9 aplay 后再进实验
+06
+动画讲解：三级开发与五步验收
+三级开发（台阶上行）× 五步验收（顶部灯逐盏点亮）× 数据流（底部光点）
+① 文本模式
+stdin · 无外设
+② 语音模式
++ 麦克风 · 喇叭
+③ 摄像头模式
++ ROS 相机话题
++麦克风喇叭
++ROS 相机
+任一级出故障 → 退回上一档复跑（前级全部可回归）
+pytest
+离线
+相机
+MJPEG
+清理
+帧/事件/日志同链流动
+图：三档台阶逐级加硬件（绿箭头），顶部五盏验收灯按 Step1-5 顺序点亮（discrete 循环），黄色回退虚线 = 三级开发"前级永远可回归"的安全网，底部光点 = 数据在同一条链路上持续流动。
+07
+互动讲解：五步验收步进台
+🎛️ 五步验收步进台 — 按 Step1→5 顺序点亮验收灯（跳步会被拒绝），也可注入两类常见失败
+Step1 pytest 回归
+Step2 离线文本链路
+Step3 启动相机节点
+Step4 实时+MJPEG
+Step5 五步核对+清理
+注入：8088 被占
+注入：推流出黑屏
+重置
+← 从 Step1 开始按序点亮；验收灯 0/5，当前未开始
+五步的通过判据（docs/03 Step1-5）：
+pytest 全绿 → 离线日志闭环 → 相机话题在线 → MJPEG 出流且 ID 稳定 → 事件完整且无残留进程
+。任何一步失败都回退到上一步，而不是往下硬闯。两个注入按钮演示最常见的两条失败分支及其定位路径。
+⚠️ 别跳步
+没跑 Step1 的回归就直接上实机，框架缺陷会被误判成硬件问题；没清理 8088 就重试推流，端口预检会直接报错退出——顺序本身就是排查效率。
+08
+实操步骤：五步验证全链路
+1
+pytest 全量回归（约 1h30m）：tests/ 纯逻辑层全绿，建立"框架无缺陷"基线
+2
+离线文本全链路（约 1h30m）：--video + --text，唤醒→追踪 id3→出画 lost→清除 unlock_all→日志齐全
+3
+另终端启动 ROS 相机节点：depth_camera.launch.py 提供 /ascamera_hp60c/.../rgb0/image
+4
+实时摄像头 + MJPEG + --save（约 2h30m）：浏览器看出流、ID 稳定（0.3 + [car]）、runs/out 落盘标注帧
+5
+五步核对 + 清理（约 1h）：docs/03 Step1-5 打勾，pkill 清残留，事件日志完整性最终确认
+步骤 1 · pytest 全量回归
+（x86 可跑、无 RKNN/ROS 依赖）：
+cd ~/ros2_ws/src/xflz_eai_car1/app/object_tracking
+python3 -m pytest tests/ -v
+# 覆盖 tools/ 门控 / VLM 虚测(vlm_fake 固定 fake_result_id=3) / 单帧 pipeline / 录音自愈
+# 全绿才继续；实机出问题时也先复跑本回归，把框架缺陷与环境问题分开
+步骤 2 · 离线视频文本全链路
+（三模式之一 --video，与音频同一状态机）：
+python3 apps/track_app.py --video /home/iflytek/ros2_ws/src/xflz_eai_car1/vision/07_multi_object_tracking/test.mp4 --text
+小飞小飞
+# stdin 首行唤醒词才进 DIALOG（--text 已关 KWS/硬件唤醒）
+追踪 id3
+# 观察：唤醒 → 追踪锁定 → 出画 lost → 清除 unlock_all
+# 核对 runs/logs/events.jsonl：command/lost/unlock_all 条目齐全；--text 走 feed_text 同一回调链
+步骤 3-4 · 实时摄像头 + MJPEG 推流 + 标注帧落盘
+：
+# 另一终端提供相机话题：
+source /opt/ros/humble/setup.bash && source ~/ros2_ws/install/setup.bash
+ros2 launch car1_peripherals depth_camera.launch.py
+# 主终端（--save 落盘标注帧，frames:1920 fps:10）：
+python3 apps/track_app.py --camera --mjpeg --save
+浏览器打开
+http://<IP>:8088/track.mjpg
+# 持续 MJPEG 流，ID 稳定由 min_confidence=0.3 + [car] 双闸压噪
+小飞小飞
+→
+追踪红色皮卡
+→
+解除
+# 语音链路闭环；headless 下 display.show 默认关，别强开 --show
+步骤 5 · 五步核对 + 资源清理 + 排查锚点
+：
+# 分层排查锚点：[diag] 录音 50 帧/5s（音频层）· [ASR 实时]（识别层）· [cmd] 逐分支（指令层）· jsonl（状态层）
+#   pause_timeout → 查 LLM（pending 超 30s）；camera_stall → 查相机（连续 30 次读帧失败）
+tail -f runs/logs/events.jsonl
+# 收尾：状态变化齐全；runs/out 标注帧带 follow 过滤不空
+pkill -f llm_server; pkill -9 aplay
+# 独占资源：8080 / 播放设备 / 串口必须释放
+ps aux | grep -E "track_app|llm_server|aplay" | grep -v grep
+# 应无残留；回滚 git revert 前同样先 pkill
+09
+重点与易错点
+回归先于实机
+：全功能验证前 pytest 必须全绿，否则框架缺陷会混入功能问题，排查方向直接跑偏。
+stdin 首行是唤醒词
+：文本模式先输入"小飞小飞"才进 DIALOG；--text 已自动关闭 kws.enabled/hardware_wakeup.enabled。
+None 帧不进 pipeline
+：EOF/断流时 read() 返回 (False, None)，engine 只在成功读帧时才处理——这是输入层与算法层的隔离边界，改造代码时别绕过它。
+相机话题必须在线
+：--camera 依赖 /ascamera_hp60c/camera_publisher/rgb0/image（rclpy 惰性导入），没起 depth_camera.launch.py 就会读帧失败累计出 camera_stall。
+MJPEG 是持续流不是图片
+：stream_name 默认 track.mjpg（name 不带 .mjpg 会自动补全）；端口 8088 预检被占用会明确报错退出，先清理再起。
+ID 跳变先查双闸
+：min_confidence=0.3 + class_filter:[car] 是实机 tuned 值——调低引入噪声 ID，调高漏检小车；别在验收阶段随手改。
+事件日志/标注帧完整性是验收关键
+：产生的事件都要追加写入 jsonl；--save 落盘帧按 follow 过滤，锁定目标没画出来说明过滤链路出错。
+收尾必清理
+：llm_server(8080)/aplay(播放设备)/XFM 串口都是独占资源，不清会直接害死下一次实验；回滚代码前也要先 pkill，避免旧进程旧逻辑混淆排查。
+问题
+原因
+解决
+实时无推流
+相机话题未起 / 8088 端口占用
+起 depth_camera.launch.py；查端口与 stream_name
+ID 跳变
+实时噪声（运动模糊/遮挡低分检测）
+恢复 min_confidence=0.3 + [car] 实机 tuned 值
+推流卡死/画面冻
+pause_timeout 未解除（LLM pending 卡死）
+查 LLM 进程与 8080；看 pause_timeout 事件
+唤醒无录音
+XFM 串口被占
+停掉冲突的 log_server，按串口三板斧排查
+下次启动失败
+残留进程占 8080/播放设备
+pkill -f llm_server / pkill -9 aplay
+离线通过实机挂
+环境/硬件问题而非框架缺陷
+先复跑 pytest 回归分离两类问题，再查话题/权限
+🎯 数值与评分手感
+评分：pytest 回归 20 + 离线全链路 25 + 实时摄像头与 MJPEG 35 + 五步验证与清理 20 = 100。参考值：标注帧 fps=10（frames:1920）；min_confidence=0.3；MJPEG 端口 8088；录音健康 50 帧/5s；camera_stall 阈值连续 30 次；pause_timeout=30.0s。
+10
+总结与思考
+本实验把九章内容合成一张验收单：三级开发（文本→语音→摄像头）保证每一层硬件都可独立回归，三模式入口（--video/--image/--camera）用统一的 FrameSource read() 契约把输入差异挡在算法层之外，五步验证（pytest → 离线 → 相机 → 实时 MJPEG → 清理）给出每步的通过判据，"缩小→复现→日志定位"给出故障时的行动地图，pkill 清理保证独占资源（8080/播放设备/串口）干净交接。从 exp01 的需求到 exp09 的全功能，事件链路里的多个 fail-closed 节点共同兜住了"不误导、不误锁"的底线。产出：pytest 全绿记录、离线/实时两条全链路日志、MJPEG 出流截图、五步核对表与清理后进程检查记录。
+🤔 思考题 1
+三模式入口（--video/--image/--camera）与三级开发模式（文本→语音→摄像头）分别从哪个维度分层解除硬件依赖？为什么换模式不会引入新 bug，而换硬件层级必须"退回上一档复跑"？
+🤔 思考题 2
+MJPEG 实时推流为什么是"离线视频不可替代"的验证手段（相机话题延迟/推流吞吐/语音与视觉并发哪些只有实时才暴露）？headless 下关闭 display.show 有何意义？再想想：从 exp01 到 exp09，至少三个 fail-closed 节点如何共同保障系统不误导、不误锁？
+CASE-04 · 通用目标追踪综合项目 · EXP-09 全功能验证
+8 学时 · 综合性 · 基于 object_tracking 实验讲义改编

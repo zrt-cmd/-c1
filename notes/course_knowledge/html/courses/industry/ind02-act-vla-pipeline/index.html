@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IND-02 双臂采训推全流程（ACT / VLA）· 机器人开发行业课程</title>
+<style>
+:root{
+  --ink:#0f172a; --ink2:#334155; --mute:#64748b; --line:#e2e8f0; --bg:#f6f8fb; --card:#ffffff;
+  --theme:#7c3aed; --theme-deep:#6d28d9; --theme-bg:#f5f3ff; --theme-bd:#ddd6fe;
+  --mono:"Cascadia Code","JetBrains Mono",Consolas,"Courier New",monospace;
+  --sans:"Segoe UI",-apple-system,"Noto Sans CJK SC","Microsoft YaHei",sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:var(--sans);background:var(--bg);color:var(--ink);line-height:1.75;font-size:15px}
+a{color:var(--theme);text-decoration:none}
+
+/* ── 顶栏 ─────────────────────────── */
+.topbar{
+  position:sticky; top:0; z-index:50; display:flex; justify-content:space-between; align-items:center;
+  background:rgba(255,255,255,.92); backdrop-filter:blur(8px); border-bottom:1px solid var(--line);
+  padding:12px 22px; font-size:13px; flex-wrap:wrap; gap:6px;
+}
+.crumb{color:var(--mute)}
+.crumb a{color:var(--theme)}
+.here{color:var(--ink);font-weight:600}
+.pill-count{
+  background:var(--theme-bg); color:var(--theme-deep); border:1px solid var(--theme-bd);
+  padding:2px 10px; border-radius:99px; font-size:12px; font-weight:600;
+}
+
+/* ── Hero ─────────────────────────── */
+.hero{
+  background:linear-gradient(135deg,#2e1065 0%,#5b21b6 52%,#7c3aed 100%);
+  color:#fff; padding:54px 22px 62px; text-align:center;
+  position:relative; overflow:hidden;
+}
+.hero::after{
+  content:""; position:absolute; inset:auto -10% -60% -10%; height:120px;
+  background:radial-gradient(closest-side,rgba(255,255,255,.18),transparent);
+}
+.eyebrow{
+  display:inline-block; font-family:var(--mono); font-size:12px; letter-spacing:.22em;
+  background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.32);
+  padding:4px 14px; border-radius:99px; margin-bottom:16px;
+}
+.hero h1{font-size:clamp(26px,4vw,40px);line-height:1.3;margin-bottom:10px;letter-spacing:.5px}
+.hero h1 .thin{font-weight:300;opacity:.85}
+.hero p{max-width:760px;margin:0 auto;opacity:.92;font-size:15px}
+.bades{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:22px}
+.bade{
+  background:rgba(255,255,255,.13); border:1px solid rgba(255,255,255,.3);
+  border-radius:8px; padding:7px 15px; font-size:13px;
+}
+.bade b{font-family:var(--mono);font-size:15px}
+
+/* ── 通用布局 ─────────────────────── */
+.wrap{max-width:1180px;margin:0 auto;padding:0 22px}
+.stats{
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+  gap:14px; margin-top:-30px; position:relative; z-index:2;
+}
+.stat{
+  background:var(--card); border:1px solid var(--line); border-radius:14px;
+  padding:18px 20px; box-shadow:0 6px 18px rgba(15,23,42,.06);
+}
+.stat .v{font-size:26px;font-weight:800;font-family:var(--mono);color:var(--theme-deep)}
+.stat .k{font-size:12.5px;color:var(--mute);margin-top:2px}
+.sec{padding:44px 0 8px}
+.sec-head{text-align:center;margin-bottom:26px}
+.sec-head .k{font-family:var(--mono);font-size:12px;letter-spacing:.2em;color:var(--theme)}
+.sec-head h2{font-size:24px;margin-top:4px}
+.sec-head p{color:var(--mute);font-size:14px;margin-top:6px;max-width:720px;margin-left:auto;margin-right:auto}
+/* 资源速览三列 */
+.res-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+.res-card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px}
+.res-card h4{font-size:15px;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.res-card h4 i{width:9px;height:9px;border-radius:50%;display:inline-block;background:var(--theme)}
+.res-card ul{margin-left:18px;font-size:13.5px;color:var(--ink2)}
+.res-card li{margin-bottom:6px}
+.res-card code{font-family:var(--mono);font-size:12.5px;background:var(--theme-bg);color:var(--theme-deep);padding:1px 6px;border-radius:5px}
+/* 素材一览条 */
+.mats{
+  display:flex;flex-wrap:wrap;gap:10px;justify-content:center;
+  background:var(--theme-bg);border:1px solid var(--theme-bd);border-radius:14px;padding:16px 18px;
+}
+.mats span{
+  background:var(--card);border:1px solid var(--line);border-radius:99px;
+  padding:6px 14px;font-size:13px;color:var(--ink2);
+}
+.mats b{font-family:var(--mono);color:var(--theme-deep)}
+
+/* ── 实验卡 ───────────────────────── */
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:18px}
+.card{
+  background:var(--card); border:1px solid var(--line); border-radius:16px;
+  padding:22px; position:relative; transition:.25s; overflow:hidden;
+}
+.card::before{
+  content:""; position:absolute; left:0; top:0; bottom:0; width:4px;
+  background:linear-gradient(180deg,var(--theme),var(--theme-deep));
+}
+.card:hover{transform:translateY(-4px);box-shadow:0 14px 30px rgba(109,40,217,.14);border-color:var(--theme-bd)}
+.card .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.code{
+  font-family:var(--mono); font-size:12px; font-weight:700;
+  background:var(--theme-bg); color:var(--theme-deep); border:1px solid var(--theme-bd);
+  padding:3px 9px; border-radius:6px;
+}
+.tag{font-size:11.5px;padding:3px 9px;border-radius:99px;font-weight:600}
+.tag.hl{background:#dcfce7;color:#15803d}
+.tag.soft{background:#f1f5f9;color:var(--mute)}
+.card h3{font-size:17.5px;margin-bottom:6px}
+.card>p{font-size:13.5px;color:var(--ink2);margin-bottom:10px}
+.meta{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.meta span{
+  font-size:11.5px; background:#f8fafc; border:1px solid var(--line);
+  padding:2px 8px; border-radius:6px; color:var(--mute);
+}
+.explist{list-style:none;border-top:1px dashed var(--line);margin-top:8px}
+.explist li{
+  display:flex; align-items:center; gap:8px; padding:7px 2px;
+  border-bottom:1px dashed var(--line); font-size:13px;
+}
+.explist li:last-child{border-bottom:none}
+.explist .ttl{color:var(--ink2);flex:1}
+.explist .ttl:hover{color:var(--theme)}
+.explist .dur{
+  font-family:var(--mono); font-size:11.5px; color:var(--theme-deep);
+  background:var(--theme-bg); border:1px solid var(--theme-bd);
+  padding:1px 8px; border-radius:99px; white-space:nowrap;
+}
+.explist .dur:hover{background:var(--theme);color:#fff}
+.card .hint{
+  font-size:12.5px; color:var(--mute); margin-top:12px;
+  padding-top:10px; border-top:1px dashed var(--line);
+}
+
+/* ── KPI / 学习路径 ───────────────── */
+.kgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
+.kcard{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px}
+.kcard h4{font-size:15px;display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.kcard h4 .dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+.kcard ol,.kcard ul{margin-left:18px;font-size:13.5px;color:var(--ink2)}
+.kcard li{margin-bottom:6px}
+.kcard p{font-size:13.5px;color:var(--ink2)}
+.kcard code,.inl{
+  font-family:var(--mono); font-size:12.5px; background:var(--theme-bg);
+  color:var(--theme-deep); padding:1px 6px; border-radius:5px;
+}
+
+/* ── 技术栈标签 ───────────────────── */
+.pills{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+.pill{
+  display:inline-flex; align-items:center; gap:7px;
+  background:var(--card); border:1px solid var(--line); border-radius:99px;
+  padding:7px 16px; font-size:13.5px; font-family:var(--mono); font-weight:600; transition:.2s;
+}
+.pill:hover{border-color:var(--theme-bd);color:var(--theme-deep)}
+.pill i{width:9px;height:9px;border-radius:50%;display:inline-block}
+
+/* ── 表格 / 页脚 / 动效 ───────────── */
+table{
+  width:100%; border-collapse:collapse; font-size:13.5px;
+  background:var(--card); border-radius:12px; overflow:hidden;
+}
+th,td{border:1px solid var(--line);padding:9px 13px;text-align:left}
+th{background:var(--theme-bg);color:var(--theme-deep);font-size:13px}
+tr:hover td{background:#fafaff}
+.foot{background:#0f172a;color:#94a3b8;margin-top:56px;padding:26px 22px;font-size:13px}
+.foot-in{
+  max-width:1180px; margin:0 auto; display:flex;
+  justify-content:space-between; gap:12px; flex-wrap:wrap;
+}
+.foot a{color:#c4b5fd}
+.foot a:hover{color:#ddd6fe}
+.reveal{opacity:0;transform:translateY(24px);transition:.6s}
+.reveal.show{opacity:1;transform:none}
+@media(max-width:860px){
+  .grid{grid-template-columns:1fr}
+  .kgrid{grid-template-columns:1fr}
+  .hero h1{letter-spacing:0}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="crumb"><a href="../../index.html">📚 开发者教程首页</a> › <span class="here">IND-02 双臂采训推全流程</span></div>
+  <div class="pill-count">🎓 4 个实验 · 32 学时</div>
+</div>
+
+<header class="hero">
+  <div class="eyebrow">INDUSTRY · CAT 3 / IND-02</div>
+  <h1>双臂采训推全流程<span class="thin">（ACT / VLA）</span></h1>
+  <p>基于 LZ-XL01 双臂平台与 LeRobot 0.4.1，从遥操作采集、ACT 训练、云端算力到真机推理与 VLA 大模型路线，打通"数据 → 模型 → 部署"的端到端机器人学习产业工作流。</p>
+  <div class="bades">
+    <div class="bade"><b>4</b> 个核心实验</div>
+    <div class="bade"><b>32</b> 学时</div>
+    <div class="bade">硬件：<b>LZ-XL01 双臂平台</b></div>
+    <div class="bade">前置：机器人操作系统与运动学基础</div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="stats">
+    <div class="stat"><div class="v">4 / 32</div><div class="k">实验数 / 总学时（每实验 8 学时）</div></div>
+    <div class="stat"><div class="v">ACT + VLA</div><div class="k">两大端到端策略路线对比实战</div></div>
+    <div class="stat"><div class="v">2 支指导视频</div><div class="k">单臂 / 双臂遥操作实录（mp4）</div></div>
+    <div class="stat"><div class="v">6 张</div><div class="k">硬件实物照片与场景实拍</div></div>
+  </div>
+
+  <!-- ═════════ 实验总览 ═════════ -->
+  <section class="sec reveal">
+    <div class="sec-head">
+      <div class="k">LAB EXPERIMENTS</div>
+      <h2>四个实验：一条真实的采、训、推、比流水线</h2>
+      <p>内容全部改编自 LZ-XL01 指导文件第 06～13 章，命令与参数取自真实文档与 LeRobot 官方源码。</p>
+    </div>
+    <div class="grid">
+
+      <article class="card" id="exp-01">
+        <div class="top"><span class="code">EXP-01</span><span class="tag hl">入门 · 视频重点</span></div>
+        <h3>遥操作与数据采集</h3>
+        <p>读懂"人在环"遥操作与示教数据采集的原理，完成机械臂串口授权、主从校准复用、单臂与双臂任务录制，理解 episode / reset / 编码入库的完整节奏。</p>
+        <div class="meta"><span>难度 ★☆☆</span><span>kw: teleoperate · record · episode</span></div>
+        <ul class="explist">
+          <li><a class="ttl" href="exp-01-teleop-recording/index.html#s1">① 实验目标与验收标准</a><a class="dur" href="exp-01-teleop-recording/index.html#s1">8 学时 · 开始</a></li>
+          <li><a class="ttl" href="exp-01-teleop-recording/index.html#s2">② 原理：人在环数据流</a><a class="dur" href="exp-01-teleop-recording/index.html#s6">动画演示</a></li>
+          <li><a class="ttl" href="exp-01-teleop-recording/index.html#s5">③ 关键命令与实操步骤</a><a class="dur" href="exp-01-teleop-recording/index.html#s4">视频 ×2</a></li>
+          <li><a class="ttl" href="exp-01-teleop-recording/index.html#s4">④ 指导视频：单臂 / 双臂遥操作</a><a class="dur" href="exp-01-teleop-recording/index.html#s7">互动练习</a></li>
+          <li><a class="ttl" href="exp-01-teleop-recording/index.html#s8">⑤ 常见问题与思考题</a><a class="dur" href="exp-01-teleop-recording/index.html#s10">测一测</a></li>
+        </ul>
+        <div class="hint">对应指导文件第 06 章《单臂遥操作》、07 章《双臂遥操作》、08 章《单臂数据采集》、09 章《双臂数据采集》。</div>
+      </article>
+
+      <article class="card" id="exp-02">
+        <div class="top"><span class="code">EXP-02</span><span class="tag hl">核心</span></div>
+        <h3>数据整理与 ACT 模型训练</h3>
+        <p>进入训练机查看与打包数据集，读懂 <span class="inl">lerobot-train</span> 启动时打印的每一行配置；拆解 ACT 的 CNN 编码器 + Transformer 编解码器 + CVAE 结构，观察 loss 曲线并调超参。</p>
+        <div class="meta"><span>难度 ★★☆</span><span>kw: ACT · CVAE · Transformer</span></div>
+        <ul class="explist">
+          <li><a class="ttl" href="exp-02-act-training/index.html#s1">① 实验目标与验收标准</a><a class="dur" href="exp-02-act-training/index.html#s1">8 学时 · 开始</a></li>
+          <li><a class="ttl" href="exp-02-act-training/index.html#s2">② 原理：编码器-解码器与 CVAE</a><a class="dur" href="exp-02-act-training/index.html#s6">动画演示</a></li>
+          <li><a class="ttl" href="exp-02-act-training/index.html#s5">③ 训练命令与超参解读</a><a class="dur" href="exp-02-act-training/index.html#s5">命令清单</a></li>
+          <li><a class="ttl" href="exp-02-act-training/index.html#s7">④ 互动：超参滑杆看 loss 模拟</a><a class="dur" href="exp-02-act-training/index.html#s7">动手调参</a></li>
+          <li><a class="ttl" href="exp-02-act-training/index.html#s8">⑤ 常见问题与思考题</a><a class="dur" href="exp-02-act-training/index.html#s10">测一测</a></li>
+        </ul>
+        <div class="hint">对应指导文件第 10 章《模型训练》，源码参考 LeRobot act 策略实现与官方训练脚本。</div>
+      </article>
+
+      <article class="card" id="exp-03">
+        <div class="top"><span class="code">EXP-03</span><span class="tag soft">进阶</span></div>
+        <h3>云服务器使用与真机推理</h3>
+        <p>租用 L40S 云实例并完成 LeRobot 环境部署与数据上传；回到本地真机，用 <span class="inl">lerobot-record --policy.path=…</span> 让训练好的 ACT 检查点自主执行任务，打通"云端训练 → 本地推理"链路。</p>
+        <div class="meta"><span>难度 ★★☆</span><span>kw: L40S · checkpoint · policy.path</span></div>
+        <ul class="explist">
+          <li><a class="ttl" href="exp-03-cloud-inference/index.html#s1">① 实验目标与验收标准</a><a class="dur" href="exp-03-cloud-inference/index.html#s1">8 学时 · 开始</a></li>
+          <li><a class="ttl" href="exp-03-cloud-inference/index.html#s2">② 原理：云训练-真机推理闭环</a><a class="dur" href="exp-03-cloud-inference/index.html#s6">动画演示</a></li>
+          <li><a class="ttl" href="exp-03-cloud-inference/index.html#s4">③ 租实例、装环境、传数据</a><a class="dur" href="exp-03-cloud-inference/index.html#s5">命令清单</a></li>
+          <li><a class="ttl" href="exp-03-cloud-inference/index.html#s7">④ 互动：显存与云租费估算器</a><a class="dur" href="exp-03-cloud-inference/index.html#s7">动手估算</a></li>
+          <li><a class="ttl" href="exp-03-cloud-inference/index.html#s8">⑤ 常见问题与思考题</a><a class="dur" href="exp-03-cloud-inference/index.html#s10">测一测</a></li>
+        </ul>
+        <div class="hint">对应指导文件第 11 章《云服务器使用》、第 12 章《模型推理》。</div>
+      </article>
+
+      <article class="card" id="exp-04">
+        <div class="top"><span class="code">EXP-04</span><span class="tag soft">对比 · 拓展</span></div>
+        <h3>VLA 大模型路线与对比</h3>
+        <p>安装 SmolVLA 扩展、下载预训练 VLM 底座，用同一批数据微调 VLA；把任务名当作语言指令喂给模型，从参数量、指令能力、数据需求、算力开销四维吃透 ACT 与 VLA 的路线差异。</p>
+        <div class="meta"><span>难度 ★★★</span><span>kw: SmolVLA · VLM · 语言指令</span></div>
+        <ul class="explist">
+          <li><a class="ttl" href="exp-04-vla-model/index.html#s1">① 实验目标与验收标准</a><a class="dur" href="exp-04-vla-model/index.html#s1">8 学时 · 开始</a></li>
+          <li><a class="ttl" href="exp-04-vla-model/index.html#s2">② 原理：语言指令如何进入模型</a><a class="dur" href="exp-04-vla-model/index.html#s6">动画演示</a></li>
+          <li><a class="ttl" href="exp-04-vla-model/index.html#s5">③ VLA 训练命令与 rename_map</a><a class="dur" href="exp-04-vla-model/index.html#s5">命令清单</a></li>
+          <li><a class="ttl" href="exp-04-vla-model/index.html#s7">④ 互动：ACT vs VLA 特性辨析</a><a class="dur" href="exp-04-vla-model/index.html#s7">动手对比</a></li>
+          <li><a class="ttl" href="exp-04-vla-model/index.html#s8">⑤ 常见问题与思考题</a><a class="dur" href="exp-04-vla-model/index.html#s10">测一测</a></li>
+        </ul>
+        <div class="hint">对应指导文件第 13 章《LZ-XL01 的 VLA 模型》。</div>
+      </article>
+    </div>
+  </section>
+
+  <!-- ═════════ 技术栈 ═════════ -->
+  <section class="sec reveal">
+    <div class="sec-head">
+      <div class="k">TECH STACK</div>
+      <h2>技术栈</h2>
+      <p>贯穿全课的工具链与模型体系。</p>
+    </div>
+    <div class="pills">
+      <span class="pill"><i style="background:#7c3aed"></i>ACT</span>
+      <span class="pill"><i style="background:#6d28d9"></i>VLA / SmolVLA</span>
+      <span class="pill"><i style="background:#8b5cf6"></i>LeRobot 0.4.1</span>
+      <span class="pill"><i style="background:#2563eb"></i>PyTorch</span>
+      <span class="pill"><i style="background:#0d9488"></i>CUDA / L40S</span>
+      <span class="pill"><i style="background:#d97706"></i>SO-ARM100 主从臂</span>
+      <span class="pill"><i style="background:#e11d48"></i>FFmpeg / SVT-AV1</span>
+    </div>
+  </section>
+
+  <!-- ═════════ 学习路径 ═════════ -->
+  <section class="sec reveal">
+    <div class="sec-head">
+      <div class="k">LEARNING PATH</div>
+      <h2>学习路径</h2>
+      <p>按"先采数据、再训模型、后上算力、终比路线"的产业顺序推进。</p>
+    </div>
+    <div class="kgrid">
+      <div class="kcard">
+        <h4><span class="dot" style="background:#7c3aed"></span>第 1 步 · 采：人在环遥操作</h4>
+        <ul><li>串口授权与主从校准</li><li>单臂 / 双臂 teleoperate</li><li>record 录制 episode 数据集</li></ul>
+      </div>
+      <div class="kcard">
+        <h4><span class="dot" style="background:#6d28d9"></span>第 2 步 · 训：ACT 端到端训练</h4>
+        <ul><li>数据集查看与打包</li><li>CNN + Transformer + CVAE</li><li>解读 loss / lr / checkpoint 日志</li></ul>
+      </div>
+      <div class="kcard">
+        <h4><span class="dot" style="background:#2563eb"></span>第 3 步 · 推：云端算力与真机推理</h4>
+        <ul><li>L40S 实例租用与环境部署</li><li>checkpoint 上传与 policy.path</li><li>真机自主执行任务</li></ul>
+      </div>
+      <div class="kcard">
+        <h4><span class="dot" style="background:#d97706"></span>第 4 步 · 比：VLA 路线对比</h4>
+        <ul><li>SmolVLA 底座与微调</li><li>语言指令 token 化</li><li>ACT vs VLA 四维对比</li></ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═════════ 课程交付物 ═════════ -->
+  <section class="sec reveal">
+    <div class="sec-head">
+      <div class="k">DELIVERABLES</div>
+      <h2>课程交付物</h2>
+    </div>
+    <div class="kcard">
+      <table>
+        <tr><th style="width:130px">交付物</th><th>说明</th></tr>
+        <tr><td>采集数据集</td><td>单臂 / 双臂任务 episode（LeRobot 格式，含三路摄像头视频与状态序列）</td></tr>
+        <tr><td>ACT 策略检查点</td><td><code>outputs/…/checkpoints/last/pretrained_model</code>，含 config 与权重</td></tr>
+        <tr><td>VLA 策略检查点</td><td>基于 SmolVLA 微调的同任务策略（EXP-04）</td></tr>
+        <tr><td>真机演示</td><td><code>lerobot-record --policy.path=…</code> 循环执行任务的实录视频</td></tr>
+        <tr><td>对比报告</td><td>ACT 与 VLA 在参数量、指令能力、数据需求、算力开销上的对比表格</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <!-- ═════════ 适合人群 ═════════ -->
+  <section class="sec reveal">
+    <div class="sec-head">
+      <div class="k">WHO SHOULD TAKE</div>
+      <h2>适合人群与先修要求</h2>
+    </div>
+    <div class="kgrid">
+      <div class="kcard">
+        <h4><span class="dot" style="background:#7c3aed"></span>适合人群</h4>
+        <ul><li>机器人 / 自动化方向本科生与研究生</li><li>智能制造企业的算法与部署工程师</li><li>具身智能方向的入门自学者</li></ul>
+      </div>
+      <div class="kcard">
+        <h4><span class="dot" style="background:#6d28d9"></span>先修知识</h4>
+        <ul><li>Linux 基础与 conda 环境操作</li><li>机器人运动学基础（关节 / 位姿）</li><li>Python 与 PyTorch 基本用法</li></ul>
+      </div>
+      <div class="kcard">
+        <h4><span class="dot" style="background:#0d9488"></span>硬件要求</h4>
+        <ul><li>LZ-XL01 双臂平台（含 3 摄像头）</li><li>本机或云端 CUDA 显卡（≥12GB）</li><li>可选：gpufree.cn L40S 租务实例</li></ul>
+      </div>
+      <div class="kcard">
+        <h4><span class="dot" style="background:#d97706"></span>学习产出</h4>
+        <ul><li>1 套 ≥50 组的示范数据集</li><li>ACT 与 VLA 各 1 个检查点</li><li>1 份两条路线的四维对比报告</li></ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═════════ 素材与服务 ═════════ -->
+  <section class="sec reveal">
+    <div class="sec-head">
+      <div class="k">MATERIALS &amp; SUPPORT</div>
+      <h2>素材与教学服务</h2>
+      <p>课程配套的原始素材、动画交互与师生支持条目，开课前按此清单核对就绪。</p>
+    </div>
+    <div class="kgrid">
+      <div class="kcard">
+        <h4><span class="dot" style="background:#7c3aed"></span>素材清单</h4>
+        <ul>
+          <li>硬件实物照片 6 张（遥操作工位 / 数据采集 / 推理真机）</li>
+          <li>指导视频 2 段（单臂 / 双臂遥操作，mp4）</li>
+          <li>SVG 演示与互动脚本，随实验页离线可用</li>
+        </ul>
+      </div>
+      <div class="kcard">
+        <h4><span class="dot" style="background:#0d9488"></span>教学服务</h4>
+        <ul>
+          <li>助教值班答疑（实验时段驻场排障）</li>
+          <li>数据集与检查点存储配额，按组分配</li>
+          <li>结课对比报告模板与评分量规（rubric）</li>
+        </ul>
+      </div>
+      <div class="kcard">
+        <h4><span class="dot" style="background:#d97706"></span>达标基线</h4>
+        <ul>
+          <li>四个实验全部通过验收（数据集、两份检查点、真机演示、对比表）</li>
+          <li>思考题与互动练习在课堂内完成自测</li>
+          <li>云实例按时关机、缓存目录命名规范无误</li>
+        </ul>
+      </div>
+    </div>
+    <div class="mats" style="margin-top:16px">
+      <span>实物照 <b>6</b> 张</span>
+      <span>指导视频 <b>2</b> 段</span>
+      <span>SVG 动画 <b>4</b> 组</span>
+      <span>互动练习 <b>4</b> 个</span>
+      <span>思考题 <b>8</b> 道</span>
+      <span>命令清单 <b>4</b> 份</span>
+      <span>实验页 <b>10</b> 章节范式 × 4</span>
+    </div>
+  </section>
+</div>
+
+<footer class="foot">
+  <div class="foot-in">
+    <div>IND-02 · 双臂采训推全流程（ACT / VLA）· CAT 3 行业应用｜32 学时 · 4 实验</div>
+    <div>基于 LZ-XL01 指导文件第 06～13 章与 LeRobot 0.4.1 改编｜<a href="../../index.html">返回行业课程</a></div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  var io=new IntersectionObserver(function(es){
+    es.forEach(function(e){
+      if(e.isIntersecting){
+        e.target.classList.add('show');
+        io.unobserve(e.target);
+      }
+    });
+  },{threshold:.12});
+  document.querySelectorAll('.reveal').forEach(function(el){
+    io.observe(el);
+  });
+})();
+</script>
+</body>
+</html>

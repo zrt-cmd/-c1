@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-06 · 跌倒判定状态机 — 老人跌倒监护综合项目</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+:root{--theme:#059669;--theme-deep:#047857;--theme-bg:#d1fae5;--theme-bd:#a7f3d0}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit" title="返回课程首页">🧠 具身智能课程 · <i>教程首页</i></a>
+  <div class="crumb"><a href="../../../index.html#case">综合项目</a> / <a href="../index.html">老人跌倒监护</a> / EXP-06</div>
+</div>
+
+<div class="wrap">
+
+<aside class="side">
+  <h4>本页目录</h4>
+  <a href="#s1" class="now">01 问题引入：弯腰捡鞋为什么不能算跌倒</a>
+  <a href="#s2">02 原理通俗讲解：像"问诊确认流程"一样的状态机</a>
+  <a href="#s3">03 关联知识点：三大几何判据与六状态机</a>
+  <a href="#s4">04 实验目标</a>
+  <a href="#s5">05 实验环境与准备</a>
+  <a href="#s6">06 动画讲解：六状态流转与时间窗</a>
+  <a href="#s7">07 互动讲解：状态机事件步进台</a>
+  <a href="#s8">08 实操步骤：跌倒→询问→应答全流程</a>
+  <a href="#s9">09 重点与易错点</a>
+  <a href="#s10">10 总结与思考</a>
+  <h4>CH1 · 需求与配置</h4>
+  <a href="../exp-01-requirements/index.html">EXP-01 需求分析</a>
+  <a href="../exp-02-architecture/index.html">EXP-02 分层架构</a>
+  <a href="../exp-03-config/index.html">EXP-03 配置详解</a>
+  <h4>CH2 · 感知与交互</h4>
+  <a href="../exp-04-voice/index.html">EXP-04 语音交互</a>
+  <a href="../exp-05-pose-detection/index.html">EXP-05 检测与姿态</a>
+  <a href="../exp-06-fall-judgment/index.html">EXP-06 跌倒状态机</a>
+  <h4>CH3 · 告警与验证</h4>
+  <a href="../exp-07-alert-evidence/index.html">EXP-07 告警证据链</a>
+  <a href="../exp-08-llm-vlm/index.html">EXP-08 LLM·VLM</a>
+  <a href="../exp-09-full-verification/index.html">EXP-09 全功能验证</a>
+</aside>
+
+<main class="content">
+
+<div class="exp-head">
+  <span class="code">EXP-06 · 第 2 章 · 综合性 · 4 学时</span>
+  <h1>跌倒判定状态机：从几何信号到"要不要问一句"</h1>
+  <p class="desc">检测与姿态（EXP-05）给出每帧关键点后，谁来拍板"这算不算跌倒"？答案是 <b>fall/state_machine.py 的六状态机</b>：IDLE→FALLING→LYING→ASK→ALERT/CANCELLED，每人一个实例。本实验吃透<b>躯干角&gt;50°、宽高比&lt;0.5、髋速尖峰 0.25×框高</b>三大判据与 1.5s/3.0s/12s/60s 四个时间窗，跑通"救命→ALERT、没事→CANCELLED"两条应答路径，并用单变量调参感受误报/漏报的权衡。</p>
+  <div class="meta">
+    <span class="tag hl">难度 ⭐⭐⭐ · 4 学时</span>
+    <span class="tag">几何三判据</span><span class="tag">六状态机</span>
+    <span class="tag">cooldown 60s</span><span class="tag">IoU 关联</span>
+  </div>
+</div>
+
+<!-- 01 -->
+<section class="blk" id="s1">
+  <h2><span class="no">01</span>问题引入：弯腰捡鞋为什么不能算跌倒</h2>
+  <p>护理场景里最怕两件事：老人真跌倒了系统没吭声（漏报），或老人只是弯腰捡只鞋就被追问"您还好吗"（误报）。前者致命，后者扰民 —— 都会让照护者不再信任这套设备。可是从关键点坐标到"跌倒"二字之间，隔着一连串判断：单帧像躺着就够吗？躺一下马上起来算吗？要不要先问一句再报警？</p>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>只看单帧 → 弯腰、下蹲都会"看起来像躺"，误报满天飞</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>加入速度尖峰 → "像躺"且"正在快速倒下"才算跌倒萌芽</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>加观察时间窗 → 持续躺 1.5s 才确认、躺满 3.0s 视为"起不来"</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span>先问一句 → 12s 应答窗口内问明白，救命才告警、没事就取消</div>
+  </div>
+  <div class="tip amber"><span class="lab">💡 一个类比</span>这就像机场安检：<b>形态可疑（躺姿）是初筛，速度异常是触发警报，观察窗是复核，ASK 询问是最后的人工确认</b>——层层过滤，才敢按下红色按钮。</div>
+</section>
+
+<!-- 02 -->
+<section class="blk" id="s2">
+  <h2><span class="no">02</span>原理通俗讲解：像"问诊确认流程"一样的状态机</h2>
+  <p>把状态机想象成分诊台的问诊流程 —— 病人（画面里的人）在不同队列之间流动，每个队列有自己的"放行条件"：</p>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">IDLE → FALLING</div><div class="kt">"疑似摔倒，先盯住他"</div><p><b>形态 + 速度双条件</b>同时成立：躯干角&gt;50°<b>或</b>宽高比&lt;0.5（像躺），<b>且</b>髋部速度&gt;0.25×框高（正在快速倒下）。进入 1.5s 观察窗。</p></div>
+    <div class="kcard"><div class="kd">FALLING → LYING</div><div class="kt">"确实躺了 1.5 秒"</div><p>观察窗内持续满足躺姿判据 → 确认躺地；若 1.5s 内人又站起来了 → <b>回 IDLE</b>（瞬时异常，正确免疫）。</p></div>
+    <div class="kcard"><div class="kd">LYING → ASK</div><div class="kt">"躺了 3 秒还没起来，问一句"</div><p>持续躺地超过 <b>lying_time 3.0s</b> 视为"起不来"，进入 12s 应答窗口，TTS 播报"您还好吗？需要帮助吗？"。<b>cooldown 60s 内不重复触发</b>。</p></div>
+    <div class="kcard"><div class="kd">ASK → ALERT / CANCELLED</div><div class="kt">"听他怎么说"</div><p>确认词（救命/帮/疼/起不来/摔/救）→ <b>ALERT 告警</b>；取消词（没事/不用）→ <b>CANCELLED 取消</b>；12s 超时无人应答 → 保守升级 ALERT。</p></div>
+  </div>
+  <p>两个容易混淆的"刹车"机制要分清：</p>
+  <table>
+    <thead><tr><th>机制</th><th>时长</th><th>挡什么</th><th>不挡什么</th></tr></thead>
+    <tbody>
+      <tr><td><b>cooldown 冷却期</b></td><td>60s（进 ALERT/CANCELLED 时起算）</td><td>挡住 LYING→ASK 的<b>重复询问</b>，防止把老人问烦</td><td><b>不挡新跌倒</b>：60s 内再次满足形态+速度 → 照样重进 FALLING（防漏报关键设计，state_machine L215-L220）</td></tr>
+      <tr><td><b>恢复判据 _is_recovered</b></td><td>持续 2s</td><td>——</td><td>bbox_aspect&gt;1.5 或角&lt;25° 持续 2s 才回 IDLE，防起身瞬间抖动立刻重入告警</td></tr>
+    </tbody>
+  </table>
+  <div class="tip tealb"><span class="lab">🔔 人文关怀与隐私底线</span>ASK 的存在本身就是关怀设计：<b>先给老人 12 秒自己解释的机会，而不是跌倒瞬间就呼叫子女/急救</b>。且全部判定在端侧完成、只在 ALERT 时落证据三件套 —— 隐私数据不出家门，告警有据可查。</div>
+</section>
+
+<!-- 03 -->
+<section class="blk" id="s3">
+  <h2><span class="no">03</span>关联知识点：三大几何判据与六状态机</h2>
+  <table>
+    <thead><tr><th>知识点</th><th>内容</th><th>源码锚点</th></tr></thead>
+    <tbody>
+      <tr><td>5.1.1 几何特征</td><td>躯干角 θ=arctan2(|dx|,|dy|)&gt;angle_thr 50°（0° 站立、90° 躺平）；bbox 高/宽&lt;aspect_thr 0.5；髋中点帧间位移&gt;0.25×bbox_h（归一化，与远近无关）；FallbackCue：vis_ok=False 且宽高比&lt;0.45 持续 2s → FALL_CUE_LOW（conf 0.6 直进 ASK）</td><td>geometry.py L45-L80（fall_features）、L58-L60（arctan2）、state_machine.py L111-L138（_is_lying / _speed_ok）</td></tr>
+      <tr><td>5.1.2 六状态机</td><td>IDLE/FALLING/LYING/ASK/ALERT/CANCELLED 每人一实例；时间窗 falling_window 1.5s、lying_time 3.0s、ask_timeout 12s、cooldown 60s（config L49-L70）</td><td>state_machine.py L34-L83（每帧推进）、L134-L230（各状态分支）；事件分发 monitor.py L340-L383（_dispatch）</td></tr>
+      <tr><td>5.1.3 IoU 关联</td><td>贪心匹配 IoU≥0.3 关联、max_age=3s 释放 ID；每 ID 独立 FSM；多人 ASK 由全局 _ask_session 静默合并（只播一次询问）</td><td>assoc.py L28-L67；monitor.py L351-L354（会话合并）、L206-L208（on_asr 单次应答 break）</td></tr>
+      <tr><td>应答词分类</td><td>classify_response 先匹配 confirm_words 再 cancel_words（"不用救我"含歧义 → 判 ALERT，安全优先）；ALERT 态只认窄表"没事/不用"</td><td>interaction.py L12-L20；state_machine.py L246-L256（respond）</td></tr>
+      <tr><td>前置依赖</td><td>关键点来自 EXP-05（BlazePose 33 点肩11/12髋23/24 或 COCO17 肩5/6髋11/12），全部在原图像素坐标系计算</td><td>geometry.py L26-L30（joint_indices 按点数选索引）</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 04 -->
+<section class="blk" id="s4">
+  <h2><span class="no">04</span>实验目标</h2>
+  <ul class="check">
+    <li>能解释躯干角 / 宽高比 / 髋速尖峰三大判据的物理含义，并说明<b>为什么必须"形态∧速度"双条件</b>（防弯腰误报）</li>
+    <li>能默画六状态机，标注每条转移的<span class="ok">时间窗与几何条件</span>（1.5s / 3.0s / 12s / 60s）</li>
+    <li>能独立完成 <span class="ok">救命 → ALERT</span> 与 <span class="ok">没事 → CANCELLED</span> 两条端到端路径，读懂 EVENT 日志</li>
+    <li>能区分<span class="ok">cooldown（只挡询问不挡跌倒）</span>与<span class="ok">恢复判据</span>的不同职责</li>
+    <li>掌握"单变量调参 → 观察 → 记录"方法论，感受阈值与误报/漏报的权衡</li>
+  </ul>
+</section>
+
+<!-- 05 -->
+<section class="blk" id="s5">
+  <h2><span class="no">05</span>实验环境与准备</h2>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>硬件：实验箱 B2 / 小车 C1（RK3576 + NPU）—— 本实验纯离线视频，<b>无需麦克风/扬声器</b></div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>软件：Ubuntu 22.04 · Python 3.10；models/ 下 yolov8n.rknn 与 RTMPose 权重就位（env_check 通过）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>素材：testdata/fall_slow_x264.mp4（慢速跌倒视频，本地已有）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span>核心模块：fall/monitor.py · state_machine.py · geometry.py · assoc.py · interaction.py；配置 config/fall_config.yaml 的 state / interaction 两段</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">5</span>改参数前<b>备份</b> fall_config.yaml，实验结束恢复默认；用例参照 docs/08_视觉测试用例.md</div>
+  </div>
+</section>
+
+<!-- 06 -->
+<section class="blk" id="s6">
+  <h2><span class="no">06</span>动画讲解：六状态流转与时间窗</h2>
+  <div class="anim-box">
+    <svg viewBox="0 0 720 340" xmlns="http://www.w3.org/2000/svg">
+      <rect x="10" y="10" width="700" height="320" rx="14" fill="#111827"/>
+      <!-- 主链六状态 -->
+      <g font-family="monospace" font-size="13" text-anchor="middle">
+        <rect x="30" y="60" width="96" height="44" rx="8" fill="#1f2937" stroke="#6b7280" stroke-width="2"/>
+        <text x="78" y="80" fill="#e5e7eb">IDLE</text>
+        <text x="78" y="96" fill="#9ca3af" font-size="10">待机</text>
+        <rect x="176" y="60" width="110" height="44" rx="8" fill="#1f2937" stroke="#f59e0b" stroke-width="2"/>
+        <text x="231" y="80" fill="#fbbf24">FALLING</text>
+        <text x="231" y="96" fill="#9ca3af" font-size="10">观察窗1.5s</text>
+        <rect x="336" y="60" width="96" height="44" rx="8" fill="#1f2937" stroke="#fb923c" stroke-width="2"/>
+        <text x="384" y="80" fill="#fdba74">LYING</text>
+        <text x="384" y="96" fill="#9ca3af" font-size="10">躺3.0s</text>
+        <rect x="482" y="60" width="96" height="44" rx="8" fill="#1f2937" stroke="#a78bfa" stroke-width="2"/>
+        <text x="530" y="80" fill="#c4b5fd">ASK</text>
+        <text x="530" y="96" fill="#9ca3af" font-size="10">窗口12s</text>
+        <rect x="470" y="190" width="120" height="44" rx="8" fill="#1f2937" stroke="#ef4444" stroke-width="2"/>
+        <text x="530" y="210" fill="#f87171">ALERT</text>
+        <text x="530" y="226" fill="#9ca3af" font-size="10">确认词/超时</text>
+        <rect x="316" y="190" width="136" height="44" rx="8" fill="#1f2937" stroke="#9ca3af" stroke-width="2"/>
+        <text x="384" y="210" fill="#d1d5db">CANCELLED</text>
+        <text x="384" y="226" fill="#9ca3af" font-size="10">取消词</text>
+      </g>
+      <!-- 连线 -->
+      <defs>
+        <marker id="ar6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/></marker>
+        <path id="p61" d="M126 82 L174 82" fill="none"/>
+        <path id="p62" d="M286 82 L334 82" fill="none"/>
+        <path id="p63" d="M432 82 L480 82" fill="none"/>
+        <path id="p64" d="M530 104 L530 188" fill="none"/>
+        <path id="p65" d="M482 84 L440 192" fill="none"/>
+        <path id="p66" d="M384 104 L200 60" fill="none" transform=""/>
+      </defs>
+      <use href="#p61" marker-end="url(#ar6)" stroke="#6b7280" stroke-width="2"/>
+      <use href="#p62" marker-end="url(#ar6)" stroke="#f59e0b" stroke-width="2"/>
+      <use href="#p63" marker-end="url(#ar6)" stroke="#fb923c" stroke-width="2"/>
+      <use href="#p64" marker-end="url(#ar6)" stroke="#ef4444" stroke-width="2"/>
+      <use href="#p65" marker-end="url(#ar6)" stroke="#a78bfa" stroke-width="2"/>
+      <path d="M480 104 L420 190" fill="none" stroke="#9ca3af" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#ar6)"/>
+      <path d="M340 234 C 220 300, 110 260, 76 106" fill="none" stroke="#6b7280" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#ar6)"/>
+      <path d="M466 234 C 560 300, 660 270, 662 108 C 663 94, 650 84, 580 82" fill="none" stroke="#ef4444" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#ar6)"/>
+      <!-- 边标注 -->
+      <g font-size="10.5" fill="#93c5fd" font-family="monospace">
+        <text x="132" y="74">形态∧速度</text>
+        <text x="292" y="74">持续躺1.5s</text>
+        <text x="436" y="74">躺满3.0s</text>
+        <text x="536" y="150" fill="#fca5a5">救命/超时12s</text>
+        <text x="424" y="146" fill="#c4b5fd">没事/不用</text>
+        <text x="118" y="292" fill="#9ca3af">cooldown 60s 只挡 ASK，不挡新跌倒</text>
+        <text x="560" y="296" fill="#9ca3af">恢复: aspect&gt;1.5或角&lt;25° 持续2s</text>
+        <text x="46" y="52" fill="#6ee7b7">cooldown结束→IDLE</text>
+      </g>
+      <!-- 流动粒子 -->
+      <circle r="4" fill="#34d399"><animateMotion dur="2.4s" repeatCount="indefinite"><mpath href="#p62"/></animateMotion></circle>
+      <circle r="4" fill="#34d399"><animateMotion dur="2.4s" begin="0.8s" repeatCount="indefinite"><mpath href="#p63"/></animateMotion></circle>
+      <circle r="4" fill="#34d399"><animateMotion dur="2.4s" begin="1.6s" repeatCount="indefinite"><mpath href="#p64"/></animateMotion></circle>
+      <!-- 时间轴: 判定三要素 -->
+      <g font-family="monospace" font-size="11">
+        <rect x="30" y="306" width="200" height="7" rx="3" fill="#374151"/>
+        <rect x="30" y="306" width="60" height="7" rx="3" fill="#f59e0b"><animate attributeName="width" values="0;200;200;0" dur="6s" repeatCount="indefinite"/></rect>
+        <text x="240" y="314" fill="#9ca3af">帧特征: ang=57 &gt; 50° 且 spd=0.31 &gt; 0.25×h → FALL_CUE</text>
+        <text x="30" y="40" fill="#34d399" font-size="12">六状态机 · 每人一实例 · 纯逻辑无IO · IoU≥0.3 保持 person_id</text>
+      </g>
+    </svg>
+    <div class="anim-cap">动画 6-1：六状态主链（实线正向 / 虚线取消与恢复）——"形态∧速度"触发 1.5s 观察窗，躺满 3.0s 进入 12s 询问窗；确认词或超时升 ALERT、取消词进 CANCELLED（灰框）；冷却期只挡 ASK、恢复判据需持续 2s。底部进度条示意单帧三判据的与逻辑。</div>
+  </div>
+</section>
+
+<!-- 07 -->
+<section class="blk" id="s7">
+  <h2><span class="no">07</span>互动讲解：状态机事件步进台</h2>
+  <div class="ix-panel">
+    <div class="ix-title">🕹️ 六状态机事件步进台 · FSM Bench —— 按事件逐个点，观察状态与日志如何推进</div>
+    <div class="ctl-row">
+      <button onclick="fStep()">▶️ 模拟跌倒（形态∧速度）</button>
+      <button onclick="fTimeout()">⏱ 推进 1.5s/3.0s 时间窗</button>
+      <button onclick="fAsk()">🗣️ 进入 ASK 并询问</button>
+      <button onclick="fAnswer('救命')">💬 输入「救命」</button>
+      <button onclick="fAnswer('没事')">💬 输入「没事」</button>
+      <button onclick="fExpire()">⌛ 救助 12s 超时</button>
+      <button onclick="fReset()">↺ 重置</button>
+    </div>
+    <div class="io" id="fsmIo"></div>
+  </div>
+  <div class="tip tealb"><span class="lab">🔔 试试连点</span>点「救命」后再点「输入救命」—— ALERT 态只认窄表<b>"没事/不用"</b>，确认词已无处可去；而 ASK 阶段先点「没事」再想告警，会落到 CANCELLED + 60s 冷却，这正是"取消容易、告警谨慎"的不对称设计。</div>
+</section>
+
+<!-- 08 -->
+<section class="blk" id="s8">
+  <h2><span class="no">08</span>实操步骤：跌倒→询问→应答全流程</h2>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>启动离线调试（--text 用 stdin 代替麦克风）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>观察 EVENT：IDLE→FALLING→LYING→ASK，画面框色 黄→橙→紫，叠加 ang=/spd=</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>ASK 窗口内 stdin 输入「救命」→ ALERT，证据三件套落盘 runs/evidence/</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span>重新运行、改输「没事」→ CANCELLED，播报"好的，请注意安全"，框变灰</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">5</span>单变量调参：angle_thr 50→30、speed_factor 0.25→0.10，对比误报变化后恢复</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">6</span>按 docs/08 T8-4/T8-5 逐场景断言（正面跌倒/弯腰/多人/起身）</div>
+  </div>
+  <div class="pre"><span class="c"># ① 启动（终端1）：离线视频 + 文本模式</span>
+cd ~/ros2_ws/src/xflz_eai_car1/app/elderly_companion
+python3 apps/fall_video_demo.py --video testdata/fall_slow_x264.mp4 --text --mjpeg
+
+<span class="c"># ② 预期 EVENT 日志（真实样例）</span>
+[I][sink] EVENT {'person_id': 1, 'from': 'IDLE', 'to': 'FALLING', 'confidence': 1.0}
+[I][sink] EVENT {'person_id': 1, 'from': 'FALLING', 'to': 'LYING', <span class="y">'ts': 1787305706.34</span>}
+[I][sink] EVENT {'person_id': 1, 'from': 'LYING', 'to': 'ASK', <span class="y">..., 'vlm': {'label': 'uncertain'</span>}}
+[I][tts] [TTS] 您还好吗？需要帮助吗？
+[I][monitor] ASK 会话已存在（person 1），person 2 进入 ASK <span class="g">静默合并</span>
+
+<span class="c"># ③ 终端1 stdin 输入（12s 窗口内）</span>
+救命        <span class="c"># → EVENT from=ASK to=ALERT，日志 ALERT: {...}，画面 ALERT=True</span>
+没事        <span class="c"># （需重启）→ EVENT from=ASK to=CANCELLED + "好的，请注意安全"</span>
+
+<span class="c"># ④ 单变量调参：编辑 config/fall_config.yaml state 段（改前备份！）</span>
+<span class="c">#   angle_thr: 30.0      # 50→30 更敏感，弯腰是否误入 FALLING？</span>
+<span class="c">#   speed_factor: 0.10   # 0.25→0.10，正常行走是否误触发？</span>
+python3 apps/fall_video_demo.py --video testdata/fall_slow_x264.mp4 --text
+
+<span class="c"># ⑤ 收尾清理（Ctrl+C 后）</span>
+pkill -f fall_video_demo; pkill -9 aplay</div>
+  <div class="tip amber"><span class="lab">💡 快速测试提示</span>cooldown 60s 会挡住同一进程内的第二次 ASK —— 想反复触发就<b>重启程序</b>或临时调小 <code>state.cooldown</code>；也要记得实验结束把 yaml 恢复默认值。</div>
+</section>
+
+<!-- 09 -->
+<section class="blk" id="s9">
+  <h2><span class="no">09</span>重点与易错点</h2>
+  <ul class="check">
+    <li><b>三判据的与逻辑</b>：_is_lying（形态）<b>and</b> _speed_ok（速度）才进 FALLING —— 只有其一都不算</li>
+    <li><b>cooldown ≠ 恢复</b>：冷却挡的是"重复询问"，恢复判据（aspect&gt;1.5 或角&lt;25° 持续2s）才负责回 IDLE</li>
+    <li><b>单次应答只推进一人</b>：on_asr 命中即 break（monitor L208），防一个"没事"触发 3 次 CANCELLED</li>
+    <li><b>确认优先</b>：classify_response 先 confirm 后 cancel —— "不用救我"判 ALERT，歧义时安全优先</li>
+  </ul>
+  <table>
+    <thead><tr><th>现象</th><th>原因</th><th>解决</th></tr></thead>
+    <tbody>
+      <tr><td>FALLING→LYING 未触发就回 IDLE</td><td>跌倒后 &lt;1.5s 迅速起身，观察窗超时（state_machine L176-L178）</td><td><b>正确行为</b>——falling_window 本就用来过滤瞬时姿态异常</td></tr>
+      <tr><td>第二次跌倒 ASK 不触发</td><td>cooldown 60s 冷却期内 LYING→ASK 被挡（L189-L190）</td><td>等冷却结束或临时调小 state.cooldown；FALLING/LYING 仍会正常推进</td></tr>
+      <tr><td>输入"救命"无反应</td><td>已超过 ask_timeout 12s，系统已自动升级 ALERT</td><td>在 ASK 窗口 12s 内输入；超时即告警属设计行为</td></tr>
+      <tr><td>ALERT 态说"还好/不需要"没取消</td><td>ALERT 只认窄表"没事/不用"（L248），宽表含"没有"易被闲聊误触发</td><td>输入精确词"没事"或"不用"——收紧是防误取消告警</td></tr>
+      <tr><td>多人 ASK 重复播报</td><td>正常应由 _ask_session 静默合并 + on_asr break 保护</td><td>看日志"ASK 会话静默合并"确认；不生效则检查 monitor 版本</td></tr>
+      <tr><td>调参后全程不触发</td><td>阈值调太高（如 angle_thr: 80），实际 ang 达不到</td><td>看画面叠加 ang=XX 实测值再定阈值，单变量回调</td></tr>
+      <tr><td>演示视频多人场景无法复现</td><td>testdata 为单人视频，IoU 关联看不出效果</td><td>读 assoc.py L48-L67 理解贪心匹配；或换多人素材</td></tr>
+      <tr><td>改了 yaml 没生效</td><td>改错副本或改完未重启</td><td>确认路径 config/fall_config.yaml，重启无 config error</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 10 -->
+<section class="blk" id="s10">
+  <h2><span class="no">10</span>总结与思考</h2>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">✅ 完成成果</div><div class="kt">全流程验证</div><p>跑通 fall_video_demo --text，观察完整 FALLING→LYING→ASK 流转；验证救命→ALERT、没事→CANCELLED 两条路径；完成至少一次单变量调参对比。</p></div>
+    <div class="kcard"><div class="kd">🧠 原理收获</div><div class="kt">判据 + 时间窗</div><p>理解"形态∧速度"与逻辑的抗误报本质，四个时间窗（1.5/3.0/12/60s）各自过滤哪类噪声，冷却只挡询问不挡跌倒的安全考量。</p></div>
+    <div class="kcard"><div class="kd">🛠 技能收获</div><div class="kt">方法论</div><p>每帧流水线（YOLO→IoU→姿态→特征→状态机）数据流；单变量调试→记录 EVENT 序列→分析误报/漏报的实验方法。</p></div>
+    <div class="kcard"><div class="kd">❓ 排障思路</div><div class="kt">三问定位法</div><p>没触发？先查冷却 → 再查时间窗 → 最后对照画面 ang=/spd= 实测值核阈值。应答没反应？查 12s 窗口与窄/宽词表。</p></div>
+  </div>
+  <div class="tip violet"><span class="lab">🟣 思考题 1</span>把 angle_thr 从 50° 调到 30°，哪些日常动作可能进入 FALLING？结合 state_machine L111-L126（_is_lying）与 L127-L138（_speed_ok）分析：为什么单纯调低角度阈值还不够，必须保留速度尖峰作为第二条件？若去掉速度条件，弯腰捡物会怎样？</div>
+  <div class="tip violet"><span class="lab">🟣 思考题 2</span>monitor.py L206-L208 的 on_asr 为什么在命中一次后就 break？若去掉它，两人同时处于 ASK 时输入一个"没事"会发生什么？结合 L351-L354 的 ASK 全局会话合并，说明系统如何做到"只播一次询问、只开一个应答窗口、一次应答只推进一人"。</div>
+</section>
+
+<nav class="expnav">
+  <a href="../exp-05-pose-detection/index.html">← EXP-05 人体检测与姿态估计</a>
+  <a href="../exp-07-alert-evidence/index.html">EXP-07 告警与证据链 →</a>
+</nav>
+
+</main>
+</div>
+
+<footer>
+  <div class="foot-in">
+    <span>CASE-03 · 老人跌倒监护 · EXP-06 跌倒判定状态机</span>
+    <span>4 学时 · 综合性 · 基于 elderly_companion 实验讲义改编</span>
+  </div>
+</footer>
+
+<script>
+var fBase='系统就绪 — person #1 <b>IDLE</b>。点「模拟跌倒」开始推帧。';
+function setF(t){document.getElementById('fsmIo').innerHTML=t;}
+function fStep(){setF(
+  '<span class="dim">▌单帧判据：</span>ang=57°&gt;50 ✓ aspect=0.42&lt;0.5 ✓ spd=0.31&gt;0.25×h ✓<br>'+
+  '<span class="ok">形态∧速度 双条件成立</span> → EVENT <b>IDLE→FALLING</b>（confidence 1.0，记 _fall_cue_ts，进入 1.5s 观察窗）<br>'+
+  '<span class="dim">画面：检测框变黄</span>');}
+function fTimeout(){setF(
+  '<span class="dim">▌+1.5s：</span>持续满足躺姿 → EVENT <b>FALLING→LYING</b>（框变橙，lying_since 计时）<br>'+
+  '<span class="dim">▌+3.0s：</span>躺满 lying_time，"起不来"成立 → EVENT <b>LYING→ASK</b>（cooldown 无阻拦）<br>'+
+  '<span class="warn">若 1.5s 内起身 → 回 IDLE（观察窗超时 = 误触发被免疫）</span>');}
+function fAsk(){setF(
+  '<span class="dim">▌_dispatch(ASK)：</span>TTS 播报「您还好吗？需要帮助吗？」，开 12s 应答窗口（ask_deadline）<br>'+
+  '<span class="dim">▌多人时：</span>已有 _ask_session → person 2 进入 ASK 走<b>静默合并</b>，不重复播报<br>'+
+  '<span class="dim">▌状态：</span><span class="ok">ASK</span>（紫框，等你应答 12s）');}
+function fAnswer(w){
+  var ok=(w==='救命');
+  if(ok) setF('classify_response(「<b>救命</b>」) → 命中 confirm_words（救命/帮/疼/摔/起不来/救，<b>先于</b> cancel 匹配）<br>'+
+    '→ EVENT <b>ASK→ALERT</b>！_start_alarm + 证据三件套落盘 + _cooldown_until=now+60s<br>'+
+    '<span class="bad">画面 ALERT=True 红色闪烁；此后只认窄表「没事/不用」可解除</span>');
+  else setF('classify_response(「<b>没事</b>」) → 命中 cancel_words<br>'+
+    '→ EVENT <b>ASK→CANCELLED</b>：清 _ask_session → _stop_alarm → 播报「好的，请注意安全」，框变灰<br>'+
+    '<span class="dim">cooldown 60s 开始计时：期间 LYING→ASK 被挡，但<b>新跌倒照样进 FALLING</b></span>');}
+function fExpire(){setF(
+  '<span class="dim">▌12s 无声应答：</span>now ≥ _ask_deadline → 保守升级 <b>ASK→ALERT</b>（无法确认安全 = 按告警处理）<br>'+
+  '<span class="warn">这就是"救命"必须在窗口内输入的原因——超时后它已无状态可转移</span>');}
+function fReset(){setF(fBase);}
+setF(fBase);
+</script>
+<script src="../shared/tutorial.js" defer></script>
+</body>
+</html>

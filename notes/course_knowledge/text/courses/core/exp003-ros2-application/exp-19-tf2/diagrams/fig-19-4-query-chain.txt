@@ -1,0 +1,40 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp003-ros2-application/exp-19-tf2/diagrams/fig-19-4-query-chain.html
+TITLE: 图 19-4 · 一次 TF 查询的全过程
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+图 19-4 · 一次 TF 查询的全过程
+图 19-4 · 一次 TF 查询的全过程
+本图回答的问题：
+lookup_transform('map','laser_frame')
+背后做了哪三步？为什么不用手写矩阵？
+激光点 p (0.30, 0)
+frame_id: laser_frame · 带 stamp
+listener 收集
+Buffer · 变换缓存
+订阅 /tf + /tf_static
+默认缓存 10 秒历史
+① 沿父指针向上爬
+源帧一路到共同祖先
+lookup_transform()
+② 找汇合点（共同祖先）
+目标帧也向上爬至相遇
+③ 该取逆的取逆，连乘
+拼出 A→B 的总变换
+按数据时间戳对齐
+Time() = 最新
+传时刻 t → 历史插值
+取该时刻的边
+T_map←laser 结果
+平移 + 四元数
+拿到结果怎么用
+tx = t.transform.translation.x
+yaw = 2·atan2(z, w)
+（半角反解，见验证题）
+超时用 timeout 等待
+消费
+树没凑齐
+超时 / Extrapolation
+✅ 结论：三次爬树 + 连乘 = 唯一解，全程无需手写矩阵
+⚠️ 风险：时间戳超出缓存窗口 → 报 extrapolation 错误
+🔍 验证：04 节步骤 1 tf2_echo 的实测输出
+EXP-19 · TF2 坐标系变换

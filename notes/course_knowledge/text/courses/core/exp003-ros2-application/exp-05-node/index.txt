@@ -1,0 +1,1908 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp003-ros2-application/exp-05-node/index.html
+TITLE: EXP-05 · 节点：ROS2 里的"一个岗位" — 机器人 ROS2 应用与开发
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+EXP-05 · 节点：ROS2 里的"一个岗位" — 机器人 ROS2 应用与开发
+🧠 具身智能课程 ·
+教程首页
+核心课程
+/
+ROS2 应用与开发
+/ EXP-05
+本页目录
+00 本课学完，你应该能做到
+01 问题引入：一台机器人里有多少个程序在干活
+02 核心原理：跟着一个真实节点，把生命周期走一遍
+03 节点 API 速查手册
+04 实操 A：编译并运行 gas_sensor_node
+05 实操 B：三节点组网与身份切换
+06 注意事项与验收清单
+07 本课总结与思考题
+CH2 · 通信机制
+EXP-05 节点
+EXP-06 话题
+EXP-07 服务
+EXP-08 动作
+EXP-09 自定义接口
+EXP-10 参数
+EXP-05 · 第 2 章 · 验证性 · 2 学时
+节点：ROS2 里的"一个岗位"
+一台机器人身上有二十多个程序在同时干活——看路的、算位置的、决定往哪走的、拧电机的。ROS2 给它们各自划一个岗位、发一张工牌，让它们既能各干各的、又能互相传数据，这就是
+节点
+。本课把"节点到底是什么、为什么这么拆、怎么自己写一个"讲透。
+难度 ⭐
+2 学时
+验证性
+关键词 node · rclpy · 计算图
+目标
+本课学完，你应该能做到
+① 说清本质
+节点是什么
+能讲出节点 = 一个继承
+rclpy.node.Node
+的独立进程，并能说明"构造 → spin → 销毁"三个阶段各干什么、为什么是这个顺序。
+② 读懂骨架
+看懂一份节点代码
+拿到像
+gas_sensor_node
+这样的节点，能指出：类继承、构造函数里的资源创建顺序、回调方法、
+main()
+的固定四步。
+③ 独立验证
+跑起来并证明它存在
+能编译运行节点，用
+ros2 node list
+/
+ros2 node info
+确认它已进入 ROS2 图，并解释启动日志与
+Ctrl+C
+退出分别对应哪个阶段。
+④ 迁移套用
+换传感器照样写
+能把这套骨架（继承 → 构造 → 回调 → main 入口）直接套到温度、IMU、超声波等其它传感器节点上。
+本课的重点与难点
+重点
+：
+class XxxNode(Node)
+的继承写法，以及构造函数里"注册节点 → 声明参数 → 创建发布者/定时器"的顺序。
+难点
+：① 为什么
+不调用
+rclpy.spin()
+就等于没开机
+；② "一个节点 = 一个独立进程"这条设计原则，在工程上有哪些优缺点。
+和前后的关系
+上一课（EXP-04）讲了怎么建包，这一课讲包里最核心的东西怎么写。本课用的
+gas_sensor_node
+正是 EXP-06 的主角
+——这里从"
+节点
+"角度拆它的结构和生命周期，EXP-06 再从"
+话题
+"角度拆它怎么发数据。
+01
+问题引入：一台机器人里，到底有多少个程序在干活
+先别看代码，看一个更实在的问题。你让小车"到桌前把那瓶水拿过来"，它身上同时发生着这些事：
+1
+相机一直在拍
+，每秒 30 张，不断说出"我看到了什么"。
+2
+雷达一直在转
+，每秒 10 圈，不断说出"周围哪边有东西、多远"。
+3
+有个程序不停在算
+："根据刚才看到的，我现在在屋里的哪个位置。"
+4
+还有个程序负责想
+："桌在前面 3 米，先绕过椅子，走过去。"
+5
+最后有个程序只干一件事
+：把"往前 0.3 米/秒"翻译成四个轮子该转多快，然后写进电机。
+这五件事，
+没有一件能等另一件慢慢做完
+——相机不会为了等规划算完就停产 30 秒。它们必须同时跑、各干各的、只把结果交出去。数下来，一台能干活的机器人身上通常同时跑着
+20 个以上
+这样的程序。
+💡 一个类比：节点就是给程序"分岗位"
+把机器人想成一家餐厅：
+采购
+每天进货、
+厨师
+只管做菜、
+服务员
+端盘子、
+收银员
+只管收钱。四件事同时进行，谁也不替谁干活，只把"东西"往前传。
+ROS2 干的事一模一样：把上面那五个程序各封成一个岗位，
+一个岗位就是一个节点
+。
+· 岗位要有
+工牌
+（节点名），不然叫谁都不知道；
+· 岗位之间要能
+传东西
+（话题/服务/动作，后面几课细讲）；
+· 一个岗位生病了（崩溃），
+只停它一个
+，餐厅照常营业。
+但这个类比有三处会带你走偏，先划清边界
+类比只是脚手架，不能当定义用。
+上面这套"岗位"说法帮你快速理解"为什么要拆"，但它有三条不成立的边界——每一条后面都会展开，这里先记住正确说法：
+类比说法
+✅ 事实
+会踩什么坑
+"一个岗位 = 一个节点 = 只干一件事"
+一个节点内部可以同时发布多个话题、订阅多个话题、提供多个服务
+，承担多项工作。拆分原则是
+职责内聚
+，不是"一事一节点"。
+以为必须拆得极碎，结果几十个节点互相追数据，反而更难维护。
+"每个程序配一张工牌"
+可执行文件与节点不是一一绑定
+：一个可执行程序里可以创建多个 Node；节点也只是进程里的一个对象。
+进程 ≠ 节点。
+用
+ps
+数进程去核对
+ros2 node list
+，发现数目对不上就以为出错了。
+"岗位只讲分工"
+分工只是一半。节点的核心能力是
+通过话题 / 服务与其它节点通信，共同组成计算图
+（把正在跑的节点和连线画成一张"谁连谁"的图，下面就画一张看看）。没有通信，孤立的节点毫无意义。
+只记"拆"，不记"连"，后面学话题/服务时接不上。
+📖 严谨定义（记住这一句，比类比更管用）
+ROS2 节点是参与 ROS 计算图通信的基础单元
+，依托
+rcl
+/
+rclpy
+库创建，在 DDS 发现网络里表现为一个
+参与者
+（Participant 侧的端点集合）。
+它具备的能力是：
+有名字
+（可被图查询）、
+有通信端点
+（可发布/订阅/提供服务）、
+由执行器驱动
+（spin 才能干活）。三者缺一，就不算一个"活着的节点"。
+🔍 "计算图"是什么：先拿上一课的例子画一张
+定义里那句"参与
+ROS 计算图
+通信"，拆开说：
+计算图就是把正在运行的节点、话题和它们之间的连线画成一张图
+。椭圆是一个节点，矩形是一条话题，箭头是数据流动的方向；谁发布了、谁订阅了、哪条线断了，图上一眼全露馅。光背定义没用，拿 EXP-01 跑过的 talker / listener 当例子，三个终端按序开，亲手画一次：
+0.1
+开两个老朋友：talker 和 listener
+终端 A / B
+每个新开终端都先加载环境，这是 EXP-01 养成的老规矩。
+# 终端 A：发布者
+source
+/opt/ros/humble/setup.bash
+ros2
+run demo_nodes_cpp talker
+# 终端 B：订阅者
+source
+/opt/ros/humble/setup.bash
+ros2
+run demo_nodes_cpp listener
+0.2
+先装看图工具（只需一次）
+终端 C
+rqt_graph
+不是 ROS2 基础包自带的
+——它装在独立的
+ros-humble-rqt-graph
+包里。没装就直接
+ros2 run
+，会报
+Package 'rqt_graph' not found
+。
+先装一次，以后就不用再装。
+# -y 表示自动确认，省掉一次 y/n 交互
+sudo
+apt install -y ros-humble-rqt-graph
+$ sudo apt install -y ros-humble-rqt-graph
+Reading package lists... Done
+The following NEW packages will be installed:
+  ros-humble-rqt-graph
+...
+Setting up ros-humble-rqt-graph (...) ...
+# 出现 "Setting up ... rqt-graph" 就是装好了
+✔ 已经装过的话这行会提示
+ros-humble-rqt-graph is already the newest version
+，可以直接跳到下一步。
+0.3
+把计算图画出来
+终端 C
+rqt_graph
+是 ROS2 的"看图窗口"，完整用法 EXP-14 细讲，这里只要会打开、会读箭头。
+source
+/opt/ros/humble/setup.bash
+ros2
+run rqt_graph rqt_graph
+✔ 三个观察点逐个对：① 图里有两个椭圆
+/talker
+、
+/listener
+；② 中间是矩形
+/chatter
+，左边一支箭头从 talker 指进来，右边一支从它指去 listener（发布 → 话题 → 订阅）；③ 回终端 A 按
+Ctrl+C
+，talker 的椭圆和箭头立刻从图上消失，重新 run 又自己连回来。
+实拍｜
+rqt_graph
+画出来的样子
+：左
+红色椭圆
+/talker
+（发布者）、中间
+绿色矩形
+/chatter
+（话题）、右
+黑色椭圆
+/listener
+（订阅者）。
+箭头方向就是数据流向
+：talker → chatter → listener。
+记住这个读图规则：
+椭圆 = 节点，矩形 = 话题，箭头 = 数据流动方向
+。后面 EXP-06 加订阅者、EXP-07 加服务时，图会越画越大，但读法永远是这三条。
+这一步其实证明了什么
+你亲眼见到了"计算图"三个字的分量：
+节点是死是活、连没连上，ROS2 自己心里有数，随时能整张画给你看
+。杀掉 talker 图就缺一块，说明图反映的是
+此刻真实的连接
+，不是文档里的设计稿。
+没有图形界面的机器（纯 SSH）画不了图，用
+ros2 node list
+加
+ros2 topic info /chatter
+看"Publisher count: 1, Subscription count: 1"，结论完全一样；图形环境怎么配，回看 EXP-01 turtlesim 冒烟测试那段。
+📌 先记住这三句，后面逐步兑现
+①
+职责内聚 ≠ 一事一节点
+——怎么划边界，02 节用
+gas_sensor_node
+演示（它同时有发布者、定时器、参数）。
+②
+进程 ≠ 节点
+——EXP-05 全程按"一进程一节点"练手，但要知道这只是常见做法，不是规定。
+③
+节点真正的价值在"连"
+——话题在 EXP-06、服务在 EXP-07、动作在 EXP-08；计算图上面刚画过一张，02 节的发现建连动画里再展开一遍。
+那这 20 多个节点，是随便乱拆的吗
+不是。真实机器人里的节点有一条约定的分工纪律，按"信号往哪个方向走"分成四层。
+上层只做判断、不碰硬件；下层只碰硬件、不做判断
+——记住这一句，下面这张图就全看懂了。
+「导航到桌前 → 伸臂对准 → 抓取」这一次任务里，同时在跑的节点有 20 个以上
+一台机器人
+硬件 + 一块主控计算机
+360° 激光雷达
+6DOF 机械臂
+上位机 RK3576
+下位机 STM32
+深度相机
+麦克纳姆轮 ×4 · 编码器电机 ×4
+右侧节点跑在上位机，下位机做实时控制
+感知层
+· 把物理世界的状态翻译成 ROS2 消息
+camera_node
+深度相机彩色流
+depth_node
+深度图采集
+lidar_node
+360° 激光雷达
+imu_node
+惯性测量
+定位与坐标层
+· 回答"我在哪、每个部件相对在哪"
+odom_node
+里程计推算
+robot_state_publisher
+关节坐标广播
+static_transform_publisher
+固定外参
+amcl_node
+全局定位
+决策规划层
+· 决定下一步怎么走、怎么抓
+nav2_planner
+全局路径规划
+nav2_controller
+局部速度控制
+move_group
+机械臂轨迹规划
+mission_node
+任务调度大脑
+执行驱动层
+· 把速度与关节指令变成电机的 PWM
+base_driver
+底盘电机驱动
+arm_driver
+6DOF 机械臂驱动
+gripper_driver
+夹爪开合
+safety_node
+急停与安全
+系统与工具层
+每台机器人都有，不参与业务逻辑
+rosout
+日志聚合
+param_events
+参数广播
+rosbag2
+录包回放
+teleop
+键盘遥控
+信号在层间
+单向流动
+：感知 → 定位 → 决策 → 执行。真正让轮子转起来的那条链是
+lidar_node → amcl_node → nav2_planner → nav2_controller → base_driver
+；而
+mission_node
+只发目标、不下命令。四层架构是通行惯例而非 ROS2 的强制规定——但正因为它，任何一层换实现时，其他层一行代码都不用改。
+分层
+典型节点
+一句话职责
+它"不该"做的事
+感知层
+camera / depth / lidar / imu
+把物理量翻译成 ROS2 消息
+不做任何逻辑判断
+定位与坐标层
+odom / robot_state_publisher / amcl
+回答"我在哪、各部件相对在哪"
+不产生任何运动
+决策规划层
+nav2_planner / nav2_controller / move_group
+决定"下一步怎么走、怎么抓"
+不直接碰硬件寄存器
+执行驱动层
+base_driver / arm_driver / gripper_driver
+把指令变成电机的 PWM
+不自己改目标、不做规划
+Node Atlas · 逐层点开，看每个节点到底在干什么
+一句话记住分层
+上层只做判断、不碰硬件；下层只碰硬件、不做判断。判断错了改上层，硬件换了改下层——这就是"崩溃域、节奏、语言三重解耦"在真实机器人系统里的具体样子。
+那为什么非要拆成这么多程序？
+先别急着接受"要拆"，我们看一个
+真会发生的场景
+——如果硬把这三件事写进同一个程序，会怎样：
+同一个故障，两种后果：相机驱动抛了一个异常
+✗ 写成一个程序：一处出错，全部停下
+robot_app.py（一个大进程）
+相机采集 30Hz
+画面抖动，抛了未捕获异常
+↓ 异常没人接，整个进程直接退出
+算位置
+■ 一起停了
+拧电机
+■ 一起停了
+车停在半路，还得有人去现场按重启
+✓ 拆成三个进程：只停坏的那个
+三个独立进程，各自跑各自的
+相机进程 · 挂了 ✗
+异常只在它自己内部，进程退出
+定位进程 · 照常运行 ✓
+继续用自己的节奏算位置
+底盘进程 · 照常运行 ✓
+继续响应急停 / 遥控，车不失控
+相机可以单独重启，另外两个一秒都没停
+（这就是"独立崩溃域"：异常不会跨进程传播）
+同一个故事，还能再撞两堵墙
+·
+节奏
+：相机 30Hz、雷达 10Hz、底盘 100Hz、导航 1Hz。四种节奏塞进一个循环，只能按最慢的走。
+要么 100Hz 的电机被 1Hz 的导航拖住，要么快的抢光 CPU、把慢的饿死。
+·
+语言
+：点云处理要 C++ 的性能，业务逻辑想用 Python 的灵活。同一个进程只能选一种，
+要么牺牲性能，要么牺牲开发效率。
+拆成独立进程后：崩溃不传播、节奏各自定、语言各自选 —— 这就是"拆"换来的三样东西。
+图 1-2｜拆与不拆，差别不在"代码好不好看"，而在于
+故障会不会扩散、节奏会不会互相拖累
+。这也解释了为什么机器人软件几乎一定得多进程。
+所以 ROS2 的解法就是"拆岗位"：
+拆成多个独立进程，各自独立崩溃域、独立执行节奏、可选各自的语言，再用标准接口对话
+。代价也很实在——你要多管一份进程、多一份通信开销，所以不是"越碎越好"，而是
+按职责边界拆
+（怎么拆见下节的四层）。
+但"拆成独立进程"不等于"一个进程塞一个节点"
+这两件事经常被混为一谈，先把它们分清楚：
+进程（Process）
+节点（Node）
+它是什么
+操作系统层面"正在运行的程序"，有自己的内存空间
+ROS2 图里的一个
+身份
+，有名字、有通信端点
+谁看得见
+操作系统（
+ps
+、任务管理器）
+ROS2（
+ros2 node list
+）
+数量关系
+不是一一对应。
+一个进程里可以只放 1 个节点，也可以放 3 个。节点是进程里的对象，进程是装这些对象的屋子。
+🔍 "一对一更省心"到底省在哪
+本课和大部分入门教程都用
+「一个程序 = 一个节点」
+：写完
+gas_sensor_node.py
+，跑起来就是一个进程、一个节点。好处很实在——
+出问题时好对付
+：
+· 某个节点行为不对，你可以
+直接 Ctrl+C 只停它
+，其它节点毫发无损；
+· 反过来，如果三个节点挤在一个程序里，你想单独停掉其中一个，
+只能把整块一起停
+，另外两个也跟着没了；
+· 排查时也直观：终端窗口里谁在刷屏，基本就能对上是哪个节点。
+一句话：一对一不是规定，是"好管"。
+但 ROS2
+并不要求
+这样。同一个程序里创建多个节点完全可以，还能省掉进程间传输开销。看这段 rclpy 示例：
+import
+rclpy
+from
+rclpy.node
+import
+Node
+# ── 同一个 context（同一个进程、同一套 ROS 运行环境）──
+ctx1 = rclpy.Context()
+rclpy.init(context=ctx1)
+node_a = Node(
+'a'
+, context=ctx1)
+# 节点 a
+node_b = Node(
+'b'
+, context=ctx1)
+# 节点 b —— 与 a 同进程、同 context
+# 此时 `ros2 node list` 看到 2 个节点，但系统里只多了 1 个进程
+# ── 再起一个 context：仍在这一个进程里，但是彼此独立的 ROS 实例 ──
+ctx2 = rclpy.Context()
+rclpy.init(context=ctx2)
+node_c = Node(
+'c'
+, context=ctx2)
+# 节点 c：同进程，但属于另一套 ROS 运行环境
+# 结果：3 个节点全部在同一个 Python 进程内 —— 进程 1 个，节点 3 个
+⚠ 一句话记住这个区别
+进程是"屋子"，节点是"屋里的人"。
+一间屋子可以住一个人（最常见、最好管），也可以住三个（省房租、串门快，但一个人出事容易连累整屋）。
+ROS2 把这两件事分开设计，是为了让你
+按需选择
+：传感器驱动这种"挂了别拖累别人"的角色，单独一间屋；同一套算法里高度耦合的几块，可以合住一间屋。
+📌 本课怎么练
+本课实操
+全程按"一个程序一个节点"
+来，因为这样最容易把生命周期、节点名、
+node list
+三者的对应关系看清楚。
+等你学完 EXP-17 launch，会看到另一种组织方式的真实写法——那时再回头看这段示例，就会有"原来可以这样省资源"的感觉。
+02
+核心原理：跟着一个真实节点，把生命周期走一遍
+上一节说"节点是岗位"。可岗位怎么设立、怎么开始干活、怎么下班？
+我们直接拿一个真节点当标本
+——
+gas_sensor_node
+，实验箱上读 MQ5 气体传感器、每秒报一次浓度的那个程序。
+💡 为什么拿它当例子
+① 它是本课程后面反复出现的
+真实代码
+；
+② 它足够小——
+一个发布者 + 一个定时器
+，刚好把节点骨架完整露出来；
+③ 它正是 EXP-06 的主角，两课能互相印证。
+全部代码不到 30 行，去掉 import 只剩四块。先扫一眼，再一块块拆：
+from
+rclpy.node
+import
+Node
+class
+GasSensorNode(Node):
+# 块1：继承 Node，拿到"入场券"
+def
+__init__(self):
+        super().__init__(
+'gas_sensor_node'
+)
+# ① 报名字 → 进 ROS2 图
+self.declare_parameter(
+'publish_period'
+,
+1.0
+)
+# ② 声明旋钮
+self.pub = self.create_publisher(Float32,
+'/gas_sensor'
+, qos)
+# ③ 开出口
+self.timer = self.create_timer(period, self.timer_cb)
+# ④ 定闹钟
+# 注：period 在 __init__ 里就能读到，因为 super().__init__() 已执行完，
+#     节点此时已完整；但声明(②)一定要在读(period)之前。
+def
+timer_cb(self):
+# 块3：回调，被闹钟触发
+raw, v, ppm, err = read_mq5_once()
+        self.pub.publish(Float32(data=ppm))
+        self.get_logger().info(
+f'raw={raw} voltage={v:.3f}V ppm={ppm:.2f}'
+)
+def
+main(args=
+None
+):
+# 块4：入口，固定四步
+rclpy.init(args=args)
+# 开门前的准备
+node = GasSensorNode()
+# 装修 + 挂牌（构造）
+try
+: rclpy.spin(node)
+# 站到柜台后（运行）
+except
+KeyboardInterrupt:
+pass
+node.destroy_node(); rclpy.shutdown()
+# 打烊摘牌（销毁）
+就四块。但这四块之间
+有严格的先后依赖
+，顺序错了程序直接崩。下面这张图是它的完整生命周期，以及每一步"为什么必须在前一步之后"：
+gas_sensor_node 的一生：4 个阶段，顺序不可交换
+左边＝代码在做什么，右边＝这一步漏掉或放错位置会怎样
+① 准备进场　rclpy.init()
+打开 ROS2 客户端库，建好底层环境
+rclpy.init(args)
+此刻还没有任何节点存在
+漏了会怎样
+后面任何
+Node(...)
+都直接抛异常：
+RuntimeError: rclpy.init() must be called first
+相当于没开门就喊营业
+② 装修挂牌　__init__()
+super().__init__('gas_sensor_node')
+→ 报名字进图，此刻就能被 list 看到
+declare_parameter('publish_period', 1.0)
+→ 声明一个运行时可调的旋钮
+create_publisher + create_timer
+→ 开出口、定闹钟（还没开始用）
+顺序错了会怎样（最高频的错误）
+把
+super().__init__()
+挪到后面：
+AttributeError: object has no attribute '_clock'
+因为
+create_publisher
+要用父类建好的底座，
+先上户口，再办业务。
+还有个软坑：节点名不唯一时，ROS2 会
+自动改名
+成
+gas_sensor_node_1
+，只给个 WARN，不报错。
+（指导书思考题 1 问的就是这件事）
+③ 站柜台营业　spin()
+事件循环一直转：闹钟响 → 调 timer_cb
+→ 读 ADC → 发
+/gas_sensor
+→ 打一行日志
+每秒重复，直到你按 Ctrl+C
+漏了会怎样（最迷惑人的现象）
+没写 spin：程序
+立刻正常退出
+、不报任何错，
+但
+timer_cb
+一次都没跑过 —— 没人按闹钟。
+现象：装好了、挂牌了、就是不出数据。05 节专门讲这个。
+④ 打烊摘牌　destroy_node() + shutdown()
+端点从图里消失、句柄释放 —— 传感器驱动必须在这里关设备，否则下次启动报"设备忙"
+四个阶段里
+只有 ③ 是"活着"
+：①②是开门前的准备，④是离场。图右那列红色文字全是真机上会碰到的报错——记住它们，排障能省一小时。
+问题一：程序怎么知道自己"该是谁"
+回到那行
+super().__init__('gas_sensor_node')
+。
+Node 这个名字，是租来的，不是天生的。
+你写个普通 Python 类，它就只是个对象，跑完就没了，谁也不知道它存在。只有继承
+Node
+并把这行
+super().__init__()
+跑完，这个对象才会向 ROS2 底层
+报到
+，从此有了全局身份、有了可被寻址的名字，出现在
+ros2 node list
+里。
+如果你这样写
+会发生什么
+为什么
+class Foo:
+（不继承 Node）
+ros2 node list
+里永远看不到它
+没报到，ROS2 图里没有它这个"参与者"
+class Foo(Node):
+但不调
+super().__init__()
+创建时就报错，根本活不到运行
+父类的底座没建，后续 API 全部不可用
+class Foo(Node):
+且调了
+super().__init__('foo')
+✅ 出现在图中，名字是
+/foo
+正常报到
+类比
+继承
+Node
+=
+办了入职手续
+；
+super().__init__('名字')
+=
+领工牌
+。手续没办，公司系统里查无此人；工牌没领，同事叫不出你。
+问题二：节点到底"在哪"被观察到
+报到完了，别人怎么看见它？靠两条命令——它们读的是同一张全局表（ROS2 图），所以只要节点在 spin，随时都能查到：
+ros2
+node list
+# 点名：现在都有谁在？→ /gas_sensor_node
+ros2
+node info /gas_sensor_node
+# 查户口：它发什么、收什么、提供哪些服务
+#  Publishers: /gas_sensor [std_msgs/msg/Float32]   ← 构造函数第 ③ 步开的出口
+#  Subscribers: /parameter_events, /rosout         ← ROS2 给每个节点自动挂的两个"系统话题"
+#  Services: /gas_sensor_node/describe_parameters … ← 参数能力（EXP-10 细讲）
+顺带解释一个新手常见疑惑：
+我明明没订阅
+/parameter_events
+和
+/rosout
+，它们哪来的？
+——这是 ROS2 在创建节点时自动挂上的公共设施：前者让"改参数"这件事能广播出去，后者把日志汇聚到统一地方。所以每个节点天生就带参数与日志能力，不用你自己写。
+问题三：spin 到底在转什么
+这是本课
+最难也最关键
+的一步。看代码
+rclpy.spin(node)
+，很容易以为它在"死循环占着不动"——恰恰相反，
+它是唯一让活能干起来的东西
+。
+💡 把 spin 想成"老板站在大堂"
+节点已经开好了四个窗口：
+点餐台
+（定时器）、
+外卖窗口
+（话题回调）、
+电话
+（服务请求）、
+意见簿
+（参数变更）。
+·
+有 spin
+：老板站在大堂，谁来了就招呼谁——闹钟响就去做采样，有消息就去处理。活有人接。
+·
+没 spin
+：老板回后院睡觉了。外卖小哥照样把东西送到窗口，可
+东西就一直堆着，没人接
+。
+这就是"程序明明在跑、log 却一行没有"的真实原因——
+不是坏了，是没人接活
+。
+① 有 spin —— 店开着，老板站在大堂
+定时器到点了
+话题消息到了
+服务请求来了
+参数被改了
+executor 事件循环
+有活就派给对应的回调
+timer_cb 被调用
+日志一行行出来 ✓
+② 没 spin —— 老板回后院睡觉了
+定时器到点了
+话题消息到了
+服务请求来了
+参数被改了
+活堆在这儿，没人接
+executor 空转
+💤 回调一次都没被调用
+✗
+消息堆在队列里
+程序却已悄悄退出
+同一家店、同样几个窗口——区别只在于"老板在不在大堂"。这就是
+spin
+的全部含义。
+spin 不产生数据，它只负责"把已经到达的活派出去"。
+问题四：谁在决定"先干哪个活"
+到这儿有个新问题：如果同一时刻闹钟响了、消息也到了，谁先？这就引出第三个概念
+Executor（执行器）
+。
+默认行为
+单线程，排队一个个来
+rclpy.spin(node)
+用的是
+SingleThreadedExecutor
+：一次只执行一个回调，其他排队。行为可预测、不会有并发 bug，
+绝大多数场景够用，也是本课用的
+。
+要并行时
+多线程执行器
+MultiThreadedExecutor(num_threads=N)
+让不同回调真正并行。代价是
+你的回调必须自己保证线程安全
+（加锁），否则数据会乱——初学阶段先别碰。
+要更细的控制
+回调组 CallbackGroup
+MutuallyExclusiveCallbackGroup
+（同组互斥，同一时刻只跑一个）/
+ReentrantCallbackGroup
+（同组可重入，可并发）。用来"哪些回调允许并行、哪些必须排队"。
+代码怎么写：三种执行器的启动方式
+上面三张卡片说的是"是什么"，这里给出"怎么写"。
+三者是层层递进的关系
+：默认单线程 → 换多线程 → 用回调组精细控制。
+先看清 main() 里那几行差在哪。
+① 默认写法：
+rclpy.spin(node)
+（本课用这个）
+# 最短的 main()：rclpy.spin 内部就是用 SingleThreadedExecutor 帮你 spin
+def
+main():
+    rclpy.init()
+    node = GasSensorNode()
+try
+:
+        rclpy.spin(node)
+# 单线程，一次一个回调，其余排队
+except
+KeyboardInterrupt:
+pass
+finally
+:
+        node.destroy_node()
+        rclpy.shutdown()
+✔
+等价于
+下面这段——理解这点很重要，
+rclpy.spin()
+不是另一种机制，只是"帮你 new 了一个单线程执行器并 spin 它"：
+# 展开后的等价写法，看得更清楚
+from
+rclpy.executors
+import
+SingleThreadedExecutor
+
+executor = SingleThreadedExecutor()
+executor.add_node(node)
+try
+:
+    executor.spin()
+finally
+:
+    executor.shutdown()
+    node.destroy_node()
+② 多线程执行器：让不同回调真正并行
+把
+SingleThreadedExecutor
+换成
+MultiThreadedExecutor
+，并指定线程数。
+注意：必须自己加锁
+，否则两个线程同时改一个变量就会出脏数据。
+# 多线程版：num_threads 决定最多几个回调同时跑
+import
+threading
+import
+rclpy
+from
+rclpy.node
+import
+Node
+from
+std_msgs.msg
+import
+Float32
+from
+rclpy.executors
+import
+MultiThreadedExecutor
+class
+GasSensorNode(Node):
+def
+__init__(self):
+super
+().__init__(
+'gas_sensor_node'
+)
+# 共享数据必须先配一把锁
+self._lock = threading.Lock()
+        self._last_ppm = 0.0
+        self.create_timer(1.0, self.timer_cb)
+        self.create_subscription(Float32,
+'/cmd'
+, self.cmd_cb, 10)
+def
+timer_cb(self):
+        ppm = read_mq5_once()
+with
+self._lock:
+# 加锁写
+self._last_ppm = ppm
+def
+cmd_cb(self, msg):
+with
+self._lock:
+# 加锁读
+print
+(
+f'当前 {self._last_ppm}'
+)
+def
+main():
+    rclpy.init()
+    node = GasSensorNode()
+# 关键一行：换成多线程执行器，开 4 个线程
+executor = MultiThreadedExecutor(num_threads=
+4
+)
+    executor.add_node(node)
+try
+:
+        executor.spin()
+# 4 个线程同时从队列里取活干
+except
+KeyboardInterrupt:
+pass
+finally
+:
+        executor.shutdown()
+        node.destroy_node()
+        rclpy.shutdown()
+⚠️
+多线程的代价（别急着用）
+·
+必须自己保证线程安全
+：所有被多个回调共享的变量都要加锁，漏一个就是"偶发"的数据错乱，极难查；
+·
+rclpy 不是完全线程安全的
+：两个回调同时调
+create_publisher
+/
+destroy_node
+这类操作可能崩；
+·
+调试变难
+：现象不再可复现（有时对有时不对）。
+结论
+：先单线程跑通，确认瓶颈真的在"回调排队"上，再考虑换多线程。
+③ 回调组：精细控制"哪些能并行"
+多线程执行器是"整体放开"，回调组是"
+按组放开
+"——你要明确告诉 ROS2：这几个回调可以并行，那几个必须排队。
+用法是在创建定时器/订阅时传入
+callback_group
+参数。
+# 回调组：给回调分组，决定组内是"互斥"还是"可重入"
+import
+time
+import
+rclpy
+from
+rclpy.node
+import
+Node
+from
+std_msgs.msg
+import
+Float32
+from
+rclpy.callback_groups
+import
+(
+    MutuallyExclusiveCallbackGroup,
+# 同组互斥：一次只跑一个
+ReentrantCallbackGroup,
+# 同组可重入：可并发跑多个
+)
+from
+rclpy.executors
+import
+MultiThreadedExecutor
+class
+RobotNode(Node):
+def
+__init__(self):
+super
+().__init__(
+'robot_node'
+)
+# 组 A：慢活，互斥——同一时刻只允许一个在跑
+self.group_slow = MutuallyExclusiveCallbackGroup()
+# 组 B：快活，可重入——多个可以同时跑
+self.group_fast = ReentrantCallbackGroup()
+# 创建时把组传进去，这个回调就归到该组
+self.create_timer(5.0, self.slow_cb, callback_group=self.group_slow)
+        self.create_subscription(
+            Float32,
+'/cmd'
+, self.fast_cb, 10,
+            callback_group=self.group_fast)
+# ← 关键参数
+def
+slow_cb(self):
+        time.sleep(3)
+# 慢：即便多个触发，同组互斥也不会叠加
+def
+fast_cb(self, msg):
+print
+(msg.data)
+# 快：多条消息可并发处理
+def
+main():
+    rclpy.init()
+    node = RobotNode()
+# 回调组必须配合多线程执行器才有多线程效果
+executor = MultiThreadedExecutor(num_threads=
+4
+)
+    executor.add_node(node)
+try
+:
+        executor.spin()
+except
+KeyboardInterrupt:
+pass
+finally
+:
+        executor.shutdown()
+        node.destroy_node()
+        rclpy.shutdown()
+回调组类型
+同组内行为
+典型用途
+MutuallyExclusiveCallbackGroup
+互斥
+：同组同一时刻只跑一个，其余排队
+操作共享硬件（如串口、GPIO）的回调，绝不能并发
+ReentrantCallbackGroup
+可重入
+：同组可多个同时跑
+纯计算、无共享状态的快回调
+不传（默认）
+归入节点的默认组，行为等同互斥
+本课所有节点的写法
+🔑
+三者的关系，一句话记住
+SingleThreadedExecutor
+= 1 个窗口，所有活排队；
+MultiThreadedExecutor
+= N 个窗口，但哪些活能同时办
+由回调组决定
+；
+回调组不换执行器就没用
+——单线程下即便标了
+Reentrant
+，也只有一个线程在跑。
+先选执行器，再用回调组微调
+。
+⚠ 一条铁律：回调里别阻塞
+单线程下只有一个回调在跑。如果
+timer_cb
+里写了
+sleep(5)
+或一个慢查询，
+这 5 秒内所有别的回调都停在队列里动不了
+，现象就是"节点卡住了"。
+回调要短
+；真要干重活，丢给独立线程或另一个节点。同理：服务回调里如果调用了还要等 spin 才能完成的东西（比如同步等待），会直接死锁——这就是 EXP-07 要讲的坑。
+问题五：节点之间怎么"接上头"
+现在
+gas_sensor_node
+已经能在柜台后正常干活了。可它发出的
+/gas_sensor
+，怎么保证被
+gas_monitor
+收到？
+代码里从来没写过对方的 IP 或端口
+——这层事完全由 DDS 代办：
+发现与建连：没有 Master，两个节点怎么互相找到
+全程由 DDS 自己完成 —— 组播宣告身份 → 单播交换端点 → 三项匹配 → 建点对点通路
+gas_sensor_node
+publisher
+gas_monitor
+subscription
+DDS 发现层
+交换端点：话题名 / 类型 / QoS
+只牵线，不中转数据
+① 我上线了
+① 我也在
+④ 建连后数据点对点直传，不经任何中间服务器
+① 各自向组播地址宣告身份（SPDP，组播地址 239.255.0.1）　　② 单播交换彼此的端点：话题名 / 类型 / QoS（SEDP）
+③ 三项全部匹配才建立通路　　④ 之后数据直连 —— 发现层只牵线、不中转，所以没有单点故障
+注意图里最关键的一句：
+"发现层只牵线、不中转"
+。所以 ROS2 没有注册中心，也就不存在"注册中心一挂、全网瘫痪"的单点故障——这是 EXP-01 里 ROS1 vs ROS2 对比的底层原因。
+⚠ 用词要准：这里是"组播"，不是"广播"
+这两个词日常混着说没关系，但在网络层面是两回事，讲 DDS 发现时必须分清：
+·
+组播（Multicast／多播）
+：发给一个
+特定组
+。DDS 用
+239.255.0.1
+这类组播地址，只有
+加入了该组
+（同 Domain、同 DDS 实现）的网卡才会收到。
+·
+广播（Broadcast）
+：发给
+同一网段内所有人
+，不管你愿不愿意听，路由器默认还不转发。
+所以准确说法是：
+节点向组播地址宣告自己（SPDP），随后双方单播交换端点（SEDP）
+。用"组播"不仅更准，也解释了为什么"同网段却互相发现不了"——多半是交换机/防火墙把组播拦了。
+🔍 记这一条，能省无数次排障
+两个节点都起来了、却收不到数据，
+90% 卡在这三项之一没对上
+：
+①
+话题名
+不一致（一个是
+/gas_sensor
+、一个是
+/gas_sensor_data
+）；
+②
+消息类型
+不一致；
+③
+QoS 不兼容
+（订阅端要 RELIABLE，发布端只给 BEST_EFFORT → 压根连不上）。
+第 ③ 条是 EXP-06 的重头戏。排查顺序就按 ①②③ 走，用
+ros2 topic info /gas_sensor --verbose
+一次看全。
+问题六：三种"对话方式"怎么选
+节点建好连上之后，说话的方式有三种。本课只需要建立"选型直觉"，细节留给后面三课：
+话题 Topic
+服务 Service
+动作 Action
+像什么
+广播电台
+打客服电话
+点外卖看进度
+方向
+单向，发完就走
+一问一答
+派活 + 多次回报 + 结果
+要不要等结果
+不等
+必须等
+不干等，可中途取消
+本课程例子
+/gas_sensor
+、
+/cmd_vel
+/verify_fingerprint
+/read_card
+在哪一课
+EXP-06
+EXP-07
+EXP-08
+怎么选：问三个问题
+要不要知道结果？
+不要
+→ 话题。
+要结果、而且一瞬算完？
+要，且快
+→ 服务。
+要结果、但很慢、还想看进度、甚至想中途叫停？
+要，且慢
+→ 动作。
+选型只要一个决策链：先问"要不要结果"，再问"快不快"
+我要发一段数据
+它的性质是什么
+不需要回话
+需要回话
+话题 Topic
+一直流，发完不管
+要结果，快吗？
+一瞬就完
+很慢 / 要进度
+服务 Service
+问一句，等一句答
+动作 Action
+派活 + 进度 + 可取消
+例：
+/gas_sensor
+每秒发浓度
+例：
+/cmd_vel
+每秒发速度
+例：验证一根指纹
+例：让机械臂走一段轨迹
+这张图不用背，但要能自己画出来。EXP-06~08 会把每个分支掰开讲透。
+03
+节点 API 速查手册
+这一节不是"讲解"，是
+手册
+。写节点时你会反复回来查：调用哪个、传什么参数、返回什么、写错了会怎样。
+下面按"你在什么场景下要用"分组
+，每条都给签名 + 参数 + 返回 + 最小示例。
+怎么用这节
+第一遍通读，建立"有这么些能力"的印象；真写代码时按场景回来查表即可。
+标 ★ 的是本课和后续实验一定会用到的
+，其余是常见但可延后再看。
+A. 程序入口：三件套（每个节点都必须有）
+接口
+作用 / 参数
+返回
+最小示例
+rclpy.init(args=None)
+★
+初始化 ROS2 客户端库，
+全局只需一次
+。
+args
+传
+sys.argv
+时能接收
+--ros-args
+类命令行参数
+None
+rclpy.init(args=args)
+rclpy.spin(node)
+★
+进入事件循环，
+阻塞
+直到 Ctrl+C 或
+shutdown()
+。没有它回调永不执行
+None
+rclpy.spin(node)
+rclpy.shutdown()
+★
+关闭上下文，释放底层资源。
+必须与 init 配对
+None
+rclpy.shutdown()
+rclpy.ok()
+查询上下文是否仍有效。想在回调里优雅退出时用它做循环条件
+bool
+while rclpy.ok(): rclpy.spin_once(node)
+rclpy.spin_once(node, timeout_sec=None)
+只处理一轮就返回，不阻塞。
+需要自己在 Python 循环里干别的事
+时用（如 GUI 刷新）
+None
+while rclpy.ok(): rclpy.spin_once(n, timeout_sec=0.1)
+⚠ 最容易被忘的一对
+init()
+必须配
+shutdown()
+。
+try/except KeyboardInterrupt
+包住 spin，再在 finally 里 shutdown，才能保证 Ctrl+C 时设备句柄被释放。
+B. 创建节点：继承 vs 直接用
+接口
+作用 / 参数
+返回
+最小示例
+class XxxNode(Node)
+★
+推荐写法
+。继承后可在类里放回调、状态、资源句柄，是真实项目的标准形态
+—
+class GasSensorNode(Node):
+super().__init__(node_name, *, context=None, namespace=None, use_global_arguments=True, cli_args=None)
+★
+构造函数
+第一行必须调用
+。
+·
+node_name
+：节点名（图内唯一）
+·
+namespace
+：命名空间，默认
+/
+·
+use_global_arguments
+：是否接收全局
+--ros-args
+—
+super().__init__('gas_sensor_node')
+Node(name)
+直接实例化
+不继承、直接 new 一个。适合写 10 行的验证脚本，
+不适合正式节点
+（回调只能挂 lambda，状态无处安放）
+Node
+n = Node('tester')
+C. 通信：开出口 / 开入口
+接口
+作用 / 参数
+返回
+最小示例
+create_publisher(msg_type, topic, qos_profile)
+★
+创建发布者。
+qos_profile
+可传整数（表示队列深度）或
+QoSProfile
+对象
+Publisher
+self.create_publisher(Float32, '/gas_sensor', 10)
+create_subscription(msg_type, topic, callback, qos_profile)
+★
+创建订阅者。
+callback(msg)
+在每条消息到达时被调用
+Subscription
+self.create_subscription(Float32, '/gas_sensor', self.on_gas, 10)
+create_service(srv_type, name, callback)
+提供服务。
+callback(req, resp)
+需
+返回 resp
+（EXP-07）
+Service
+self.create_service(Verify, '/verify_fingerprint', self.on_verify)
+create_client(srv_type, name)
+请求服务。之后用
+call_async()
+发请求（EXP-07）
+Client
+self.cli = self.create_client(Verify, '/verify_fingerprint')
+Publisher.publish(msg)
+★
+发一条消息，
+立即返回
+，不等任何人
+None
+self.pub.publish(Float32(data=ppm))
+create_timer(timer_period_sec, callback)
+★
+周期定时器。
+callback()
+无参；周期单位
+秒
+（可传 float）
+Timer
+self.create_timer(1.0, self.timer_cb)
+命名参数的三种简写
+qos_profile
+传整数
+10
+等价于
+QoSProfile(depth=10)
+（默认 RELIABLE + KEEP_LAST）。想精细控制就显式构造：
+QoSProfile(history=HistoryPolicy.KEEP_LAST, depth=10, reliability=ReliabilityPolicy.BEST_EFFORT)
+——这是 EXP-06 的重点。
+D. 参数：让节点"可调"
+接口
+作用 / 参数
+返回
+最小示例
+declare_parameter(name, value, descriptor=None)
+★
+声明参数。
+value 的类型决定参数类型
+（
+1.0
+→double，
+1
+→int，
+True
+→bool）。不可重复声明
+—
+self.declare_parameter('publish_period', 1.0)
+get_parameter(name)
+★
+取参数对象，值在
+.value
+。参数不存在会抛异常
+Parameter
+p = self.get_parameter('publish_period').value
+set_parameters([Parameter(...)])
+代码内部改参数，返回结果列表（
+successful
+字段）
+list
+self.set_parameters([Parameter('x', Parameter.Type.DOUBLE, 2.0)])
+add_on_set_parameters_callback(cb)
+挂"改参前的闸门"：
+cb(params)
+返回
+SetParametersResult(successful=bool)
+，
+校验不过就不让改
+（EXP-10）
+None
+self.add_on_set_parameters_callback(self.on_set)
+has_parameter(name)
+判断是否已声明，避免重复 declare 报错
+bool
+if not self.has_parameter('x'): ...
+E. 日志：别用 print
+接口
+作用 / 参数
+返回
+最小示例
+get_logger()
+★
+取该节点的日志器。消息会同时进终端和
+/rosout
+，能被 rqt_console、rosbag 收集
+Logger
+log = self.get_logger()
+log.debug / info / warn / error / fatal(msg)
+★
+五档级别。
+只输出 ≥ 当前级别的消息
+（默认 info，所以 debug 平时看不见）
+None
+self.get_logger().info(f'ppm={ppm:.2f}')
+log.info(msg, throttle_duration_sec=1.0)
+限流打印
+。高频回调里必用，否则终端会被刷爆（EXP-06 的 200Hz 传感器就靠它）
+None
+log.info(f'v={v}', throttle_duration_sec=1.0)
+log.set_level(LoggingSeverity.DEBUG)
+运行时改本节点日志级别，用于现场排障
+None
+log.set_level(LoggingSeverity.DEBUG)
+为什么别用 print
+print
+只在终端可见、无级别、进不了
+/rosout
+、录包录不到。
+节点里一律用
+get_logger()
+。
+F. 自省：我是谁、我周围有谁
+接口
+作用
+返回
+最小示例
+get_name()
+本节点的短名（不含命名空间）
+str
+'gas_sensor_node'
+get_namespace()
+本节点的命名空间
+str
+'/'
+get_fully_qualified_name()
+★
+完整路径，
+和图里显示的名字一致
+str
+'/r1/gas_sensor_node'
+get_node_names_and_namespaces()
+返回
+[(name, ns), ...]
+，图里所有节点（含自己）
+list
+[('gas_sensor_node','/'), ('talker','/')]
+count_publishers(topic)
+/
+count_subscribers(topic)
+某话题当前有几个发布端 / 订阅端。
+排查"到底有没有人在听"
+时很好用
+int
+self.count_subscribers('/gas_sensor')
+destroy_node()
+★
+销毁节点、注销端点、释放资源
+None
+node.destroy_node()
+G. 命名规则：为什么你的话题"跑"到了别处
+ROS2 的名字有三种写法，
+写错一种，话题就会挂到你没预期的位置
+——这是"代码没错、就是收不到数据"的第二大原因。
+类型
+写法
+展开成什么
+典型用途
+全局名
+/robot1/cmd_vel
+原样，从根开始
+跨命名空间引用，明确指定
+相对名
+★
+cmd_vel
+/<命名空间>/cmd_vel
+推荐
+：代码里尽量写相对名
+私有名
+~/state
+/<ns>/<节点名>/state
+节点内部私有话题，不希望被别人抢
+命名空间
+namespace='r1'
+--ros-args -r __ns:=/r1
+给节点套前辍
+多机器人同名功能隔离
+重映射
+--ros-args -r /gas:=/gas2
+改名不改码
+第三方包适配、临时替换
+# 相对名 + 命名空间：同一份代码跑两台车，互不串台
+ros2
+run my_pkg my_node --ros-args -r __ns:=/r1
+# 话题变 /r1/cmd_vel
+ros2
+run my_pkg my_node --ros-args -r __ns:=/r2
+# 话题变 /r2/cmd_vel
+# 若代码里写死全局名 /cmd_vel，上面这条就失效——两台车照样抢同一个话题
+★ 一条硬规矩：代码里别写死全局名
+所有话题/服务名都写成
+相对名
+（
+'gas_sensor'
+而不是
+'/gas_sensor'
+），代码就天生"可搬家"：进什么命名空间就挂哪。
+这是多机器人系统的基础
+，也是 EXP-13 分布式与 EXP-17 launch 编排的前提。
+04
+实操 A：编译并运行 gas_sensor_node
+本实操
+不自己写新节点
+——直接跑现成的
+gas_sensor_node
+，把 02 节讲的"构造 → spin → 销毁"在终端里一条条对上号。
+四条命令一组、共四步
+，一步步来。
+🎯 做完要看到什么（先记住这 5 个现象，跑完逐个打勾）
+① 启动后终端
+每秒刷一行
+raw=… voltage=…V ppm=…
+；
+② 另开终端
+ros2 node list
+能看到
+/gas_sensor_node
+；
+③
+ros2 node info /gas_sensor_node
+的 Publishers 里有
+/gas_sensor
+；
+④
+ros2 topic list
+里有
+/gas_sensor
+、
+/parameter_events
+、
+/rosout
+；
+⑤
+Ctrl+C
+后回到命令提示符，再次
+node list
+已无该节点。
+步骤 1
+编译 ros_sensor 包
+（约 10 分钟 · 终端 1）
+1.1
+加载 ROS2 系统环境
+终端 1
+每个
+新开
+的终端都要先做这一步，否则连
+ros2
+命令都找不到。
+source
+/opt/ros/humble/setup.bash
+echo
+$ROS_DISTRO
+# 打印 humble 才算加载成功
+1.2
+进工作空间编译
+终端 1
+colcon build
+必须在工作空间
+根目录
+跑。这里一次编两个包——
+ros_sensor
+是节点所在包，
+ros_sensor_interfaces
+是它依赖的接口包（顺序由 colcon 自动排）。
+cd
+~/ros2_ws
+colcon build
+--packages-select ros_sensor ros_sensor_interfaces
+参数
+含义
+--packages-select A B
+只编这两个包，工作空间里其它包一律不动，省时间
+✔ 结尾出现
+Summary: 2 packages finished
+1.3
+编译后必须重新 source
+终端 1
+忘这一步，是
+package not found
+的头号原因。
+编译产物刚落到
+install/
+，但当前终端的环境变量还是旧的，不认识这个新包。
+source
+install/setup.bash
+ros2
+pkg executables ros_sensor
+# 应列出 gas_sensor_node 等可执行名
+✔ 看到
+gas_sensor_node
+说明包和入口都注册成功了
+步骤 2
+读一遍 gas_sensor_node 代码
+（约 30 分钟 · 对照 02 节的四个阶段）
+2.1
+打开源码文件
+终端 1
+节点源码在
+ros_sensor
+包里。用编辑器或
+cat
+打开即可。
+cd
+~/ros2_ws/src/xflz_eai_car1/driver/ros_sensor/ros_sensor/ros_sensor
+cat
+gas_sensor_node.py
+2.2
+对着清单读，逐条打勾
+纸上 / 笔记
+不要通读，
+带着这 6 个问题去找
+——它们就是 02 节的六个知识点：
+找什么
+在哪一行
+对应原理
+类继承了谁
+class GasSensorNode(Node)
+入场券：不继承 Node 就不进图
+节点叫什么名
+super().__init__('…')
+里的字符串
+工牌：图里显示的就是它
+声明了几个参数
+declare_parameter(...)
+旋钮：运行时可调（EXP-10）
+开了哪些出口
+create_publisher(...)
+通信：话题名 + 类型 + QoS
+闹钟周期是多少
+create_timer(period, …)
+节拍：
+publish_period
+默认 1.0 秒
+main 里哪几行在 spin
+rclpy.spin(node)
+活着：没有它回调一次都不跑
+✔ 能指着代码说出"这行对应 02 节哪个阶段"，这一步就算过了
+2.3
+看入口是怎么注册的
+终端 1
+ros2 run
+能找到这个节点，靠的是
+setup.py
+里的
+entry_points
+注册。
+grep
+-A6 console_scripts setup.py
+entry_points={
+    'console_scripts': [
+        'gas_sensor_node = ros_sensor.gas_sensor_node:main',
+    ],
+},
+✔ 读懂这行：
+等号左边
+是
+ros2 run
+用的可执行名，
+右边
+是"哪个文件里的哪个函数"。
+没有这行，就是
+No executable found
+。
+步骤 3
+运行节点并用 node 命令观察
+（约 30 分钟 · 终端 2 跑节点，终端 3 观察）
+3.1
+终端 2 启动节点
+终端 2
+新终端同样要"cd + source"走一遍，然后再 run。
+cd
+~/ros2_ws
+source
+/opt/ros/humble/setup.bash
+source
+~/ros2_ws/install/setup.bash
+ros2
+run ros_sensor gas_sensor_node
+✔ 每秒刷一行（这是
+运行阶段
+，spin 在驱动
+timer_cb
+）：
+[INFO] [gas_sensor_node]: raw=1234 voltage=1.201V ppm=312.45
+3.2
+终端 3：它在图里吗
+终端 3
+新终端 cd + source 之后，用两条命令给节点"点名 + 查户口"。
+ros2
+node list
+# 点名 → /gas_sensor_node
+ros2
+node info /gas_sensor_node
+# 查户口：看 Publishers 段
+ros2
+topic list
+# → /gas_sensor、/parameter_events、/rosout
+✔
+node info
+的 Publishers 里应有
+/gas_sensor [std_msgs/msg/Float32]
+——这正是构造函数第 ③ 步开的那个出口
+3.3
+动手改：换掉节点名
+终端 2 + 3
+把源码里
+'gas_sensor_node'
+改成
+'my_gas_node'
+，验证"名字就是工牌"。
+改完源码必须重新编译一次
+（默认安装方式是把文件复制到 install，不是软链接），再 source 才生效。
+# 终端 2：Ctrl+C 停掉节点，改完名字后重新编译 + source
+cd
+~/ros2_ws
+colcon build
+--packages-select ros_sensor
+source
+install/setup.bash
+ros2
+run ros_sensor gas_sensor_node
+# 终端 3：确认名字变了
+ros2
+node list
+# → /my_gas_node
+✔ 名字跟着源码走。
+没重新编译就看不到变化
+——因为跑的是 install 里那份副本，不是 src 里的源码。
+3.4
+体验"重名 + 命名空间"
+终端 2 + 3
+节点名在图内必须唯一。起两个同名节点，或给它套个命名空间，看看分别发生什么。
+# 再开一个终端起第二个实例：名字被自动改成 _1
+ros2
+run ros_sensor gas_sensor_node
+ros2
+node list
+# → /gas_sensor_node 和 /gas_sensor_node_1   （只给 WARN，不报错）
+# 换命名空间：名字带上前辍，互不串台
+ros2
+run ros_sensor gas_sensor_node --ros-args -r __ns:=/r1
+ros2
+node list
+# → /r1/gas_sensor_node
+✔ 记住这两个现象：
+重名会自动加后缀（静默）
+，
+命名空间是隔离多机的关键
+步骤 4
+收尾：确认优雅退出
+（约 5 分钟）
+4.1
+Ctrl+C 并确认节点已消失
+终端 2 + 3
+按
+Ctrl+C
+触发
+KeyboardInterrupt
+，代码里
+except
+捕获后执行
+destroy_node()
+与
+shutdown()
+——这是
+销毁阶段
+。
+# 终端 2：按 Ctrl+C，应干净回到提示符（不该有红色 traceback）
+# 终端 3：立刻再查一次
+ros2
+node list
+# → 空（或已无 gas_sensor_node）
+✔ 节点已从图中摘牌。若残留几秒，是 DDS 租约超时，正常
+卡住了先看这里（按出现频率排序）
+①
+Package 'ros_sensor' not found
+→ 这个终端没 source，回到
+1.3
+重来。
+②
+No executable found
+→ 没编译，或
+entry_points
+没注册，回
+1.2 / 2.3
+。
+③ 节点启动后
+立刻退出
+、没有任何日志 → 代码里缺
+rclpy.spin(node)
+，回
+02 节阶段 ③
+。
+④
+ros2 node list
+是空的 → 节点被 Ctrl+C 了，或启动即报错退出，看终端 2 的输出。
+⑤ 每秒打印
+读取 ADC 失败
+→ 当前设备没接 MQ5（或 IIO 路径不同）。
+不影响本课
+——本课只关心节点结构，换到 B2 实验箱即可正常输出。
+💡 给学有余力的你
+把本实操的
+ros_sensor
+换成自己建的包、把
+gas_sensor_node
+换成一个"每 2 秒打印一句你好"的节点，
+其余步骤一字不改再走一遍
+——这就是"迁移套用"，也是本课目标 ④。
+能独立走通这一遍，EXP-05 才算真的过了。
+05
+实操 B：三节点组网与身份切换
+# 终端 1–2 各起一个节点：talker 与 listener
+ros2 run demo_nodes_cpp talker
+ros2 run demo_nodes_cpp listener
+# 全景观察
+ros2 node list
+ros2 node info /listener
+#  Subscriber /parameter_events: [rcl_interfaces/msg/ParameterEvent]
+#  Service /listener/get_parameters: [rcl_interfaces/srv/GetParameters]
+# 用命名空间再造一个"平行世界"
+ros2 run demo_nodes_cpp talker --ros-args -r __ns:=/r2
+ros2 node list
+# 共存：/talker 与 /r2/talker，互不串线
+观察要点：
+/parameter_events
+是每个节点都天然订阅的
+系统话题
+——这就是"节点天生带参数能力"的证据。
+06
+注意事项与验收清单
+能说出"节点 = 一个继承
+Node
+的独立进程"，并解释为什么要拆成多节点（崩溃域 / 节奏 / 语言三重解耦）
+能说清「岗位」类比的
+三条边界
+：① 职责内聚 ≠ 一事一节点（一个节点可同时有多个发布/订阅/服务）；②
+进程 ≠ 节点
+（一个可执行程序可创建多个 Node）；③ 节点的核心价值在"能通信"，不只是"被拆开"
+能画出「构造 → spin → 销毁」三阶段，并说出每个阶段应放什么操作
+能解释"为什么不继承
+Node
+就进不了图"、"为什么
+super().__init__()
+必须第一行"
+能解释不调
+spin
+时节点"活着却毫无反应"的原因
+能说出机器人「感知 / 定位 / 决策 / 执行」四层各有哪些节点，以及"上层不碰硬件、下层不做判断"的含义
+node list
+/
+node info
+/
+topic list
+三件套操作熟练，能从输出里读出"它发什么、收什么"
+能说出无 Master 时节点靠什么发现彼此（DDS 组播宣告身份 → 单播交换端点 → 三项匹配 → 直连）
+能判断一个需求该用话题 / 服务 / 动作，并各举本课程一个真实例子
+演示重名节点被自动改名、以及用命名空间隔离两台机器人的方法
+能说出
+entry_points
+里"等号左边是什么、右边是什么"，并解释
+No executable found
+的成因
+坑
+症状
+解法
+忘了 spin
+程序
+正常退出
+、无报错，但一行日志都没有
+末尾加
+rclpy.spin(node)
+；要刷 GUI 就用
+spin_once
+循环
+super().__init__()
+没放第一行
+AttributeError: … has no attribute '_clock'
+先上户口再办业务：
+super().__init__()
+必须在所有
+create_*
+之前
+忘 source
+Package not found
+/
+ImportError: Node
+新终端先
+source /opt/ros/humble/setup.bash
+，再
+source install/setup.bash
+节点重名
+只给 WARN，名字被自动改成
+xxx_1
+，话题易串线
+用
+node list
+核对真名；改 name 或加命名空间
+代码写死全局名
+加了命名空间，话题却没跟着变
+话题名一律写相对名（
+'gas_sensor'
+而非
+'/gas_sensor'
+）
+回调里做了耗时操作
+整个节点"卡住"，其它回调全不响应
+回调要短；重活丢独立线程或拆成另一个节点；高频日志加
+throttle_duration_sec
+Ctrl+C 后节点残留
+端点还在图里几秒
+DDS 租约超时，短暂残留正常；常驻则查是否吞了 SIGINT
+07
+本课总结与思考题
+定位
+节点 = 一个独立岗位
+继承
+Node
+才进图；拆多节点的意义是崩溃域、节奏、语言三重解耦。
+生命周期
+init → 构造 → spin → 销毁
+顺序不可换。只有 spin 期间节点"活着"，回调才会被执行。
+发现
+组播宣告 → 单播交换端点 → 匹配 → 直连
+无注册中心。三项（话题名 / 类型 / QoS）任一不匹配就不通。
+身份
+相对名 + 命名空间
+代码里不写死全局名，一套代码就能多处部署，这是多机系统的地基。
+思考题
+① 把
+super().__init__('gas_sensor_node')
+删掉，或挪到
+create_publisher()
+之后，程序分别会出现什么现象？请结合"注册顺序"解释原因。
+② 本课里一个节点对应一个独立进程。如果机器人上有 5 个传感器，可以起 5 个进程，也可以在 1 个进程里放 5 个节点（配
+MultiThreadedExecutor
+）。两种方式各有什么优缺点、分别适合什么场景？
+③ 如果你写了一个节点，
+ros2 node list
+能看到它，但把消息发出去后订阅端完全没反应。请按"spin / 节点名 / 话题名 / QoS"四个方向列出排查顺序和每一步要敲的命令。
+④ 同一条
+/cmd_vel
+速度指令，如果改用
+服务
+下发会出什么问题？请从"可能有多个订阅者""每秒要发几十次""发布者不该等回执"三个角度说明它为什么天生该用话题。
+⑤ 为什么说"发现层只牵线、不中转"就能避免 ROS1 那种单点故障？如果发现层自己挂了，已经在通信的两方还能继续发数据吗？
+CORE-01 · 机器人 ROS2 应用与开发 · EXP-05 节点：ROS2 里的"一个岗位"
+2 学时 · 验证性 · 基于 ros_practice 实验讲义改编

@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-01 URDF 模型与仿真控制 — 机器人机械臂应用与开发</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+:root{--theme:#dc2626;--theme-deep:#b91c1c;--theme-bg:#fee2e2;--theme-bd:#fecaca}
+/* 01 截图 */
+.shot{margin:1rem 0 .4rem;background:#0f172a;border:1px solid #334155;border-radius:14px;padding:.7rem}
+.shot img{width:100%;display:block;border-radius:8px}
+.shot figcaption{font-size:.78rem;color:#94a3b8;text-align:center;padding-top:.55rem;line-height:1.6}
+/* 07 架构图 */
+.arch{margin:1rem 0 .4rem;padding:.8rem .9rem;background:#f8fafc;border:1px solid var(--border,#e2e8f0);border-radius:14px}
+.arch svg{width:100%;height:auto;display:block}
+.arch .cap{font-size:.76rem;color:#64748b;text-align:center;padding-top:.5rem;line-height:1.6}
+.todo{margin:.4rem 0}
+ul.todo{list-style:disc;padding-left:1.5rem}
+ol.todo{list-style:decimal;padding-left:1.6rem}
+.todo li{padding:7px 0 7px 4px;border-bottom:1px dashed var(--border,#e2e8f0)}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit" title="返回课程首页">🤖 具身智能课程 · <i>教程首页</i></a>
+  <div class="crumb"><a href="../../../index.html#core">核心课程</a> / <a href="../index.html">机械臂应用与开发</a> / EXP-01</div>
+</div>
+
+<div class="wrap">
+<aside class="side">
+  <h4>本页目录</h4>
+  <a href="#s1" class="now">01 问题引入：机械臂为什么这样设计</a>
+  <a href="#s2">02 上手第一步：RViz 仿真跑起来</a>
+  <a href="#s3">03 关节 · 限位 · 角色</a>
+  <a href="#s8">04 深读一：URDF 简化说明</a>
+  <a href="#s9">05 深读二：display 架构解析</a>
+  <a href="#s10">06 总结与思考</a>
+  <h4>本课程实验</h4>
+  <a href="../exp-01-urdf-simulation/index.html" class="now">EXP-01 URDF 模型与仿真控制</a>
+  <a href="../exp-02-serial-pwm/index.html">EXP-02 关节电机底层控制与应用</a>
+  <a href="../exp-03-kinematics/index.html">EXP-03 正运动学基础</a>
+  <a href="../exp-04-ik-solver/index.html">EXP-04 逆运动学基础与 IK 解算</a>
+  <a href="../exp-05-action-replay/index.html">EXP-05 ROS2 架构与动作回放</a>
+  <a href="../exp-06-fixed-grasp/index.html">EXP-06 逆运动学固定抓取</a>
+  <a href="../exp-07-visual-grasp/index.html">EXP-07 视觉动态抓取</a>
+</aside>
+<main class="content">
+
+<div class="exp-head">
+  <span class="code">EXP-01 · 第 1 章 · 验证性 · 4 学时</span>
+  <h1>URDF 模型与仿真控制</h1>
+  <p class="desc">URDF 基础已在《机器人 ROS2 应用与开发》学过，这里直接上手——先启动小车的 RViz 仿真熟悉机械臂模型，再通过拖拽 GUI 认识 <b>joint、夹爪与 base_link / camera_link / tcp_link</b>，为后续实验铺垫。</p>
+  <div class="meta">
+    <span class="tag hl">难度 ⭐ · 4 学时 · 验证性</span>
+    <span class="tag">ROS2 Humble</span>
+    <span class="tag">joint_state_publisher_gui</span>
+    <span class="tag">RViz2 · TF</span>
+  </div>
+</div>
+
+<!-- 01 -->
+<section class="blk" id="s1">
+  <h2><span class="no">01</span>问题引入：机械臂为什么这样设计</h2>
+  <p class="lead">机械臂不是凭空画出来的——它是照着一条手臂<b>"仿"出来的</b>：底座回转像肩、两节臂杆像大臂小臂、腕部两关节像手腕、夹爪像手指。先把下图这副数字身体当成"一条手臂"来看：<b>它为什么被设计成这样？哪里在仿人，哪里又故意和人不一样？</b></p>
+  <figure class="shot">
+    <img src="display_launch_rviz.jpg" alt="左：joint_state_publisher_gui 滑块面板；右：RViz2 中 car1 模型与 TF 坐标系">
+    <figcaption>图 1-1｜display.launch.py 启动后的两个窗口：左 = joint_state_publisher_gui（关节角发布面板，wheel_rb_joint / arm_joint1~5 / r_joint…）；右 = RViz2（RobotModel + TF 已勾选，Orbit 视角锁定 base_link，密密麻麻的坐标轴就是 TF 树的"分身"）</figcaption>
+  </figure>
+  <pre><span class="c"># 在带有 GUI 界面的终端运行：实验箱屏幕、VNC 或 MobaxTerm（纯 SSH 黑窗弹不出图形窗口）</span>
+<span class="g">ros2</span> launch car1_description display.launch.py</pre>
+  <p>下面三张卡就是"<b>哪里仿人、哪里故意不一样</b>"的三条线索——它们的答案全部写在一份说明书（car1.urdf）里，而且就在这屏左右两个窗口里看得见：</p>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">为什么 · 1</div><div class="kt">是 5 个关节 + 夹爪，不是 6 / 7 个？</div><p>桌面抓取的最小完备集：<b>回转定方位、大臂小臂定距离、腕部两关节定姿态、夹爪收尾执行</b>——少一个够不着，多一个成本涨。设计从任务倒推，EXP-07 的视觉抓取就是终点。</p></div>
+    <div class="kcard"><div class="kd">为什么 · 2</div><div class="kt">为什么滑块里还冒出 wheel_rb_joint？</div><p>car1 是<b>"移动底盘 + 机械臂"的复合体</b>——车轮关节也是身体的一部分，也会随臂关节一起出现在 <code>/joint_states</code> 消息里。看截图左窗：滑块从 wheel_rb_joint 一路排到 r_joint。</p></div>
+    <div class="kcard"><div class="kd">为什么 · 3</div><div class="kt">为什么要专门立 base_link / camera_link / tcp_link？</div><p><b>base_link 是根</b>（一切坐标的原点）、<b>camera_link 是眼</b>（视觉观测挂在腕上）、<b>tcp_link 是指尖参考点</b>（IK 的落点、抓取的验收点）——后续所有"在哪""到哪"全靠这三个词说话。</p></div>
+  </div>
+  <div class="tip amber"><span class="lab">🎯 带着问题动手</span><b>关节、限位、角色</b>三个词是本实验的钥匙：02 节先把这屏跑起来，03 节把三件事一次讲清，04 节再钻进说明书文本找最终答案。</div>
+</section>
+
+<!-- 02 -->
+<section class="blk" id="s2">
+  <h2><span class="no">02</span>上手第一步：RViz 仿真跑起来</h2>
+  <div class="tip tealb"><span class="lab">🚀 运行环境</span>请在 <b>设备</b>的 Ubuntu 上打开终端——<b>实验箱 B2</b> 或 <b>小车 C1</b>（设备上位机）均可。</div>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>首次编译描述包：<code>colcon build --packages-select car1_description</code>（打出 <code>Finished</code> 才算成功）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>新终端装载环境：<code>source /opt/ros/humble/setup.bash</code> → <code>source ~/ros2_ws/install/setup.bash</code>（两行都无任何输出才是对的）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>一条命令弹出两个窗口：<code>ros2 launch car1_description display.launch.py</code></div>
+  </div>
+  <pre><span class="c"># 就这三步——注意每个新终端都要重新 source 两次</span>
+<span class="g">colcon</span> build --packages-select car1_description
+<span class="g">source</span> install/setup.bash
+<span class="g">ros2</span> launch car1_description display.launch.py</pre>
+  <p>对照 01 节截图，两个窗口的分工与用法：</p>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">左窗 · GUI</div><div class="kt">joint_state_publisher_gui = 默认发布者</div><p><b>逐个拖滑块</b>：arm_joint1 底座回转、arm_joint2 大臂抬举、arm_joint3 小臂伸缩、arm_joint4/5 腕部调姿态，<b>滑到底部的 r_joint 就是夹爪</b>（旋转开合，源码里由 gripper_controller 单独接管它）；wheel_lb/lf/rb/rf 是四个车轮，按钮 <b>Randomize</b> 随机姿态找手感、<b>Center</b> 一键回零。它只干一件事：<b>把每个关节的角度发布到 <code>/joint_states</code></b>——注意"发布者"这个身份不专属于 GUI，06 节动手任务里会用 <code>ros2 topic pub</code> 顶替它。</p></div>
+    <div class="kcard"><div class="kd">右窗 · RViz2</div><div class="kt">rviz2 = 订阅者 · 收到就重画</div><p>Displays 里勾着 <b>Grid / RobotModel / TF</b>：它<b>订阅</b>话题数据，左窗每发布一次新关节角，右窗模型就跟着更新一次——这条"发布 → 订阅"的单向链正是 05 要拆的话题链路。</p></div>
+    <div class="kcard"><div class="kd">三个重点坐标系</div><div class="kt">base · camera · tcp</div><p>在右窗 TF 标签里逐个勾选一遍：<b>base_link</b>（车体之根）、<b>camera_link</b>（腕上相机）、<b>tcp_link</b>（指尖参考）——把它们和"为什么 · 3"对上号。</p></div>
+  </div>
+  <div class="tip"><span class="lab">💡 为后续实验铺垫</span>EXP-02 要发的 PWM 对应的就是这些 joint 的角度；EXP-03/05 算 FK/IK 的目标点就是 tcp_link。这一屏玩熟，后面每个实验的"坐标系对话"都不再抽象。</div>
+  <p>窗口里的事摸出问题了？左窗<strong>发布</strong>、右窗<strong>订阅</strong>，先把三个词讲清，链路才看得懂 → <a href="#s3" style="color:var(--theme-deep,#b91c1c);font-weight:700">03 关节 · 限位 · 角色</a></p>
+</section>
+
+<!-- 03 -->
+<section class="blk" id="s3">
+  <h2><span class="no">03</span>关节 · 限位 · 角色</h2>
+  <p class="lead">关节（叫什么）、限位（能转多少）、角色（干什么用）——一个关节一行，一次讲透。限位按<b>角度</b>分两层标注：<b>URDF 层</b> = display 里滑块的真实行程（文件里实际写的是弧度，04 节见原文）；<b>实机层</b> = 270° 舵机真正能去的地方：</p>
+  <table>
+    <thead><tr><th>关节（GUI 同名）</th><th>转轴</th><th>限位（角度）· URDF 滑块</th><th>限位 · 实机（270° 舵机）</th><th>角色</th></tr></thead>
+    <tbody>
+      <tr><td>arm_joint1（底座回转）</td><td>Z</td><td>±180°</td><td>±135°</td><td>决定手臂朝向哪个方位</td></tr>
+      <tr><td>arm_joint2（大臂俯仰）</td><td>Y</td><td>±180°</td><td>±135°</td><td>抬起整条手臂</td></tr>
+      <tr><td>arm_joint3（小臂俯仰）</td><td>Y</td><td>±180°</td><td>±135°</td><td>伸缩半径的关键</td></tr>
+      <tr><td>arm_joint4（腕部俯仰）</td><td>Y</td><td>±180°</td><td>±135°</td><td>决定末端俯仰角（pitch），桌面抓取的关键</td></tr>
+      <tr><td>arm_joint5（夹爪自转）</td><td>Z</td><td>±180°</td><td>±135°</td><td>绕工具轴自转，只改夹爪朝向——<b>与 J1 共轴</b></td></tr>
+      <tr><td>夹爪 r_joint（舵机 id5）</td><td>—</td><td>±180°（<b>旋转</b>关节，不是平移）</td><td>PWM 800（开）~ 1500（闭）</td><td>开合执行——gripper_controller 所控</td></tr>
+      <tr><td>四个车轮 wheel_*</td><td>—</td><td>continuous（无行程限制）</td><td>走底盘驱动，不占臂舵机</td><td>底盘移动，本实验只观察</td></tr>
+      <tr><td>l_joint / r_in·r_out / l_in·l_out</td><td>—</td><td>±180°</td><td>无独立舵机（源码 joints 表仅 6 路）</td><td>随动连杆，只观察</td></tr>
+    </tbody>
+  </table>
+  <div class="tip"><span class="lab">💡 先记一条轴分布</span><b>J1 绕 Z，J2/J3/J4 三根轴互相平行都绕 Y，J5 又回到 Z。</b>这一条看似枯燥，却决定了后面所有算法：<b>J2、J3、J4 的角度可以直接相加</b>（同一平面内接力转），而 J1 不行；也正因为 J1 与 J5 共轴，这台机器只有 <b>4 个独立笛卡尔自由度</b>（x, y, z + 俯仰），J5 在固定 pose 下永远解出 0。EXP-03 打开"坐标帧"就能亲眼看到这三根平行轴。</div>
+  <div class="tip amber"><span class="lab">⚠️ 限位的两层口径</span>URDF 层：car1.urdf 里臂关节统一写 <code>lower="-3.14" upper="3.14"</code>，所以滑块一路能拖到 ±180°。实机层：舵机是 270° 总行程的总线舵机，PWM 从 500 到 2500、中位 1500，折下来每边只有 ±135°（<code>arm_controller.py</code> 里 <code>JOINT_LIMITS_RAD = ±2.356</code>）。两边一比：同一个关节，仿真能去的地方比实机多出 45°，RViz 放你过去，真机会打齿。这 45° 就是安全红线第 1 条（不许把角度下发到舵机物理行程之外）要管的地方，EXP-02 接上真机才真正生效。</div>
+  <p>把两条限位画在同一把尺子上，红区就是"仿真放行、实机撞墙"的 45° 危险带：</p>
+  <div class="arch">
+    <svg viewBox="0 0 680 168" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="双刻度尺对比图：URDF 层滑块行程 ±180 度，实机层舵机行程 ±135 度，两端各 45 度为仿真放行而实机禁区的红色危险带">
+      <!-- 尺 A：URDF 层 -->
+      <text x="60" y="26" font-size="11.5" fill="#1e40af" font-weight="700">URDF 层 · 滑块真实行程</text>
+      <rect x="60" y="36" width="560" height="26" rx="6" fill="#dbeafe" stroke="#2563eb" stroke-width="1.5"/>
+      <text x="340" y="54" font-size="11.5" fill="#1e3a8a" text-anchor="middle" font-weight="700">±180°（lower=-3.14 ~ upper=+3.14）</text>
+      <!-- 尺 B：实机层 -->
+      <text x="60" y="96" font-size="11.5" fill="#0f766e" font-weight="700">实机层 · 270° 舵机中位到两端</text>
+      <rect x="135" y="106" width="410" height="26" rx="6" fill="#ccfbf1" stroke="#0d9488" stroke-width="1.5"/>
+      <text x="340" y="124" font-size="11.5" fill="#115e59" text-anchor="middle" font-weight="700">±135°（PWM 500~2500 · 中位 1500）</text>
+      <!-- 红色危险带 -->
+      <rect x="60" y="106" width="75" height="26" rx="6" fill="#fee2e2" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="4 3"/>
+      <rect x="545" y="106" width="75" height="26" rx="6" fill="#fee2e2" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="4 3"/>
+      <text x="97" y="123" font-size="9.5" fill="#b91c1c" text-anchor="middle" font-weight="700">+45° 禁区</text>
+      <text x="582" y="123" font-size="9.5" fill="#b91c1c" text-anchor="middle" font-weight="700">+45° 禁区</text>
+      <!-- 中位与刻度 -->
+      <line x1="340" y1="30" x2="340" y2="142" stroke="#64748b" stroke-width="1.5" stroke-dasharray="5 4"/>
+      <text x="340" y="156" font-size="10" fill="#475569" text-anchor="middle">0°（PWM 1500 中位）</text>
+      <text x="60" y="80" font-size="10" fill="#64748b" text-anchor="middle">−180°</text>
+      <text x="620" y="80" font-size="10" fill="#64748b" text-anchor="middle">+180°</text>
+    </svg>
+    <div class="cap">图 1-2｜两层限位双刻度尺：上尺 = 你拖的滑块行程，下尺 = 舵机能去的地方，两端红区 = 仿真放行、实机撞墙的 45° 危险带</div>
+  </div>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">限位 · 为什么</div><div class="kt">数字止挡 = 物理止挡的倒影</div><p>舵机拧到头会<b>堵转打齿</b>（安全红线第 1 条）——URDF 的 <code>&lt;limit&gt;</code> 先在数字世界拦一道：限位外的点，RViz 滑块拖不过去、控制器直接拒收。改限位 = 改身体说明书，必须重新 build 生效。</p></div>
+    <div class="kcard"><div class="kd">角色 · 坐标系</div><div class="kt">树上五个岗位</div><p><b>base_link</b>=根/世界原点 · <b>link1~5</b>=逐段骨骼 · <b>tcp_link</b>=指尖参考点（IK 落点、验收点）· <b>camera_link</b>=相机光心（EXP-07 视觉起点）· TF 树：base_link→link1→…→tcp_link，父子单向永不打环；截图右侧还有 wheel_/load_ 等挂点，展开 TF 面板自行对照。</p></div>
+    <div class="kcard"><div class="kd">角色 · 三个节点</div><div class="kt">发布 → 订阅，一条单向链</div><p><b>joint_state_publisher_gui</b> 把关节角<strong>发布</strong>到 /joint_states → <b>robot_state_publisher</b> <strong>订阅</strong>它、算出坐标变换再<strong>发布</strong>到 /tf → <b>rviz2</b> <strong>订阅</strong>/tf 渲染模型——三者正是 display.launch 弹出的全部家当（05 节解剖）。往后所有"让机械臂动起来"的题，都是在替换这条链的<strong>发布端</strong>：少碰 GUI，自己发消息。</p></div>
+  </div>
+  <div class="tip amber"><span class="lab">⚠️ 与实机的一处呼应</span>仿真里 arm_joint2/3 的零位是理想值，实机装配总会歪几度。EXP-05 的零位校准补的就是这个差：servo_calib GUI 逐关节拖滑块找到真机的机械中位，把当前 PWM 与 1500 的差值写进 <code>servo_offsets.yaml</code>，驱动节点启动时读这份文件、给发往舵机的指令补上偏差（<code>base_driver_node.py</code>）。数字身体与钢铁身体之间，永远隔着一次校准。</div>
+  <p>三个词立好了，钻进说明书对原文 → <a href="#s8" style="color:var(--theme-deep,#b91c1c);font-weight:700">04 深读一：URDF 简化说明</a></p>
+</section>
+
+<!-- 04 深读一（原 06 位） -->
+<section class="blk" id="s8">
+  <h2><span class="no">04</span>深读一：display 用的 URDF 简化说明</h2>
+  <p class="lead">刚跑的 <code>display.launch.py</code> 加载的是 <code>ros2_ws/src/xflz_eai_car1/simulations/car1_description/urdf/</code> 下的 <b>car1.urdf</b>（launch 源码原句：<code>os.path.join(pkg_share, 'urdf', 'car1.urdf')</code>）。语法前置课都学过，这里做"简化版导览"——把上千行剥到骨架，每个标签对应你刚玩过的一个现象：</p>
+  <pre>&lt;robot name="car1"&gt;
+  &lt;!-- ① 每段"骨骼" = 你看到的一个零件 --&gt;
+  &lt;link name="base_link"&gt;
+    &lt;visual&gt;    外形 + mesh 资源路径（洋红色=这里写错） &lt;/visual&gt;
+    &lt;collision&gt; 碰撞外壳（为将来的物理世界预留） &lt;/collision&gt;
+    &lt;inertial&gt;  质量与惯量（Gazebo 才真正用到） &lt;/inertial&gt;
+  &lt;/link&gt;
+
+  &lt;!-- ② 每个"关节" = 你拖的一个滑块（以底座回转为例） --&gt;
+  &lt;joint name="arm_joint1" type="revolute"&gt;   &lt;!-- 旋转关节 --&gt;
+    &lt;parent link="base_link"/&gt;                &lt;!-- 挂在谁身上 --&gt;
+    &lt;child  link="link1"/&gt;                     &lt;!-- 长出谁 --&gt;
+    &lt;origin xyz="0 0 0.1" rpy="0 0 0"/&gt;       &lt;!-- 相对父的安装位姿 --&gt;
+    &lt;axis   xyz="0 0 1"/&gt;                     &lt;!-- 绕哪根轴转=滑块调的量 --&gt;
+    &lt;limit  lower="-3.14" upper="3.14"         &lt;!-- 数字止挡=03 节限位表出处 --&gt;
+            effort="…" velocity="…"/&gt;
+  &lt;/joint&gt;
+
+  &lt;!-- ③ 末端与眼睛：坐标系立在各自 link 上 --&gt;
+  &lt;link name="tcp_link"/&gt;     &lt;!-- 指尖参考点：IK 落点 --&gt;
+  &lt;link name="camera_link"/&gt;  &lt;!-- 相机光心：视觉起点 --&gt;
+
+  &lt;!-- ④ 夹爪 r_joint 也是旋转关节：URDF 管行程，实机开合另有 PWM 口径 --&gt;
+  &lt;joint name="r_joint" type="revolute"&gt;
+    &lt;limit lower="-3.14" upper="3.14"/&gt;  &lt;!-- ±180°；实机 800~1500 μs，EXP-02 换算 --&gt;
+  &lt;/joint&gt;
+&lt;/robot&gt;</pre>
+  <p>把上面的父子关系装起来看一眼——五节臂怎么一节节长出来：</p>
+  <div class="arch">
+    <svg viewBox="0 0 680 175" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="连杆装配示意图：base_link 经 joint1 到 link5 逐节相连，腕部挂 camera_link，末端为 tcp_link 与夹爪 r_joint，底盘带 continuous 车轮">
+      <!-- 连杆方块 -->
+      <g font-size="10.5" font-weight="700" fill="#0f172a" text-anchor="middle">
+        <rect x="20"  y="60" width="70" height="40" rx="8" fill="#f1f5f9" stroke="#475569" stroke-width="1.5"/><text x="55"  y="84">base_link</text>
+        <rect x="134" y="60" width="70" height="40" rx="8" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/><text x="169" y="84">link1</text>
+        <rect x="248" y="60" width="70" height="40" rx="8" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/><text x="283" y="84">link2</text>
+        <rect x="362" y="60" width="70" height="40" rx="8" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/><text x="397" y="84">link3</text>
+        <rect x="476" y="60" width="70" height="40" rx="8" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/><text x="511" y="84">link4</text>
+        <rect x="590" y="60" width="70" height="40" rx="8" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/><text x="625" y="84">link5</text>
+      </g>
+      <!-- 关节圆圈 -->
+      <g font-size="10" font-weight="700" fill="#0f766e" text-anchor="middle">
+        <circle cx="112" cy="80"  r="13" fill="#ccfbf1" stroke="#0d9488" stroke-width="1.5"/><text x="112" y="84">J1</text>
+        <circle cx="226" cy="80"  r="13" fill="#ccfbf1" stroke="#0d9488" stroke-width="1.5"/><text x="226" y="84">J2</text>
+        <circle cx="340" cy="80"  r="13" fill="#ccfbf1" stroke="#0d9488" stroke-width="1.5"/><text x="340" y="84">J3</text>
+        <circle cx="454" cy="80"  r="13" fill="#ccfbf1" stroke="#0d9488" stroke-width="1.5"/><text x="454" y="84">J4</text>
+        <circle cx="568" cy="80"  r="13" fill="#ccfbf1" stroke="#0d9488" stroke-width="1.5"/><text x="568" y="84">J5</text>
+      </g>
+      <!-- 末端三件：tcp / camera / gripper -->
+      <line x1="625" y1="60" x2="625" y2="40" stroke="#7c3aed" stroke-width="1.5"/>
+      <text x="625" y="32" font-size="10" fill="#6d28d9" text-anchor="middle" font-weight="700">tcp_link 指尖</text>
+      <line x1="660" y1="100" x2="660" y2="128" stroke="#b45309" stroke-width="1.5" stroke-dasharray="4 3"/>
+      <text x="645" y="143" font-size="10" fill="#b45309" text-anchor="end" font-weight="700">r_joint 爪（旋转）</text>
+      <line x1="511" y1="100" x2="511" y2="128" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="4 3"/>
+      <text x="511" y="143" font-size="10" fill="#6d28d9" text-anchor="middle" font-weight="700">camera_link 腕上相机</text>
+      <!-- 车轮 -->
+      <circle cx="45"  cy="140" r="10" fill="#e2e8f0" stroke="#64748b" stroke-width="1.5"/>
+      <circle cx="78"  cy="140" r="10" fill="#e2e8f0" stroke="#64748b" stroke-width="1.5"/>
+      <text x="140" y="144" font-size="10" fill="#475569">wheel_* · continuous（不占臂舵机）</text>
+      <!-- 注脚 -->
+      <text x="340" y="167" font-size="10.5" fill="#64748b" text-anchor="middle">方块 = link（零件）、圆圈 = joint（J1–J5 全是 revolute ±3.14）——父子单向，没有回环</text>
+    </svg>
+    <div class="cap">图 1-3｜连杆装配示意：方块是 link、圆圈是 joint，与上方样例的 parent/child 一行行对应；TF 树就是把这些方块串起来的那棵树</div>
+  </div>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">看点 1</div><div class="kt">两类标签，一张身体说明书</div><p><code>&lt;link&gt;</code> 是零件（visual/collision/inertial 三重身份），<code>&lt;joint&gt;</code> 是装配关系——谁接谁、绕哪转、转多少。03 节表格的每一行都能在这里找到原文。</p></div>
+    <div class="kcard"><div class="kd">看点 2</div><div class="kt">axis + origin = 你拖的"旋钮"</div><p>GUI 滑块改的就是该 joint 在 <code>axis</code> 方向上的角度值，<code>origin</code> 决定这一段挂在哪——改 <code>origin</code> 的 2cm，tcp_link 在空间里整体平移（思考：FK 还准吗？）。</p></div>
+    <div class="kcard"><div class="kd">看点 3</div><div class="kt">limit 就是限位表出处</div><p><code>lower/upper</code> 直接决定滑块行程——所以改完必须 <code>colcon build</code> 重新装载；这也是 03 节"改限位=改说明书"的字面含义。</p></div>
+    <div class="kcard"><div class="kd">看点 4</div><div class="kt">全表没有平移关节</div><p>能拖的关节全是 <b>revolute</b>（弧度，±3.14），四个车轮 <b>continuous</b>，<b>没有一个 prismatic</b>，夹爪 r_joint 也是旋转关节。它与众不同在实机侧：开合量不看弧度，看 PWM 800~1500 μs，EXP-02 换算时别把舵机量程当角度量程用。</p></div>
+  </div>
+  <p>说明书看完了，回头看"读它的程序"——这条 launch 到底启动了谁、话怎么传 → <a href="#s9" style="color:var(--theme-deep,#b91c1c);font-weight:700">05 深读二：display 架构解析</a>。</p>
+</section>
+
+<!-- 05 -->
+<section class="blk" id="s9">
+  <h2><span class="no">05</span>深读二：display.launch.py 架构解析</h2>
+  <p class="lead">一条命令、两个窗口——背后其实是 <b>一个 launch 文件拉起三个节点、两条话题接力</b>。三问拆解：框架什么样？话题谁发谁收？怎么用命令证明？</p>
+  <p><b>看这张图先盯一个细节</b>：蓝色箭头上有个点在向右跑（关节角消息），青色箭头上也有个点在跑（坐标变换），而且<b>青点总是晚半拍</b>——晚的这一拍，就是"先有角度、才算变换"的因果顺序：</p>
+  <div class="arch">
+    <svg viewBox="0 0 680 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="display.launch.py 框架流程图：launch 注入参数并启动三个节点，节点间以 joint_states 与 tf 话题接力">
+      <!-- launch -->
+      <rect x="230" y="10" width="220" height="44" rx="10" fill="#7f1d1d" stroke="#dc2626" stroke-width="2"/>
+      <text x="340" y="37" font-size="14" fill="#fff" text-anchor="middle" font-weight="700">display.launch.py（编排者）</text>
+      <!-- 参数注入虚线 -->
+      <g stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="5 4" fill="none">
+        <path d="M300 54 L110 96"/>
+        <path d="M340 54 L340 96"/>
+        <path d="M380 54 L570 96"/>
+      </g>
+      <text x="340" y="76" font-size="10.5" fill="#64748b" text-anchor="middle">读取 car1.urdf → 注入 robot_description 参数</text>
+      <!-- 三节点 -->
+      <rect x="20" y="98" width="180" height="74" rx="10" fill="#fff" stroke="#2563eb" stroke-width="2"/>
+      <text x="110" y="122" font-size="12" fill="#1e40af" text-anchor="middle" font-weight="700">joint_state_</text>
+      <text x="110" y="138" font-size="12" fill="#1e40af" text-anchor="middle" font-weight="700">publisher_gui</text>
+      <text x="110" y="160" font-size="10.5" fill="#64748b" text-anchor="middle">左窗 · 默认发布者</text>
+
+      <rect x="250" y="98" width="180" height="74" rx="10" fill="#fff" stroke="#0d9488" stroke-width="2"/>
+      <text x="340" y="126" font-size="12" fill="#0f766e" text-anchor="middle" font-weight="700">robot_state_</text>
+      <text x="340" y="142" font-size="12" fill="#0f766e" text-anchor="middle" font-weight="700">publisher</text>
+      <text x="340" y="162" font-size="10.5" fill="#64748b" text-anchor="middle">订阅角 · 发布 TF</text>
+
+      <rect x="480" y="98" width="180" height="74" rx="10" fill="#fff" stroke="#7c3aed" stroke-width="2"/>
+      <text x="570" y="126" font-size="12" fill="#6d28d9" text-anchor="middle" font-weight="700">rviz2</text>
+      <text x="570" y="146" font-size="10.5" fill="#64748b" text-anchor="middle">右窗 · 订阅者</text>
+      <text x="570" y="162" font-size="10.5" fill="#64748b" text-anchor="middle">收到就重画 · RobotModel + TF</text>
+      <!-- 话题箭头 -->
+      <defs>
+        <marker id="fa1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/></marker>
+        <marker id="fa2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0d9488"/></marker>
+      </defs>
+      <line x1="202" y1="205" x2="246" y2="205" stroke="#2563eb" stroke-width="2.5" marker-end="url(#fa1)"/>
+      <text x="224" y="192" font-size="10.5" fill="#1e40af" text-anchor="middle" font-weight="700">/joint_states</text>
+      <text x="224" y="222" font-size="9.5" fill="#64748b" text-anchor="middle">JointState 角度</text>
+      <line x1="432" y1="205" x2="476" y2="205" stroke="#0d9488" stroke-width="2.5" marker-end="url(#fa2)"/>
+      <text x="454" y="192" font-size="10.5" fill="#0f766e" text-anchor="middle" font-weight="700">/tf、/tf_static</text>
+      <text x="454" y="222" font-size="9.5" fill="#64748b" text-anchor="middle">TFMessage 位姿</text>
+      <!-- 消息流动动画：蓝点=关节角消息，晚半拍的青点=坐标变换（差半拍=因果顺序） -->
+      <circle cy="205" r="5" fill="#2563eb">
+        <animate attributeName="cx" values="202;246" dur="1.6s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.1;0.9;1" dur="1.6s" repeatCount="indefinite"/>
+      </circle>
+      <circle cy="205" r="5" fill="#0d9488">
+        <animate attributeName="cx" values="432;476" dur="1.6s" begin="0.8s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.1;0.9;1" dur="1.6s" begin="0.8s" repeatCount="indefinite"/>
+      </circle>
+      <!-- 说明底注 -->
+      <rect x="20" y="244" width="640" height="44" rx="9" fill="#f1f5f9" stroke="#e2e8f0"/>
+      <text x="340" y="262" font-size="11" fill="#334155" text-anchor="middle">数据流：你拖滑块 → GUI 发 /joint_states → robot_state_publisher 算出变换发 /tf → rviz2 订阅 /tf + RobotModel 画模型</text>
+      <text x="340" y="278" font-size="10.5" fill="#64748b" text-anchor="middle">robot_description 是 launch 注入的参数（URDF 本体），不是话题——别混淆</text>
+    </svg>
+    <div class="cap">图 1-4｜display.launch.py 框架流程图：顶部 launch 编排，中排三节点，下排两条话题接力箭头</div>
+  </div>
+  <p>这就是本节结论：<b>没有左端发布的角度，右端就无从订阅</b>——06 节动手任务要你"顶替 GUI 当发布者"，顶的正是链条最左边那个口。</p>
+  <p><b>① 发布订阅清单</b>——把上图的箭头变成一张表：</p>
+  <table>
+    <thead><tr><th>通道</th><th>类型</th><th>发布者</th><th>订阅者</th><th>作用</th></tr></thead>
+    <tbody>
+      <tr><td><code>/joint_states</code></td><td>sensor_msgs/JointState</td><td>joint_state_publisher_gui</td><td>robot_state_publisher（rviz2 亦可读）</td><td>每个关节此刻的角度值，本链路<b>唯一心跳</b></td></tr>
+      <tr><td><code>/tf</code></td><td>tf2_msgs/TFMessage</td><td>robot_state_publisher</td><td>rviz2</td><td>各坐标系相对位姿（随滑块动的那部分）</td></tr>
+      <tr><td><code>/tf_static</code></td><td>tf2_msgs/TFMessage</td><td>robot_state_publisher</td><td>rviz2</td><td>安装后固定不动的偏移（相机挂点等）</td></tr>
+      <tr><td><code>robot_description</code></td><td>string <b>参数</b>（非话题！）</td><td>launch 读 URDF 后注入</td><td>rsp / rviz2</td><td>模型本体文本的传递通道</td></tr>
+    </tbody>
+  </table>
+  <p><b>② 如何验证</b>——五个命令 + 预期结论（每新开一个终端先两次 source）：</p>
+  <pre><span class="c"># 1) 节点都在吗：launch 的三兄弟 jsp_gui / rsp / rviz2 都在即合格</span>
+<span class="c">#    多出来的名字有来路，不算异常：</span>
+<span class="c">#    · transform_listener_impl_xxxx 是 rviz2 的 TF 监听器自动注册的框架节点</span>
+<span class="c">#      （后缀十六进制每次启动都变，不是谁手写的）</span>
+<span class="g">ros2</span> node list
+
+<span class="c"># 2) 话题清单：确认出现 /joint_states 与 /tf（/tf_static）</span>
+<span class="g">ros2</span> topic list
+
+<span class="c"># 3) 谁发谁收：预期 publisher=1、subscription≥1（rsp 在收）</span>
+<span class="g">ros2</span> topic info /joint_states
+
+<span class="c"># 4) 打包内容：name 与 position 两个数组同序、下标对应</span>
+<span class="g">ros2</span> topic echo /joint_states --once
+
+<span class="c"># 5) 边拖滑块边跑：频率 &gt; 0 = 心跳健康；按住不放看 position 变化</span>
+<span class="g">ros2</span> topic hz /joint_states</pre>
+  <div class="tip"><span class="lab">💡 验证的精髓</span>四、五两条对照着看才有意义：<b>echo 静态看结构，hz+拖动动态看心跳</b>——以后任何"模型不动"的第一反应，都是先跑第 5 条。</div>
+  <p><b>③ rviz2 介绍</b>——对着 01 节截图右窗认面板：</p>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">Displays 面板</div><div class="kt">显示什么 · 勾什么画什么</div><p><b>Grid</b> 地面参考网格 · <b>RobotModel</b> 读 robot_description 把连杆画出来 · <b>TF</b> 每个坐标系一根彩色轴 + 名字（截图满屏坐标轴就是它）。Global Status 显示 <b>Ok</b> 才算健康。</p></div>
+    <div class="kcard"><div class="kd">Fixed Frame</div><div class="kt">一切显示的"世界零点"</div><p>本例 <b>base_link</b>——所有坐标都先换算到它再画。切到 tcp_link，整个网格会"飞到指尖下"：变的不是模型，是<b>看世界的立场</b>（对应 06 节观察题③）。</p></div>
+    <div class="kcard"><div class="kd">Views 面板</div><div class="kt">怎么观察 · Orbit 三件套</div><p>截图中 Current View = <b>Orbit</b>、Target Frame = base_link：左键旋转、右键平移、滚轮缩放；Distance 调远近。绕模型一圈，把"为什么 · 3"的三个坐标系都看一眼。</p></div>
+    <div class="kcard"><div class="kd">状态色 · 自救</div><div class="kt">红 / 洋红 各有其因</div><p>状态红 → 话题没到（查 /tf、rsp 是否在跑）；RobotModel <b>洋红</b> → mesh 路径写法错（package://）；整屏空白 → 看 Fixed Frame 是否拼错。全部小坑汇总在 06 节"自救三板斧"。</p></div>
+  </div>
+  <p>一屏两窗一条链都拆完了，收个尾 → <a href="#s10" style="color:var(--theme-deep,#b91c1c);font-weight:700">06 总结与思考</a></p>
+</section>
+
+<!-- 06 -->
+<section class="blk" id="s10">
+  <h2><span class="no">06</span>总结与思考</h2>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">✅ 完成成果</div><div class="kt">一屏两窗一条链</div><p>display.launch 起手 → GUI 拖遍 joint/夹爪 → RViz 勾出三个坐标系 → view_frames 出 TF 树 PDF。</p></div>
+    <div class="kcard"><div class="kd">🧠 原理收获</div><div class="kt">关节 · 限位 · 角色</div><p>URDF 的 limit 是数字止挡、axis+origin 是滑块的旋钮、base/camera/tcp 是全课程的坐标系语言。</p></div>
+    <div class="kcard"><div class="kd">🛠 技能收获</div><div class="kt">话题验证四件套</div><p>node list → topic list → info/echo → hz：静态结构与动态心跳分开查，任何"不动"先跑 hz。</p></div>
+    <div class="kcard"><div class="kd">⏰ 心跳优先原则</div><div class="kt">/joint_states 是唯一心跳</div><p>它停了，rsp 不再发 TF、rviz 定格——排障顺序永远是：心跳 → 节点活没活 → 最后才怀疑 URDF 文本。</p></div>
+  </div>
+    <p><b>① 验收清单</b>——七条全做到，这一节才算过：</p>
+  <ul class="todo">
+    <li>一条 <code>ros2 launch car1_description display.launch.py</code> 起手，能说出弹出的两个窗口各是谁</li>
+    <li>拖遍 GUI 滑块：逐个报出 joint 名称、角色与限位，并能演示<b>夹爪开合</b>（r_joint 旋转行程）</li>
+    <li>在 RViz2 勾选 TF，认出 <b>base_link / camera_link / tcp_link</b>，并解释 Fixed Frame 的含义</li>
+    <li>用 <code>view_frames</code> 生成 TF 树 PDF，用 <code>ros2 topic hz /joint_states</code> 验证心跳</li>
+    <li>用 <code>ros2 topic pub</code> 往 <code>/joint_states</code> 写关节角驱动模型，并说清 GUI 在链路中的真实角色</li>
+    <li>读完 04 节：在 URDF 简化版里指认任意关节的 <code>limit</code> / <code>axis</code> / <code>parent-child</code> 三要素</li>
+    <li>读完 05 节：画得出 display 的框架流程图，说得出 /joint_states 与 /tf 谁发谁收、怎么用命令验证</li>
+  </ul>
+  <p><b>② 动手任务</b>——按 6 项自己做一遍，缺哪项补哪项：</p>
+  <p class="lead">02 节是跟着做，这 6 项自己来——边做边回答后面列出的三个观察题：</p>
+  <ol class="todo">
+    <li><b>重跑一遍</b>：新开终端 → 两次 source → launch（02 节三步，这次独立完成）</li>
+    <li><b>逐滑块从头拖到尾</b>：给每个关节归类——谁管"方位"、谁管"距离"、谁管"姿态"、谁管"开合"？末端到不了的空间盲区在哪</li>
+    <li><b>玩 Randomize / Center</b>：随机姿态下 tcp_link 还在你预期的位置吗？一键归零找"home 态"</li>
+    <li><b>RViz 开 TF 面板逐帧勾选</b>：把 base_link / camera_link / tcp_link 全勾出来；试两件事——① Fixed Frame 从 base_link 切到 tcp_link，看整体"世界"如何重排 ② Orbit 视角（左键旋转 / 右键平移 / 滚轮缩放）绕模型一圈</li>
+    <li><b>两条验证命令</b>：生成 TF 树 PDF + 查心跳（下方代码框），对照截图里那一屏坐标轴</li>
+    <li><b>绕过 GUI 直接发话</b>：GUI 究竟是"被谁控制"的？先看它往哪发（hz 有心跳），再用下方命令自己往 <code>/joint_states</code> 写关节角——底座依次转 <b>正前（0）→ 斜前 +45° → 斜前 −45°</b>（±0.785 rad），观察哪边是前左、哪边是前右</li>
+  </ol>
+  <pre><span class="c"># 生成 TF 树：预期 7+ 坐标系一张 PDF，base_link 单根无环</span>
+<span class="g">ros2</span> run tf2_tools view_frames
+
+<span class="c"># 查心跳：拖动滑块期间频率 &gt; 0、position 数值在变；为 0 则模型不会更新</span>
+<span class="g">ros2</span> topic hz /joint_states</pre>
+  <pre><span class="c"># 顶替 GUI 当发布者——谁往 /joint_states 发消息，订阅方（robot_state_publisher）就听谁的</span>
+<span class="c"># GUI 开着会持续发布盖过你的单发：先关掉左窗再发（发完姿态常驻，直到下次有人发言）</span>
+<span class="g">ros2</span> topic pub --once /joint_states sensor_msgs/msg/JointState "{name: [arm_joint1], position: [0.0]}"     <span class="c"># 正前（零位）0 rad</span>
+<span class="g">ros2</span> topic pub --once /joint_states sensor_msgs/msg/JointState "{name: [arm_joint1], position: [0.785]}"    <span class="c"># 斜前一翼 +45°</span>
+<span class="g">ros2</span> topic pub --once /joint_states sensor_msgs/msg/JointState "{name: [arm_joint1], position: [-0.785]}"   <span class="c"># 斜前另一翼 −45°（哪边是前左自己记录）</span></pre>
+  <div class="tip violet"><span class="lab">💡 一句话答案：GUI 不是"被控对象"</span>它只是一台往 <code>/joint_states</code> 发消息的机器——你用 <code>pub</code> 发同样的消息，模型照样动；GUI 自己的滑块却不会跟着回摆（它<b>只发不收</b>）。这条"谁发谁听"的单向链，05 节已经画成完整话题图，本节思考题 1 正好考它的反面。后续的抓取题同样走这条路：自己发布目标姿态，GUI 全程可缺席。</div>
+  <div class="tip tealb"><span class="lab">🔍 三个观察题（做的时候想）</span>① 只拖 arm_joint1，tcp_link 到 base_link 的<b>距离</b>变不变？② 拖哪两个关节对"距离"贡献最大？③ Fixed Frame 切到 tcp_link 后，为什么地面网格"飞"到了指尖下——它代表的是谁的眼中世界？</div>
+  <div class="tip amber"><span class="lab">⚠️ 自救三板斧</span>模型变<b>洋红色</b> → mesh 路径写法应为 <code>package://car1_description/...</code>；控制台刷 <code>extrapolation</code> → robot_state_publisher 没跑 / Fixed Frame 不存在；滑块拖了没反应 → <code>ros2 topic hz /joint_states</code> 先查心跳，再重启 GUI。</div>
+  <div class="tip violet"><span class="lab">📝 思考题 1</span>直接关掉左窗（joint_state_publisher_gui），右窗模型会发生什么？请用"发布 /joint_states → 订阅并算出 /tf → 订阅渲染"的发布订阅链解释，并写出一条能确诊你结论的命令。</div>
+  <div class="tip violet"><span class="lab">📝 思考题 2</span>03 节的表里 URDF 给了 ±180°、实机只有 ±135°——照 URDF 的行程把 arm_joint2 发到 <code>+170°</code>，仿真滑块拖得过去，这一步到了真机会撞上什么？提示：数字止挡放宽了，舵机的<b>物理止挡</b>放宽了吗？（呼应安全红线第 1 条）</div>
+</section>
+
+<nav class="expnav">
+  <a href="../index.html"><span class="lb">← 返回</span>课程目录 · 机械臂应用与开发</a>
+  <a class="next" href="../exp-02-serial-pwm/index.html"><span class="lb">下一个实验 →</span>EXP-02 关节电机底层控制与应用</a>
+</nav>
+
+<footer>
+  <span>CORE-05 · 机器人机械臂应用与开发 · EXP-01 URDF 模型与仿真控制</span>
+  <span>4 学时 · 验证性 · 设备实机运行 · 基于 arm_practice 实验讲义改编</span>
+</footer>
+
+</main>
+</div>
+
+<script src="../shared/tutorial.js" defer></script>
+</body>
+</html>

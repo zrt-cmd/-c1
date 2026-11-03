@@ -1,0 +1,346 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/cases/exp006a-elderly-companion/exp-03-config/index.html
+TITLE: EXP-03 · fall_config.yaml 配置详解 — 老人跌倒监护综合项目
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+EXP-03 · fall_config.yaml 配置详解 — 老人跌倒监护综合项目
+🧠 具身智能课程 ·
+教程首页
+综合项目
+/
+老人跌倒监护
+/ EXP-03
+本页目录
+01 问题引入：改一个阈值为什么要惊动全系统
+02 原理通俗讲解：配置是"全屋总闸"
+03 关联知识点：十四段配置与模块对号入座
+04 实验目标
+05 实验环境与准备
+06 动画讲解：十四段配置与三层覆盖优先级
+07 互动讲解：配置项开关与阈值对比台
+08 实操步骤：env_check 自检与 CLI 覆盖
+09 重点与易错点
+10 总结与思考
+CH1 · 需求与配置
+EXP-01 需求分析
+EXP-02 分层架构
+EXP-03 配置详解
+CH2 · 感知与交互
+EXP-04 语音交互
+EXP-05 检测与姿态
+EXP-06 跌倒状态机
+CH3 · 告警与验证
+EXP-07 告警证据链
+EXP-08 LLM·VLM
+EXP-09 全功能验证
+EXP-03 · 第 1 章 · 设计性 · 4 学时
+fall_config.yaml 配置详解：系统唯一的"总闸"
+整个 elderly_companion 只认一份 YAML：
+config/fall_config.yaml
+，共十四段，管着从模型路径、检测阈值、状态机时间参数到串口设备、LLM 服务端口的一切。本实验吃透
+config_schema 必填/可缺省双轨
+、
+CLI > yaml > 代码默认
+三层覆盖优先级，学会用
+env_check
+一键体检七个依赖库、模型文件与串口设备，做到"改参数不动代码、动代码必过自检"。
+难度 ⭐⭐ · 4 学时
+十四段 YAML
+config_schema
+覆盖优先级
+env_check
+01
+问题引入：改一个阈值为什么要惊动全系统
+课堂上最常见的事故：同学把"躯干角 50°"直接写进状态机源码里测试 —— 结果代码里 50、YAML 里 50、注释里 45，三处不一致，谁也说不清线上到底用的哪个。工程化的答案是：
+所有可调量只住在配置文件里
+。
+1
+阈值散落源码 → 改一次要全文搜索，漏一处就是隐性 bug
+2
+集中到 fall_config.yaml → 调参 = 改一行，重启即生效，还可 git diff 审查
+3
+再加 config_schema 校验 → 键名拼错、必填缺失在启动时立刻报错，不带病运行
+4
+最后由 env_check 把关 → 依赖库、模型文件、串口设备逐一探测，EXIT 0 才准开工
+💡 一个类比
+配置文件像家里的
+配电总闸 + 分路标签
+：哪里该通电、多少安培（阈值）都写在面板上。总闸不清晰，谁都不敢动线路。
+02
+原理通俗讲解：参数的三层来源与"双轨制"
+同一个参数可能来自三个地方，
+优先级从高到低
+：
+第 1 优先
+命令行 CLI 参数
+如
+--score-thr 0.4 --log-level DEBUG
+：一次性实验覆盖，不落盘、不污染文件，跑完即失效。适合"今天临时试一个值"。
+第 2 优先
+fall_config.yaml
+持久化的正式值：团队共享、随版本走。适合"这个项目的正式参数"。CLI 没给的键，全部以这里为准。
+第 3 优先
+代码内默认值
+config_schema 的兜底：yaml 没写、CLI 也没给的
+可缺省键
+，自动填默认值，保证程序永远拿得到值。
+而 config_schema 本身是
+双轨制
+：
+轨道
+schema 写法
+缺失时的行为
+例子
+纯 type（必填）
+type: str
+（无 default）
+yaml 里没写 → 启动直接
+config error: missing key
+detect.model_path 等路径类键
+(type, default)（可缺省）
+带默认值
+yaml 没写 → 自动填默认，程序照常跑
+detect.score_thr、state.angle_thr
+🔔 隐患坑：schema 有默认不等于 YAML 是活键
+典型如
+session.wake_words
+：schema 给了默认值（可缺省轨道），于是 yaml 里没写时也会"正常启动"—— 但你以为在改唤醒词、实际生效的是 schema 默认。
+要改的键必须显式写进 yaml
+，别依赖兜底。
+03
+关联知识点：十四段配置与模块对号入座
+十四段各管一个"辖区"，与 EXP-02 六层一一咬合：
+段名
+管什么
+消费模块
+paths
+模型/数据/输出目录
+全部加载方
+model
+模型选型，含
+vlm.enabled
+（config L16，默认 false，约 1.5G 懒加载）与 pose_type（schema L11 默认 blazepose，yaml L9 为 rtmpose）
+检测/姿态/VLM
+detect
+score_thr（L27 默认 0.25）、
+crop_margin: 1.5
+（L33，改 1.0 躺姿容易裁丢）
+YOLOv8 检测
+source
+video / image / camera 模式与深度相机话题 /ascamera_hp60c
+fall_app --mode
+session
+唤醒词、会话合并（wake_words 注意第 02 节隐患坑）
+voice_loop
+speech
+六麦硬件唤醒开关（L39 true）、串口 /dev/ttyACM0（L41）、ASR/TTS 参数
+KWS / ASR / TTS
+state
+angle_thr 50（L57）、aspect_thr 0.5、falling_window 1.5、lying_time 3.0、ask_timeout 12（L62）、cooldown 60
+六状态机
+interaction
+confirm/cancel 词表、播报节奏
+询问流
+alert
+告警串口
+/dev/ttyUSB0（L115）
+、帧参数（USB1 是毫米波雷达，别插错）
+alert 硬件驱动
+evidence
+FrameRing pre/post 秒数、三件套目录、events.jsonl 上限
+证据落盘
+monitor
+IoU 关联（iou_thr 0.3、max_age 3.0s）等监控参数
+monitor.py
+arm_reaction
+下位机联动动作（LED/蜂鸣/OLED）
+告警执行
+server · display · save · log
+LLM 服务端口
+8080（L170/L173）
+、MJPEG 预览 8088、保存与日志级别
+Flask / 预览 / 日志
+llm
+Qwen3.5 rkllm 模型路径、采样参数、max_history 等
+RKLLM
+04
+实验目标
+能按用途默写
+十四段配置
+的分段清单，并说出 state / detect / alert / llm 四段的关键键与默认值
+能解释
+CLI > yaml > 代码默认
+三层优先级，并现场演示一次 CLI 覆盖
+能区分 config_schema 的
+必填（纯 type）与可缺省（带 default）
+双轨行为
+能独立运行 env_check，读懂
+[env] OK / MISSING / 自检通过
+三种输出与退出码含义
+牢记三个端口/设备易混点：
+TTYACM0（六麦）vs TTYUSB0（告警）vs TTYUSB1（雷达）；8080（LLM）vs 8088（MJPEG）
+05
+实验环境与准备
+1
+硬件到位：工控主机 + 摄像头 + XFM 六麦，串口已枚举（
+ls /dev/ttyUSB* /dev/ttyACM*
+）
+2
+进入工程：
+~/ros2_ws/src/xflz_eai_car1/app/elderly_companion
+，确认 config/ 就位
+3
+预读两份文件：
+config/fall_config.yaml
+（正式值）与
+common/config_schema
+（双轨规则）
+4
+工具准备：编辑器 + 终端两个窗口（一个改 yaml、一个跑自检）
+06
+动画讲解：十四段配置与三层覆盖优先级
+左边十四段配置轮番点亮，右侧演示一个参数从 CLI 覆盖不到时逐层回退到 yaml、再到 schema 默认的下行动画：
+fall_config.yaml · 十四段
+paths
+model
+detect
+source
+session
+speech
+state
+interaction
+alert
+evidence
+monitor
+arm_reaction
+server·display
+llm 等
+config_schema · 双轨校验
+纯 type · 必填
+缺 → config error: missing key
+例：detect.model_path
+type+default · 可缺省
+缺 → 自动填默认值
+例：state.angle_thr = 50.0
+覆盖优先级 · CLI > yaml > 默认
+① 命令行 CLI
+--score-thr 0.4（临时生效，不落盘）
+给了 → 用它；没给 ↓
+② fall_config.yaml
+score_thr: 0.25（正式值，随版本走）
+写了 → 用它；没写 ↓
+③ config_schema 默认
+可缺省键兜底（必填键则报错）
+env_check 体检通过 → EXIT 0 开工
+动画 3-1｜左：十四段按序点亮、下方双轨校验分流；右：一个参数层层回退的取值路线，最终由 env_check 放行
+07
+互动讲解：配置项开关与阈值对比台
+切换开关与阈值预设，观察"谁生效、行为怎么变"：
+配置对比台 · Config Bench
+📄 只用 yaml 默认
+⚡ CLI --score-thr 0.4
+👁 vlm.enabled: true
+❌ 必填键缺失
+↺ 复位
+// 四种典型配置场景，观察参数来源与系统行为的差异
+当前：yaml 默认 → detect.score_thr=0.25，vlm.enabled=false，必填键齐全
+env_check：[env] 自检通过（EXIT 0）
+🙋 调参伦理
+把 score_thr 调高"少误报"，代价是远处/遮挡的老人被漏检；调低则误报增长。调参不是刷指标，是
+在"漏救"与"骚扰"之间找平衡
+—— 每次改动都记录理由。
+08
+实操步骤：env_check 自检与 CLI 覆盖实验
+1
+进入工程目录，先跑官方自检 —— 七库、模型文件、/dev/ttyUSB0 逐一探测
+2
+故意制造 schema 键名拼错（detect.model_path → detect.model_pth），观察启动报错
+3
+改回后做一次 CLI 覆盖：--score-thr 0.4 --log-level DEBUG，确认临时值生效且 yaml 未被改动
+4
+逐条核对 state 段六个时间/角度参数与 EXP-01 三条时序的对应关系
+5
+口述三个设备/端口分工（六麦 ACM0、告警 USB0、雷达 USB1；LLM 8080、MJPEG 8088）并复验
+# ① 进入工程并运行环境自检（只读探测，不会自动安装任何东西）
+cd
+~/ros2_ws/src/xflz_eai_car1/app/elderly_companion
+python3
+common/env_check.py --config config/fall_config.yaml
+# 预期逐条输出：[env] OK numpy 1.24.3 ... 直到 [env] 自检通过（EXIT 0）
+# 探测 7 库：numpy / cv2 / scipy / rknnlite / sherpa_onnx / serial / yaml
+# 同时探测模型文件与串口设备；缺项输出 [env] MISSING /dev/ttyUSB0（EXIT 2）
+# ② schema 报错演示：把 detect.model_path 拼成 detect.model_pth 后启动
+python3
+apps/fall_video_demo.py --video testdata/fall_slow_x264.mp4 --text
+# 预期：config error: missing key  → 立刻改回（必填轨道，绝不带病启动）
+# ③ CLI 覆盖实验：临时值生效，yaml 保持原样
+python3
+apps/fall_video_demo.py --video testdata/fall_slow_x264.mp4 --text --score-thr 0.4 --log-level DEBUG
+# 优先级：--score-thr 0.4 > yaml 的 score_thr: 0.25 > schema 默认
+🔍 端口备忘
+/dev/ttyACM0
+= XFM 六麦硬件唤醒（speech 段）；
+/dev/ttyUSB0
+= 告警串口（alert 段 L115）；
+/dev/ttyUSB1
+= 毫米波雷达，告警不走它。硬件插拔后枚举号可能漂移，报错先
+ls /dev/tty*
+核对。
+09
+重点与易错点
+三层覆盖优先级：
+CLI > yaml > 代码默认
+，临时试值用 CLI、正式值进 yaml
+双轨制：
+纯 type 必填缺了报 config error；带 default 可缺省自动兜底
+env_check 是
+只读自检
+：不自动装依赖，缺啥报啥，EXIT 0 才开工
+重点键位：vlm.enabled 默认
+false
+（L16）、angle_thr
+50
+（L57）、ask_timeout
+12
+（L62）、alert.port
+USB0
+（L115）、llm 端口
+8080
+（L170/173）
+⚠️ 常见坑
+现象 → 解法
+键名拼错
+启动
+config error: missing key
+→ 核对 schema：改 yaml 键名而不是改 schema
+误把"可缺省"当"没生效"
+改了概念却没改 yaml（session.wake_words 典型）→ 要改的键显式写进 yaml
+CLI 参数顺序/拼写错
+--sore-thr 静默或报错 → 每次跑完看日志里的实际生效值
+串口张冠李戴
+告警没反应，插的是 USB1（雷达）→ alert.port 对准 USB0
+端口混用
+curl 8088 找 LLM / MJPEG 8088 找 llm → LLM 在
+8080
+（/v1/models），预览流在 8088
+体检当安装器
+MISSING 后等它自动修 → env_check 只读，依赖需按讲义自行安装
+10
+总结与思考
+✅ 完成成果
+十四段配置地图
+分段清单 + 关键键值表（state/detect/alert/llm 四段随口能报默认值）。
+🧠 原理收获
+三层优先级 + 双轨校验
+参数取值路线与必填/可缺省的分裂行为，理解"schema 默认不等于 yaml 是活键"。
+🛠 技能收获
+env_check 工作流
+自检 → EXIT 0 → 开工；看懂 OK / MISSING / 退出码三类信号。
+❓ 排障思路
+先问参数从哪来
+行为诡异时先打印/核对实际生效值：CLI？yaml？还是 schema 兜底？
+📝 思考题 1
+实验课上你临时要试 score_thr=0.4，正式项目值是 0.25。用哪种方式覆盖最稳妥？如果下一位同学接手，如何保证他不会"误以为"项目值已改成 0.4？写出你的操作与沟通清单。
+📝 思考题 2
+config_schema 给 session.wake_words 提供了默认值，但讲义仍强调"要改就必须显式写进 yaml"。请推演一次事故：同学 A 只在心里把唤醒词改成"小飞小飞"，现场系统却毫无反应 —— 用"双轨制 + 三层优先级"解释这个现象的完整链条。
+CASE-03 · 老人跌倒监护 · EXP-03 fall_config.yaml 配置详解
+4 学时 · 设计性 · 基于 elderly_companion 实验讲义改编

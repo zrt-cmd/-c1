@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>图 17-1 · Launch 解析执行与 SIGINT 级联</title>
+<style>
+:root{--bg-page:#ffffff;--bg-card:#ffffff;--text:#0f172a;--text2:#475569;--muted:#94a3b8;
+  --border:#e2e8f0;--teal:#0891b2;--green:#059669;--purple:#7c3aed;--orange:#ea580c;--red:#e11d48;--gray:#64748b;
+  --teal-bg:rgba(8,145,178,.08);--green-bg:rgba(5,150,105,.08);--purple-bg:rgba(124,58,237,.08);
+  --orange-bg:rgba(234,88,12,.10);--gray-bg:rgba(100,116,139,.08)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg-page);color:var(--text);font-family:system-ui,"PingFang SC","Microsoft YaHei",sans-serif;padding:16px 14px 12px}
+.hd{margin-bottom:6px}
+.hd h1{font-size:15px;margin:0 0 4px}
+.hd .q{font-size:12px;color:var(--text2);margin:0}
+svg{width:100%;height:auto;display:block}
+.t{font:600 12.5px system-ui,sans-serif;fill:var(--text)}
+.s{font:400 10.5px system-ui,sans-serif;fill:var(--text2)}
+.l{font:600 10.5px ui-monospace,Consolas,monospace;fill:var(--text2)}
+.dock{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.dock span{font-size:11.5px;border-radius:999px;padding:3px 10px;line-height:1.6}
+.ok{background:#ecfdf5;color:#047857;border:1px solid #a7f3d0}
+.warn{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca}
+.evid{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}
+.ft{font-size:10.5px;color:var(--muted);margin-top:8px;text-align:right}
+</style>
+</head>
+<body>
+<div class="hd">
+  <h1>图 17-1 · 解析 → Runner → 子进程 → SIGINT 级联</h1>
+  <p class="q">本图回答的问题：ros2 launch 读完 .launch.py 之后做了什么？一次 Ctrl+C 如何停干净全部节点？</p>
+</div>
+<svg viewBox="0 0 760 470" role="img" aria-label="Launch 解析执行与退出级联图">
+  <text class="l" x="14" y="22" fill="var(--purple)">剧本层</text>
+  <text class="l" x="330" y="22" fill="var(--teal)">编排层</text>
+  <text class="l" x="560" y="22" fill="var(--green)">进程层</text>
+
+  <!-- 剧本 -->
+  <rect x="34" y="40" width="200" height="150" rx="9" fill="#fff"/>
+  <rect x="34" y="40" width="200" height="150" rx="9" fill="var(--purple-bg)" stroke="var(--purple)" stroke-width="1.8"/>
+  <text class="t" x="134" y="66" text-anchor="middle">my.launch.py</text>
+  <g class="l">
+    <text x="50" y="92">Node(A)          → Action1</text>
+    <text x="50" y="116">Node(B)          → Action2</text>
+    <text x="50" y="140">If(mode) Node(C) → Action3</text>
+    <text x="50" y="164">OnExit(A) → cleanup</text>
+  </g>
+  <text class="s" x="134" y="184" text-anchor="middle">入口：generate_launch_description()</text>
+
+  <line x1="234" y1="115" x2="300" y2="115" stroke="var(--purple)" stroke-width="1.8" marker-end="url(#ap)"/>
+  <text class="l" x="240" y="106" fill="var(--purple)">解析</text>
+
+  <!-- Runner -->
+  <rect x="304" y="52" width="160" height="126" rx="9" fill="#fff"/>
+  <rect x="304" y="52" width="160" height="126" rx="9" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1.8"/>
+  <text class="t" x="384" y="80" text-anchor="middle">Launch Runner</text>
+  <g class="s">
+    <text x="318" y="106">① 按序执行 Action</text>
+    <text x="318" y="130">② 评估 condition</text>
+    <text x="318" y="154">③ 拉起子进程并监管</text>
+  </g>
+
+  <!-- 进程 -->
+  <rect x="500" y="40" width="226" height="56" rx="8" fill="var(--green-bg)" stroke="var(--green)" stroke-width="1.6"/>
+  <text class="t" x="613" y="64" text-anchor="middle">[talker-1] pid 4242</text>
+  <text class="s" x="613" y="84" text-anchor="middle">output='screen' 汇入同一终端</text>
+
+  <rect x="500" y="110" width="226" height="56" rx="8" fill="var(--green-bg)" stroke="var(--green)" stroke-width="1.6"/>
+  <text class="t" x="613" y="134" text-anchor="middle">[listener-2] pid 4243</text>
+  <text class="s" x="613" y="154" text-anchor="middle">日志前缀 = 谁在说话</text>
+
+  <rect x="500" y="180" width="226" height="56" rx="8" fill="#fff"/>
+  <rect x="500" y="180" width="226" height="56" rx="8" fill="var(--orange-bg)" stroke="var(--orange)" stroke-width="1.6" stroke-dasharray="6,4"/>
+  <text class="t" x="613" y="204" text-anchor="middle">[debug-3] 条件节点</text>
+  <text class="s" x="613" y="224" text-anchor="middle">condition 成立才创建进程</text>
+
+  <line x1="464" y1="90" x2="496" y2="68" stroke="var(--teal)" stroke-width="1.6" marker-end="url(#at)"/>
+  <line x1="464" y1="115" x2="496" y2="138" stroke="var(--teal)" stroke-width="1.6" marker-end="url(#at)"/>
+  <line x1="464" y1="158" x2="496" y2="204" stroke="var(--orange)" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#ao)"/>
+  <text class="l" x="468" y="188" fill="var(--orange)">评估通过才 spawn</text>
+
+  <!-- SIGINT 级联 -->
+  <rect x="34" y="270" width="692" height="76" rx="9" fill="#fff"/>
+  <rect x="34" y="270" width="692" height="76" rx="9" fill="var(--red)" fill-opacity=".06" stroke="var(--red)" stroke-width="1.8"/>
+  <text class="t" x="380" y="298" text-anchor="middle" fill="var(--red)">Ctrl+C → Runner 向全部子进程广播 SIGINT</text>
+  <text class="s" x="380" y="322" text-anchor="middle">talker-1 finished cleanly · listener-2 finished cleanly · 无僵尸残留</text>
+  <text class="s" x="380" y="340" text-anchor="middle" fill="var(--gray)">不要直接 kill Launch 父进程——绕过级联会留下孤儿节点</text>
+
+  <!-- 箭头：runner/进程 → 级联框 -->
+  <line x1="384" y1="178" x2="384" y2="266" stroke="var(--red)" stroke-width="1.6" marker-end="url(#ar)"/>
+  <text class="l" x="394" y="230" fill="var(--red)">退出信号由 Runner 统一下发</text>
+  <line x1="613" y1="236" x2="613" y2="266" stroke="var(--gray)" stroke-width="1.4" stroke-dasharray="4,4" marker-end="url(#ag)"/>
+
+  <!-- 事件可复用 -->
+  <rect x="34" y="376" width="440" height="58" rx="8" fill="var(--purple-bg)" stroke="var(--purple)" stroke-width="1.5"/>
+  <text class="t" x="254" y="400" text-anchor="middle">退出同一机制的另一面：事件编排</text>
+  <text class="s" x="254" y="422" text-anchor="middle">OnProcessExit(A) → 自动执行 on_exit 里的 Action（恢复/清理/接续）</text>
+  <line x1="380" y1="346" x2="380" y2="372" stroke="var(--purple)" stroke-width="1.5" marker-end="url(#ap)"/>
+
+  <rect x="500" y="376" width="226" height="58" rx="8" fill="var(--green-bg)" stroke="var(--green)" stroke-width="1.5"/>
+  <text class="t" x="613" y="400" text-anchor="middle">监管日志是身份证明</text>
+  <text class="s" x="613" y="422" text-anchor="middle">process has died / finished cleanly</text>
+
+  <defs>
+    <marker id="ap" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="var(--purple)"/></marker>
+    <marker id="at" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="var(--teal)"/></marker>
+    <marker id="ao" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="var(--orange)"/></marker>
+    <marker id="ar" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="var(--red)"/></marker>
+    <marker id="ag" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="var(--gray)"/></marker>
+  </defs>
+</svg>
+<div class="dock">
+  <span class="ok">✅ 一次 Ctrl+C 全停 = Runner 广播 SIGINT 的级联清理</span>
+  <span class="warn">⚠️ 直接 kill 父进程 → 绕过级联留孤儿 · condition False 的 name 也占号</span>
+  <span class="evid">🔍 04 节第 1 步：两行 process has finished cleanly</span>
+</div>
+<div class="ft">EXP-17 · Launch 启动系统</div>
+</body>
+</html>

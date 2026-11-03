@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>图 16-2 · 录放管线与时钟开关</title>
+<style>
+:root{--bg-page:#ffffff;--bg-card:#ffffff;--text:#0f172a;--text2:#475569;--muted:#94a3b8;
+  --border:#e2e8f0;--teal:#0891b2;--green:#059669;--purple:#7c3aed;--orange:#ea580c;--red:#e11d48;--gray:#64748b;
+  --teal-bg:rgba(8,145,178,.08);--green-bg:rgba(5,150,105,.08);--purple-bg:rgba(124,58,237,.08);
+  --orange-bg:rgba(234,88,12,.10);--gray-bg:rgba(100,116,139,.08)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg-page);color:var(--text);font-family:system-ui,"PingFang SC","Microsoft YaHei",sans-serif;padding:16px 14px 12px}
+.hd{margin-bottom:6px}
+.hd h1{font-size:15px;margin:0 0 4px}
+.hd .q{font-size:12px;color:var(--text2);margin:0}
+svg{width:100%;height:auto;display:block}
+.t{font:600 12.5px system-ui,sans-serif;fill:var(--text)}
+.s{font:400 10.5px system-ui,sans-serif;fill:var(--text2)}
+.l{font:600 10.5px ui-monospace,Consolas,monospace;fill:var(--text2)}
+.dock{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.dock span{font-size:11.5px;border-radius:999px;padding:3px 10px;line-height:1.6}
+.ok{background:#ecfdf5;color:#047857;border:1px solid #a7f3d0}
+.warn{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca}
+.evid{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}
+.ft{font-size:10.5px;color:var(--muted);margin-top:8px;text-align:right}
+</style>
+</head>
+<body>
+<div class="hd">
+  <h1>图 16-2 · 录放管线：写进去是原片，放出来是再生</h1>
+  <p class="q">本图回答的问题：从现场消息到 listener 复活，中间经过哪几步？--clock 双开关在管线的哪一段？</p>
+</div>
+<svg viewBox="0 0 760 470" role="img" aria-label="录放管线图">
+  <text class="l" x="14" y="22" fill="var(--orange)">① 现场录制（写入）</text>
+  <text class="l" x="330" y="22" fill="var(--purple)">② SQLite 时间序列</text>
+  <text class="l" x="560" y="22" fill="var(--green)">③ 工位回放（再生）</text>
+
+  <!-- 源话题 -->
+  <rect x="30" y="44" width="175" height="56" rx="8" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1.5"/>
+  <text class="t" x="117" y="68" text-anchor="middle">/chatter 等话题流</text>
+  <text class="s" x="117" y="88" text-anchor="middle">talker · 1Hz 实时数据</text>
+
+  <line x1="205" y1="72" x2="252" y2="72" stroke="var(--orange)" stroke-width="1.8" marker-end="url(#ao)"/>
+  <text class="l" x="210" y="64">CDR 字节</text>
+
+  <!-- record -->
+  <rect x="256" y="40" width="158" height="64" rx="8" fill="#fff"/>
+  <rect x="256" y="40" width="158" height="64" rx="8" fill="var(--green-bg)" stroke="var(--green)" stroke-width="1.8"/>
+  <text class="t" x="335" y="66" text-anchor="middle">ros2 bag record</text>
+  <text class="s" x="335" y="87" text-anchor="middle">Ctrl+C 优雅停 · 事务写盘</text>
+
+  <line x1="414" y1="72" x2="466" y2="72" stroke="var(--purple)" stroke-width="1.8" marker-end="url(#ap)"/>
+
+  <!-- bag 文件 -->
+  <rect x="470" y="34" width="264" height="76" rx="8" fill="#fff"/>
+  <rect x="470" y="34" width="264" height="76" rx="8" fill="var(--purple-bg)" stroke="var(--purple)" stroke-width="1.8"/>
+  <text class="t" x="602" y="58" text-anchor="middle">exp16_full/ · SQLite3 + YAML</text>
+  <g class="l">
+    <text x="486" y="80">t=10.002  /chatter  [CDR]</text>
+    <text x="486" y="100">t=11.004  /chatter  [CDR] …</text>
+  </g>
+
+  <!-- 断链风险 -->
+  <rect x="30" y="130" width="384" height="30" rx="6" fill="var(--red)" fill-opacity=".07" stroke="var(--red)" stroke-width="1.2"/>
+  <text class="s" x="222" y="150" text-anchor="middle" fill="var(--red)" font-weight="600">⚠ kill -9 停录：缓存丢、YAML 不写 → 包损坏（必须 Ctrl+C）</text>
+
+  <!-- play -->
+  <rect x="470" y="188" width="130" height="58" rx="8" fill="#fff"/>
+  <rect x="470" y="188" width="130" height="58" rx="8" fill="var(--green-bg)" stroke="var(--green)" stroke-width="1.8"/>
+  <text class="t" x="535" y="212" text-anchor="middle">ros2 bag play</text>
+  <text class="s" x="535" y="232" text-anchor="middle">按原时序 · -r 调速</text>
+
+  <line x1="600" y1="72" x2="560" y2="186" stroke="var(--purple)" stroke-width="1.6" stroke-dasharray="6,4" marker-end="url(#ap)"/>
+  <text class="l" x="612" y="130">索引读取</text>
+
+  <line x1="604" y1="217" x2="640" y2="217" stroke="var(--green)" stroke-width="1.8" marker-end="url(#ag2)"/>
+  <text class="l" x="606" y="208">再生发布</text>
+
+  <!-- listener 胶囊 -->
+  <rect x="644" y="190" width="100" height="54" rx="27" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1.8"/>
+  <text class="t" x="694" y="213" text-anchor="middle">listener</text>
+  <text class="s" x="694" y="232" text-anchor="middle">分不清新旧</text>
+
+  <!-- 双开关时钟框（主场） -->
+  <rect x="40" y="196" width="400" height="130" rx="9" fill="#fff"/>
+  <rect x="40" y="196" width="400" height="130" rx="9" fill="var(--orange-bg)" stroke="var(--orange)" stroke-width="2"/>
+  <text class="t" x="240" y="222" text-anchor="middle" fill="var(--orange)">时钟双开关（配合 EXP-11 use_sim_time）</text>
+  <g class="s">
+    <text x="58" y="250">① play --clock → 以约 40Hz 持续再生 /clock 话题</text>
+    <text x="58" y="274">② 节点 / rviz2 -p use_sim_time:=true → 认钟</text>
+    <text x="58" y="300" fill="var(--red)" font-weight="600">漏一个：now=今天 · stamp=昨天 → TF LookupException 满屏</text>
+  </g>
+
+  <!-- 验证路径 -->
+  <rect x="40" y="346" width="400" height="66" rx="9" fill="var(--green-bg)" stroke="var(--green)" stroke-width="1.5"/>
+  <text class="t" x="240" y="372" text-anchor="middle">验钟：Panels → Add New Panel → Time</text>
+  <text class="s" x="240" y="394" text-anchor="middle">ros2 topic delay /scan（须带 header；/chatter 会报 no header）</text>
+
+  <line x1="440" y1="261" x2="470" y2="261" stroke="var(--red)" stroke-width="1.5" stroke-dasharray="5,4"/>
+  <text class="l" x="444" y="331" fill="var(--gray)">漏开关的症状在右侧回放段爆发</text>
+  <line x1="440" y1="379" x2="644" y2="258" stroke="var(--green)" stroke-width="1.3" stroke-dasharray="4,4"/>
+
+  <defs>
+    <marker id="ao" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="var(--orange)"/></marker>
+    <marker id="ap" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="var(--purple)"/></marker>
+    <marker id="ag2" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="var(--green)"/></marker>
+  </defs>
+</svg>
+<div class="dock">
+  <span class="ok">✅ 结论：record 原片落盘、play 按索引再生，节点无法分辨历史与现场</span>
+  <span class="warn">⚠️ 风险：kill -9 违规停录 · --clock/use_sim_time 漏一个即时间错位</span>
+  <span class="evid">🔍 验证：04 节 3 回放 listener 复活 + 4 双开关 Time 面板</span>
+</div>
+<div class="ft">EXP-16 · rosbag2 数据录制与回放</div>
+</body>
+</html>

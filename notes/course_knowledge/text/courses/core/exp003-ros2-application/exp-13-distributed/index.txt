@@ -1,0 +1,851 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp003-ros2-application/exp-13-distributed/index.html
+TITLE: EXP-13 · ROS2 分布式通讯 — 机器人 ROS2 应用与开发
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+EXP-13 · ROS2 分布式通讯 — 机器人 ROS2 应用与开发
+🧠 具身智能课程 ·
+教程首页
+核心课程
+/
+ROS2 应用与开发
+/ EXP-13
+本页目录
+★ 课程目标
+01 问题引入：好好的机器人为什么会"串台"
+02 先看现象：同域就通、异域就断
+03 原理讲解
+04 实验步骤
+05 注意事项与验收
+06 本课总结与验证题
+CH3 · 底层机制与分布式
+EXP-11 时间与定时器
+EXP-12 DDS 通信剖析
+EXP-13 分布式通讯
+EXP-13 · 第三章 · 验证性 · 2 学时
+ROS2 分布式通讯：域隔离、组网与安全
+同一个教室里三台机器人全用默认配置，A 车的操作命令竟被 B 车执行了——这不是 bug，是"串台"。本课先用
+ROS_DOMAIN_ID
+治串台（教学分组靠它统一话题名），再沿"同网群控用 namespace、无线组控改单播发现、大规模机群上 DISCOVERY_SERVER"把四级选型一次讲透。
+难度 ⭐⭐
+2 学时
+验证性
+关键词 DOMAIN_ID · namespace · 单播发现 · DISCOVERY_SERVER
+目标
+本课学完，你应该能做到
+① 会分组
+教学用域号划圈
+能讲清
+ROS_DOMAIN_ID
+落到教学分组怎么用：给每组分配不同域号，让 6 个小组可以放心共用
+/cmd_vel
+、
+/chatter
+这类标准话题名而不串台，并算出域号对应的组播地址与发现端口。
+② 会群控
+同网多车加前缀寻址
+能用 namespace 把同域多车的话题变成
+/robot01/cmd_vel
+…
+/robot06/cmd_vel
+，说清"按车寻址"与"循环前缀=群发"两种群控写法，并用
+ros2 topic list
+验证前缀已生效。
+③ 会纠无线
+改单播发现不再赌组播
+能解释 802.11 为什么坑组播（按最低速率发、无 ACK 重传、AP 聚合限速），并会写一份 Fast DDS XML 的固定对端名单，用
+FASTRTPS_DEFAULT_PROFILES_FILE
+切到单播发现。
+④ 会选型
+上量靠服务器容灾
+能按"教学分组 → 同网群控 → 无线组控 → 大规模机群"四级场景选对方案：部署
+DISCOVERY_SERVER
+集中发现，说清主备多机容灾思路与每一级的代价。
+本课的重点与难点
+重点
+：四级选型判据——规模有多大、网是怎样的（有线/无线）、要不要统一话题名；对应四招：域号划圈、namespace 寻址、XML 单播绕障、服务器集中。
+难点
+：无线组播失败"不报错、时好时坏"的定位；以及为什么名单长了就该换成 DISCOVERY_SERVER 而不是继续加静态 IP。
+和前后的关系
+EXP-12 已把域模型讲透，
+我们教学环境就用域号这件事
+给各组划圈、放心统一话题名；本课再补上同网 namespace 群控、无线单播发现与大规模容灾——这是后面多车联动实验（EXP-15/17）的组网前提。
+01
+问题引入：好好的机器人为什么会"串台"
+先回忆
+EXP-05 讲过节点靠"网络组播"互相发现、EXP-06 讲过话题不经过任何中心服务器、EXP-12 已把域模型（
+ROS_DOMAIN_ID
+划圈）讲透——教学环境正是靠它给各组划圈，好让大家都统一叫
+/cmd_vel
+。本课在"划圈"之上再解决三件更实际的事：同域多车怎么群控（namespace）、无线为什么坑组播（单播 XML）、上规模后怎么集中发现（DISCOVERY_SERVER 主备）。
+1
+场景
+同一教室三台 B2 实验车同时开机，全部使用 ROS2 默认配置
+2
+怪事
+给 1 号车发
+ros2 topic pub /cmd_vel
+，2 号车竟然也动了
+3
+排查
+两台车
+echo $ROS_DOMAIN_ID
+都是空（默认 0），在同一网络里互相"听得见"
+4
+本质
+ROS2 没有中心注册表，靠
+网络组播
+互相发现——同域 = 同一个"频道"
+定义
+域（Domain）
+是 ROS2 的逻辑通信隔离圈：只有
+ROS_DOMAIN_ID
+相同的节点才能互相发现和通信。ID 取值 0~232，不同域的节点即使插在同一根网线上也"互相看不见"。这是 DDS 层的机制，ROS1 需要换 Master 地址才能做到的事，ROS2 改一个环境变量就行。
+事故复盘：一次真实的"串台"
+某次实训课，三台 B2 实验车（编号 1/2/3）同时开机做无人驾驶循迹练习。约 10 分钟后，2 号车突然"抽风"——直行中猛地右转撞到护栏。重启后正常，但 20 分钟后 3 号车又出现同样症状。三台车的代码完全一样，都没改过。
+1
+14:02 · 三车开机
+全部出厂默认配置，
+echo $ROS_DOMAIN_ID
+都为空 →
+都是域 0
+2
+14:05 · 2 号车撞栏
+日志显示收到了一条
+/cmd_vel
+：
+angular.z = -0.8
+，但 2 号车自己
+从没发过这个话题
+3
+14:25 · 3 号车复现
+同样的指令、同样的动作——三台车的
+/cmd_vel
+在同一个域里
+混成了一条
+4
+根因定位
+助教在 1 号车上手动发了一段测试指令，2/3 号车同时响应——
+串台坐实
+四层放大效应
+为什么单机演示好好的、连上同一 WiFi 就出事？因为默认配置下三台车共享同一个通信域，且
+/cmd_vel
+这类话题名在三台车上
+完全一样
+——于是"1 号车的意图"被 2 号车忠实地执行了：
+①
+无隔离圈
+：同域 = 同一频道，谁都能听见；
+②
+话题名撞车
+：三车都叫
+/cmd_vel
+，语义上无法区分"谁的命令"；
+③
+QoS 默认兼容
+：都是 RELIABLE + KEEP_LAST(10)，发现阶段直接撮合成功，没有任何警告；
+④
+无声接管
+：订阅端收到指令就执行，不会问"这条是谁发的"。
+—— 四层任何一层有防护，事故都不会发生。而最省事的一层，就是域名。
+本课的三个问题
+① 域号到底是什么、凭什么能"划圈"？（03 节原理）
+② 划圈之后，两台设备怎么才能
+看见彼此
+？（03 节组网三前提：同段、同 ID、组播通）
+③ 同一个 WiFi 下，"不被别人看见"和"能看见自己人"如何同时成立？（02 / 04 节实操）
+02
+先看现象：同域就通、异域就断
+不接第二台设备，三个终端、四步、约 2 分钟：先看到"同域互通"，再亲眼看它"异域即断、切域即串"。域号的完整给法（当前终端 / 单条命令 / 写进镜像三种）见 04 节"域号的三种给法"，本节第一条命令就是最常用的给法一。
+终端 1
+域 42 发布端
+保持运行
+1
+进域 42 起 talker
+终端 1
+export
+ROS_DOMAIN_ID=
+42
+ros2
+run demo_nodes_cpp talker
+$ export ROS_DOMAIN_ID=42
+[INFO] [talker]: Publishing: 'Hello World: 1'
+终端 2
+同域能收
+新终端
+2
+同域 42 的 listener 立刻收到
+终端 2
+export
+ROS_DOMAIN_ID=
+42
+ros2
+run demo_nodes_cpp listener
+[INFO] [listener]: I heard: [Hello World: 1]
+# 同域互通成立 ✓
+终端 3
+异域即断
+新终端
+3
+换域 99：对端话题消失、收不到数
+终端 3
+export
+ROS_DOMAIN_ID=
+99
+ros2
+topic list
+# 只有 /parameter_events、/rosout，没有 /chatter ✓
+4
+全部 unset：串台现场重现
+三终端都执行
+unset
+ROS_DOMAIN_ID
+ros2
+topic list
+/chatter  ← 又回来了：回到同一域，别人的话题立刻可见
+✔ 现象到手：同域通、异域断、切回默认即时串——机制细节与完整操作在 03 / 04 节拆解。
+03
+原理讲解
+一个数字如何隔离整张网
+物理层根因
+组播地址跟着 ID 走
+Fast-DDS 根据域号计算出专属组播地址
+239.255.0.N
+和端口
+7400 + N×250
+。发往不同域的发现报文在
+网卡层就被分流
+，根本不会送到对方协议栈——这就是隔离的第一道防线。
+发现流程
+SPDP 宣告 → SEDP 交换
+节点启动即向域内组播地址周期发送 SPDP 发现报文；收到回应后双方通过 SEDP 交换"我有哪些话题/服务/动作端点"，才建立点对点的正式传输链。
+对比 ROS1
+去中心化的天然优势
+ROS1 靠唯一的 ROS_MASTER_URI 注册中心，改域要换 Master 地址、全部节点重启；ROS2 每个节点自主发现，改 DOMAIN_ID 就是各改各的环境变量，Master 单点故障问题也随之消失。
+组网三前提
+同段、同 ID、组播通
+跨机通信只依赖三件事：① IP 同网段（能互相 ping 通）② 双方 ROS_DOMAIN_ID 相同 ③ 组播没有被防火墙/交换机拦截。没有 Master、没有配置文件，就这三条。
+对比维度
+ROS1
+ROS2（DDS）
+发现方式
+所有节点向 ROSMaster 注册/查询
+域内组播 SPDP 自主互发现
+"隔离"手段
+改 Master URI + 全节点重启
+改 ROS_DOMAIN_ID，即时生效
+取值范围
+无域概念（一台机器一个 Master）
+0~232，共 233 个逻辑隔离域
+单点故障
+Master 挂了新节点进不来
+无中心，任意节点退出不影响他人
+隔离层次
+应用层（还能互相 ping）
+直达 DDS 发现层甚至网卡过滤
+和 VLAN 的本质区别
+VLAN 是交换机上的
+硬件隔离
+——报文不在同一广播域，要动网络设备配置；域是 DDS 发现层的
+软件隔离
+——报文照样到达网卡，只因组播地址 / 端口不同在
+网卡分流层
+就被丢弃。交换机一动不动，改一个环境变量即时生效。
+要点
+三台机器人要"各自独立"，最简单的规范是：
+每台机器人烧录不同的 DOMAIN_ID
+（写进
+~/.bashrc
+或机器人系统镜像），中央工作站同时开多个终端、用不同 ID 分别接入各车——比给每台车配独立网段省事得多。
+组播发现与域隔离的物理过程
+图 13-1 · 域隔离物理过程｜本图回答：改一个 ROS_DOMAIN_ID，为什么两台机器就"互相看不见"了？
+✅ 结论：域号→地址端口是物理映射，隔离在网卡分流层
+⚠️ 风险：全域默认 0 = 串台；组播被拦 = 同域也看不见
+🔍 验证：EXP-12 A-1 实测 7400/9150 + 三终端实操
+EXP-12 实测对上号
+上一章的端口证据在这里继续用：
+发现端口 = 7400 + 250 × 域号
+。域 7 实测就是 9150/9161（EXP-12 实操 A-1 亲测），不是理论值——域号一变，端口
+物理上
+就换了，这是"网卡层分流"最硬的证据。
+⚠ 组播地址别记错成 239.255.0.0
+ROS 2 默认在
+239.255.0.0/24
+这个网段上划分子网，但每个域的地址都从
+.1
+起算：
+域号 N → 239.255.0.(N+1)
+。所以域 0 是
+239.255.0.1
+，域 5 是
+239.255.0.6
+。
+网段第一个地址（.0）与最后一个地址（.255）在 IPv4 组播里不分配给主机，这也是"域号最大只能到 232"的原因之一。
+记法：地址末位 = 域号 + 1。
+ROS_DOMAIN_ID
+组播地址
+发现端口（组播 / 单播）
+被谁用
+0（默认）
+239.255.0.1
+7400 / 7411
+出厂默认 →
+串台的根源
+1
+239.255.0.2
+7650 / 7661
+多机车间第 1 组
+5
+239.255.0.6
+8650 / 8661
+本节演示用
+7
+239.255.0.8
+9150 / 9161
+EXP-12 实操实测值
+42
+239.255.0.43
+17900 / 17911
+实操 A 用（42 = 实验编号，好记）
+算一遍就知道上限
+域号最大 232，对应端口 7400 + 250×232 =
+65400
+，已经贴着系统端口上限 65535。所以域号
+不能乱挑大数字
+——实验室给 20 个组分配域号，从
+1~20
+顺序发牌即可，既避开默认域 0，又留足余量。
+两种发现模式与通信安全
+模式一 · 默认
+组播自主发现
+开局域网、机器人数量少（<50 节点）时的默认选择。零配置、即开即用，但依赖组播——部分企业网/云环境交换机禁用了组播，就全军覆没。
+模式二 · 进阶
+ROS_DISCOVERY_SERVER 单播
+指定一台"发现服务器"，所有节点改为向它单播注册。不受组播限制，适合 50~500 节点、跨子网、云端混合部署。代价是要先启动并维护 server 进程。
+安全层
+DDS-Security / SROS2
+DDS 标准定义的安全扩展：governance（哪些域要加密）+ permissions（谁能发/收哪个话题）+ passwords（密钥），ROS2 封装为 sros2 工具包，未授权节点连"看到话题"都做不到。
+成本意识
+加密是有代价的
+SROS2 Enforce 模式带来约 5~15% CPU 开销。教学小车资源有限，建议：内网实验默认不开，涉及远程遥控/OTA 升级的产品化场景再启用。
+维度
+组播发现（默认）
+DISCOVERY_SERVER
+传输方式
+组播 239.255.0.N
+单播到指定 IP:11811
+配置成本
+零（只改域号）
+先跑 fastdds discovery，每终端 export 服务器地址
+跨子网/云
+组播通常被路由丢弃 → 不通
+单播可路由 → 通
+适用规模
+单网段、小中型系统
+几十到数百节点、跨网段
+故障特征
+防火墙/交换机一拦就全挂
+server 挂了新节点发现不了（有单点）→ 可配多台服务器地址容灾互备，见末节四级选型
+SROS2 速览
+三步启用：①
+sros2 security generate_artifacts -p governance.xml -p permissions.xml -k keystore
+生成密钥库 ② 每个节点启动时注入
+ROS_SECURITY_ENABLE=true
+、
+ROS_SECURITY_STRATEGY=Enforce
+、
+ROS_SECURITY_KEYSTORE
+③ enclave 名必须与 permissions 声明一致。效果：未授权节点 echo 会直接失败。⚠ 密钥库严禁提交 git。
+部署后怎么验（可照抄）
+① 起服务器：
+fastdds discovery --server-id 0 --ip-address <本机IP> --port 11811
+；② 每个终端
+export ROS_DISCOVERY_SERVER=<ip>:11811
+；③ 验证：
+ros2 daemon status
+确认 CLI 守护进程正常，跨子网两台机器各跑
+ros2 node list
+都能列出对方节点——列得出，发现链路即成立。
+场景全景：从教室到机群，四级选型与真实案例
+图 13-4 · 场景全景｜本图回答：规模和网络一变，什么时候划圈、什么时候加前缀、什么时候改单播、什么时候上服务器？
+✅ 结论：分组划圈 → 群控前缀 → 无线单播 → 上量集中，四级逐级升级
+⚠️ 风险：无线上赌组播=随机丢发现；40 车仍全组播=发现风暴
+🔍 验证：02/04 三终端 · 本节 namespace/XML 命令 · 组排台 server 场景
+四级口诀（一句话选型）
+圈用
+域号
+划（EXP-12 已学，教学分组就这么用——各组一个域号，话题名才能全员统一）；车用
+前缀
+寻址（同域 namespace）；无线用
+单播
+绕障（XML 固定对端，802.11 组播靠不住）；机群用
+服务器
+集中（DISCOVERY_SERVER 主备容灾）。规模或网络介质一变，就往下一级走一格。
+第一级 · 教学分组
+整组换域号，话题名统一
+实训室 6 组同时上课：每组发一个域号（
+1~6
+），组内全部光明正大叫
+/cmd_vel
+、
+/chatter
+——异组之间本来就互相看不见，串台在分组这一层就死掉。这就是我们教学统一用
+ROS_DOMAIN_ID
+的原因。
+第二级 · 同网群控
+同域加 namespace 前缀
+同一组 6 台 B2 要联动：进入同一域后，各车话题挂上前缀
+/robot01/cmd_vel
+…
+/robot06/cmd_vel
+——指哪打哪是"按车寻址"，循环 6 个前缀发一遍就是"群发全组"。
+第三级 · 无线组控
+XML 固定对端，单播宣告
+车跑起来靠实训 AP：802.11 对组播按最低速率发、不重传还聚合限速，SPDP 宣告一多就随机丢——把固定几台的 IP 写进一份 Fast DDS XML，宣告逐台单播直达，发现不再赌无线组播。
+第四级 · 大规模机群
+服务器集中 + 主备容灾
+开放日 40 台车跨教室联调：静态名单已经写不动、组播更会形成发现风暴——全部节点改为向 DISCOVERY_SERVER 单播注册，部署两台 server 一主一备，主挂备切，发现链路不断。
+第二级落地 · namespace 怎么设、怎么用、怎么验
+设
+（每台车一个前缀，同域内话题即被隔开，二选一）：
+# 给法 A · 命令行（先看效果最直观）
+ros2
+run demo_nodes_cpp talker --ros-args -r __ns:=/robot01
+# 给法 B · launch 一行（后面多车实验的标准姿势）
+Node(
+package
+=...,
+executable
+=...,
+namespace
+=
+'robot01'
+)
+用
+（群控两种打法）：按车寻址
+ros2 topic pub /robot01/cmd_vel …
+只动 1 号车；群发全组 = 按
+robot01…robot06
+循环发同一指令。
+验
+：
+ros2 topic list
+应看到
+/robot01/chatter
+——另一终端不带前缀去
+echo /chatter
+一条也收不到；
+ros2 node list
+里节点也带着
+/robot01
+前缀。失败模式：前缀写在了启动前缀之外的终端、或还没进同域就先验前缀——顺序是先划圈（同域）再寻址（前缀）。
+第三级落地 · 无线为什么坑组播、XML 怎么配
+机制
+（802.11 与以太网不同）：无线组播按
+最低速率
+发、
+没有 ACK/重传
+，AP 还会把组播聚合并限速——多台车同时跑起来，SPDP 宣告在空口随机丢失，症状是"发现时好时坏、还不报任何错"。
+设
+（把固定队友写成单播初始对端名单，每台机器都持有一份同样的 XML）：
+<!-- peers.xml：固定队员的单播对端名单 -->
+<participant><rtps><builtin><initialPeersLocator>
+  <locator><udpv4><address>192.168.10.11</address></udpv4></locator>
+  <locator><udpv4><address>192.168.10.12</address></udpv4></locator>
+</initialPeersLocator></builtin></rtps></participant>
+export
+FASTRTPS_DEFAULT_PROFILES_FILE=$
+PWD
+/peers.xml
+# 每个终端都要，写进 bashrc 固化
+怎么用
+：6 台车的 WIFI IP 互写进同一份名单，启动即按名单逐台
+单播
+互发宣告——组播从发现的关键路径上被摘掉。
+验
+：
+ros2 topic list
+跨车互见、稳定不闪；
+tcpdump -ni wlan0 udp port 7400
+抓到的是发往固定 IP 的单播。
+⚠ 名单超过十几台就别再手写——那就是第四级的活。
+第四级落地 · 服务器集中与容灾（部署命令见上一小节"部署后怎么验"）
+怎么用
+：几十上百台车全部
+export ROS_DISCOVERY_SERVER=<ip1>:11811
+发现统一走服务器，不再有组播风暴也没有越写越长的静态名单。
+容灾怎么做
+：起第二台 server（不同机器、同一端口即可），客户端把备用地址一并写进同一变量（分号分隔两个
+ip:port
+）——主服务器故障时切到备机继续宣告与接入。
+验
+：跑起主备后 kill 掉主服务器进程，已建链的话链照常、新节点仍能经备机加入；把两台地址全删光才会回到"组播赌运气"。
+代价
+：多一台常驻服务器要维护——这就是划得来的规模门槛。
+04
+实验步骤
+工程化顺序：先看全景（图 13-2）→ 再进诊断台与三终端实操 → 最后读验收清单。
+图 13-2 · 工程全景｜本图回答：本实验的终端、DDS 发现和组网条件如何连成一张网？
+✅ 结论：同域同地址同端口才互通
+⚠️ 风险：三前提任一不满足即"看不见"且无报错
+🔍 验证：三终端四步 + 诊断台六场景
+双机组网诊断台
+图 13-3 · 组网诊断台｜本图回答：按什么顺序排查"节点互相看不见"，每步用哪条命令？
+✅ 结论：ID → ping → 组播 → QoS 四步按序排查
+⚠️ 风险：组播被禁网阻断 → 换 DISCOVERY_SERVER
+🔍 验证：诊断台六场景（fw / vm / server）
+组排 Network Bench：判断两台设备能否互通，说不出原因就是没学透
+网络场景
+默认网络 · A=0 B=0 · 防火墙放行
+A=0 · B=5（域隔离生效）
+A=0 B=0 · 但防火墙拦截组播
+A=0 B=0 · 虚拟机 NAT 模式
+补救：B 切回 0，双方一致
+组播被禁 · 改用 DISCOVERY_SERVER
+域号的三种给法
+三种给法对应三种使用场景——先在当前终端试（最常用），排查时用前缀式做 A/B 对照，确认无误再固化到机器人镜像里。
+终端
+给法一 · 当前终端会话生效
+最常用 · 调试友好
+1
+export 后，本终端启动的节点都进域 5
+终端 A · 发布方
+影响范围是
+当前 shell 及其启动的所有子进程
+——新开的终端不受影响。用官方 demo 的
+talker
+做发布方：
+export
+ROS_DOMAIN_ID=
+5
+echo
+$ROS_DOMAIN_ID
+# 5
+ros2
+run demo_nodes_cpp talker
+# 本终端启动的节点都进域 5
+$ export ROS_DOMAIN_ID=5
+$ echo $ROS_DOMAIN_ID
+5
+$ ros2 run demo_nodes_cpp talker
+[INFO] [talker]: Publishing: 'Hello World: 1'
+[INFO] [talker]: Publishing: 'Hello World: 2'
+再开一个终端 B，同样
+export ROS_DOMAIN_ID=5
+后跑
+listener
+，就能收到：
+export
+ROS_DOMAIN_ID=
+5
+ros2
+run demo_nodes_cpp listener
+# 同域才能收
+$ export ROS_DOMAIN_ID=5
+$ ros2 run demo_nodes_cpp listener
+[INFO] [listener]: I heard: [Hello World: 1]
+[INFO] [listener]: I heard: [Hello World: 2]
+终端
+给法二 · 单条命令临时指定
+不污染环境
+2
+前缀式注入，命令返回后变量表毫发无损
+终端
+多人共用一台机器时必备——排查串台问题做 A/B 对照最干净。同一台机器上，让
+listener
+留在域 5，
+talker
+用前缀式临时进域 6，立刻看不到数据：
+ROS_DOMAIN_ID
+=
+6
+ros2 run demo_nodes_cpp talker
+echo
+$ROS_DOMAIN_ID
+# 输出仍为空——环境没被改
+$ ROS_DOMAIN_ID=6 ros2 run demo_nodes_cpp talker
+[INFO] [talker]: Publishing: 'Hello World: 1'
+# 域 5 的 listener 一条也收不到 —— 域号不同，物理上就是两个网络
+$ echo $ROS_DOMAIN_ID
+（空）—— 当前 shell 的变量表没被污染
+终端
+给法三 · 写进 bashrc 固化
+机器人出厂配置
+3
+写进镜像，开机自动生效
+终端
+工控机/机器人出厂配置的标准做法；注意
+source 只影响之后新开的终端
+：
+echo
+'export ROS_DOMAIN_ID=5'
+>> ~/.bashrc
+source
+~/.bashrc
+# 只影响新开终端；老终端不会变
+$ cat ~/.bashrc | tail -1
+export ROS_DOMAIN_ID=5
+# 但当前终端 echo 仍是空 —— 必须再 source 或重开终端
+✔ 三种给法的差别一句话记住：
+export 管当前终端
+、
+前缀只管一条命令
+、
+bashrc 管开机以后的新终端
+。
+原理
+给法二（前缀式）为什么"不污染环境"？shell 的
+VAR=x cmd
+语法只在
+cmd
+进程及其子进程的环境里注入该变量，命令返回后当前 shell 的变量表毫发无损。排查串台问题时用它做 A/B 对照，比反复 export/unset 干净得多。
+单机三终端，10 分钟看到隔离效果
+不接第二台设备也能完整验证域机制——开三个终端即可。三个终端都先
+cd ~/ros2_ws
+并
+source install/setup.bash
+。
+1
+终端1 · 域 42
+export ROS_DOMAIN_ID=42，启动 talker 发布 /chatter
+2
+终端2 · 同域
+export 同为 42，启动 listener（或 topic echo）→
+能收到
+，证明同域互通
+3
+终端3 · 异域
+export ROS_DOMAIN_ID=99 后再 echo →
+收不到
+，publishers 列表为空
+4
+复现串台
+三终端全部 unset 恢复默认 0 → 终端3 的 listener 立即开始打印
+终端 1
+域 42 发布端
+保持运行
+1
+进域 42 并启动 talker
+终端 1
+export
+ROS_DOMAIN_ID=
+42
+ros2
+run demo_nodes_cpp talker
+$ export ROS_DOMAIN_ID=42
+$ ros2 run demo_nodes_cpp talker
+[INFO] [talker]: Publishing: 'Hello World: 1'
+[INFO] [talker]: Publishing: 'Hello World: 2'
+终端 2
+同域验证（预期：能收到）
+新终端
+2
+同域 listener → 收到数据
+终端 2
+域号相同 = 组播地址端口相同 → SPDP 命中 → SEDP 撮合 → 数据到达：
+export
+ROS_DOMAIN_ID=
+42
+ros2
+topic list
+# 能看到 /chatter
+ros2
+run demo_nodes_cpp listener
+$ export ROS_DOMAIN_ID=42
+$ ros2 topic list
+/chatter
+/parameter_events
+/rosout
+$ ros2 run demo_nodes_cpp listener
+[INFO] [listener]: I heard: [Hello World: 7]
+[INFO] [listener]: I heard: [Hello World: 8]
+# 同域互通成立 ✓（也可用 ros2 topic echo /chatter 看到同样的 data）
+终端 3
+异域验证（预期：收不到）
+新终端
+3
+换域 99 → 对端话题消失
+终端 3
+注意：列表
+不是空的
+——本机域内公共话题仍在，判断标准是有没有
+对端节点的话题
+：
+export
+ROS_DOMAIN_ID=
+99
+ros2
+topic list
+# 只有本机公共话题
+ros2
+run demo_nodes_cpp listener
+# 一直空，等不到数据
+$ export ROS_DOMAIN_ID=99
+$ ros2 topic list
+/parameter_events
+/rosout
+# 没有 /chatter —— 域 42 的话题在这个域不可见 ✓
+$ ros2 run demo_nodes_cpp listener
+（一直等待，没有任何 I heard 输出）
+终端 3
+复现串台：切回默认域 0
+4
+三终端 unset → 串台现场重现
+终端 3
+这正是事故复盘里发生的事——只要回到同一个域，别人的话题立刻出现在你眼前：
+unset
+ROS_DOMAIN_ID
+ros2
+topic list
+$ unset ROS_DOMAIN_ID   # 终端1 也执行
+$ ros2 topic list
+/chatter
+← 对端话题又出现了（串台重现）
+/parameter_events
+/rosout
+$ ros2 run demo_nodes_cpp listener
+[INFO] [listener]: I heard: [Hello World: 13]  ← 立刻开始打印
+# 若这是别人的机器人，它的 /cmd_vel 就会被我订阅到 —— 事故就是这样发生的
+✔ 四步走完，域隔离的机制你已亲手验证：同域互通、异域隔离、切域即时生效。
+观察点
+终端 3 里
+ros2 topic list
+并非"空"——本机域内公共话题（/parameter_events、/rosout）仍在。判断标准是
+有没有对端节点的话题
+，不是列表长度。
+05
+注意事项与验收
+验收 1：单机三终端——
+talker
+与
+listener
+实测
+同域互通、异域隔离、切回默认域串台重现
+，三步截图齐全
+验收 2：能算出任意域号的发现端口（
+7400 + 250×域号
+），并说明域 232 为何贴着上限
+验收 3：三种给法各跑一次，能说清导出范围差异（当前终端 / 单条命令 / 开机后新终端）
+验收 4：能说出跨机组网三前提（同网段 → 同域号 → 组播畅通），并按序排查（ID → ping → multicast → 防火墙）
+验收 5：对照
+图 13-1 上半
+（SPDP 组播宣告 → SEDP 交换端点 → 数据链路建立），自己默画得出 SPDP→SEDP 发现两阶段流程图
+验收 6：对照
+图 13-4
+说清四级选型判据——为什么教学组用域号、同网群控用 namespace、无线要改单播 XML、40 车级必须上 DISCOVERY_SERVER 及其主备容灾思路
+验收 7：能把
+talker
+挂进
+/robot01
+命名空间，用
+ros2 topic list
+/
+ros2 node list
+验证前缀生效，并解释不带前缀的终端为什么收不到
+坑
+症状
+解法
+环境变量没生效
+改了 bashrc 但当前终端还是老域号
+source 后开新终端；老终端手动 export；或用 env 前缀式当场验证
+防火墙拦组播
+域号一致、ping 通，就是互相看不到
+ufw allow 7400:8399/udp；云服务器还要在安全组放行 UDP 组播段
+虚拟机 NAT 模式
+虚拟机内节点与宿主机互发现失败
+VMware/VirtualBox 改"桥接模式"，让虚拟机拿到同网段真实 IP
+script 命令被截断
+记录会话时 \ 转义链接失效、话题被硬换行截开
+cmd 写成数组 script -qec "ros2 topic pub -r 1 /a std_msgs/msg/String '{data: hello}'" log
+fastdds 工具不存在
+command not found: fastdds
+sudo apt install ros-humble-rmw-fastrtps-cpp
+SROS2 enclave 名不匹配
+开了 Enforce 后节点无法通信
+enclave 名必须与 permissions 定义完全一致；密钥库不进 git
+06
+本课总结与验证题
+概念
+域 = DDS 层逻辑隔离圈
+ROS_DOMAIN_ID 0~232，同号互通、异号隔离，对应专属组播地址与端口。
+组网
+只要三个前提
+同网段、同域号、组播畅通。排查顺序：ID → ping → multicast → 防火墙 → 换 RMW。
+进阶
+四级场景选对方案
+教学分组用域号、同网群控用 namespace、无线组控改 XML 单播、大规模机群上 DISCOVERY_SERVER 主备容灾。
+工程化
+隔离要落到镜像里
+每台机器人出厂烧录独立域号，中央站多 ID 接入——这是多机车间的标准姿势。
+回扣事故复盘
+现在你能完整解释开课时那场"串台"了：三台车都是默认域 0、话题名都是
+/cmd_vel
+、QoS 默认兼容、订阅端收到就执行——
+改一个域号，四层里最关键的那一层就补上了
+。工程上的落地动作只有一句：把
+export ROS_DOMAIN_ID=N
+写进每台车的
+~/.bashrc
+，出厂即隔离。
+验证题（改动型 · 每题先自己作答，再展开核对）
+1（目标①·改参数）
+把域号从 5 改成 232：组播地址末位、发现端口各变成多少？为什么域号不能继续往大了挑？
+参考答案与得分点
+得分点：①地址末位 = 域号 + 1 →
+239.255.0.233
+②端口 = 7400 + 250×232 →
+65400
+（单播 65411） ③再大一级 65650 就超过系统端口上限 65535 → 域号最大 232。（①②各 40%，③ 20%）
+2（目标②·改设置）
+6 台车在同一个域里，话题全叫
+/chatter
+，根本分不清谁是谁。给其中一台的启动加
+--ros-args -r __ns:=/robot01
+后：话题名变成了什么？另一个不带前缀的终端去
+echo /chatter
+还能收到吗？想一条指令同时驱动 6 台，你怎么做？
+参考答案与得分点
+得分点：① 话题变为
+/robot01/chatter
+（节点也挂进 /robot01 命名空间）② 收不到——前缀把作用域隔开了，必须
+echo /robot01/chatter
+③ 群控 = 按
+robot01…robot06
+六个前缀循环发同一指令（或 launch 批量挂 namespace）。（①②各 40%，③ 20%）
+3（目标①·改命令）
+只在终端 1
+export ROS_DOMAIN_ID=42
+，终端 2 忘了 export 直接跑 listener——预期现象？想让"以后新开的所有终端"都默认进域 42，用哪种给法？
+参考答案与得分点
+得分点：①终端 2 落在默认域 0 → 收不到任何 I heard（域不同物理隔离） ②用给法三：
+echo 'export ROS_DOMAIN_ID=42' >> ~/.bashrc
+并重开终端/source ③给法一（export）只影响当前 shell 及子进程。（①②各 40%，③ 20%）
+4（目标④·改模式）
+两机同域 0 但交换机禁了组播：ping 通、域号一致，topic list 却为空。有人建议"两台都改成域 99 再试"——能通吗？两条正确修法是什么？
+参考答案与得分点
+得分点：①不能——域号与组播被拦无关，改域只会两边继续不可见 ②修法 A：放行组播（
+ufw allow 7400:8399/udp
+、交换机开 IGMP） ③修法 B：部署
+fastdds discovery
++ 每终端
+export ROS_DISCOVERY_SERVER=<ip>:11811
+改单播发现。（①30%，②③各 35%）
+5（目标④·改规划）
+工厂方案原为"每车独立域号"，结果中央监控站（单终端、默认域）订阅不到任何一辆车的 /robot_status。改哪一层才能让一个监控站汇总所有车？
+参考答案与得分点
+得分点：①现状根因：域互相隔离，单终端只能进一个域 ②方案 A：监控站开 N 个终端各 export 车辆域号（N 个进程） ③方案 B：每域起转发/bridge 节点把 /robot_status 聚到监控域 ④代价：A 终端多、B 多一跳延迟与故障点，"全同域"最省事但串台回归。（①30%，②③各 30%，④ 10%）
+6（目标③·改网络）
+车队挪到 802.11 无线 AP 下组控，症状：ping 通、同域号一致，
+ros2 topic list
+却"时有时无"。有人让你把每台车换成不同的域号——对吗？你按第三级方案写好
+peers.xml
+并
+export FASTRTPS_DEFAULT_PROFILES_FILE
+之后，用什么命令能确认发现已经改走单播？
+参考答案与得分点
+得分点：①不对——丢的是无线组播里的 SPDP（802.11 组播无 ACK、按最低速率发、AP 还限速），域号与它无关，换域只会两边继续不可见 ②变量要写进每台车的 bashrc/镜像，新开终端才行 ③
+tcpdump -ni wlan0 udp port 7400
+应看到发往固定车 IP 的单播、且跨车
+topic list
+稳定互见。（①40%，②③各 30%）
+CORE-01 · 机器人 ROS2 应用与开发 · EXP-13 ROS2 分布式通讯
+2 学时 · 验证性

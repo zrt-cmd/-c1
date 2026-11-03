@@ -1,0 +1,36 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp003-ros2-application/exp-16-rosbag/diagrams/fig-16-2-record-play-pipeline.html
+TITLE: 图 16-2 · 录放管线与时钟开关
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+图 16-2 · 录放管线与时钟开关
+图 16-2 · 录放管线：写进去是原片，放出来是再生
+本图回答的问题：从现场消息到 listener 复活，中间经过哪几步？--clock 双开关在管线的哪一段？
+① 现场录制（写入）
+② SQLite 时间序列
+③ 工位回放（再生）
+/chatter 等话题流
+talker · 1Hz 实时数据
+CDR 字节
+ros2 bag record
+Ctrl+C 优雅停 · 事务写盘
+exp16_full/ · SQLite3 + YAML
+t=10.002  /chatter  [CDR]
+t=11.004  /chatter  [CDR] …
+⚠ kill -9 停录：缓存丢、YAML 不写 → 包损坏（必须 Ctrl+C）
+ros2 bag play
+按原时序 · -r 调速
+索引读取
+再生发布
+listener
+分不清新旧
+时钟双开关（配合 EXP-11 use_sim_time）
+① play --clock → 以约 40Hz 持续再生 /clock 话题
+② 节点 / rviz2 -p use_sim_time:=true → 认钟
+漏一个：now=今天 · stamp=昨天 → TF LookupException 满屏
+验钟：Panels → Add New Panel → Time
+ros2 topic delay /scan（须带 header；/chatter 会报 no header）
+漏开关的症状在右侧回放段爆发
+✅ 结论：record 原片落盘、play 按索引再生，节点无法分辨历史与现场
+⚠️ 风险：kill -9 违规停录 · --clock/use_sim_time 漏一个即时间错位
+🔍 验证：04 节 3 回放 listener 复活 + 4 双开关 Time 面板
+EXP-16 · rosbag2 数据录制与回放

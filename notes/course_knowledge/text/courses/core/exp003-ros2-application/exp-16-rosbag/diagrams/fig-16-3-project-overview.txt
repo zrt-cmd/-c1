@@ -1,0 +1,35 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp003-ros2-application/exp-16-rosbag/diagrams/fig-16-3-project-overview.html
+TITLE: 图 16-3 · 实验工程全景
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+图 16-3 · 实验工程全景
+图 16-3 · 实验工程全景：三个终端各管一段
+本图回答的问题：录→查→放全流程里，每个终端各自扮演什么角色，数据从哪来到哪去？
+终端 A · 现场源
+终端 B / 新终端 · 观众
+终端 C · 录放控制台
+talker
+ros2 run demo_nodes_cpp
+listener
+录制时旁听 · 回放时当观众
+record / info / play
+写入 · 体检 · 再生发布
+/chatter 1Hz
+订阅
+record -a 分叉捕获全部活跃话题
+~/ros2_bags/exp16_full/
+exp16_full_0.db3 · 消息本体（CDR 时间序列）
+metadata.yaml · 清单（13.55s / 54 条 / QoS）
+Ctrl+C 写入
+play 读取
+四步闭环（04 节按序执行）
+① 录 record -a 15s
+② 查 info 心算 1.03Hz
+③ 断源后 play
+④ -r 2.0 调速
+回放前先停 talker/listener（ros2 node list 为空）——历史与现场不能混
+⚠ 第 3 步前必须 Ctrl+C 断掉终端 A/B，否则新旧消息混流
+✅ 结论：A 造现场 · C 录放 · B 当观众，bag 目录是唯一交接物
+⚠️ 风险：不断源就回放 → 分不清哪条消息是真的
+🔍 验证：04 节 1.4 录制 → 2 体检 → 3 断源回放
+EXP-16 · rosbag2 数据录制与回放

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>图 18-4 · 自建元包流程</title>
+<style>
+:root{--bg-page:#ffffff;--text:#0f172a;--text2:#475569;--muted:#94a3b8;--border:#e2e8f0;
+  --teal:#0891b2;--green:#059669;--purple:#7c3aed;--orange:#ea580c;--red:#e11d48;--gray:#64748b;
+  --teal-bg:rgba(8,145,178,.08);--green-bg:rgba(5,150,105,.08);--purple-bg:rgba(124,58,237,.08);
+  --orange-bg:rgba(234,88,12,.10);--red-bg:rgba(225,29,72,.08);--gray-bg:rgba(100,116,139,.08)}
+*{box-sizing:border-box}
+body{margin:0;background:#fff;color:var(--text);font-family:system-ui,"PingFang SC","Microsoft YaHei",sans-serif;padding:16px 14px 12px}
+.hd h1{font-size:15px;margin:0 0 4px}
+.hd .q{font-size:12px;color:var(--text2);margin:0}
+svg{width:100%;height:auto;display:block}
+.t{font:600 12.5px system-ui,sans-serif;fill:var(--text)}
+.s{font:400 10.5px system-ui,sans-serif;fill:var(--text2)}
+.l{font:600 10.5px ui-monospace,Consolas,monospace;fill:var(--text2)}
+.dock{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.dock span{font-size:11.5px;border-radius:999px;padding:3px 10px;line-height:1.6}
+.ok{background:#ecfdf5;color:#047857;border:1px solid #a7f3d0}
+.warn{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca}
+.evid{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}
+.ft{font-size:10.5px;color:var(--muted);margin-top:8px;text-align:right}
+</style>
+</head>
+<body>
+<div class="hd">
+  <h1>图 18-4 · 打造 car1_meta 的四步流程</h1>
+  <p class="q">本图回答的问题：从零建一个元包，每一步动什么文件、用什么命令、看什么输出？</p>
+</div>
+<svg viewBox="0 0 800 300" role="img" aria-label="自建元包四步流程图">
+  <defs>
+    <marker id="d-t" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#0891b2"/></marker>
+    <marker id="d-p" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#7c3aed"/></marker>
+    <marker id="d-g" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#059669"/></marker>
+    <marker id="d-o" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#ea580c"/></marker>
+    <marker id="d-r" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#e11d48"/></marker>
+  </defs>
+
+  <!-- step1 起点胶囊 -->
+  <rect x="20" y="60" width="132" height="46" rx="23" fill="#fff"/>
+  <rect x="20" y="60" width="132" height="46" rx="23" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1.5"/>
+  <text class="t" x="86" y="82" text-anchor="middle">ros2 pkg create</text>
+  <text class="s" x="86" y="100" text-anchor="middle">--build-type ament_cmake</text>
+
+  <line x1="152" y1="83" x2="196" y2="83" stroke="var(--teal)" stroke-width="1.5" marker-end="url(#d-t)"/>
+  <text class="l" x="163" y="74">①</text>
+
+  <!-- step2 package.xml -->
+  <rect x="200" y="50" width="176" height="66" rx="6" fill="#fff"/>
+  <rect x="200" y="50" width="176" height="66" rx="6" fill="var(--purple-bg)" stroke="var(--purple)" stroke-width="1.5"/>
+  <text class="t" x="288" y="74" text-anchor="middle">改 package.xml</text>
+  <text class="s" x="288" y="93" text-anchor="middle">删 build_depend/test</text>
+  <text class="s" x="288" y="109" text-anchor="middle">留 exec_depend + export</text>
+
+  <line x1="376" y1="83" x2="420" y2="83" stroke="var(--purple)" stroke-width="1.5" marker-end="url(#d-p)"/>
+  <text class="l" x="387" y="74">②</text>
+
+  <!-- step3 CMakeLists -->
+  <rect x="424" y="50" width="176" height="66" rx="6" fill="#fff"/>
+  <rect x="424" y="50" width="176" height="66" rx="6" fill="var(--purple-bg)" stroke="var(--purple)" stroke-width="1.5"/>
+  <text class="t" x="512" y="74" text-anchor="middle">改 CMakeLists.txt</text>
+  <text class="s" x="512" y="93" text-anchor="middle">只留四行有效内容</text>
+  <text class="s" x="512" y="109" text-anchor="middle">ament_package() 收尾</text>
+
+  <line x1="600" y1="83" x2="644" y2="83" stroke="var(--purple)" stroke-width="1.5" marker-end="url(#d-p)"/>
+  <text class="l" x="611" y="74">③</text>
+
+  <!-- step4 colcon build -->
+  <rect x="648" y="50" width="140" height="66" rx="6" fill="#fff"/>
+  <rect x="648" y="50" width="140" height="66" rx="6" fill="var(--green-bg)" stroke="var(--green)" stroke-width="1.5"/>
+  <text class="t" x="718" y="74" text-anchor="middle">colcon build</text>
+  <text class="s" x="718" y="93" text-anchor="middle">--packages-select</text>
+  <text class="s" x="718" y="109" text-anchor="middle">0.5s 注册完成</text>
+
+  <!-- 验证 -->
+  <line x1="718" y1="116" x2="718" y2="166" stroke="var(--green)" stroke-width="1.5" marker-end="url(#d-g)"/>
+  <text class="l" x="728" y="146">④</text>
+  <rect x="612" y="170" width="176" height="56" rx="6" fill="#fff"/>
+  <rect x="612" y="170" width="176" height="56" rx="6" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1.5"/>
+  <text class="t" x="700" y="193" text-anchor="middle">source + pkg xml</text>
+  <text class="s" x="700" y="213" text-anchor="middle">能看到全部 exec_depend</text>
+
+  <line x1="610" y1="198" x2="470" y2="198" stroke="var(--teal)" stroke-width="1.5" marker-end="url(#d-t)"/>
+  <text class="l" x="516" y="190">回读清单</text>
+  <rect x="300" y="170" width="166" height="56" rx="6" fill="#fff"/>
+  <rect x="300" y="170" width="166" height="56" rx="6" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1.5"/>
+  <text class="t" x="383" y="193" text-anchor="middle">聚合关系生效</text>
+  <text class="s" x="383" y="213" text-anchor="middle">rosdep 可解析整棵树</text>
+
+  <!-- 风险 -->
+  <line x1="288" y1="116" x2="288" y2="166" stroke="var(--red)" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#d-r)"/>
+  <rect x="44" y="170" width="200" height="56" rx="6" fill="#fff"/>
+  <rect x="44" y="170" width="200" height="56" rx="6" fill="var(--red-bg)" stroke="var(--red)" stroke-width="1.5" stroke-dasharray="6,4"/>
+  <text class="t" x="144" y="193" text-anchor="middle" fill="var(--red)">两处常见失败</text>
+  <text class="s" x="144" y="211" text-anchor="middle">选了 ament_python</text>
+  <text class="s" x="144" y="225" text-anchor="middle">元包里写了 build_depend</text>
+  <line x1="244" y1="198" x2="298" y2="198" stroke="var(--red)" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#d-r)"/>
+
+  <text class="s" x="400" y="268" text-anchor="middle">①建包 → ②清 XML → ③精简 CMake → ④构建并回读验证；②③ 是"元包身份"的两处硬约束</text>
+</svg>
+<div class="dock">
+  <span class="ok">✅ 结论：四步即可得到可安装、可回读的元包</span>
+  <span class="warn">⚠️ 风险：build-type 选错或混入 build_depend 都会让身份失真</span>
+  <span class="evid">🔍 验证：04 节步骤 ④ ros2 pkg xml car1_meta 的输出</span>
+</div>
+<div class="ft">EXP-18 · 元功能包与依赖聚合</div>
+</body>
+</html>

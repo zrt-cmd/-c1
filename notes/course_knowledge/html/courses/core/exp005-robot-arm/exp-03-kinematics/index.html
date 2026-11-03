@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-03 正运动学基础 · 机器人机械臂应用与开发</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+:root{--theme:#dc2626;--theme-deep:#b91c1c;--theme-bg:#fee2e2;--theme-bd:#fecaca}
+/* 雅可比与奇异性交互演示 */
+.jacdemo{margin:1.1rem 0 .4rem;padding:1rem 1.1rem;background:#fffbeb;border:1px solid #fde68a;border-radius:14px}
+.jacdemo .jd-head{display:flex;align-items:baseline;gap:.6rem;flex-wrap:wrap;margin-bottom:.55rem}
+.jacdemo .jd-head b{font-size:.98rem;color:#92400e}
+.jacdemo .jd-head .lab{font-size:.72rem;font-weight:700;color:#fff;background:#d97706;border-radius:999px;padding:2px 9px}
+.jacdemo .jd-body{display:flex;gap:1rem;align-items:center;flex-wrap:wrap}
+.jacdemo .jd-svg{flex:none;background:#fefce8;border:1px solid #fde68a;border-radius:10px}
+.jacdemo .jd-side{flex:1;min-width:235px}
+.jacdemo .jd-row{display:flex;align-items:center;gap:.55rem;font-size:.8rem;color:#78350f;margin:.35rem 0}
+.jacdemo .jd-row input[type=range]{flex:1;accent-color:#d97706}
+.jacdemo .jd-val{font-family:monospace;font-weight:700;width:3.4em;text-align:right}
+.jacdemo .bar{height:9px;background:#fde68a;border-radius:99px;overflow:hidden;margin:.3rem 0 .55rem}
+.jacdemo .bar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#16a34a,#d97706);transition:width .15s}
+.jacdemo .bar i.sing{background:linear-gradient(90deg,#dc2626,#b91c1c)}
+.jacdemo .jd-status{font-size:.82rem;font-weight:700;padding:.4rem .65rem;border-radius:8px;display:block;margin:.3rem 0}
+.jacdemo .st-ok{background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0}
+.jacdemo .st-near{background:#fffbeb;color:#b45309;border:1px solid #fde68a}
+.jacdemo .st-sing{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca}
+.jacdemo .jd-mat{font-family:monospace;font-size:.78rem;background:#0f172a;color:#e2e8f0;border-radius:8px;padding:.5rem .7rem;margin:.35rem 0 .1rem;white-space:pre;line-height:1.55;overflow-x:auto}
+.jacdemo .jd-note{font-size:.78rem;color:#78350f;line-height:1.7;margin:.45rem 0 0}
+/* 3D 交互模型（iframe 嵌入） */
+.frame-embed{margin:1.1rem 0 .5rem;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden;background:#f8fafc}
+.frame-embed iframe{display:block;width:100%;border:0}
+
+/* 公共样式给所有 <code> 加了浅灰底，包在深色 <pre> 里就会糊成一片。
+   这里把 pre 里面的 code 还原成"纯文字"，并放大一点点，公式才看得清。 */
+pre code{background:none;border:0;padding:0;border-radius:0;color:inherit;font-size:13.5px;line-height:1.85}
+pre{font-size:13.5px;line-height:1.85}
+
+/* 左 2D 拆解图 + 右 3D 真模型，并排对照 */
+.armpair{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:1rem 0 .6rem;align-items:center}
+.armpair>div{min-width:0;display:flex;flex-direction:column}
+.armpair-l svg{display:block;width:100%;height:auto;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px}
+.armpair-r iframe{display:block;width:100%;height:320px;border:1px solid #e2e8f0;border-radius:12px;background:#f8fafc}
+.armpair .embed-cap{margin:6px 0 0;padding:0;border:0;background:transparent;font-size:12px;line-height:1.6;color:#64748b;text-align:center}
+@media(max-width:860px){.armpair{grid-template-columns:1fr;align-items:start}.armpair-r iframe{height:280px}}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit" title="返回课程首页">🤖 具身智能课程 · <i>教程首页</i></a>
+  <div class="crumb"><a href="../../../index.html#core">核心课程</a> / <a href="../index.html">机械臂应用与开发</a> / EXP-03</div>
+</div>
+
+<div class="wrap">
+<aside class="side">
+  <h4>本页目录</h4>
+  <nav>
+    <a class="now" href="#s0">00 · FK 是什么</a>
+    <a href="#s1">01 · 目标与路线图</a>
+    <a href="#s2">02 · 台阶① 一根棍子</a>
+    <a href="#s3">03 · 台阶② 朝哪边伸</a>
+    <a href="#s4">04 · 台阶③ 三节串联</a>
+    <a href="#s5">05 · 台阶④ 姿态</a>
+    <a href="#s6">06 · 台阶⑤ 旋转矩阵</a>
+    <a href="#s7">07 · 台阶⑥ 齐次矩阵</a>
+    <a href="#s8">08 · 台阶⑦ 上真机</a>
+    <a href="#s9">09 · 动手验证</a>
+    <a href="#s10">10 · 总结与思考</a>
+  </nav>
+
+  <h4>本课程实验</h4>
+  <nav>
+    <a href="../exp-01-urdf-simulation/index.html">EXP-01 URDF 模型与仿真控制</a>
+    <a href="../exp-02-serial-pwm/index.html">EXP-02 串口协议与 PWM</a>
+    <a class="now" href="../exp-03-kinematics/index.html">EXP-03 正运动学基础</a>
+    <a href="../exp-04-ik-solver/index.html">EXP-04 逆运动学与 IK 解算</a>
+    <a href="../exp-05-action-replay/index.html">EXP-05 ROS2 架构与动作回放</a>
+    <a href="../exp-06-fixed-grasp/index.html">EXP-06 逆运动学固定抓取</a>
+    <a href="../exp-07-visual-grasp/index.html">EXP-07 视觉动态抓取</a>
+  </nav>
+</aside>
+
+<main class="content">
+
+<div class="exp-head">
+  <span class="code">EXP-03 · 第 2 章 · 验证性 · 4 学时</span>
+  <h1>正运动学基础：从关节角算出指尖位姿</h1>
+  <p class="desc">这一章只干一件事：<b>知道每个关节转了多少度，把指尖在哪、朝着哪算出来。</b>听着简单，但要把这件事算准，得用上三角函数和矩阵。别急，下面把它拆成 7 级台阶，每级只加一样新东西：<b>走到第 4 级，你就能自己把位姿算出来</b>；第 5、6 级把同一件事换成矩阵，让程序也能算，两条都得走；第 7 级上真机核对。全程都用同一个模型 <code>simple-arm.urdf</code>，里面每个数字你都可以自己动手验一遍。</p>
+  <div class="meta">
+    <span class="tag hl">⭐⭐ 中</span>
+    <span class="tag">4 学时</span>
+    <span class="tag">sin/cos · 向量 · 矩阵</span>
+  </div>
+</div>
+
+<!-- ==================== 00 开篇 ==================== -->
+<section class="blk" id="s0">
+<h2><span class="no">00</span>先认识一下这个名字</h2>
+
+<p>你在前面两个实验里已经让机械臂动起来了。URDF 交代了它长什么样子，串口协议让它真的转起来。可是有个问题一直悬着：<b>五个舵机各自转了一个角，指尖现在到底在哪？</b></p>
+
+<p>回答这个问题的学问，叫做 Forward Kinematics，中文一般译成「正运动学」，平时大家直接叫它 FK。它的意思很直白：<b>关节转了多少，是已知的；末端在哪、朝着哪，是要求的。</b></p>
+
+<p>叫「正」，是因为<b>顺序和人的习惯一样：先把胳膊摆成某个姿势，再去看手落在哪</b>。反过来那个问题你也一定想过：如果我想让手够到桌上的杯子，各关节该转多少？那是另一个学问，叫逆运动学（IK），下一章才讲。这一章我们只顺着来。</p>
+
+<h3>那"在哪、朝着哪"具体是几个数</h3>
+<p>新手常犯的一个误会，是<b>以为算出 x、y、z 三个坐标就算完事了</b>。其实不够。想想你伸手去拿杯子：手放在杯子的位置，但掌心朝上还是朝下，结果完全不同。所以完整的答案有两部分：</p>
+<table>
+  <tr><th>部分</th><th>说的是什么</th><th>几个数</th><th>本章算出来的</th></tr>
+  <tr><td>位置</td><td>指尖在空间里的坐标</td><td>3 个（x, y, z）</td><td>(0.157, 0, 0.342) m</td></tr>
+  <tr><td>姿态</td><td>指尖朝着哪个方向，夹爪是朝上还是朝前</td><td>3 个（绕三根轴的转角）</td><td>工具段倾角 90°，也就是水平朝前</td></tr>
+</table>
+<p>两个加起来 6 个数，行内把这一整套叫<b>「位姿」</b>（pose）。后面讲到最后你会发现，光有位置没有姿态，夹爪是抓不住东西的。</p>
+
+<h3>要动用的数学，先看一眼全貌</h3>
+<p><b>下面这张表你现在不用全懂，混个眼熟就行。</b>之所以提前列出来，是想让你心里有个数：这一章不会突然冒出一堆没见过的符号。</p>
+<table>
+  <tr><th>数学</th><th>在这儿干什么用</th><th>第几个台阶用到</th></tr>
+  <tr><td>sin / cos</td><td>棍子斜着伸的时候，算它往前多少、往上多少</td><td>台阶一</td></tr>
+  <tr><td>向量加法</td><td>一段接一段地加起来，每段都是一个横竖两个数</td><td>台阶一、台阶三</td></tr>
+  <tr><td>角度相加</td><td>后一节是在前一节已经转过的角度上再转</td><td>台阶三</td></tr>
+  <tr><td>旋转矩阵</td><td>把"转一下"写成一个能反复套用的式子</td><td>台阶五</td></tr>
+  <tr><td>齐次矩阵 4×4</td><td>把"转"和"挪"合成一次乘法，可以一直连乘下去</td><td>台阶六</td></tr>
+</table>
+<p>顺便说几个这里<b>故意不讲</b>的东西：叉积、点积、雅可比、四元数。不是它们不重要，是这一章用不上。叉积只在判断"正转是往哪边"时提一句右手定则，不写公式。等你学到 IK 和轨迹规划，它们自然会回来找你。</p>
+</section>
+
+<!-- ==================== 01 问题 + 路线图 ==================== -->
+<section class="blk" id="s1">
+<h2><span class="no">01</span>先看清这台机器长什么样</h2>
+
+<p>要算指尖，得先知道身上有几个能转的地方。我们用一个教学模型 <code>simple-arm.urdf</code> 来说明，它和真机的关节链条、转轴方向完全一样，只是把真机上那些几毫米的装配偏差抹平了，方便你用计算器算。</p>
+
+<p>它有五个关节，五根连杆。别看数量不少，分工其实很清楚。左边这张拆解图说明每个关节管什么，右边是同一台机器人按 <code>simple-arm.urdf</code> 加载出来的真模型，两边可以对着看：</p>
+<div class="armpair">
+  <div class="armpair-l">
+    <svg viewBox="0 0 450 230" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="5 个关节的分工">
+      <g font-family="Microsoft YaHei,Noto Sans CJK SC,sans-serif">
+        <!-- 底座 -->
+        <rect x="90" y="180" width="110" height="14" rx="4" fill="#cbd5e1" stroke="#94a3b8"/>
+        <text x="145" y="212" font-size="10.5" fill="#475569" text-anchor="middle">底座（固定不动）</text>
+
+        <!-- J1 转台（绕 Z 转，从上往下看才会转） -->
+        <circle cx="145" cy="164" r="17" fill="#fee2e2" stroke="#dc2626" stroke-width="1.6"/>
+        <text x="145" y="169" font-size="11.5" font-weight="700" fill="#b91c1c" text-anchor="middle">J1</text>
+        <text x="170" y="154" font-size="10.5" font-weight="700" fill="#b91c1c">绕 Z 转：航向角 q1</text>
+        <text x="170" y="169" font-size="10" fill="#64748b">决定往哪边转</text>
+
+        <!-- J1 → J2 的立柱 -->
+        <line x1="145" y1="147" x2="145" y2="134" stroke="#94a3b8" stroke-width="6.5" stroke-linecap="round"/>
+
+        <!-- J2：绕 Y 转，把大臂往斜后方放倒 50° -->
+        <circle cx="145" cy="127" r="13" fill="#dcfce7" stroke="#16a34a" stroke-width="1.6"/>
+        <text x="145" y="131" font-size="11" font-weight="700" fill="#15803d" text-anchor="middle">J2</text>
+        <text x="163" y="124" font-size="10" font-weight="700" fill="#16a34a">J2 / J3 / J4 绕 Y 转</text>
+        <text x="163" y="138" font-size="10" fill="#64748b">俯仰角 q2 q3 q4，决定抬多高、伸多远</text>
+
+        <!-- 大臂：从 J2 往左下放倒（累计 -50°） -->
+        <line x1="145" y1="127" x2="110" y2="86" stroke="#f87171" stroke-width="10" stroke-linecap="round"/>
+        <text x="60" y="100" font-size="9.5" fill="#b91c1c">大臂 L1</text>
+        <text x="60" y="112" font-size="9.5" fill="#b91c1c">0.126 m</text>
+        <text x="52" y="78" font-size="10" font-weight="700" fill="#b91c1c">q2 = −50°</text>
+
+        <!-- J3：小臂在这里折回朝前上（累计 +55°） -->
+        <circle cx="110" cy="86" r="11" fill="#dcfce7" stroke="#16a34a" stroke-width="1.6"/>
+        <text x="110" y="90" font-size="10" font-weight="700" fill="#15803d" text-anchor="middle">J3</text>
+
+        <!-- 小臂：从 J3 往右上（累计 +55°，比竖直偏右 55° 的水平分量） -->
+        <line x1="110" y1="86" x2="150" y2="59" stroke="#fbbf24" stroke-width="9" stroke-linecap="round"/>
+        <text x="86" y="50" font-size="9.5" fill="#b45309">小臂 L2</text>
+        <text x="86" y="62" font-size="9.5" fill="#b45309">0.126 m</text>
+
+        <!-- J4：工具段在这里压平（累计 +90°，水平朝前） -->
+        <circle cx="150" cy="59" r="9.5" fill="#dcfce7" stroke="#16a34a" stroke-width="1.6"/>
+        <text x="150" y="62" font-size="9" font-weight="700" fill="#15803d" text-anchor="middle">J4</text>
+
+        <!-- 工具段：完全水平朝右（累计 90°） -->
+        <line x1="159" y1="59" x2="222" y2="59" stroke="#a78bfa" stroke-width="8" stroke-linecap="round"/>
+        <text x="176" y="50" font-size="9.5" fill="#6d28d9">工具段 0.151 m，水平</text>
+        <text x="176" y="74" font-size="9.5" font-weight="700" fill="#6d28d9">q2+q3+q4 = 90°</text>
+
+        <!-- J5 与夹爪 -->
+        <circle cx="232" cy="59" r="9" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.6"/>
+        <text x="232" y="62.5" font-size="9" font-weight="700" fill="#6d28d9" text-anchor="middle">J5</text>
+        <line x1="241" y1="55" x2="256" y2="53" stroke="#475569" stroke-width="2.4"/>
+        <line x1="241" y1="63" x2="256" y2="65" stroke="#475569" stroke-width="2.4"/>
+        <text x="296" y="52" font-size="9.5" fill="#475569">夹爪</text>
+        <text x="296" y="64" font-size="9.5" fill="#475569">左右开合</text>
+        <text x="296" y="41" font-size="10" font-weight="700" fill="#6d28d9">J5 绕 Z 转</text>
+
+        <!-- TCP 标记 -->
+        <circle cx="249" cy="59" r="3" fill="#dc2626"/>
+        <text x="249" y="83" font-size="9" fill="#dc2626" text-anchor="middle">TCP</text>
+
+        <!-- 竖直参考线 -->
+        <line x1="145" y1="134" x2="145" y2="38" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="3 4"/>
+        <text x="148" y="36" font-size="8.5" fill="#b0bcc9">竖直参考</text>
+      </g>
+    </svg>
+    <p class="embed-cap">拆解图｜J1 管往哪转，J2、J3、J4 管抬多高伸多远（这三根轴互相平行），J5 管夹爪朝向</p>
+  </div>
+  <div class="armpair-r">
+    <iframe src="_build/card-fk3d.html?view=model" title="URDF 加载的 3D 模型"></iframe>
+    <p class="embed-cap">真模型｜同一个 URDF 加载出来的 3D 模型，带坐标轴和 link 名字，可拖动旋转</p>
+  </div>
+</div>
+<p>左边是拆解，右边是实体，说的是同一台机器。你要是对不上号，就在右边转一转，找到那个关节——比如把视角转到侧面，能看到 J2、J3、J4 那三根轴确实指向同一个方向。</p>
+
+<p>关节数、每根连杆多长，这些都是 URDF 文件里写死的，不用你去量。真正需要你动脑子的是：<b>这些关节一起转起来，指尖会跑到哪。</b></p>
+
+<h3>怎么学：七个小台阶</h3>
+<p>这事一次说完会很难消化，所以下面<b>拆成七个台阶</b>。前面几级你连矩阵都不用碰，拿个计算器就能算；等手算彻底算通了，再回过头用矩阵把同样的过程重写一遍，那时候你会觉得矩阵是来帮忙的，而不是来为难你的。</p>
+<div class="frame-embed">
+  <iframe src="_build/fk-roadmap.html" height="660" title="FK 讲解路径路线图"></iframe>
+</div>
+<p class="embed-cap">图 1-2｜七级台阶怎么排队。第 1~3 级先把手算打通，第 4 级你自己就能算出完整位姿，走到这儿你就真的懂了。第 5、6 级把同一套计算换成矩阵重写一遍，答案不变，但只有这样程序才能算——真机和 ROS 里跑的就是这两级。第 7 级上真机核对。两条都得走。</p>
+
+<h3>几个会反复出现的词</h3>
+<p>这些词下面会一直出现，先花半分钟过一遍，不认识也没关系，看到后面自然就懂了。</p>
+<table>
+  <tr><th>词</th><th>说的是什么</th></tr>
+  <tr><td><code>tcp_link</code></td><td>两指之间的那个夹持点。这一章说"指尖"，指的都是它</td></tr>
+  <tr><td><code>base_link</code></td><td>底座本体，坐标原点就在它的安装面上。所有坐标都从这里量</td></tr>
+  <tr><td>连杆</td><td>机械臂身上的一根棍子，长度是固定的</td></tr>
+  <tr><td>关节</td><td>两根连杆之间能转的那个地方。这台机器五个关节都是转动的</td></tr>
+  <tr><td>累计角</td><td>从竖直方向量起，这一节手上总共转过了多少度。台阶三会重点讲</td></tr>
+  <tr><td>位姿</td><td>位置 3 个数加上姿态 3 个数，一共 6 个</td></tr>
+</table>
+
+<h3>顺带把坐标方向定下来</h3>
+<p><b>算坐标之前得先说好，x、y、z 分别指哪边。</b>不然你算出来的数跟别人的对不上。你可以想象自己站在小车正后方，面朝车头看：</p>
+<div class="kgrid">
+  <div class="kcard"><div class="kd" style="color:#dc2626">X</div><div class="kt">朝前</div><p>车头那个方向，红色</p></div>
+  <div class="kcard"><div class="kd" style="color:#16a34a">Y</div><div class="kt">朝左</div><p>你的左手边，绿色</p></div>
+  <div class="kcard"><div class="kd" style="color:#2563eb">Z</div><div class="kt">朝上</div><p>离开地面往上，蓝色</p></div>
+  <div class="kcard"><div class="kd">右手系</div><div class="kt">X × Y = Z</div><p>右手三根手指一比就出来了</p></div>
+</div>
+<p>这套约定是<b> ROS 官方定下的（REP-103）</b>，<code>simple-arm.urdf</code> 里每个 link 的 rpy 都是 <code>0 0 0</code>，老老实实照它来，所以不会出现某个关节反着转的情况。</p>
+</section>
+
+<!-- ==================== 02 台阶① ==================== -->
+<section class="blk" id="s2">
+<h2><span class="no">02</span>台阶一：先只算一根棍子</h2>
+
+<p><b>七个台阶里最简单的就是这个。</b>把整台机器先忘掉，只留一根棍子：一端固定在 J2，长度 L = 0.126 米，绕 J2 转了 θ 度。它的末端落在哪？</p>
+
+<p>你会直觉地觉得"就是斜着的那个点"，但要写成分量，其实只需要回答两个数：<b>往前伸了多少，往上抬了多少。</b></p>
+<div class="flow">
+  <div class="step"><span class="n">1</span>往前（水平方向）= L · sin θ</div>
+  <div class="step"><span class="n">2</span>往上（竖直方向）= L · cos θ</div>
+</div>
+
+<p><b>这两个式子不是背下来的</b>，你把棍子、水平线、竖直线画在一起，就围出了一个直角三角形。棍子是斜边，θ 是从竖直那边量起来的角，那么"往前"那条是对边，"往上"那条是邻边。sin 和 cos 的定义就是这么来的，一代进去就是这个结果。</p>
+
+<div class="jacdemo">
+  <div class="jd-head"><span class="lab">动画</span><b>拖一下滑块，看棍子怎么斜着伸</b></div>
+  <div class="jd-body">
+    <svg class="jd-svg" id="rodSvg" viewBox="0 0 300 250" width="300" height="250">
+      <g id="rodG"></g>
+    </svg>
+    <div class="jd-side">
+      <div class="jd-row"><span>角度 θ</span><input type="range" id="rodRange" min="0" max="90" value="0" step="1"><span class="jd-val" id="rodVal">0°</span></div>
+      <table style="margin-top:10px">
+        <tr><th>θ</th><th>往前 L·sinθ</th><th>往上 L·cosθ</th></tr>
+        <tr><td><code id="t0">0°</code></td><td><code id="x0">0.000</code> m</td><td><code id="z0">0.126</code> m</td></tr>
+        <tr><td><code id="t1">30°</code></td><td><code id="x1">0.063</code> m</td><td><code id="z1">0.109</code> m</td></tr>
+        <tr><td><code id="t2">45°</code></td><td><code id="x2">0.089</code> m</td><td><code id="z2">0.089</code> m</td></tr>
+        <tr><td><code id="t3">60°</code></td><td><code id="x3">0.109</code> m</td><td><code id="z3">0.063</code> m</td></tr>
+        <tr><td><code id="t4">90°</code></td><td><code id="x4">0.126</code> m</td><td><code id="z4">0.000</code> m</td></tr>
+      </table>
+      <p style="font-size:12.5px;margin-top:8px;color:#78350f">自己拖几下会发现一个规律：θ 是 0 度的时候全在竖着，90 度的时候全在横着，45 度时两边正好对半分。不管怎么转，两个数加起来的"份量"是不变的。</p>
+    </div>
+  </div>
+</div>
+
+<p>到这里你已经学会一件事：<b>斜着伸出去的距离，可以拆成"往前"和"往上"两份，分别用 sin 和 cos 算。</b>还不需要向量，更不需要矩阵，一个计算器足够了。</p>
+
+<p>拿个题练一下手：换成一根 0.2 米的棍子，转到 60 度，末端比起点往前伸了多少、往上抬了多少？（往前 0.173 米，往上 0.100 米）</p>
+</section>
+
+<!-- ==================== 03 台阶② ==================== -->
+<section class="blk" id="s3">
+<h2><span class="no">03</span>台阶二：往哪边伸，由 J1 说了算</h2>
+
+<p>台阶一我们只在一个竖直平面里算。可是机械臂会转圈，J1 就是干这个的。它有个特点：<b>不改变你伸出去多远，只改变你朝哪个方向伸。</b></p>
+
+<p><b>你可以站在地上往下看。</b>台阶一算出来的那个前伸量 r，就像一根平躺在地面上的棍子。J1 转 q1，就是在水平面上把这根棍子拨了一下：</p>
+<div class="flow">
+  <div class="step"><span class="n">1</span>x = r · cos q1　<span style="color:#64748b;font-size:13px">（朝车头方向的分量）</span></div>
+  <div class="step"><span class="n">2</span>y = r · sin q1　<span style="color:#64748b;font-size:13px">（朝左手边的分量）</span></div>
+  <div class="step"><span class="n">3</span>z 不变　<span style="color:#64748b;font-size:13px">（J1 绕竖直轴转，高度不受影响）</span></div>
+</div>
+
+<div class="jacdemo">
+  <div class="jd-head"><span class="lab">动画</span><b>拖滑块，看这根棍子在水平面上转圈</b></div>
+  <div class="jd-body">
+    <svg class="jd-svg" id="yawSvg" viewBox="0 0 300 240" width="300" height="240">
+      <g id="yawG"></g>
+    </svg>
+    <div class="jd-side">
+      <div class="jd-row"><span>航向 q1</span><input type="range" id="yawRange" min="-180" max="180" value="0" step="5"><span class="jd-val" id="yawVal">0°</span></div>
+      <table style="margin-top:10px">
+        <tr><th>q1</th><th>x</th><th>y</th><th>z</th></tr>
+        <tr><td><code>0°</code></td><td>+0.157</td><td>0.000</td><td>0.342</td></tr>
+        <tr><td><code>45°</code></td><td>+0.111</td><td>+0.111</td><td>0.342</td></tr>
+        <tr><td><code>90°</code></td><td>0.000</td><td>+0.157</td><td>0.342</td></tr>
+        <tr><td><code>180°</code></td><td>−0.157</td><td>0.000</td><td>0.342</td></tr>
+      </table>
+      <p style="font-size:12.5px;margin-top:8px;color:#78350f">注意看表格里 z 那一列，四个角度下一直是 0.342，一动没动。动的只有 x 和 y。所以想看航向角，得切到俯视图，从侧面看不出来。</p>
+    </div>
+  </div>
+</div>
+
+<p>到这儿，<b>位置的三个数就凑齐了</b>。不过先别高兴太早，这三个数是"每个角度各算一遍、再加起来"得到的，换个姿态就得从头再算，很费事。这个麻烦留到台阶五解决。</p>
+
+<h3>为什么 J2、J3、J4 只在竖直平面里动</h3>
+<p>因为<b>它们三根轴都指向同一个方向</b>（都是 Y）。绕同一个方向的轴转，末端只会在一个垂直于这根轴的平面里移动，也就是 X-Z 那个竖直平面。这解释了我们为什么要先算平面内的结果（台阶一），最后才套上航向（台阶二）。两件事可以分开算，但不能把顺序搞反。</p>
+</section>
+
+<!-- ==================== 04 台阶③ ==================== -->
+<section class="blk" id="s4">
+<h2><span class="no">04</span>台阶三：三节接起来，角度要累加</h2>
+
+<p>把大臂、小臂、工具段接上。这里几乎每个人都会犯同一个错，先给你提个醒：</p>
+<p>大臂先转了 q2，小臂再转 q3 的时候，它可不是从竖直方向开始转 q3，<b>而是在大臂已经转过去的基础上再转 q3。</b>所以小臂真正相对竖直方向的倾角是 q2 + q3，写成 q3 就错了。</p>
+
+<p>拿 <code>simple-arm.urdf</code> 里的真实长度来算（单位是米）：</p>
+<table>
+  <tr><th>哪一段</th><th>有多长</th><th>从哪到哪</th><th>它的累计角</th></tr>
+  <tr><td>大臂</td><td>L1 = 0.126144</td><td>J2 到 J3</td><td>q2</td></tr>
+  <tr><td>小臂</td><td>L2 = 0.126144</td><td>J3 到 J4</td><td>q2 + q3</td></tr>
+  <tr><td>工具段</td><td>L_TCP = 0.150642</td><td>J4 到指尖 tcp_link</td><td>q2 + q3 + q4</td></tr>
+  <tr style="background:#fef3c7"><td colspan="2"><b>两杆合长 L1 + L2</b></td><td colspan="2"><b>= 0.2523 m</b> —— 这是 IK 判断"够不够得着"的分界线，下一章会反复用到</td></tr>
+</table>
+
+<div class="tip amber">
+<span class="lab">⚠️ 三个和代码对不上的地方，先在这里说清</span>
+<b>① 0.126 与 0.126144 的差别不是笔误。</b>URDF 里写的是 Z 分量 0.12614，但连杆在 X 上还有 −0.0009 m 的装配偏斜，程序取的是 X-Z 平面投影长度 <code>hypot(−0.0009, 0.126141) = 0.126144</code>。手算取 0.126、程序取 0.126144，差异 0.1 mm 级别，不影响本章结论，但对账时别以为哪边算错了。<br>
+<b>② 工具段长度别用「0.074 + 0.076」硬加。</b>J4→J5 是 0.0744，J5→TCP 是 0.0762，但 J5 的固定姿态是 <b>绕 Z 转 −π</b>，两段在 X 上的偏移方向反过来了，实际投影是 <code>0.150642 m</code>（≈0.0744+0.0762，0.2 mm 差异来自那个反向偏移）。<br>
+<b>③ 本章的 0.126 / 0.151 口径是教学模型 <code>simple-arm.urdf</code>——它把装配偏差抹平了</b>，方便你用计算器复现。真机跑的是 <code>config.py</code> 里的标定值，两者差在毫米级，这正是台阶七"手算 / 程序 / 卷尺三方对账"要量的事。
+</div>
+
+<div class="jacdemo">
+  <div class="jd-head"><span class="lab">动画</span><b>先摆大臂，再在小臂上接着转，看累计角怎么长出来</b></div>
+  <div class="jd-body">
+    <svg class="jd-svg" id="armSvg" viewBox="0 0 340 280" width="340" height="280">
+      <g id="armG"></g>
+    </svg>
+    <div class="jd-side">
+      <div class="jd-row"><span>大臂 q2</span><input type="range" id="q2R" min="-90" max="90" value="-50" step="1"><span class="jd-val" id="q2V">−50°</span></div>
+      <div class="jd-row"><span>小臂 q3</span><input type="range" id="q3R" min="-120" max="120" value="105" step="1"><span class="jd-val" id="q3V">105°</span></div>
+      <div class="jd-row"><span>工具 q4</span><input type="range" id="q4R" min="-120" max="120" value="35" step="1"><span class="jd-val" id="q4V">35°</span></div>
+      <table style="margin-top:8px">
+        <tr><th>段</th><th>累计角</th><th>dx</th><th>dz</th></tr>
+        <tr><td>大臂</td><td><code id="c1">−50°</code></td><td><code id="d1x">−0.097</code></td><td><code id="d1z">+0.081</code></td></tr>
+        <tr><td>小臂</td><td><code id="c2">+55°</code></td><td><code id="d2x">+0.103</code></td><td><code id="d2z">+0.072</code></td></tr>
+        <tr><td>工具</td><td><code id="c3">+90°</code></td><td><code id="d3x">+0.151</code></td><td><code id="d3z">+0.000</code></td></tr>
+        <tr style="background:#fef3c7"><td><b>指尖</b></td><td colspan="3"><code id="tcpTxt">x=+0.157  z=0.342 m</code></td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<h3>拿笔自己算一遍</h3>
+<p>J2 离地 0.1295 加 0.0595，也就是 <b>0.189 米</b>，我们从这里出发往上累加。关节角取默认那一组：q2 = −50°，q3 = 105°，q4 = 35°。</p>
+<table>
+  <tr><th>走到哪</th><th>累计角</th><th>这一段往前的量</th><th>这一段往上的量</th><th>现在的位置</th></tr>
+  <tr><td>起点 J2</td><td>—</td><td>—</td><td>—</td><td>(0.000, 0.189)</td></tr>
+  <tr><td>加上大臂</td><td>−50°</td><td>0.126·sin(−50°) = −0.097</td><td>0.126·cos(−50°) = +0.081</td><td>(−0.097, 0.270)</td></tr>
+  <tr><td>加上小臂</td><td>−50+105 = +55°</td><td>0.126·sin(55°) = +0.103</td><td>0.126·cos(55°) = +0.072</td><td>(+0.007, 0.342)</td></tr>
+  <tr><td>加上工具段</td><td>−50+105+35 = +90°</td><td>0.151·sin(90°) = +0.151</td><td>0.151·cos(90°) = 0.000</td><td><b>(+0.157, 0.342)</b></td></tr>
+</table>
+
+<p>算完了，指尖落在 <b>(x, y, z) = (0.157, 0.000, 0.342) 米</b>。这个数字先记着，等会儿程序的输出、3D 页面的读数、你拿卷尺量的结果，都要跟它对上。</p>
+
+<p>还有个细节值得停下来看一眼：最后那段工具"往上"的量是 0。因为累计角刚好 90 度，工具段完全躺平了，一点竖直分量都没有。这看着像巧合，其实马上就要用到。</p>
+</section>
+
+<!-- ==================== 05 台阶④ 姿态 ==================== -->
+<section class="blk" id="s5">
+<h2><span class="no">05</span>台阶四：位置有了，还差"朝着哪"</h2>
+
+<p>位置算完了。但前面说过，<b>只说指尖在哪是不完整的</b>。指尖是戳着、躺着还是平着，决定了夹爪能不能真正夹到东西。</p>
+
+<h3>这台机器上，姿态就是一个数</h3>
+<p>因为 J2、J3、J4 绕的是同一根轴，它们的角度可以一路加下去。加出来的那个数，就是工具段相对竖直方向歪了多少：</p>
+<div class="flow">
+  <div class="step"><span class="n">1</span>工具段倾角 = q2 + q3 + q4 = −50 + 105 + 35 = <b>90°</b>，完全水平朝前</div>
+  <div class="step"><span class="n">2</span>夹爪自己转了多少 = q1 + q5（q1 是整体航向，q5 是夹爪自转）</div>
+</div>
+
+<p>这 3 个数（俯仰、航向、自转）合起来，<b>课本上叫欧拉角</b>。名字听着唬人，其实就是"用三个角描述朝向"这件事，你刚才已经算出来了。</p>
+
+<div class="kgrid">
+  <div class="kcard"><div class="kd">累计角 90°</div><div class="kt">工具段水平</div><p>夹爪正对前方，适合平推着抓</p></div>
+  <div class="kcard"><div class="kd">累计角 0°</div><div class="kt">工具段竖直向上</div><p>夹爪朝天，像托着个盘子</p></div>
+  <div class="kcard"><div class="kd">累计角 180°</div><div class="kt">工具段竖直向下</div><p>夹爪朝地，适合从上面往下抓</p></div>
+</div>
+
+<p>到这一步，位置 (0.157, 0, 0.342) 和姿态（倾角 90°、航向 q1、自转 q5）都有了。<b>你能用手算把它算出来了。</b></p>
+<p>但手算只能应付考试，程序得替你做这件事。下面两级把同一套计算换成矩阵重写一遍。答案不变，可只有这样才写得成代码，真机和 ROS 里跑的就是那一套。</p>
+
+<h3>那为什么还要学矩阵</h3>
+<p>刚才那套手算有两个问题。一是每换一组角度，三个式子都得重新算一遍，算一百组就是三百遍。二是我们偷偷做了个简化：算的时候把"转"和"挪"拆开处理，先转角度再加上长度。可真实情况是每一节都在转完马上挪，转和挪交替着来，手写公式很快就乱成一团。</p>
+<p>下一页开始的两个台阶就是来解决这个的。把"转"写成一个矩阵，再把"转"和"挪"打包成 4×4，之后就像串珠子一样一路乘下去，姿态换了也不用手忙脚乱。</p>
+</section>
+
+<!-- ==================== 06 台阶⑤ 旋转矩阵 ==================== -->
+<section class="blk" id="s6">
+<h2><span class="no">06</span>台阶五：用矩阵把"转"打包</h2>
+
+<p><b>先只处理"转"这一件事。</b>台阶一里我们把"斜着伸"拆成了两个式子，每个姿态都要写一遍。能不能写成一个固定模板，把角度套进去就出结果？</p>
+
+<p>能。绕着 Y 轴转 θ 角的模板长这样：</p>
+<pre><code>R(θ) = [  cos θ   sin θ ]
+       [ −sin θ   cos θ ]</code></pre>
+
+<p>别看这两行，它作用在一个点 (x, z) 上，效果就是把这个点绕原点转 θ。公式先别硬背，拖一下下面这个滑块，看那个红点转起来就明白了。</p>
+
+<div class="jacdemo">
+  <div class="jd-head"><span class="lab">动画</span><b>一个点乘上这个矩阵，等于绕原点转了一下</b></div>
+  <div class="jd-body">
+    <svg class="jd-svg" id="matSvg" viewBox="0 0 300 240" width="300" height="240">
+      <g id="matG"></g>
+    </svg>
+    <div class="jd-side">
+      <div class="jd-row"><span>旋转角 θ</span><input type="range" id="matRange" min="-180" max="180" value="0" step="5"><span class="jd-val" id="matVal">0°</span></div>
+      <p style="font-size:12.5px;margin:8px 0;color:#78350f">原来的点 (0, 0.126)，在正上方</p>
+      <p style="font-size:12.5px;margin:8px 0;color:#78350f">转完以后 <code id="matOut">(0.000, 0.126)</code></p>
+      <div class="bar"><i id="matBar" style="width:0%"></i></div>
+      <p style="font-size:12px;color:#94a3b8">矩阵里那四个位置，说到底就是在算"转完之后横竖各是多少"，没什么神秘的东西。</p>
+    </div>
+  </div>
+</div>
+
+<h3>省事在哪儿</h3>
+<p>三段接起来的时候，每段的累计角不一样，但<b>用的是同一个模板</b>，只是把 θ 换成不同的值：</p>
+<pre><code>第 1 段：v1 = R(q2)      · (0, L1)
+第 2 段：v2 = R(q2+q3)   · (0, L2)
+第 3 段：v3 = R(q2+q3+q4)· (0, L3)
+指尖 = 起点 + v1 + v2 + v3</code></pre>
+<p>这样写，换姿态只需要改代入的角度，不用重新推公式。而且如果你把两个矩阵乘起来，会发现一件有意思的事：R(30度) 乘 R(40度) 等于 R(70度)。<b>矩阵相乘就是角度相加</b>，这正是台阶三说的"角度会累加"，只是换了个说法。</p>
+
+<h3>三维里，姿态就藏在矩阵的列里</h3>
+<p>二维的模板是 2×2，到了三维写成 3×3。这个 3×3 里有个特别好用的性质：<b>它的三列，就是这个物体自己三根轴在空间里的方向。</b></p>
+<table>
+  <tr><th>看第几列</th><th>代表什么</th><th>默认姿态下是</th></tr>
+  <tr><td>第 1 列</td><td>物体自己的 X 轴朝向哪</td><td>(0, 0, 1)，竖直向上</td></tr>
+  <tr><td>第 2 列</td><td>物体自己的 Y 轴朝向哪</td><td>(0, 1, 0)，朝左</td></tr>
+  <tr><td>第 3 列</td><td>物体自己的 Z 轴，也就是工具的指向</td><td><b>(1, 0, 0)，水平朝前</b></td></tr>
+</table>
+<p>看第 3 列是 (1, 0, 0)，说明工具段指向 +X，就是水平朝前。这跟台阶四用"累计角 90 度"得出来的结论是同一件事。所以姿态用矩阵列表示、或者用欧拉角表示，只是两种写法。</p>
+
+<p><b>不放心的话可以对照算：</b>把台阶三的手算和这里的矩阵方法各跑一遍，换四组姿态比较，最大差值 1.1×10⁻¹⁶ 米，纯粹是计算机浮点数的毛刺，等于完全一致。</p>
+</section>
+
+<!-- ==================== 07 台阶⑥ 齐次矩阵 ==================== -->
+<section class="blk" id="s7">
+<h2><span class="no">07</span>台阶六：把"转"和"挪"合成一个矩阵</h2>
+
+<p>台阶五解决了转，可每一节实际做的是转完之后，再沿着转过去的方向挪一段。写成两步很麻烦：</p>
+<pre><code>p = R · p    （先转）
+p = p + d    （再挪）</code></pre>
+
+<p>能不能一步干完？可以。把矩阵从 3×3 扩成 4×4，多出来的那一列放平移量，最后一行补上 (0, 0, 0, 1) 占位就行：</p>
+<pre><code>T = [ R(3×3)   d(3×1) ]      左上角管转，最后一列管挪
+    [   0 0 0     1    ]</code></pre>
+
+<div class="kgrid">
+  <div class="kcard"><div class="kd">左上那一块 3×3</div><div class="kt">旋转</div><p>物体转到什么方向了</p></div>
+  <div class="kcard"><div class="kd">最后一列</div><div class="kt">平移</div><p>原点被挪到哪去了</p></div>
+  <div class="kcard"><div class="kd">最后一行</div><div class="kt">(0,0,0,1)</div><p>只是占个位，为了让矩阵能相乘</p></div>
+</div>
+
+<h3>好处是能一直乘下去</h3>
+<p>换成 4×4 之后，<b>整条胳膊就变成一串矩阵相乘</b>：</p>
+<pre><code>T_total = T_base · T_J1 · T_J2 · T_J3 · T_J4 · T_J5 · T_TCP
+
+从 T_total 里直接读两样东西：
+  TCP 位置 = 最后一列
+  工具朝向 = 第 3 列</code></pre>
+<p>ROS、URDF、以及各种机器人库，内部干的就是这件事，包括我们页面里那个 3D 模型加载器 <code>urdf-arm.js</code>。</p>
+
+<h3>三种写法摆在一起看</h3>
+<table>
+  <tr><th>方法</th><th>怎么算</th><th>默认姿态算出来</th><th>什么时候用</th></tr>
+  <tr><td>分段手算</td><td>每段算 sin/cos，再加起来</td><td>(0.157, 0, 0.342)</td><td>考试、纸上验算、理解原理</td></tr>
+  <tr><td>旋转矩阵</td><td>2×2 连乘，逐级旋转</td><td>(0.157, 0, 0.342)</td><td>写代码、讲清楚角度累加</td></tr>
+  <tr><td>齐次 4×4</td><td>一串矩阵乘起来，一次读出位姿</td><td>(0.157, 0, 0.342)</td><td>工程实现、接 ROS</td></tr>
+</table>
+<p>三个结果一样。所以<b>矩阵不是什么更高级的数学，它只是把同样的计算写得更省事而已</b>。手算能算通的话，你已经真的懂了。</p>
+
+<p>另外顺手回答一个很多人会问的问题：<b>非得用 DH 参数吗？</b>不非得。DH 只是另一种把每节变换写下来的约定，好处是参数少、推公式方便。我们的 URDF 已经把关节位置和转轴方向都写明白了，不换算成 DH 一样能算 FK，ROS 自己就是这么干的。等你要手推解析 IK 的时候，DH 才显得顺手，那是下一章的事。</p>
+</section>
+
+<!-- ==================== 08 台阶⑦ 上真机 ==================== -->
+<section class="blk" id="s8">
+<h2><span class="no">08</span>台阶七：上真机，从 PWM 算到位姿</h2>
+
+<p>前面所有推导的前提都是<b>"关节角已知"</b>。可你在真机上手里拿到的其实是舵机的 PWM 值，不是角度。所以真实链路要多一步换算：</p>
+
+<div class="flow">
+  <div class="step"><span class="n">1</span><b>PWM 值</b>（500 到 2500，中间位置是 1500）</div>
+  <div class="arr"></div>
+  <div class="step"><span class="n">2</span><b>关节角</b>：rad = (PWM − 1500) × 0.002356</div>
+  <div class="arr"></div>
+  <div class="step"><span class="n">3</span><b>位姿</b>：套台阶六那串矩阵</div>
+</div>
+
+<p><b>那个 0.002356 是算出来的</b>：这颗舵机是 270 度的总线舵机，等于 4.712 弧度，PWM 从 500 到 2500 跨度 2000 个格。平均下来一格就是 4.712 ÷ 2000 = 0.002356 弧度。</p>
+
+<h3>真机程序是怎么组织的</h3>
+<p>仓库里 <code>ros2_ws/src/xflz_eai_car1/arm/kinematics/kinematics/</code> 放着这一章的可运行版本。它的组织方式和你刚才手算的顺序是一样的：</p>
+
+<table>
+  <tr><th>文件</th><th>负责什么</th><th>对应本章哪一步</th></tr>
+  <tr><td><code>config.py</code></td><td>几何常量：每段多长、往哪偏、关节能转到几度</td><td>台阶三那张长度表</td></tr>
+  <tr><td><code>fk.py</code></td><td>核心，把齐次矩阵一路乘下去，算出 TCP 位置和 4×4 矩阵</td><td>台阶六</td></tr>
+  <tr><td><code>transform.py</code></td><td>PWM 和弧度的双向换算</td><td>本页第一步</td></tr>
+  <tr><td><code>pwm_to_tcp.py</code></td><td>命令行工具，敲 5 个 PWM 进去，直接打印位置和姿态</td><td>整条链路串起来</td></tr>
+  <tr><td><code>fk_demo.py</code></td><td>演示用，从 URDF 文件读关节，一节一节打印中间结果</td><td>理解"一节一节乘"</td></tr>
+</table>
+
+<h3>核心其实就三行</h3>
+<p><code>fk_demo.py</code> 里最要紧的部分简化成这样：</p>
+<pre><code>T = np.eye(4)                      # 从单位矩阵开始，相当于底座
+
+for joint in joints:
+    Tx = 平移矩阵(joint.xyz)        # 挪到关节所在的位置
+    Ra = 旋转矩阵(joint.axis, θ)    # 绕这根轴转 θ
+    T  = T @ Tx @ Ra                # 累乘，在已有变换上再叠一层
+
+tcp = T[:3, 3]                     # 最后一列就是 TCP 位置</code></pre>
+
+<p>要留意 <code>T @ Tx @ Ra</code> 这个顺序。对矩阵右乘，意思是在局部坐标系里做变换，正好对应本章说的"先转再挪，而且挪的方向是转过之后的方向"。顺序写反了，结果就错了。</p>
+
+<h3>程序会打印出什么</h3>
+<p><code>pwm_to_tcp.py</code> 除了位置，还会把 3×3 矩阵换算回欧拉角，就是台阶四讲的那三个姿态角：</p>
+<pre><code>【TCP 位置】
+  X: +0.157 m    Y: +0.000 m    Z: +0.342 m
+【TCP 姿态】(Roll-Pitch-Yaw)
+  Roll: 接近水平   Pitch: 水平向前   Yaw: 正前方
+【TCP Z 轴方向】
+  向量: (+1.000, +0.000, -0.000)   ← 工具指向正前方</code></pre>
+<p>看到 Z 轴方向是 (1, 0, 0) 了吗？跟台阶五那张表里"第 3 列 = (1,0,0)"是同一个东西。</p>
+
+<h3>最后一步要自己动手</h3>
+<p>程序里的几何常量都是标定值，真机装配难免有几毫米的偏差。所以这一章的验收，不是看你算的数字跟书上的一不一样，而是看三样东西能不能对上：<b>你手算的结果、程序打印的结果、你拿卷尺量的结果</b>，三者差在 5 毫米以内就算过了。</p>
+</section>
+
+<!-- ==================== 09 动手 ==================== -->
+<section class="blk" id="s9">
+<h2><span class="no">09</span>动手验一遍</h2>
+
+<h3>先把 3D 模型拖出来对账</h3>
+<p><b>下面这个模型跟本章用的是同一份</b> <code>simple-arm.urdf</code>，右上角的读数是直接从 URDF 的变换链算出来的，中间没有手工填数：</p>
+<div class="frame-embed">
+  <iframe src="_build/card-fk3d.html" height="640" title="3D 机械臂 FK 互动"></iframe>
+</div>
+<p class="embed-cap">互动 9-1｜把 J2、J3、J4 三个滑杆拖到 −50°、105°、35°，右上角应该是 x 0.157、y 0.000、z 0.342，跟你台阶三手算的对上了。然后拖 J1 看看 y 怎么变、z 为什么不动。勾上"坐标帧"，能看到每个关节的转轴指着哪个方向。</p>
+
+<h3>再上真机跑一次</h3>
+<ol>
+  <li>把机械臂摆到默认姿态，记下五个舵机各自的 PWM 值</li>
+  <li>运行 <code>python3 pwm_to_tcp.py 1500 &lt;PWM2&gt; &lt;PWM3&gt; &lt;PWM4&gt; 1500</code></li>
+  <li>从底座中心出发，拿卷尺量出指尖的 x、y、z</li>
+  <li>把误差记下来，想一想差在哪：是标定参数不准，还是你摆的角度本来就有偏差？</li>
+</ol>
+
+<h3>做完了自检一下</h3>
+<ul class="check">
+  <li>能不看答案，算出手算默认姿态下指尖的位置，并说出每一段的累计角</li>
+  <li>能解释 J1 转了为什么 z 坐标不变</li>
+  <li>能说清"姿态"用几个数表示，默认姿态下分别是多少</li>
+  <li>能画出 4×4 矩阵的形状，指出哪块是转、哪块是挪</li>
+  <li>程序输出跟你量的位置差在 5 毫米以内</li>
+</ul>
+</section>
+
+<!-- ==================== 10 总结 ==================== -->
+<section class="blk" id="s10">
+<h2><span class="no">10</span>回头看看走过的这七步</h2>
+
+<table>
+  <tr><th>台阶</th><th>用了什么</th><th>得到了什么</th></tr>
+  <tr><td>一、一根棍子</td><td>sin / cos</td><td>斜着伸 = 往前 L·sinθ + 往上 L·cosθ</td></tr>
+  <tr><td>二、往哪边伸</td><td>水平面分解</td><td>位置的三个数齐了</td></tr>
+  <tr><td>三、三节串联</td><td>角度累加</td><td>手算出 (0.157, 0, 0.342)</td></tr>
+  <tr><td>四、姿态</td><td>欧拉角</td><td>累计角 90°，工具段水平</td></tr>
+  <tr><td>五、旋转矩阵</td><td>2×2 / 3×3</td><td>公式打包，矩阵的列就是姿态</td></tr>
+  <tr><td>六、齐次矩阵</td><td>4×4</td><td>一串矩阵连乘，一次读出位姿</td></tr>
+  <tr><td>七、上真机</td><td>PWM 换算</td><td>手算、程序、卷尺三方对上</td></tr>
+</table>
+
+<p>如果只能记住一句，记住台阶三那个坑：<b>后一节的角度是叠在前一节上面的。</b>初学者算错，八成错在这儿。</p>
+
+<h3>几道题，不急着答完</h3>
+<div class="tip violet"><b>1.</b> 只动 J4，指尖的位置会变吗？姿态会变吗？（提示：J4 到指尖有 0.151 米）</div>
+<div class="tip violet"><b>2.</b> 累计角 90 度时，工具段往上的分量正好是 0。要是改成 60 度，指尖会往哪个方向偏？</div>
+<div class="tip violet"><b>3.</b> 为什么 J2、J3、J4 的角度能直接相加，J1 却不行？（提示：想想它们各自的轴指向哪）</div>
+<div class="tip violet"><b>4.</b> 如果同一组关节角，你两次算出了两个不一样的指尖位置，最可能是哪儿出了问题？（提示：正运动学的答案必须是唯一的）</div>
+<div class="tip violet"><b>5.</b> 4×4 矩阵最后一行为什么永远是 (0,0,0,1)？如果把它改掉会发生什么？</div>
+
+<h3>下一章</h3>
+<p>这一章是"摆好姿势，算指尖在哪"。下一章整个反过来：<b>想让指尖到某个位置，关节该转多少。</b>那就是逆运动学，难度会明显上去：可能压根没有解，可能有七八组解，还得考虑关节转不到那么大的角度。不过不管 IK 怎么算，验证它算得对不对，最后还得靠这一章的 FK 来对答案。</p>
+</section>
+
+<nav class="expnav">
+  <a href="../exp-02-serial-pwm/index.html"><span class="lb">上一节</span>EXP-02 串口协议与 PWM</a>
+  <a class="next" href="../exp-04-ik-solver/index.html"><span class="lb">下一节</span>EXP-04 逆运动学与 IK 解算</a>
+</nav>
+
+<footer>
+  <span>具身智能课程 · 机械臂应用与开发</span>
+  <span>EXP-03 正运动学基础</span>
+</footer>
+
+</main>
+</div>
+
+<script src="../shared/tutorial.js" defer></script>
+<script>
+/* ============ 三个台阶的小动画（纯 2D，不依赖任何库） ============ */
+(function () {
+  var D = Math.PI / 180;
+  var L1 = 0.12614, L2 = 0.12614, LTOOL = 0.07439 + 0.07625;
+  var H_J2 = 0.1295 + 0.0595;
+
+  function svgEl(tag, attrs) {
+    var el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    for (var k in attrs) el.setAttribute(k, attrs[k]);
+    return el;
+  }
+
+    /* ---------- 台阶① 一根棍子 ---------- */
+  var rodG = document.getElementById('rodG');
+  if (rodG) {
+    /* 布局：起点（铰点）在左下，Z 轴竖直向上，X 轴水平向右。
+       角度 θ 从「竖直的 Z 轴」量到棍子，所以：
+         · 沿 Z 轴那条边（往上） = 邻边 = L·cosθ   ← 紧贴 Z 轴画
+         · 水平那条边（往前）   = 对边 = L·sinθ   ← 从棍尖垂直落到 X 轴
+       两条边 + 棍子 = 一个直角三角形，直角在 (棍尖正下方, 起点水平线上)。 */
+    var CX = 62, CY = 208, SC = 880;   /* 1 m 对应 880 px */
+
+    function drawRod(deg) {
+      rodG.innerHTML = '';
+      var t = deg * D;
+      var ex = CX + L1 * Math.sin(t) * SC;      /* 棍尖 x */
+      var ey = CY - L1 * Math.cos(t) * SC;      /* 棍尖 y（屏幕向上为负）*/
+      var zx = CX;                               /* 沿 Z 轴的竖直边：x 恒等于起点 */
+      var zy = ey;                               /* 竖直边顶端 = 棍尖的高度 */
+
+      /* ---- 两根坐标轴（实线，比虚线更"像轴"）---- */
+      rodG.appendChild(svgEl('line', { x1: CX, y1: CY, x2: CX, y2: CY - 185, stroke: '#c3ccd8', 'stroke-width': 1.4 }));
+      rodG.appendChild(svgEl('line', { x1: CX, y1: CY, x2: CX + 195, y2: CY, stroke: '#c3ccd8', 'stroke-width': 1.4 }));
+      var axZ = svgEl('text', { x: CX + 6, y: CY - 188, 'font-size': 10.5, fill: '#94a3b8', 'font-weight': 700 });
+      axZ.textContent = 'Z（往上）';
+      rodG.appendChild(axZ);
+      var axX = svgEl('text', { x: CX + 150, y: CY + 16, 'font-size': 10.5, fill: '#94a3b8', 'font-weight': 700 });
+      axX.textContent = 'X（往前）';
+      rodG.appendChild(axX);
+
+      /* ---- 邻边：沿 Z 轴，从起点到"棍尖的高度" ---- */
+      rodG.appendChild(svgEl('line', {
+        x1: zx, y1: CY, x2: zx, y2: zy,
+        stroke: '#7c3aed', 'stroke-width': 3.4, 'stroke-linecap': 'round'
+      }));
+      /* ---- 对边：从"棍尖高度点"水平连到棍尖（这才和对边对上）---- */
+      rodG.appendChild(svgEl('line', {
+        x1: zx, y1: zy, x2: ex, y2: ey,
+        stroke: '#0891b2', 'stroke-width': 3.4, 'stroke-linecap': 'round'
+      }));
+
+      /* ---- 直角标记（在 zx, zy 这个角上）---- */
+      var sq = 9;
+      rodG.appendChild(svgEl('path', {
+        d: 'M ' + zx + ' ' + (zy + sq) + ' L ' + (zx + sq) + ' ' + (zy + sq) + ' L ' + (zx + sq) + ' ' + zy,
+        fill: 'none', stroke: '#94a3b8', 'stroke-width': 1.2
+      }));
+
+      /* ---- 棍子（斜边）---- */
+      rodG.appendChild(svgEl('line', {
+        x1: CX, y1: CY, x2: ex, y2: ey,
+        stroke: '#dc2626', 'stroke-width': 4.5, 'stroke-linecap': 'round'
+      }));
+      rodG.appendChild(svgEl('circle', { cx: ex, cy: ey, r: 5, fill: '#b91c1c' }));
+      rodG.appendChild(svgEl('circle', { cx: CX, cy: CY, r: 4.5, fill: '#334155' }));
+
+      /* ---- 角度弧：从 +Z 方向（竖直）扫到棍子 ---- */
+      var ar = 40;
+      rodG.appendChild(svgEl('path', {
+        d: 'M ' + CX + ' ' + (CY - ar) +
+           ' A ' + ar + ' ' + ar + ' 0 0 1 ' +
+           (CX + ar * Math.sin(t)) + ' ' + (CY - ar * Math.cos(t)),
+        fill: 'none', stroke: '#d97706', 'stroke-width': 1.8
+      }));
+      /* 弧线中点放角度值 */
+      var midA = t / 2;
+      var txt = svgEl('text', {
+        x: CX + (ar + 13) * Math.sin(midA),
+        y: CY - (ar + 13) * Math.cos(midA) + 3,
+        'font-size': 11, 'font-weight': 700, fill: '#b45309', 'text-anchor': 'middle'
+      });
+      txt.textContent = deg + '°';
+      rodG.appendChild(txt);
+
+      /* ---- 两条边上的数值标签 ---- */
+      var vAdj = (L1 * Math.cos(t)).toFixed(3);
+      var vOpp = (L1 * Math.sin(t)).toFixed(3);
+
+      /* 邻边（竖直，沿 Z）：贴在左边 */
+      var lAdj = svgEl('text', {
+        x: zx - 7, y: (CY + zy) / 2 + 4,
+        'font-size': 9.5, fill: '#7c3aed', 'text-anchor': 'end', 'font-weight': 700
+      });
+      lAdj.textContent = vAdj;
+      rodG.appendChild(lAdj);
+      var lAdj2 = svgEl('text', {
+        x: zx - 7, y: (CY + zy) / 2 + 15,
+        'font-size': 8, fill: '#a78bfa', 'text-anchor': 'end'
+      });
+      lAdj2.textContent = 'L·cosθ';
+      rodG.appendChild(lAdj2);
+
+      /* 对边（水平）：贴在上面 */
+      var lOpp = svgEl('text', {
+        x: (zx + ex) / 2, y: zy - 7,
+        'font-size': 9.5, fill: '#0891b2', 'text-anchor': 'middle', 'font-weight': 700
+      });
+      lOpp.textContent = vOpp + '  L·sinθ';
+      rodG.appendChild(lOpp);
+    }
+    var rodRange = document.getElementById('rodRange');
+    rodRange.addEventListener('input', function () {
+      document.getElementById('rodVal').textContent = rodRange.value + '°';
+      drawRod(+rodRange.value);
+    });
+    drawRod(0);
+  }
+
+  /* ---------- 台阶② 航向 ---------- */
+  var yawG = document.getElementById('yawG');
+  if (yawG) {
+    var OX = 150, OY = 120, RR = 82;
+    var R0 = 0.1573;   /* 默认姿态的前伸量 */
+    function drawYaw(deg) {
+      yawG.innerHTML = '';
+      /* 两个坐标轴 */
+      yawG.appendChild(svgEl('line', { x1: OX - 110, y1: OY, x2: OX + 110, y2: OY, stroke: '#e2e8f0', 'stroke-width': 1.2 }));
+      yawG.appendChild(svgEl('line', { x1: OX, y1: OY - 105, x2: OX, y2: OY + 105, stroke: '#e2e8f0', 'stroke-width': 1.2 }));
+      var xt = svgEl('text', { x: OX + 96, y: OY - 6, 'font-size': 10, fill: '#dc2626', 'font-weight': 700 });
+      xt.textContent = '+X 前'; yawG.appendChild(xt);
+      var yt = svgEl('text', { x: OX + 6, y: OY + 100, 'font-size': 10, fill: '#16a34a', 'font-weight': 700 });
+      yt.textContent = '+Y 左'; yawG.appendChild(yt);
+
+      /* 圆 */
+      yawG.appendChild(svgEl('circle', { cx: OX, cy: OY, r: RR, fill: 'none', stroke: '#f1f5f9', 'stroke-width': 1 }));
+      /* 底盘 */
+      yawG.appendChild(svgEl('circle', { cx: OX, cy: OY, r: 14, fill: '#e2e8f0', stroke: '#94a3b8' }));
+
+      var t = deg * D;
+      var ex = OX + RR * Math.cos(t);
+      var ey = OY - RR * Math.sin(t);
+      yawG.appendChild(svgEl('line', { x1: OX, y1: OY, x2: ex, y2: ey, stroke: '#dc2626', 'stroke-width': 3.4, 'stroke-linecap': 'round' }));
+      yawG.appendChild(svgEl('circle', { cx: ex, cy: ey, r: 5, fill: '#b91c1c' }));
+      /* 水平/竖直分量 */
+      yawG.appendChild(svgEl('line', { x1: OX, y1: OY, x2: ex, y2: OY, stroke: '#dc2626', 'stroke-width': 1.2, 'stroke-dasharray': '4 3', opacity: .5 }));
+      yawG.appendChild(svgEl('line', { x1: ex, y1: OY, x2: ex, y2: ey, stroke: '#16a34a', 'stroke-width': 1.2, 'stroke-dasharray': '4 3', opacity: .5 }));
+
+      var a = svgEl('text', { x: OX + 26, y: OY - 18, 'font-size': 11, 'font-weight': 700, fill: '#b45309' });
+      a.textContent = deg + '°';
+      yawG.appendChild(a);
+
+      var xx = svgEl('text', { x: OX + RR * Math.cos(t) / 2, y: OY + 14, 'font-size': 9.5, fill: '#b91c1c', 'text-anchor': 'middle' });
+      xx.textContent = (R0 * Math.cos(t)).toFixed(3);
+      yawG.appendChild(xx);
+      var yy = svgEl('text', { x: ex + 6, y: OY - RR * Math.sin(t) / 2, 'font-size': 9.5, fill: '#15803d' });
+      yy.textContent = (R0 * Math.sin(t)).toFixed(3);
+      yawG.appendChild(yy);
+    }
+    var yawRange = document.getElementById('yawRange');
+    yawRange.addEventListener('input', function () {
+      document.getElementById('yawVal').textContent = yawRange.value + '°';
+      drawYaw(+yawRange.value);
+    });
+    drawYaw(0);
+  }
+
+  /* ---------- 台阶③ 三节串联 ---------- */
+  var armG = document.getElementById('armG');
+  if (armG) {
+    var AX = 120, AY = 230, ASC = 520;
+    function drawArm(q2, q3, q4) {
+      armG.innerHTML = '';
+      /* 地面 */
+      armG.appendChild(svgEl('line', { x1: 20, y1: AY + 6, x2: 320, y2: AY + 6, stroke: '#cbd5e1', 'stroke-width': 2 }));
+      /* J2 起点 */
+      var x = 0, z = H_J2;
+      var px = AX, py = AY - z * ASC;
+      armG.appendChild(svgEl('circle', { cx: AX, cy: AY, r: 9, fill: '#e2e8f0', stroke: '#94a3b8' }));
+
+      var segs = [
+        { L: L1, a: q2, color: '#ef4444' },
+        { L: L2, a: q2 + q3, color: '#fbbf24' },
+        { L: LTOOL, a: q2 + q3 + q4, color: '#a78bfa' }
+      ];
+      var acc = 0, accz = 0;
+      for (var i = 0; i < segs.length; i++) {
+        var s = segs[i];
+        var nx = acc + s.L * Math.sin(s.a * D);
+        var nz = accz + s.L * Math.cos(s.a * D);
+        var x1 = AX + acc * ASC, y1 = AY - (H_J2 + accz) * ASC;
+        var x2 = AX + nx * ASC, y2 = AY - (H_J2 + nz) * ASC;
+        armG.appendChild(svgEl('line', { x1: x1, y1: y1, x2: x2, y2: y2, stroke: s.color, 'stroke-width': 9, 'stroke-linecap': 'round' }));
+        armG.appendChild(svgEl('circle', { cx: x2, cy: y2, r: 5.5, fill: '#fff', stroke: s.color, 'stroke-width': 2 }));
+        /* 累计角标注 */
+        var mid = { x: (x1 + x2) / 2, y: (y1 + y2) / 2 };
+        var lab = svgEl('text', { x: mid.x + 10, y: mid.y, 'font-size': 9, fill: s.color, 'font-weight': 700 });
+        lab.textContent = Math.round(s.a) + '°';
+        armG.appendChild(lab);
+        acc = nx; accz = nz;
+      }
+      /* 指尖 */
+      var tx = AX + acc * ASC, ty = AY - (H_J2 + accz) * ASC;
+      armG.appendChild(svgEl('circle', { cx: tx, cy: ty, r: 6, fill: '#dc2626' }));
+      var tl = svgEl('text', { x: tx + 8, y: ty - 8, 'font-size': 10, 'font-weight': 700, fill: '#b91c1c' });
+      tl.textContent = 'TCP';
+      armG.appendChild(tl);
+
+      /* 参考竖线 */
+      armG.appendChild(svgEl('line', { x1: AX, y1: AY, x2: AX, y2: 30, stroke: '#e2e8f0', 'stroke-width': 1, 'stroke-dasharray': '4 4' }));
+
+      /* 读数 */
+      document.getElementById('c1').textContent = Math.round(q2) + '°';
+      document.getElementById('c2').textContent = (q2 + q3 >= 0 ? '+' : '') + Math.round(q2 + q3) + '°';
+      document.getElementById('c3').textContent = (q2 + q3 + q4 >= 0 ? '+' : '') + Math.round(q2 + q3 + q4) + '°';
+      document.getElementById('d1x').textContent = (L1 * Math.sin(q2 * D)).toFixed(3);
+      document.getElementById('d1z').textContent = (L1 * Math.cos(q2 * D)).toFixed(3);
+      document.getElementById('d2x').textContent = (L2 * Math.sin((q2 + q3) * D)).toFixed(3);
+      document.getElementById('d2z').textContent = (L2 * Math.cos((q2 + q3) * D)).toFixed(3);
+      document.getElementById('d3x').textContent = (LTOOL * Math.sin((q2 + q3 + q4) * D)).toFixed(3);
+      document.getElementById('d3z').textContent = (LTOOL * Math.cos((q2 + q3 + q4) * D)).toFixed(3);
+      document.getElementById('tcpTxt').textContent = 'x=' + (acc >= 0 ? '+' : '') + acc.toFixed(3) + '  z=' + (H_J2 + accz).toFixed(3) + ' m';
+    }
+    function readArm() {
+      var a = +document.getElementById('q2R').value;
+      var b = +document.getElementById('q3R').value;
+      var c = +document.getElementById('q4R').value;
+      document.getElementById('q2V').textContent = a + '°';
+      document.getElementById('q3V').textContent = b + '°';
+      document.getElementById('q4V').textContent = c + '°';
+      drawArm(a, b, c);
+    }
+    ['q2R', 'q3R', 'q4R'].forEach(function (id) {
+      document.getElementById(id).addEventListener('input', readArm);
+    });
+    readArm();
+  }
+
+  /* ---------- 台阶⑤ 旋转矩阵 ---------- */
+  var matG = document.getElementById('matG');
+  if (matG) {
+    var MX = 150, MY = 140, MR = 85;
+    var P0 = [0, 0.126];
+    function drawMat(deg) {
+      matG.innerHTML = '';
+      matG.appendChild(svgEl('line', { x1: MX - 110, y1: MY, x2: MX + 110, y2: MY, stroke: '#e2e8f0', 'stroke-width': 1.2 }));
+      matG.appendChild(svgEl('line', { x1: MX, y1: MY - 100, x2: MX, y2: MY + 100, stroke: '#e2e8f0', 'stroke-width': 1.2 }));
+      matG.appendChild(svgEl('circle', { cx: MX, cy: MY, r: 3, fill: '#94a3b8' }));
+
+      var t = deg * D;
+      var c = Math.cos(t), s = Math.sin(t);
+      /* R(θ) = [c  s; -s  c] 作用在 (x, z) */
+      var px = P0[0] * c + P0[1] * s;
+      var pz = -P0[0] * s + P0[1] * c;
+
+      /* 原始点（灰） */
+      matG.appendChild(svgEl('line', { x1: MX, y1: MY, x2: MX + P0[0] * 600, y2: MY - P0[1] * 600, stroke: '#cbd5e1', 'stroke-width': 2, 'stroke-dasharray': '4 3' }));
+      matG.appendChild(svgEl('circle', { cx: MX, cy: MY - P0[1] * 600, r: 4, fill: '#cbd5e1' }));
+
+      /* 旋转后（红） */
+      matG.appendChild(svgEl('line', { x1: MX, y1: MY, x2: MX + px * 600, y2: MY - pz * 600, stroke: '#dc2626', 'stroke-width': 3.4, 'stroke-linecap': 'round' }));
+      matG.appendChild(svgEl('circle', { cx: MX + px * 600, cy: MY - pz * 600, r: 5.5, fill: '#b91c1c' }));
+
+      /* 角度弧 */
+      matG.appendChild(svgEl('path', {
+        d: 'M ' + MX + ' ' + (MY - MR) + ' A ' + MR + ' ' + MR + ' 0 ' + (Math.abs(deg) > 180 ? 1 : 0) + ' ' + (deg >= 0 ? 1 : 0) + ' ' + (MX + MR * Math.sin(t)) + ' ' + (MY - MR * Math.cos(t)),
+        fill: 'none', stroke: '#d97706', 'stroke-width': 1.5
+      }));
+
+      document.getElementById('matOut').textContent = '(' + px.toFixed(3) + ', ' + pz.toFixed(3) + ')';
+      document.getElementById('matBar').style.width = Math.min(100, Math.abs(deg) / 180 * 100) + '%';
+    }
+    var matRange = document.getElementById('matRange');
+    matRange.addEventListener('input', function () {
+      document.getElementById('matVal').textContent = matRange.value + '°';
+      drawMat(+matRange.value);
+    });
+    drawMat(0);
+  }
+})();
+</script>
+</body>
+</html>

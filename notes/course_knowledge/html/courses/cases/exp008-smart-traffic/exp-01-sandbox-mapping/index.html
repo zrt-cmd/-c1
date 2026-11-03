@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-01 · 沙盘环境认知与建图导航 | CASE-05 机器人小车智慧交通综合案例</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+  :root{
+    --theme:#4f46e5;
+    --theme-deep:#4338ca;
+    --theme-bg:#eef2ff;
+    --theme-bd:#c7d2fe;
+  }
+  figure.fig img{max-height:420px;object-fit:contain}
+  .tag.hl{background:var(--theme-bg);border-color:var(--theme-bd);color:var(--theme-deep)}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="bar-in" style="display:flex;align-items:center;justify-content:space-between;width:100%">
+    <a class="logo" href="../index.html"><b>CASE-05</b>智慧交通</a>
+    <nav class="crumb"><a href="../../../index.html#case">总首页</a> / <a href="../index.html#case">CASE-05 机器人小车智慧交通综合案例</a> / EXP-01</nav>
+  </div>
+</header>
+
+<div class="wrap">
+  <aside class="side">
+    <h4>本页目录</h4>
+    <a href="#s1">01 本节目标</a>
+    <a href="#s2">02 核心原理</a>
+    <a href="#s3">03 硬件与场景</a>
+    <a href="#s4">04 操作步骤</a>
+    <a href="#s5">05 关键命令</a>
+    <a href="#s6">06 原理动画</a>
+    <a href="#s7">07 互动实验</a>
+    <a href="#s8">08 常见问题</a>
+    <a href="#s9">09 拓展阅读</a>
+    <a href="#s10">10 思考题</a>
+    <h4>兄弟实验</h4>
+    <a href="../exp-02-traffic-vision/index.html">EXP-02 交通标志与红绿灯识别</a>
+    <a href="../exp-03-lane-signal/index.html">EXP-03 车道保持与路口通行</a>
+    <a href="../exp-04-smart-parking/index.html">EXP-04 智慧泊车与综合路测</a>
+  </aside>
+
+  <main class="content">
+    <div class="exp-head">
+      <div class="code">EXP-01 · 8 学时（2 理论 + 6 实践）</div>
+      <h1>沙盘环境认知与建图导航</h1>
+      <p class="desc">先认识沙盘上的每一条交通语义，再让小车 C1 用激光 SLAM 遍历全场、闭环保存 slam_map，用 Nav2 完成点到点巡路，最后回到地图上给路口、灯口、车位打语义标注——验收标准：地图闭环无重影 + 点到点 3 次到位 + 语义标注 ≥6 处。</p>
+      <div class="meta"><span class="tag hl">理论2+实践6</span><span class="tag">slam_toolbox</span><span class="tag">car1_slam / slam_map</span><span class="tag">Nav2 + AMCL</span><span class="tag">安全边界</span></div>
+    </div>
+
+    <section class="blk" id="s1">
+      <h2><span class="no">01</span>本节目标</h2>
+      <ul class="check">
+        <li>说出沙盘典型元素及其交通语义：车道线（约 40cm 宽）、直角弯、T 形/十字路口、红绿灯模型、斑马线、平行车位/侧方车位、四类交通标志牌、行人模型、高对比识别线。</li>
+        <li>讲清激光 SLAM 三件事：怎么扫（/scan 扫描匹配）、怎么闭（回环校正）、怎么存（slam_map 栅格地图）。</li>
+        <li>独立跑通 <code>car1_slam/slam.launch.py</code> 遍历建图并保存 <code>slam_map</code>，在 RViz2 检查路口无重影。</li>
+        <li>用 <code>car1_navigation/navigation.launch.py</code> 完成 Nav2 点到点巡路，会设 2D Pose Estimate 初始位姿。</li>
+        <li>在地图上完成 ≥6 处沙盘语义标注（路口/灯口/车位/斑马线），形成后续实验的点位底座。</li>
+        <li>牢记安全铁律：<b>沙盘边缘 0.5m 内视为安全边界，小车低速起步（≤0.15m/s），先空场后巡路</b>。</li>
+      </ul>
+      <div class="tip amber"><b>素材说明：</b>本实验无实拍素材，示意图与交互动画为准；两幅沙盘参照图抓取自 Hiwonder 官方产品页（公开图），仅作同类规格参考，<b>元素与尺寸以现场沙盘实际为准</b>。</div>
+    </section>
+
+    <section class="blk" id="s2">
+      <h2><span class="no">02</span>核心原理：沙盘即结构化城市，SLAM 把它变成栅格地图</h2>
+      <p><b>把沙盘想像成一座"微缩城市"的施工图纸：</b>车道线是道路中轴，路口是节点，红绿灯与标志牌是规则牌，车位是终点站。小车要在这座城市里活下来，先得把"图纸"装进脑子里——这幅图纸就是 <b>slam_map 栅格地图</b>。激光雷达每转一圈吐出一帧 <code>/scan</code>，slam_toolbox 做<b>扫描匹配</b>：拿当前帧与已有地图对齐，能对上就推出自身位姿、顺手把新墙面刷进地图；走过回头路时触发<b>回环校正</b>——发现"这面墙我来过"，把累计漂移一把拉回，路口才不会画成两个路口。</p>
+      <h3>沙盘元素 → 地图语义 → 课程用途（典型规格，以现场沙盘实际元素为准）</h3>
+      <table>
+        <thead><tr><th>沙盘元素</th><th>典型规格</th><th>在本课程中的用途</th></tr></thead>
+        <tbody>
+          <tr><td>车道线 / 高对比识别线</td><td>车道宽约 40cm，黑黄高对比</td><td>EXP-03 视觉巡线的检测对象，建图时贴地特征对激光反射弱、靠边界墙定图</td></tr>
+          <tr><td>直角弯 ×4、T 形/十字路口</td><td>路口为规则几何，墙沿笔直</td><td>建图回环的关键路标；EXP-03 路口状态机的执行场所</td></tr>
+          <tr><td>红绿灯模型</td><td>立式三色灯，高约 24cm</td><td>EXP-02 三态识别 → EXP-03 红灯停绿灯行</td></tr>
+          <tr><td>斑马线人行横道</td><td>白条纹横跨车道</td><td>EXP-03 礼让行人触发区；EXP-04 综合路测扣分项</td></tr>
+          <tr><td>平行车位 / 侧方车位</td><td>标线框约 45×35cm</td><td>EXP-04 车位检测与轨迹泊车目标</td></tr>
+          <tr><td>交通标志牌（直行/转向/停车/注意行人）</td><td>牌面约 8×8cm、杆高约 16cm</td><td>EXP-02 四类标志检测 → EXP-04 按标志改道</td></tr>
+          <tr><td>行人模型</td><td>立牌式，置于斑马线端</td><td>EXP-03 斑马线礼让判据</td></tr>
+        </tbody>
+      </table>
+      <figure class="fig">
+        <svg viewBox="0 0 720 340" role="img" aria-label="沙盘路网拓扑自制示意图">
+          <rect x="20" y="20" width="680" height="300" rx="14" fill="#0f172a" stroke="#c7d2fe" stroke-width="2"/>
+          <rect x="60" y="60" width="600" height="220" fill="none" stroke="#e2e8f0" stroke-width="14"/>
+          <rect x="64" y="64" width="592" height="212" fill="none" stroke="#0f172a" stroke-width="8"/>
+          <line x1="320" y1="60" x2="360" y2="280" stroke="#e2e8f0" stroke-width="12"/><line x1="324" y1="64" x2="356" y2="276" stroke="#0f172a" stroke-width="6"/>
+          <line x1="60" y1="170" x2="660" y2="170" stroke="#e2e8f0" stroke-width="12"/><line x1="64" y1="166" x2="656" y2="166" stroke="#0f172a" stroke-width="6"/>
+          <g stroke="#f8fafc" stroke-width="3" stroke-dasharray="9 7">
+            <line x1="140" y1="152" x2="140" y2="188"/><line x1="540" y1="152" x2="540" y2="188"/>
+            <line x1="302" y1="110" x2="338" y2="110"/><line x1="302" y1="230" x2="338" y2="230"/>
+          </g>
+          <rect x="285" y="150" width="70" height="40" fill="none" stroke="#4f46e5" stroke-width="3" stroke-dasharray="6 5"/>
+          <text x="320" y="212" fill="#a5b4fc" font-size="13" text-anchor="middle" font-family="Noto Sans CJK SC">中心十字路口（灯口）</text>
+          <rect x="70" y="70" width="60" height="44" fill="none" stroke="#f59e0b" stroke-width="3"/><text x="100" y="136" fill="#fbbf24" font-size="12" text-anchor="middle" font-family="Noto Sans CJK SC">直角弯</text>
+          <rect x="596" y="226" width="56" height="52" fill="none" stroke="#4ade80" stroke-width="3"/><text x="624" y="300" fill="#4ade80" font-size="12" text-anchor="middle" font-family="Noto Sans CJK SC">平行车位</text>
+          <g fill="#f8fafc"><rect x="352" y="146" width="34" height="14" rx="2"/><rect x="356" y="164" width="34" height="14" rx="2"/><rect x="352" y="182" width="34" height="14" rx="2"/></g>
+          <text x="430" y="96" fill="#f87171" font-size="12" font-family="Noto Sans CJK SC">红绿灯模型</text>
+          <circle cx="470" cy="100" r="7" fill="#ef4444"/>
+          <path d="M160 170 L160 120 L240 120" fill="none" stroke="#818cf8" stroke-width="2.5" stroke-dasharray="7 6"/>
+          <text x="180" y="106" fill="#a5b4fc" font-size="12" font-family="Noto Sans CJK SC">巡图回环路线（闭环）</text>
+          <text x="60" y="34" fill="#94a3b8" font-size="12" font-family="Noto Sans CJK SC">沙盘路网拓扑（俯视简化）</text>
+        </svg>
+        <figcaption>图 1-1｜<b>自制示意图</b>：沙盘路网拓扑——外环主路 + 中轴支路构成回环，中心为灯口十字路口，四角为直角弯，右下为平行车位；蓝紫虚线示意建图时应走的闭环巡图路线。</figcaption>
+      </figure>
+      <p>地图有了，<b>Nav2</b> 负责"怎么走"：AMCL 粒子滤波拿实时 /scan 与 slam_map 匹配求出小车在图上的坐标（map→base_link），全局规划器（A*/DWA 层级）在代价地图上铺出路线，局部控制器沿路纠偏，把结果化成 <code>/cmd_vel</code> 速度流给麦克纳姆轮底盘——于是"走到那个路口"就成了一次点击。<b>语义标注</b>则是往这张图上贴标签：把 map 坐标系里的路口、灯口、车位写进一个 yaml 点位表，EXP-02~04 全部按名取点，不再传裸坐标。</p>
+    </section>
+
+    <section class="blk" id="s3">
+      <h2><span class="no">03</span>硬件与场景</h2>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">小车 C1 · 底盘</div><div class="kt">麦克纳姆轮四轮底盘，执行 /cmd_vel；全向平移让直角弯出弯更从容，但 <b>横移会带来雷达视差</b>，建图时优先前向行驶。</div></div> <div class="kcard"><div class="kd">小车 C1 · 眼睛</div><div class="kt">2D 激光雷达（建图主力）+ HP60C 深度相机（/ascamera_hp60c/**，<b>存在 0.5m 近盲区</b>，贴墙作业时不可依赖）。</div></div> <div class="kcard"><div class="kd">小车 C1 · 大脑</div><div class="kt">6 TOPS NPU 端侧算力，本实验主要跑 slam_toolbox 与 Nav2；语音 car1_speech 在 EXP-04 播报成绩时启用。</div></div> <div class="kcard"><div class="kd">智慧交通教学沙盘</div><div class="kt">约 3.26m×2.98m 级别铺装 + 挡边围栏，元素见第 02 节表；<b>以现场沙盘实际元素为准</b>。</div></div>
+      </div>
+      <table>
+        <thead><tr><th>上电前检查</th><th>标准</th><th>不达标后果</th></tr></thead>
+        <tbody>
+          <tr><td>电量</td><td>&gt;50%，低于 30% 立即回充</td><td>建图半途掉电，slam_map 损坏重跑</td></tr>
+          <tr><td>雷达话题</td><td><code>ros2 topic echo /scan --once</code> 有数据</td><td>slam_toolbox 无输入，map 全黑</td></tr>
+          <tr><td>沙盘清场</td><td>移走散落物，行人模型归位</td><td>动态障碍被刷进地图成"鬼墙"</td></tr>
+          <tr><td>安全边界</td><td>沙盘四周 0.5m 无人踩踏区</td><td>小车冲沿、人员绊倒</td></tr>
+        </tbody>
+      </table>
+      <figure class="fig">
+        <img src="./images/fig-sandbox-scene.jpg" alt="交通教学沙盘场景参照图" loading="lazy">
+        <figcaption>图 1-2｜交通教学沙盘场景参照（<b>网抓自 Hiwonder 官方产品页</b> 的同类产品公开图，非本教室实拍）：环形车道、路口、标志牌、行道树分区与红绿灯立柱的典型布局——<b>本课沙盘元素以现场实际为准</b>。</figcaption>
+      </figure>
+    </section>
+
+    <section class="blk" id="s4">
+      <h2><span class="no">04</span>操作步骤</h2>
+      <div class="flow">
+        <div class="step"><b class="n">S1</b>认知与清场<br><small>对照第 02 节表逐个认元素 → 划安全边界 → 上电自检</small></div> <div class="arr">→</div>
+        <div class="step"><b class="n">S2</b>启动建图<br><small>slam.launch.py + RViz2，遥控低速遍历沙盘闭环一圈</small></div> <div class="arr">→</div>
+        <div class="step"><b class="n">S3</b>保存与检查<br><small>保存 slam_map，检查路口无重影、车位框完整</small></div> <div class="arr">→</div>
+        <div class="step"><b class="n">S4</b>Nav2 巡路<br><small>navigation.launch.py 加载地图 → 设初始位姿 → 3 个目标点</small></div> <div class="arr">→</div>
+        <div class="step"><b class="n">S5</b>语义标注<br><small>RViz2 Pick Point 记录路口/灯口/车位 → 写入点位 yaml</small></div>
+      </div>
+      <ol style="margin:14px 0 6px;padding-left:22px;line-height:1.9">
+        <li><b>遍历策略：</b>先沿外环顺时针走一圈，再穿中轴支路，最后回到出发点触发回环——直角弯外侧 90° 缓转，<b>速度 ≤0.15m/s，起步前让轮子转半圈再落</b>，避免麦克纳姆轮原地打滑刷歪地图。</li>
+        <li><b>闭环检查：</b>RViz2 中回到起点时，起始墙面与返场墙面应<b>重合成一条线</b>；出现"双墙"说明漂移大，重新建图并放慢过弯速度。</li>
+        <li><b>保存地图：</b>执行第 05 节命令保存 <code>slam_map.yaml + slam_map.pgm</code>，先在 RViz2 反复加载确认再往下走。</li>
+        <li><b>点到点巡路：</b>加载地图启动导航后<b>必设 2D Pose Estimate</b>，依次下发 3 个目标点（A 角直角弯、B 点灯口前、C 点车位前），每个点连续 3 次到位算通过。</li>
+        <li><b>语义标注：</b>用 RViz2 的 Publish Point 读坐标，按 <code>name: {x, y, yaw}</code> 格式写入点位 yaml，至少标注 4 路口 + 1 灯口 + 1 车位。</li>
+        <li><b>留痕：</b>保存地图截图、3 次到位截屏与点位 yaml，构成本实验验收证据。</li>
+      </ol>
+    </section>
+
+    <section class="blk" id="s5">
+      <h2><span class="no">05</span>关键命令</h2>
+      <p class="dim">命令风格与《培训方案》xlsx 一致；包名、地图名沿用 car1_slam / slam_map / car1_navigation 约定。</p>
+      <pre><span class="c"># ① 预检：雷达与底盘话题在线</span>
+ros2 topic echo /scan --once
+ros2 topic list | grep -E <span class="y">"scan|cmd_vel"</span>
+
+<span class="c"># ② 启动激光 SLAM 建图（终端1）+ RViz2 观察（终端2）</span>
+ros2 launch car1_slam slam.launch.py
+rviz2 -d <span class="b">~/car1_ws/src/car1_slam/rviz/slam.rviz</span>
+
+<span class="c"># ③ 遥控遍历沙盘闭环（低速起步！）+ 查看 TF 树确认 frame 完整</span>
+ros2 run teleop_twist_keyboard teleop_twist_keyboard
+ros2 run tf2_tools view_frames
+
+<span class="c"># ④ 保存地图为 slam_map（遍历闭环并回到起点后执行）</span>
+ros2 run nav2_map_server map_saver_cli -f <span class="g">slam_map</span>
+
+<span class="c"># ⑤ 加载 slam_map 启动 Nav2 + AMCL 定位</span>
+ros2 launch car1_navigation navigation.launch.py <span class="b">map:=slam_map</span>
+
+<span class="c"># ⑥ RViz2 设初始位姿（2D Pose Estimate）后再下发目标点</span>
+ros2 action send_goal /navigate_to_pose nav2_msgs/action/NavigateToPose \
+  <span class="y">"{pose: {header: {frame_id: map}, pose: {position: {x: 1.2, y: 0.8}}}}"</span>
+
+<span class="c"># ⑦ 监控定位质量：粒子云应收敛成一撮，TF 持续刷新</span>
+ros2 topic echo /amcl_pose --once
+ros2 run tf2_ros tf2_echo map base_link</pre>
+      <div class="tip amber"><b>验收标准（写入 s4 打卡）：</b>① slam_map 覆盖全场、路口无重影；② 3 个目标点各连续 3 次到位（横向偏差 &lt; 半个车道）；③ 点位 yaml ≥6 条且名称可读。<b>易错点：初始位姿必设、低速起步、闭环回原点、目标点别压在车道线上（footprint 会顶掉）。</b></div>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">数据流</div><div class="kt">/scan → slam_toolbox → /map → AMCL（+初始位姿）→ /cmd_vel → 底盘，一条链断了先查话题。</div></div> <div class="kcard"><div class="kd">为什么保留 slam_map</div><div class="kt">EXP-04 综合路测在同一张图上跑，点位、路线全部复用，禁止随意挪动沙盘元素。</div></div> <div class="kcard"><div class="kd">回环的意义</div><div class="kt">闭环把"走到路口时车以为自己在直道"的累计误差拉回，否则语义标注全是错位的。</div></div> <div class="kcard"><div class="kd">语义标注格式</div><div class="kt">waypoints.yaml：name/x/y/yaw 四字段，EXP-03~04 按名取点，杜绝裸坐标硬编码。</div></div>
+      </div>
+    </section>
+
+    <section class="blk" id="s6">
+      <h2><span class="no">06</span>原理动画：遍历建图与 Nav2 点到点</h2>
+      <div class="anim-box">
+        <svg viewBox="0 0 720 300" width="100%" role="img" aria-label="激光SLAM遍历建图与回环动画">
+          <defs>
+            <marker id="e01a1" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#818cf8"/></marker>
+          </defs>
+          <g font-size="13" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif">
+            <text x="215" y="28" fill="#a5b4fc" font-weight="bold">实时建图：/scan 扫描匹配 + 回环校正</text>
+            <rect x="40" y="50" width="350" height="220" rx="10" fill="#020617" stroke="#334155"/>
+            <g stroke="#475569" stroke-width="10" fill="none">
+              <rect x="70" y="80" width="290" height="160"/>
+            </g>
+            <g fill="#818cf8">
+              <rect x="70" y="80" width="290" height="5" opacity="0.4"/>
+            </g>
+            <circle cx="90" cy="90" r="9" fill="#a5b4fc"/>
+            <path d="M90,90 H330 V230 H90 Z" fill="none" stroke="#818cf8" stroke-width="3" stroke-dasharray="8 6" stroke-linecap="round">
+              <animate attributeName="stroke-dashoffset" from="28" to="0" dur="1s" repeatCount="indefinite"/>
+            </path>
+            <circle r="8" fill="#fbbf24">
+              <animateMotion dur="8s" repeatCount="indefinite" keyPoints="0;1" keyTimes="0;1" calcMode="linear" path="M90,90 H330 V230 H90 Z"/>
+            </circle>
+            <g>
+              <line x1="90" y1="90" x2="90" y2="60" stroke="#4ade80" stroke-width="3" opacity="0.9">
+                <animate attributeName="opacity" values="0.9;0.2;0.9" dur="0.6s" repeatCount="indefinite"/>
+                <animateTransform attributeName="transform" type="rotate" from="0 90 90" to="360 90 90" dur="2s" repeatCount="indefinite"/>
+              </line>
+            </g>
+            <circle cx="90" cy="90" r="26" fill="none" stroke="#4ade80" stroke-width="2" opacity="0">
+              <animate attributeName="r" values="16;70" dur="8s" begin="6.6s" repeatCount="indefinite"/>
+              <animate attributeName="opacity" values="0.9;0" dur="8s" begin="6.6s" repeatCount="indefinite"/>
+            </circle>
+            <text x="215" y="300" fill="#94a3b8" font-size="11">黄点=小车沿闭环巡图 · 绿线=激光扫掠 · 末段脉冲=回到起点触发回环校正</text>
+            <rect x="430" y="50" width="250" height="220" rx="10" fill="#020617" stroke="#334155"/>
+            <text x="555" y="80" fill="#a5b4fc" font-weight="bold">回环前后对比</text>
+            <text x="555" y="106" fill="#f87171" font-size="12">❌ 漂移：路口出现"双墙"重影</text>
+            <g stroke="#475569" stroke-width="7" fill="none">
+              <path d="M460,150 H640"/>
+              <path d="M460,150 L636,158"/>
+            </g>
+            <text x="555" y="200" fill="#4ade80" font-size="12">✅ 校正：墙面重合、坐标拉回</text>
+            <g stroke="#4ade80" stroke-width="7" fill="none">
+              <path d="M460,240 H640"/>
+            </g>
+            <path d="M460,240 H640" fill="none" stroke="#22c55e" stroke-width="3" opacity="0.6"/>
+          </g>
+        </svg>
+        <div class="anim-cap">动画 1-1：小车沿沙盘外环闭环巡图，激光扫掠不断刷进新墙面；回到起点脉冲扩散——回环校正把累计漂移拉回，右下"双墙"复位为单墙。</div>
+      </div>
+      <div class="anim-box">
+        <svg viewBox="0 0 720 240" width="100%" role="img" aria-label="Nav2点到点管线动画">
+          <defs>
+            <marker id="e01a2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#818cf8"/></marker>
+          </defs>
+          <g font-size="13" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif">
+            <g>
+              <rect x="20" y="40" width="130" height="54" rx="10" fill="#1e1b4b" stroke="#818cf8" stroke-width="2"/>
+              <text x="85" y="63" fill="#c7d2fe" font-weight="bold">slam_map + 目标点</text>
+              <text x="85" y="84" fill="#a5b4fc" font-size="11">map 帧坐标</text>
+              <rect x="185" y="40" width="120" height="54" rx="10" fill="#1e1b4b" stroke="#818cf8" stroke-width="2"/>
+              <text x="245" y="63" fill="#c7d2fe" font-weight="bold">AMCL 定位</text>
+              <text x="245" y="84" fill="#a5b4fc" font-size="11">粒子滤波 /amcl_pose</text>
+              <rect x="340" y="40" width="130" height="54" rx="10" fill="#1e1b4b" stroke="#818cf8" stroke-width="2"/>
+              <text x="405" y="63" fill="#c7d2fe" font-weight="bold">全局规划 A*</text>
+              <text x="405" y="84" fill="#a5b4fc" font-size="11">代价地图避障</text>
+              <rect x="505" y="40" width="90" height="54" rx="10" fill="#1e1b4b" stroke="#818cf8" stroke-width="2"/>
+              <text x="550" y="63" fill="#c7d2fe" font-weight="bold">/cmd_vel</text>
+              <text x="550" y="84" fill="#a5b4fc" font-size="11">速度指令</text>
+              <rect x="630" y="40" width="70" height="54" rx="10" fill="#1e1b4b" stroke="#818cf8" stroke-width="2"/>
+              <text x="665" y="72" fill="#c7d2fe" font-weight="bold">小车 C1</text>
+              <line x1="150" y1="67" x2="181" y2="67" stroke="#818cf8" stroke-width="2" marker-end="url(#e01a2)"/>
+              <line x1="305" y1="67" x2="336" y2="67" stroke="#818cf8" stroke-width="2" marker-end="url(#e01a2)"/>
+              <line x1="470" y1="67" x2="501" y2="67" stroke="#818cf8" stroke-width="2" marker-end="url(#e01a2)"/>
+              <line x1="595" y1="67" x2="626" y2="67" stroke="#818cf8" stroke-width="2" marker-end="url(#e01a2)"/>
+              <circle r="7" fill="#fbbf24">
+                <animateMotion dur="3s" repeatCount="indefinite" path="M85,60 L245,60 L405,60 L550,60 L665,60"/>
+              </circle>
+            </g>
+            <path d="M665,100 V160 H85 V104" fill="none" stroke="#4ade80" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#e01a2)"/>
+            <text x="375" y="180" fill="#4ade80" font-size="11">里程计 + 激光匹配反馈：位姿实时回灌 AMCL，规划闭环（只发不收=盲开）</text>
+            <circle r="6" fill="#4ade80">
+              <animateMotion dur="3s" begin="1.5s" repeatCount="indefinite" path="M665,140 H85"/>
+            </circle>
+            <g transform="translate(60,196)">
+              <rect x="0" y="0" width="620" height="34" rx="8" fill="#0b1220" stroke="#1e293b"/>
+              <line x1="40" y1="17" x2="560" y2="17" stroke="#334155" stroke-width="6"/>
+              <line x1="40" y1="17" x2="560" y2="17" stroke="#818cf8" stroke-width="6" stroke-dasharray="520" stroke-dashoffset="520">
+                <animate attributeName="stroke-dashoffset" values="520;0" dur="6s" repeatCount="indefinite"/>
+              </line>
+              <rect x="36" y="8" width="18" height="18" rx="4" fill="#fbbf24">
+                <animate attributeName="x" values="36;544" dur="6s" repeatCount="indefinite"/>
+              </rect>
+              <circle cx="560" cy="17" r="7" fill="#4ade80"/>
+              <text x="590" y="22" fill="#94a3b8" font-size="11" text-anchor="middle">goal</text>
+            </g>
+          </g>
+        </svg>
+        <div class="anim-cap">动画 1-2：点到点管线——目标点进入后，AMCL 先把"我在哪"算准，A* 铺路，/cmd_vel 驱动底盘，位姿反馈不断回灌；下方进度条演示目标点从下发到到位的全过程。</div>
+      </div>
+      <div class="tip violet"><span class="lab">观察</span>动画 1-1 里为什么回环发生在"回到起点"那一刻？SLAM 的误差是<b>越走越攒</b>的：只在识别出旧场景时才有机会把攒下的误差一次性摊销——这就是巡图必须<b>闭环</b>、不能只走单程的原因。</div>
+    </section>
+
+    <section class="blk" id="s7">
+      <h2><span class="no">07</span>互动实验：红绿灯配时模拟器</h2>
+      <div class="ix-panel">
+        <div class="ix-title">沙盘灯口配时推演：拖时间轴看南北/东西向灯态与通行决策</div>
+        <div class="ctl-row">
+<label class="ctl">信号周期时刻 <span id="tLab">0 s</span> <input type="range" id="tN" min="0" max="47" value="0" step="1" oninput="sig()"> </label>
+<label class="ctl">车距停止线 <span id="dLab">80%</span> <input type="range" id="dN" min="10" max="100" value="80" step="5" oninput="sig()"> </label>
+          <button class="btn ghost" onclick="sigReset()">重置</button>
+        </div>
+        <svg viewBox="0 0 720 150" width="100%" role="img" aria-label="双相位信号灯与车辆位置示意">
+          <g font-family="Noto Sans CJK SC, sans-serif">
+            <rect x="10" y="10" width="700" height="130" rx="10" fill="#0b0f17" stroke="#1e293b"/>
+            <text x="30" y="36" fill="#94a3b8" font-size="12">南北向</text>
+            <rect id="lbR" x="70" y="20" width="24" height="24" rx="5" fill="#3f3f46"/>
+            <rect id="lbY" x="70" y="58" width="24" height="24" rx="5" fill="#3f3f46"/>
+            <rect id="lbG" x="70" y="96" width="24" height="24" rx="5" fill="#16a34a"/>
+            <rect x="480" y="40" width="220" height="70" rx="6" fill="#111827" stroke="#374151"/>
+            <line x1="560" y1="40" x2="560" y2="110" stroke="#f8fafc" stroke-width="3" stroke-dasharray="8 6"/>
+            <text x="543" y="130" fill="#94a3b8" font-size="11" text-anchor="middle">停止线</text>
+            <rect id="carN" x="600" y="63" width="70" height="24" rx="5" fill="#fbbf24"/>
+            <text x="635" y="80" fill="#0f172a" font-size="11" text-anchor="middle" font-weight="bold">C1</text>
+            <text x="330" y="36" fill="#94a3b8" font-size="12">东西向</text>
+            <circle id="eR" cx="360" cy="30" r="10" fill="#ef4444" opacity="0.25"/>
+            <circle id="eG" cx="392" cy="30" r="10" fill="#22c55e" opacity="0.25"/>
+            <text x="300" y="76" fill="#94a3b8" font-size="11">灯口平面见第 06 节动画</text>
+          </g>
+        </svg>
+        <div class="io" id="sigIo"></div>
+      </div>
+      <p style="margin-top:10px">配时公式（本模拟器采用）：南北向 红 3s → 绿 25s → 黄 5s，东西向 绿 13s → 黄 2s，周期 48s。把滑杆推到黄灯切换前 2 秒再看车辆位置——<b>"能否在停止线前停下"决定黄灯该走还是该停</b>，这正是 EXP-03 路口状态机的判据原型。</p>
+    </section>
+
+    <section class="blk" id="s8">
+      <h2><span class="no">08</span>常见问题</h2>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">Q map 一片黑？</div><div class="kt">先查 /scan 是否在滚；再看 slam.launch.py 是否指到雷达话题；最后确认沙盘挡边在雷达量程内且反射正常。</div></div> <div class="kcard"><div class="kd">Q 路口出现双墙重影？</div><div class="kt">回环没触发或触发失败：放慢过弯、让起点与终点重叠 0.5m 以上；仍不行则清图重建，禁用横移。</div></div> <div class="kcard"><div class="kd">Q 启动导航后小车原地打转/找不着北？</div><div class="kt">没设 2D Pose Estimate！AMCL 初始粒子弥散，必须先在 RViz 给初值对准起始朝向。</div></div> <div class="kcard"><div class="kd">Q goal 发出即被拒？</div><div class="kt">多半是 transform 超时或目标点落在代价地图内：检查 view_frames 的 map→odom→base_link 链，把点挪到车道内。</div></div> <div class="kcard"><div class="kd">Q 小车起步就画歪？</div><div class="kt">起步过猛导致轮子打滑（低速起步铁律）：teleop 先点动半圈观察 RViz 再连续行进。</div></div> <div class="kcard"><div class="kd">Q 相机能帮忙建图吗？</div><div class="kt">本实验只用 2D 雷达；HP60C 有 0.5m 近盲区，靠墙场景不可依赖，留给 EXP-02 做视觉。</div></div> <div class="kcard"><div class="kd">Q 地图存哪了？</div><div class="kt">工作目录下 slam_map.yaml/.pgm；提交时连同点位 yaml 一起归档，EXP-04 复用。</div></div> <div class="kcard"><div class="kd">Q 巡路时撞行人模型？</div><div class="kt">语义上行人模型是"可绕障"，先从地图删掉误刷的模型再导航，或在 costmap 中膨胀半径调大。</div></div>
+      </div>
+    </section>
+
+    <section class="blk" id="s9">
+      <h2><span class="no">09</span>拓展阅读</h2>
+      <ul class="check">
+        <li><b>slam_toolbox 官方文档</b>（ROS 2 Wiki）：mapping / localization 两种模式的参数表——对照本课 slam.launch.py 看 resolution、max_laser_range 怎么影响 40cm 车道的建图精度。</li>
+        <li><b>Nav2 概念页</b>：global planner 与 controller 的分工、代价地图膨胀层——理解"目标点为什么不能压线放"。</li>
+        <li><b>tf2_tools view_frames</b>：每次导航会话开始先导一次 TF 树，map→odom→base_link 断链是 80% 导航怪病的根源。</li>
+        <li><b>教学沙盘选型</b>：淘宝「ROS机器人无人驾驶沙盘」（id=696594369848，¥899，塔克创新品牌店）；同类规格可参考 Hiwonder 自动驾驶地图产品页（本课抓图来源）。</li>
+        <li><b>本课程索引</b>：<a href="../index.html#case">CASE-05 课程目录</a>，下一实验将把灯口与标志牌变成话题数据。</li>
+      </ul>
+    </section>
+
+    <section class="blk" id="s10">
+      <h2><span class="no">10</span>思考题 · 自测</h2>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">✅ 完成成果</div><div class="kt">slam_map 全场无重影 + 3 目标点 ×3 次到位 + 语义点位 yaml ≥6 条。</div></div> <div class="kcard"><div class="kd">🧠 原理收获</div><div class="kt">能讲清扫描匹配、回环校正、AMCL 粒子滤波三者在"画图→认路"链条中的分工。</div></div> <div class="kcard"><div class="kd">🛠 技能收获</div><div class="kt">独立完成建图、存图、加载导航、设初始位姿、下发目标点与语义标注全流程。</div></div> <div class="kcard"><div class="kd">📐 评分速览</div><div class="kt">地图质量 40% + 巡路到位 30% + 标注完整性 20% + 安全规范 10%。</div></div>
+      </div>
+      <div class="tip violet"><span class="lab">思考 1</span>为什么巡图必须回到起点闭环？如果不闭环，语义标注里的"灯口"坐标会怎样随巡图时长漂移？请用"误差累积"解释。</div>
+      <div class="tip violet"><span class="lab">思考 2</span>假设把初始位姿故意偏 30° 再导航，小车会有什么表现？这与"低速起步"各自防的是哪类事故？</div>
+    </section>
+
+    <nav class="expnav">
+      <a class="prev" href="../index.html#case">← 返回课程目录</a>
+      <a class="next" href="../exp-02-traffic-vision/index.html">下一个：EXP-02 交通标志与红绿灯识别 →</a>
+    </nav>
+    <footer>
+      <div>CASE-05 · 机器人小车智慧交通综合案例（小车 C1）· EXP-01 沙盘环境认知与建图导航</div>
+      <div>8 学时 · 2 理论 + 6 实践 · 沙盘规格按同类教学沙盘典型设计并抓公开图参照，以现场实际元素为准</div>
+    </footer>
+  </main>
+</div>
+
+<script>
+function sig(){
+  var t=parseInt(document.getElementById('tN').value,10);
+  var d=parseInt(document.getElementById('dN').value,10);
+  document.getElementById('tLab').textContent=t+' s';
+  document.getElementById('dLab').textContent=d+'%';
+  var ns = t<3?'R':(t<28?'G':(t<33?'Y':'R'));       // 南北：红3 绿25 黄5
+  var ew = t<33?'R':(t<46?'G':'Y');                  // 东西：绿13 黄2
+  var col={R:'#ef4444',Y:'#f59e0b',G:'#22c55e'},
+      off={R:'#3f3f46',Y:'#3f3f46',G:'#16a34a'};
+  [['lbR','R'],['lbY','Y'],['lbG','G']].forEach(function(p){
+    var el=document.getElementById(p[0]);
+    el.setAttribute('fill', ns===p[1]?col[p[1]]:off[p[1]]);
+  });
+  document.getElementById('eR').setAttribute('opacity', ew==='R'?'1':'0.25');
+  document.getElementById('eG').setAttribute('opacity', ew==='G'?'1':'0.25');
+  var car=document.getElementById('carN'), x=600-(ns==='G'?Math.min(120,(t-3)*5):0);
+  car.setAttribute('x',x);
+  var dec = ns==='R'?'红灯：保持在停止线后等待':(ns==='G'?'绿灯：低速通过（保持巡线）':'黄灯：距停止线远则刹停，已过线则通过');
+  var nxt = ns==='R'?'绿灯(3s 后)':(ns==='G'?'黄灯(28s 时刻)':'东西向放行(33s 时刻)');
+  document.getElementById('sigIo').innerHTML =
+    '时刻 '+t+'/48s　周期：南北 红3 → 绿25 → 黄5，东西 绿13 → 黄2\n'
+  + '<span class="ok">南北向：'+({R:'红灯',G:'绿灯',Y:'黄灯'})[ns]+'</span>　'+dec+'\n'
+  + '<span class="dim">东西向：'+(ew==='G'?'绿灯放行':(ew==='Y'?'黄灯':'红灯'))+'　车距停止线 '+d+'%（'+(d<40?'已进入减速区':(d<75?'预减速中':'区间正常'))+'）</span>\n'
+  + '下一个状态切换：'+nxt+'　→ EXP-03 状态机将把本行文字写成代码';
+}
+function sigReset(){document.getElementById('tN').value=0;document.getElementById('dN').value=80;sig();}
+sig();
+</script>
+<script src="../shared/tutorial.js" defer></script>
+</body>
+</html>

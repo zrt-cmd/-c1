@@ -1,0 +1,348 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/cases/exp006-smart-factory/exp-07-palletizing/index.html
+TITLE: EXP-07 · 自主码垛 — 智慧工厂装货分拣码垛综合项目
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+EXP-07 · 自主码垛 — 智慧工厂装货分拣码垛综合项目
+🧠 具身智能课程 ·
+教程首页
+综合项目
+/
+智慧工厂装货分拣码垛
+/ EXP-07
+本页目录
+01 问题引入
+02 原理通俗讲解
+03 关联知识点
+04 实验目标
+05 实验环境与准备
+06 动画讲解
+07 互动讲解
+08 实操步骤
+09 重点与易错点
+10 总结与思考
+CASE-01 · 智慧工厂
+EXP-01 需求分析
+EXP-02 五节点架构
+EXP-03 接口设计
+EXP-04 语音交互集成
+EXP-05 视觉自适应装货
+EXP-06 智能分拣
+EXP-07 自主码垛
+EXP-08 危险检测与急停
+EXP-09 全功能快速验证
+EXP-07 · 第 2 章 · 综合性 · 6 学时
+自主码垛：流水线送料 + 跨节点编排抓取
+码垛是全项目最完整的任务链路：N2 调度器先调 N-conveyor 的 run_until_sensor 让流水线送料
+    （复用底盘电机 M1，光电 GPIO17 定点停），订阅 /eai_factory/conveyor/state 收到 sensor_blocked 后
+    才触发 N-grasp 固定点位八步抓取，完成后播报"码垛完成"——融合流水线驱动、光电防抖、跨节点状态同步三大知识点（R6）。
+🏗️ 跨节点编排
+M1 电机复用 · rps=0.1
+光电定点停 run_until_sensor
+sensor_blocked 状态同步
+急停置位保持 · 显式复位
+01
+问题引入：为什么要"先送料，再抓取"？
+分拣是手边直接抓，码垛的物料却在流水线那头——这引入了两个新问题：
+流水线怎么停得准
+（不能靠数秒数），以及
+两个节点怎么配合
+（调度器不能瞎猜物品到了没有）。源讲义的回答是：让传感器说话。
+    流水线转到光电被遮挡才停（
+sensor_blocked
+），调度器订阅这个状态、收到才触发抓取——
+用状态同步取代 sleep 固定时长
+，这是分布式编排的通用范式。
+相应地停不准也有代价：本实验快速验证流程里写得很清楚——触发后不放物品，送料会空跑
+sensor_timeout=30.0s
+后置
+timeout
+，抓取永远不会开始。
+02
+原理通俗讲解：传送带、感应门与调度室
+借马达
+流水线电机复用前左轮
+工厂流水线不另买驱动，
+复用底盘电机通道 M1（前左轮）
+：N-conveyor 往
+/car1_base_driver/set_motor
+发速度，STM32 会
+保持最后收到的速度一直转
+；
+        要停就发
+rps=0
+——立即且可靠。参数：
+motor_id=1
+、
+run_speed=0.1
+（m/s）。
+        就像借用已有的电风扇插座：插上就转，拔掉（发 0）就停。
+感应门
+光电四段式定点停
+run_until_sensor
+分四段：
+先等"清沿"
+（光电恢复无遮挡，确认起始端干净）
+        →
+再等"挡沿"
+（物品到达、电平变 LOW(0)）→
+防抖确认
+（
+debounce_reads=3
+连续 3 次读遮挡才算数，
+poll_period=0.05s
+）
+        → 停带。约定：
+1=无遮挡、0=遮挡
+；超时
+sensor_timeout=30s
+。
+        就像车库感应门：先确认门前确实有车、稳定停住，才判断"到位"。
+调度室
+等状态，不数秒
+N2 的
+_start_palletize_sequence
+（L98-110）置
+_awaiting_sensor=True
+后异步调送料；
+        物品到位时
+_conveyor_state_cb
+（L121-127）收到
+sensor_blocked
+才
+_trigger_grasp('palletize')
+。
+等信号，不等时间
+——传送带快慢、物品长短都不影响正确性。
+保险栓
+急停置位保持、显式复位
+conveyor 状态机：
+idle / running / sensor_blocked / emergency / timeout / error
+。
+emergency_stop
+置位
+_emergency_stop=True
+并立即发 rps=0（L240-248）；
+        期间
+run
+/
+run_until_sensor
+一律拒绝（"emergency active — call reset_emergency first"），
+        必须显式
+reset_emergency
+才回 idle——
+急停后绝不自动复跑
+，像总闸按下后必须人工合闸。
+03
+关联知识点
+GPIO 准备
+sysfs 导出 GPIO17
+sudo bash scripts/setup_conveyor_gpio.sh
+导出 + 上拉输入（幂等，已导出跳过 L13-24）；
+        读
+/sys/class/gpio/gpio17/value
+；节点启动时未导出会尝试免密 sudo 自动补导出（L135-163）。
+palletize 点位
+固定抓取（vision=false）
+observe [0.145, 0.0027, 0.185, 3.1381] 取料、place [0.0608, 0.1345, 0.2051, 2.6461] 放置；
+        全套八步含提前开爪、抬 0.03、放后抬 0.05、go_work。
+语音闭环
+"码垛"→"码垛完成"
+intent_hints 内置"码垛/开始码垛/堆码/马舵"等误识别词（yaml L36）；完成后 _grasp_status_cb 映射
+palletize→码垛完成
+发 /eai_factory/speak 播报。
+TC1~TC9
+流水线验收矩阵
+启停（TC1/TC2）、photo 话题（TC3）、定点停与超时（TC4/TC5）、手动急停（TC6）、
+        N3 danger 联动急停（TC7）、GPIO 已/未导出场景（TC8/TC9），见 docs/10。
+04
+实验目标
+理解复用底盘电机 M1 的驱动原理（发布速度 → STM32 保持 → 发 0 即停）与光电电平约定 1=无遮挡、0=遮挡。
+掌握 run_until_sensor"清沿 → 挡沿 → 防抖 → 超时"四段式流程与流水线状态机转换。
+独立完成"先送料后抓取"跨节点编排的全链路验证（服务/语音双通道触发，观察 sensor_blocked → 抓取 → done）。
+掌握急停置位/复位语义与 run 被拒绝的安全含义，能按 docs/10 完成 TC1~TC9 验收。
+05
+实验环境与准备
+硬件：流水线电机（复用底盘 M1 前左轮通道）＋光电传感器 GPIO0_C1=17；码垛为固定点位抓取，不用 AprilTag。
+先导出 GPIO 并验证可读
+sudo bash scripts/setup_conveyor_gpio.sh
+cat /sys/class/gpio/gpio17/value
+# 输出 0 或 1 即成功
+arm_controller 在跑（抓取/放置/回 work 依赖）；机械臂处于 work 安全位、车身固定。
+省内存启动（保留流水线+机械臂，关语音/视觉/画面）：
+source /opt/ros/humble/setup.bash
+source /home/iflytek/ros2_ws/install/setup.bash
+ros2 launch eai_factory eai_factory.launch.py \
+  start_voice:=false start_vision:=false start_viz:=false
+确认节点与服务：
+ros2 node list
+应有 eai_factory_conveyor / grasp / scheduler；
+ros2 service list | grep conveyor
+应有 run / stop / run_until_sensor / emergency_stop / reset_emergency。
+06
+动画讲解：编排链路与状态机
+palletize 跨节点编排：先送料后抓取
+N2 调度器
+start_palletize
+N-conveyor
+run_until_sensor 送料
+光电 GPIO17
+0=遮挡 防抖×3
+N-grasp
+固定八步
+① service
+② 转带
+③ state
+④ grasp/status: palletize|done → speak"码垛完成"
+conveyor 状态机：急停置位保持、显式复位
+idle
+running
+sensor_blocked
+emergency
+timeout
+挡沿×3
+急停
+reset
+回 idle
+emergency 期间 run / run_until_sensor 全被拒绝：
+"emergency active — call reset_emergency first"
+⚠ 30s 不放物品 → timeout，抓取永不开始
+急停后绝不自动复跑 —— 必须显式 reset
+图 7-1　上：四步编排链（service 送料 → 转带 → sensor_blocked 状态回传 → 八步抓取 → 完成播报），光点即一次任务的数据流；下：conveyor 状态机，红色为急停置位路径，急停期间所有启动请求被拒绝。
+07
+互动讲解：编排时序故障沙盘
+点击按钮模拟不同现场情形，观察调度器与流水线的实际反应：
+🎛️ 码垛编排时序沙盘
+正常流程
+放货太晚
+物品已挡光
+急停未复位
+复位
+选择一种现场情形，观察 run_until_sensor 四段流程与调度器编排的结果……
+核心
+四种情形殊途同归地指向同一条设计原则：
+编排依赖"状态信号"而非"时间估算"
+——
+      每种失败模式都能在状态机上找到确定的落点（timeout / immediate / emergency）。
+08
+实操步骤
+1
+环境准备（导出 GPIO + 省内存启动）
+sudo bash scripts/setup_conveyor_gpio.sh
+cat /sys/class/gpio/gpio17/value
+# 0 或 1
+ros2 launch eai_factory eai_factory.launch.py \
+  start_voice:=false start_vision:=false start_grasp:=true start_viz:=false
+2
+流水线单测（观察电机—光电—定点停）
+ros2 topic echo /eai_factory/conveyor/state
+# 终端1
+ros2 service call /eai_factory/conveyor/run_until_sensor std_srvs/srv/Trigger
+# 触发后尽快把物品放到流水线起始端
+预期：立即返回 started；/car1_base_driver/set_motor 出现
+id: 1, rps: 0.1
+；
+      遮挡后
+rps: 0.0
+，state 出现
+sensor_blocked
+。
+3
+码垛全流程：送料 → 抓取 → 播报
+ros2 topic echo /eai_factory/conveyor/state
+# 三终端同开
+ros2 topic echo /eai_factory/grasp/status
+ros2 service call /eai_factory/start_palletize std_srvs/srv/Trigger
+日志应出现
+[SCHEDULER] palletize: feeding belt...
+→
+item at sensor — starting grasp
+→ 八步抓取 →
+palletize|done
+。
+4
+急停三连测（TC6）
+ros2 service call /eai_factory/conveyor/emergency_stop std_srvs/srv/Trigger
+ros2 service call /eai_factory/conveyor/run std_srvs/srv/Trigger
+success: False — "emergency active — call reset_emergency first"
+ros2 service call /eai_factory/conveyor/reset_emergency std_srvs/srv/Trigger
+ros2 service call /eai_factory/conveyor/run std_srvs/srv/Trigger
+# 恢复成功
+5
+语音联动
+：全功能启动后喊"小飞小飞 → 码垛"，听到"码垛完成"播报，
+      终端
+task palletize done — announce "码垛完成"
+（intent_hints 已含"马舵"等容错词）。
+6
+TC1~TC9 验收
+：必测 TC1 run、TC2 stop、TC4 定点停、TC6 手动急停；
+      尝试 TC5（不放物品等 30s 看 timeout）与 TC7（手动发
+/eai_factory/safety/danger true
+联动急停，
+      测完必须再发
+false
+恢复）。结果按 docs/10_流水线测试用例.md 填表。
+09
+重点与易错点
+诊断
+"只送不抓"三查：
+state 到没到 sensor_blocked
+（photo 话题是否 true）、
+防抖满足没有
+（debounce_reads=3）、
+急停标志在不在
+（emergency 拒绝返回）。
+现象
+根因
+处理
+流水线不转
+GPIO 未导出或电机通道接错
+sudo bash scripts/setup_conveyor_gpio.sh
+；确认 conveyor.motor_id=1
+run_until_sensor 立即 timeout
+物品已停在光电位，清沿不满足
+先移开物品再触发，或先 run 清位再 stop
+遮挡了仍不判 sensor_blocked
+电平约定弄反或防抖未满
+确认 1=无遮挡、0=遮挡；看 photo 是否持续 true 三个周期
+码垛只送料不抓取
+state 变化没触发 _conveyor_state_cb
+ros2 topic echo /eai_factory/conveyor/state
+确认消息在发
+抓取位置偏
+堆叠高度/位置与打点不一致
+重新打点更新 grasp.tasks.palletize.observe_pose（yaml L89）
+服务一直拒绝 "emergency active"
+急停置位保持，未显式复位
+reset_emergency
+后再触发（安全设计，非故障）
+评分自测（源讲义 15/30/35/10/10）：原理 15、步骤与命令日志 30、四步验证现象 35、TC1~TC9 表 10、思考题 10。
+安全：启停前确认机械臂 work 位、车身固定；抓取区全程手离；测完急停必须复位。
+实验结束
+bash scripts/stop_eai_factory.sh
+清理，防残留进程占串口。
+10
+总结与思考
+借力
+M1 电机复用
+发速度即转、发 0 即停，STM32 保持最后速度驱动流水线。
+等信号
+清沿→挡沿→防抖→超时
+四段式定点停，debounce_reads=3 过滤抖动，30s 超时兜底。
+跨节点
+state 同步再抓取
+_awaiting_sensor + _conveyor_state_cb，状态驱动取代定时。
+安全停
+置位保持 · 显式复位
+急停后 run 全拒，防误自启是设计而非缺陷。
+思考 1
+为什么 run_until_sensor 要先等"清沿"再等"挡沿"？如果物品一开始就在光电传感器处，
+      省掉清沿会发生什么？（提示：与超时 30s 现象联系起来）
+思考 2
+编排等待如果不用 _conveyor_state_cb 订阅、而是
+sleep(10)
+再触发抓取，
+      在"传送带加速"和"抓取服务还没就绪"两种情况下分别会出什么问题？
+      结合 _pending_task / 2s 重试机制说明状态订阅方案多补了哪一层保险。
+CASE-01 · 智慧工厂装货分拣码垛 · EXP-07 自主码垛
+6 学时 · 综合性 · 基于 llm_practice 实验讲义改编

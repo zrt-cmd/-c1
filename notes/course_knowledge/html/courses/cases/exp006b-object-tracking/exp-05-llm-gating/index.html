@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-05 · LLM 指令门控（FunctionCall） — 通用目标追踪综合项目</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>:root{--theme:#0e7490;--theme-deep:#155e75;--theme-bg:#cffafe;--theme-bd:#a5f3fc}</style>
+</head>
+<body>
+<div class="topbar">
+  <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit" title="返回课程首页">🎓 具身智能课程 · <i>通用目标追踪</i></a>
+  <div class="crumb"><a href="../../../index.html#case">综合项目</a> / <a href="../index.html">通用目标追踪</a> / EXP-05</div>
+</div>
+
+<div class="wrap">
+  <aside class="side">
+    <h4>本页目录</h4>
+    <a href="#s1" class="now">01 问题引入 · LLM 的嘴，门控的手</a>
+    <a href="#s2">02 原理通俗讲解 · 拿不准就不放行</a>
+    <a href="#s3">03 关联知识点</a>
+    <a href="#s4">04 实验目标</a>
+    <a href="#s5">05 实验环境与准备</a>
+    <a href="#s6">06 动画讲解 · 门控路由与 fail-closed 出口</a>
+    <a href="#s7">07 互动讲解 · 门控判定输入实验台</a>
+    <a href="#s8">08 实操步骤 · 追踪/清除/闲聊三连</a>
+    <a href="#s9">09 重点与易错点</a>
+    <a href="#s10">10 总结与思考</a>
+    <h4>CH1 · 需求与架构设计</h4>
+    <a href="../exp-01-requirements/index.html">EXP-01 需求分析（R1-R13）</a>
+    <a href="../exp-02-track-engine/index.html">EXP-02 TrackEngine 单状态机</a>
+    <a href="../exp-03-config/index.html">EXP-03 track_config.yaml 详解</a>
+    <h4>CH2 · 感知与交互核心</h4>
+    <a href="../exp-04-deepsort-tracking/index.html">EXP-04 DeepSORT 追踪底座</a>
+    <a href="../exp-05-llm-gating/index.html">EXP-05 LLM 指令门控</a>
+    <a href="../exp-06-vlm-selection/index.html">EXP-06 VLM 描述选目标</a>
+    <h4>CH3 · 语音、可靠性与验收</h4>
+    <a href="../exp-07-voice-interrupt/index.html">EXP-07 语音交互（流式 TTS 打断）</a>
+    <a href="../exp-08-events-degrade/index.html">EXP-08 事件日志与故障降级</a>
+    <a href="../exp-09-full-verify/index.html">EXP-09 全功能验证</a>
+  </aside>
+
+  <main class="content">
+    <div class="exp-head">
+      <span class="code">EXP-05 · 第 2 章 · 综合性 · 4 学时</span>
+      <h1>LLM 指令门控（FunctionCall）：结构化解析 + fail-closed 拦截</h1>
+      <p class="desc">大模型负责"听懂人话"，但绝不能让它直接指挥追踪器。本项目让 LLM 只输出结构化 FunctionCall（track_ids / clear_track / save_snapshot 或闲聊文本），再由 CommandWorker._native_gate 按固定顺序核验：清除词短路、非指令回落、ID 数值对齐、描述转 VLM、确知工具才执行——所有"不确定锁谁"的分支一律不动作（fail-closed），最后还有 parse_instruction 规则兜底防 LLM 彻底宕机。</p>
+      <div class="meta"><span class="tag hl">🎯 产出：门控三连验证记录</span><span class="tag">📦 NATIVE_TOOLS + _native_gate</span><span class="tag">⏱ 4 学时</span></div>
+    </div>
+
+    <section class="blk" id="s1">
+      <h2><span class="no">01</span>问题引入：LLM 的嘴，门控的手</h2>
+      <p>如果没有门控，用户随口一句"把那个红色的追一下"，0.8B 的小模型可能幻觉出一个根本不存在的 id99；一句"你好"也可能被误吐成 <code>track_ids</code> 而当成追踪指令执行。需求 R7 要求指令理解可控、可拦截，R5 要求误触发为零。所以架构把职责劈成两半——嘴与手分开：</p>
+      <div class="flow">
+        <div class="step"><b>LLM（FunctionCall 模式）</b>：把自然语言翻译成 4 种受控输出之一——<code>track_ids(ids)</code>、<code>clear_track()</code>、<code>save_snapshot()</code>，或普通闲聊文本。它只"吐"工具调用（原生 rkllm 标签串或 JSON），自己不执行任何动作。</div>
+        <div class="step"><b>CommandWorker._handle（L253-318）</b>：<code>_native_chat</code> 带 NATIVE_TOOLS（L29-41 三个函数 schema）请求 → <code>parse_native</code> 解析。</div>
+        <div class="step"><b>_native_gate 门控（L320-366）</b>：按固定顺序核验——清除词、指令语义、ID 是否存在、描述是否转 VLM，通过才 <code>registry.call</code>。</div>
+        <div class="step"><b>规则兜底 parse_instruction</b>：LLM 不可用/超时/输出畸形时接棒（tools.py L45-68），追踪/清除照常、绝不产生空 submit；TrackEngine 只消费放行后的最终指令。</div>
+      </div>
+      <div class="tip tealb"><span class="lab">💡 信任模型</span><b>模型可幻觉、代码可兜底</b>——安全边界在 Python 侧：模型误吐 track_ids 不代表会锁车，门控不点头就执行不了。这正是"LLM 的嘴，门控的手"。</div>
+    </section>
+
+    <section class="blk" id="s2">
+      <h2><span class="no">02</span>原理通俗讲解：机场安检的"拿不准就不放行"</h2>
+      <p>把 LLM 想成 <b>热心的前台接待</b>：语法再好也只是复述请求；放行进闸机的是安检员（_native_gate），前台说的不算数。安检员按 <b>固定顺序</b>核验（对应讲义 5.6 路由图）：</p>
+      <div class="kgrid">
+        <div class="kcard"><h3>① 清除词短路 = 绿色通道</h3><p>话语命中 clear_words（清除/解除/取消/停/不追/恢复全/不跟，track_config.yaml L76）→ 强制 <code>clear_track</code> 解除全部锁定，<b>即使模型吐的是 track_ids 也忽略</b>。实测记录在 L325-335 注释：0.8B 对「清除」误吐过 track_ids——清除是安全操作，宁可多解也不锁错。</p></div>
+        <div class="kcard"><h3>② 非指令回落 = 不是找我们的</h3><p>"你好""今天天气"这类纯闲聊（is_instruction=false）→ 回落对话、<b>不执行工具</b>，日志 [LLM] 开头，且用<b>干净请求</b>（不写 llm_chat.history），避免工具轮串进闲聊上下文。</p></div>
+        <div class="kcard"><h3>③ ID 数值对齐 = 查身份证</h3><p>FunctionCall 给了 id，门控拿出来跟当前检测一一对：数值不对齐 → 回「未找到该 ID 目标」，不 submit_effect。LLM 说有不算有，画面里真有才算有。</p></div>
+        <div class="kcard"><h3>④ 无 id 但含描述 = 转 VLM</h3><p>"追踪红色小轿车"没有 id 却命中 color_words/desc_words → 转 track_vlm 视觉选车（EXP-06 接力）；<b>无 id 又无描述</b> → 回引导"请提供目标 id"。VLM 无果由 _vlm_none（L402-405）产出话术。</p></div>
+        <div class="kcard"><h3>⑤ 确知工具才执行</h3><p>路由图的其余出口：track_vlm → VLM 视觉选车；save_snapshot 等其它工具 → 放行 registry 执行。只有解析与门控双确认的动作才会抵达引擎。</p></div>
+        <div class="kcard"><h3>默认出口 = 拒绝</h3><p>"不确定锁谁"（id 不存在 / 数值不对齐 / 闲聊 / VLM 无果）的分支<b>都不调用 submit_effect</b>，只回引导语——这就是 fail-closed：宁可不动作，也不动作错。</p></div>
+      </div>
+      <p>类比消防门——正常状态锁着（默认关闭），只有确认是自己人才推开；绝不会因为"识别不出"就敞开门。锁车是危险副作用（锁定后即便目标消失也不跟别的车），<b>误锁成本远高于不动作</b>，这是 fail-closed 成为安全核心的原因。</p>
+      <div class="tip tealb"><span class="lab">🛡 三层防线</span>第一层 FunctionCall 结构解析（畸形输出进不来）→ 第二层 _native_gate 门控路由（语义与存在性核验）→ 第三层 parse_instruction 规则兜底（LLM 挂了追踪/清除照用）。任一层失败都向更保守层退，三层都失败才回"没听懂"，且任何一层都不产生空 submit。</div>
+    </section>
+
+    <section class="blk" id="s3">
+      <h2><span class="no">03</span>关联知识点</h2>
+      <div class="kgrid">
+        <div class="kcard"><h3>NATIVE_TOOLS（L29-41）</h3><p>只注册三个工具：track_ids（数组 id）、clear_track（无参）、save_snapshot（落盘快照）。工具面收窄 = 攻击面与幻觉面收窄。</p></div>
+        <div class="kcard"><h3>双路径解析</h3><p>原生 rkllm FunctionCall 标签串与结构化 JSON 双路径（4.1.2），都汇到同一道门控——路径可变，闸口不变。</p></div>
+        <div class="kcard"><h3>生产者-消费者线程</h3><p>CommandWorker.run（L248-251）死循环从队列 get 再 _handle；_handle 入口 <code>engine.pending.set()</code>（L254）暂停读帧等，LLM 推理秒级也不卡主循环。副作用统一经 <code>engine.submit_effect()</code> 回主循环单线程消费，避免并发改 session。</p></div>
+        <div class="kcard"><h3>server_manager 常驻</h3><p>ensure_running（L55-111）：端口预检（默认 8080，0=自动）→ 已就绪则复用外部服务 → 否则按 auto_start 拉起 Flask 子进程并轮询 GET /v1/models（超 120s 抛错）；stop（L113-117）只杀自己拉起的子进程。同项目多实验共享 8080。</p></div>
+        <div class="kcard"><h3>规则兜底 parse_instruction</h3><p>L45-68 固定顺序：①颜色词+车类词 → track_vlm；②阿拉伯/中文数字 → track_ids（_zh_to_num L13-37，"六十九"→69，只认万/亿以下层级）；③清除词 → clear_track；返回 None = 非指令。<b>L67 特判：追踪但 id 解析不出也返回 None——绝不产空 submit 误清当前锁</b>（评审 P0-2）。</p></div>
+        <div class="kcard"><h3>interaction 词表</h3><p>关卡判断的依据全在词表里（track_config.yaml），改话术先改词表再改代码。</p></div>
+      </div>
+      <pre><span class="c"># config/track_config.yaml L76 起（interaction 词表，讲义 5.6 JSON）</span>
+interaction:
+  clear_words:   [清除, 解除, 取消, 停, 不追, 恢复全, 不跟]
+  track_words:   [追踪, 追, 锁定, 识别, 找, 看, 跟, 停]
+  instruct_words:[追踪, 追, 停, 取消, 解除, 不追, 恢复全, 不跟, 清除]
+  color_words:   [红, 蓝, 白, 黑, 绿, 黄, 灰, 粉, 紫]
+  desc_words:    [红, 黄, 蓝, 白, 黑, 绿, 灰, 粉, 紫, 卡车, 轿车, suv, 大, 小, 新, 旧]</pre>
+      <ul class="check">
+        <li>_rule_fallback（track_app.py L618-626）：LLM 失败 → parse_instruction → 执行或回"没听懂"；<b>只支持追踪/清除/列目标，不支持闲聊</b>（test_chat_reply_clean.py L206-217 断言闲聊无规则可匹配）。</li>
+        <li>行为基线：tests/test_native_wiring.py L18-113 覆盖门控 id 对齐/不对齐/清除强制/描述走 VLM/闲聊回落五类断言。</li>
+        <li>安全依据：rkllm 原生工具调用（llm_server.py set_function_tools）与 OpenAI function calling 同构——但执行权始终在本地 registry。</li>
+      </ul>
+    </section>
+
+    <section class="blk" id="s4">
+      <h2><span class="no">04</span>实验目标</h2>
+      <ul class="check">
+        <li><b>掌握</b> CommandWorker 门控路由（_native_gate L320-366 顺序）与 fail-closed 语义。</li>
+        <li><b>理解</b>清除语义强制 clear_track（分支①短路）与闲聊回落（分支②不执行工具）的本质差异。</li>
+        <li><b>掌握</b> LLM 子进程常驻管理（server_manager，端口 8080）与 parse_instruction 规则兜底。</li>
+        <li><b>独立完成</b>文本全链路验证：<code>track_app.py --text --mjpeg</code> 交互，先输入「小飞小飞」唤醒，再「追踪 id3 的车」锁定，然后清除、闲聊。</li>
+        <li><b>会读日志分岔</b>：[cmd] = 门控放行指令、[LLM] = 闲聊回落、[track_vlm] = 转视觉选目标——三种前缀对应三条路由。</li>
+        <li><b>迁移</b>：理解大模型 FunctionCall 在机器人指令场景的门控安全设计（模型可幻觉、代码可兜底）。</li>
+      </ul>
+      <div class="tip violet"><span class="lab">📦 完成成果</span>pytest 门控用例全绿证明 + 一张 _native_gate 路由顺序图（标注 fail-closed 出口）+ 文本全链路验证日志（追踪/清除/闲聊三例）+ rules 兜底测试记录。</div>
+    </section>
+
+    <section class="blk" id="s5">
+      <h2><span class="no">05</span>实验环境与准备</h2>
+      <div class="kgrid">
+        <div class="kcard"><h3>硬件与系统</h3><p>具身智能实验箱 B2 / 机器人小车 C1；Ubuntu 22.04 + ROS 2 Humble，Python 3.10。<b>文本模式 --text 不需要语音硬件</b>，但 LLM 服务需板端（自动起 8080）。</p></div>
+        <div class="kcard"><h3>核心库</h3><p>RKLLM；非 native 路径用 ask_stream 走 HTTP 访问 RKLLM 服务 8080 端口。</p></div>
+        <div class="kcard"><h3>服务</h3><p>本地 llm_server 常驻 8080，GET /v1/models 轮询就绪（120s 窗口）。实验结束 <code>pkill -f llm_server</code> 清理（track_app main 的 finally 也会调 llm_mgr.stop()）。</p></div>
+        <div class="kcard"><h3>代码锚点</h3><p>apps/track_app.py：NATIVE_TOOLS L29-41、run L248-251、_handle L253-318、_native_gate L320-366（L325-335 清除短路注释）、_vlm_none L402-405、_rule_fallback L618-626；tools/tools.py parse_instruction L45-68、_zh_to_num L13-37。</p></div>
+        <div class="kcard"><h3>测试</h3><p><code>python3 -m pytest tests/ -q -k "not test_real"</code>——跳过需真实板端模型的用例，纯逻辑 x86 可跑；覆盖 test_native_wiring / test_native_client / test_native_parser / test_chat_reply_*。</p></div>
+        <div class="kcard"><h3>入口命令</h3><p>文本全链路入口是 track_app.py（先唤醒词再对话），视频用 test.mp4 离线素材即可，另配 --mjpeg 可在浏览器看画面。</p></div>
+      </div>
+      <pre><span class="c"># ① 快速回归（跳过真模型用例，x86 可跑）</span>
+<span class="g">cd</span> ~/ros2_ws/src/xflz_eai_car1/app/object_tracking
+<span class="y">python3 -m pytest tests/ -q -k "not test_real"</span>
+
+<span class="c"># ② 查看门控与兜底的源码锚点</span>
+<span class="g">grep</span> -n "NATIVE_TOOLS\|_native_gate\|_rule_fallback" apps/track_app.py
+<span class="g">grep</span> -n "clear_words" config/track_config.yaml   <span class="c"># L76 词表</span></pre>
+    </section>
+
+    <section class="blk" id="s6">
+      <h2><span class="no">06</span>动画讲解：门控路由与 fail-closed 出口</h2>
+      <p>一条 FunctionCall 进门后按路由图顺序核验。看三条彩带走哪条路——青色合法指令五步放行；琥珀话语含清除词在①短路强制 clear_track；红色幻觉 ID 在③"数值不对齐"被拦下坠入⑤拒绝口。</p>
+      <div class="anim-box">
+        <svg viewBox="0 0 720 255" width="100%">
+          <rect x="15" y="95" width="105" height="60" rx="10" fill="none" stroke="#0891b2" stroke-width="2"/>
+          <text x="67" y="120" text-anchor="middle" font-size="12" fill="#0e7490">FunctionCall</text>
+          <text x="67" y="140" text-anchor="middle" font-size="11" fill="#64748b">_handle 解析</text>
+          <rect x="160" y="95" width="100" height="60" rx="10" fill="none" stroke="#0891b2" stroke-width="2"/>
+          <text x="210" y="120" text-anchor="middle" font-size="12" fill="#0e7490">① 含清除词?</text>
+          <text x="210" y="140" text-anchor="middle" font-size="11" fill="#64748b">短路检查</text>
+          <rect x="300" y="95" width="100" height="60" rx="10" fill="none" stroke="#0891b2" stroke-width="2"/>
+          <text x="350" y="120" text-anchor="middle" font-size="12" fill="#0e7490">② 是指令?</text>
+          <text x="350" y="140" text-anchor="middle" font-size="11" fill="#64748b">否→闲聊回落</text>
+          <rect x="440" y="95" width="105" height="60" rx="10" fill="none" stroke="#0891b2" stroke-width="2"/>
+          <text x="492" y="120" text-anchor="middle" font-size="12" fill="#0e7490">③ ID 对齐?</text>
+          <text x="492" y="140" text-anchor="middle" font-size="11" fill="#64748b">查当前检测</text>
+          <rect x="590" y="95" width="115" height="60" rx="10" fill="none" stroke="#0e7490" stroke-width="2.5"/>
+          <text x="647" y="120" text-anchor="middle" font-size="12" fill="#0e7490">放行 → 引擎</text>
+          <text x="647" y="140" text-anchor="middle" font-size="11" fill="#64748b">track_ids 执行</text>
+          <rect x="170" y="197" width="150" height="45" rx="10" fill="none" stroke="#f59e0b" stroke-width="2"/>
+          <text x="245" y="224" text-anchor="middle" font-size="12" fill="#b45309">强制 clear_track</text>
+          <rect x="290" y="197" width="130" height="45" rx="10" fill="none" stroke="#7c3aed" stroke-width="2"/>
+          <text x="355" y="224" text-anchor="middle" font-size="12" fill="#7c3aed">④ 描述→VLM</text>
+          <rect x="590" y="197" width="115" height="45" rx="10" fill="none" stroke="#dc2626" stroke-width="2"/>
+          <text x="647" y="224" text-anchor="middle" font-size="12" fill="#dc2626">⑤ else 回引导</text>
+          <path d="M120 125 H155" stroke="#94a3b8" stroke-width="2" marker-end="url(#a5)"/>
+          <path d="M260 125 H295" stroke="#94a3b8" stroke-width="2" marker-end="url(#a5)"/>
+          <path d="M400 125 H435" stroke="#94a3b8" stroke-width="2" marker-end="url(#a5)"/>
+          <path d="M545 125 H585" stroke="#0e7490" stroke-width="2.5" marker-end="url(#a5g)"/>
+          <path d="M210 155 V193" stroke="#f59e0b" stroke-width="2" marker-end="url(#a5o)"/>
+          <path d="M355 155 V193" stroke="#7c3aed" stroke-width="2" marker-end="url(#a5v)"/>
+          <marker id="a5" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#94a3b8"/></marker>
+          <marker id="a5g" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#0e7490"/></marker>
+          <marker id="a5o" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#f59e0b"/></marker>
+          <marker id="a5v" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#7c3aed"/></marker>
+          <circle r="6" fill="#0e7490">
+            <animate attributeName="cx" values="67;210;350;492;647" dur="3.6s" repeatCount="indefinite"/>
+            <animate attributeName="cy" values="125;125;125;125;125" dur="3.6s" repeatCount="indefinite"/>
+          </circle>
+          <circle r="5" fill="#f59e0b" opacity="0.95">
+            <animate attributeName="cx" values="67;210;210" dur="3.6s" begin="1.2s" repeatCount="indefinite"/>
+            <animate attributeName="cy" values="125;125;219" dur="3.6s" begin="1.2s" repeatCount="indefinite"/>
+          </circle>
+          <circle r="5.5" fill="#dc2626" opacity="0.9">
+            <animate attributeName="cx" values="67;210;350;492;492;647" dur="3.6s" begin="2.4s" repeatCount="indefinite"/>
+            <animate attributeName="cy" values="125;125;125;125;219;219" dur="3.6s" begin="2.4s" repeatCount="indefinite"/>
+          </circle>
+        </svg>
+        <div class="anim-cap">青色：合法 track_ids 依序过四闸抵达放行；琥珀：话语含 clear_words 在①短路、强制 clear_track 解锁（模型即使吐了 track_ids 也忽略——L325-335 注释的实测场景）；红色：0.8B 幻觉出不存在的 ID，在③"数值不对齐"被拦下坠入⑤回引导——不确定锁谁，默认动作就是不动作。</div>
+      </div>
+    </section>
+
+    <section class="blk" id="s7">
+      <h2><span class="no">07</span>互动讲解：门控判定输入实验台</h2>
+      <p>点预设句或自由输入，模拟它经 FunctionCall 解析后落在门控哪条路由（判定逻辑按 L320-366 路由顺序的讲义语义推演；示例检测池：<b>id2、id3、id7</b>）。</p>
+      <div class="ix-panel">
+        <div class="ix-title">🎛 门控判定输入实验台 · Gate Lab</div>
+        <div class="ctl-row">
+          <button class="btn ghost" onclick="gateCase('track')">追踪 id3（对齐）</button>
+          <button class="btn ghost" onclick="gateCase('ghost')">追踪 id99（幻觉 ID）</button>
+          <button class="btn ghost" onclick="gateCase('clear')">清除锁定</button>
+          <button class="btn ghost" onclick="gateCase('desc')">追踪红色小轿车</button>
+          <button class="btn ghost" onclick="gateCase('noid')">追踪目标</button>
+          <button class="btn ghost" onclick="gateCase('chat')">你好呀</button>
+          <button class="btn" onclick="gateCase('reset')">复位</button>
+        </div>
+        <div class="ctl-row">
+          <input class="io" id="gateIn" style="flex:1;min-width:220px" placeholder="自由输入一句，如：帮我锁定 id7 / 解除追踪 / 追蓝色卡车 / 停 / 今天周末吗">
+          <button class="btn" onclick="gateCustom()">门控判定 →</button>
+        </div>
+        <div class="io" id="gateIo"><span class="ok">就绪</span>：选择或输入一句话语，观察五条路由走向。</div>
+      </div>
+      <p>试着输入「停」「不追了」——它们都在 clear_words 里，会走分支①短路；再输入「追高架」——有追踪词却解不出数字与描述，应停在"请提供目标 id"的引导，绝不空 submit。这就是 L67 特判在替你把关。</p>
+    </section>
+
+    <section class="blk" id="s8">
+      <h2><span class="no">08</span>实操步骤：追踪 / 清除 / 闲聊三连</h2>
+      <div class="flow">
+        <div class="step"><span class="n">0</span><b>pytest 门控用例（约 60min）</b>：<code>python3 -m pytest tests/ -q -k "not test_real"</code> 验证 gate/thread 用例；关键文件 test_native_wiring.py（id 对齐/不对齐/清除强制/描述走 VLM/闲聊回落，L18-113）、test_chat_reply_clean.py——理解断言：闲聊回落干净请求、无工具残留。</div>
+        <div class="arr"></div>
+        <div class="step"><span class="n">1</span><b>读路由顺序（约 100min）</b>：通读 apps/track_app.py CommandWorker._native_gate L320-366，按下书顺序画路由图——清除词短路 → 非指令回落 → ID 无且含描述转 VLM → ID 数值不对齐回引导 → track_vlm → VLM → else 执行；标注每个 fail-closed 出口"不 submit_effect"。</div>
+        <div class="arr"></div>
+        <div class="step"><span class="n">2</span><b>文本全链路（约 90min）</b>：起 track_app.py --text --mjpeg，先输入「小飞小飞」唤醒，再输入「追踪 id3 的车」——观察 <code>[cmd] track_ids {3}</code> → 播报"好的，只追踪 id3"。</div>
+        <div class="arr"></div>
+        <div class="step"><span class="n">3</span><b>清除与闲聊</b>：输入「清除」→ <code>[cmd] 清除语义指令，执行 clear_track</code>（验证 clear_words 短路，R9）；输入「你好」→ <code>[LLM] 自然回复</code> 且 [cmd] 不存在——闲聊回落不执行工具、不写 llm_chat.history。</div>
+        <div class="arr"></div>
+        <div class="step"><span class="n">4</span><b>server_manager 与规则兜底（约 50min）</b>：读 llm/server_manager.py 确认 8080 常驻逻辑；<code>pkill -f llm_server</code>（或配置 llm.enabled=false）后重跑，再发「追踪 id3」→ 走 parse_instruction 规则兜底照常锁定，发「你好」→ _rule_fallback 回"没听懂"——不崩线程。</div>
+        <div class="arr"></div>
+        <div class="step"><span class="n">5</span><b>fail-closed 用例 E1-E3（讲义步骤5）</b>：逐一对照路由图打"不确定锁谁"分支——①幻觉/不对齐 ID 被拒、②无 id 无描述回引导、③闲聊误吐 track_ids 被回落，核对回引导话术与"锁定集保持不变"。</div>
+      </div>
+      <pre><span class="c"># 工作目录（object_tracking 模块）</span>
+<span class="g">cd</span> ~/ros2_ws/src/xflz_eai_car1/app/object_tracking
+
+<span class="c"># 1. 纯逻辑门控用例（x86，无真实 LLM）</span>
+<span class="y">python3 -m pytest tests/ -q -k "not test_real"</span>   <span class="c"># 覆盖 _native_gate/test_native_wiring/闲聊</span>
+
+<span class="c"># 2. 文本全链路（LLM FunctionCall + 门控）——依次在提示符输入三句</span>
+<span class="y">python3 apps/track_app.py --video /home/iflytek/ros2_ws/src/xflz_eai_car1/vision/07_multi_object_tracking/test.mp4 --text --mjpeg</span>
+<span class="y">小飞小飞</span>
+<span class="y">追踪id3</span>
+<span class="c"># 期望：[cmd] track_ids {3} → 播报「好的，只追踪 id3」</span>
+<span class="y">清除</span>
+<span class="c"># 期望：[cmd] 清除语义指令，执行 clear_track → 播报「好的，已解除全部锁定」</span>
+<span class="y">你好</span>
+<span class="c"># 期望：[LLM] 自然回复，[cmd] 不存在——闲聊回落干净请求，无工具执行</span>
+
+<span class="c"># 3. 规则兜底演练：杀 LLM 后重跑第 2 条命令</span>
+<span class="y">pkill -f llm_server</span>
+<span class="c"># 「追踪 id3」→ parse_instruction L45-68 接管照常锁定；「你好」→ _rule_fallback 回「没听懂」（设计预期）</span>
+
+<span class="c"># 4. 实验收尾：清理常驻子进程</span>
+<span class="y">pkill -f llm_server</span></pre>
+    </section>
+
+    <section class="blk" id="s9">
+      <h2><span class="no">09</span>重点与易错点</h2>
+      <ul class="check">
+        <li><b>路由顺序即安全</b>：清除 &gt; 非指令回落 &gt; ID 对齐 &gt; 描述转 VLM &gt; 执行。清除必须放最前——它是安全操作且模型可能误吐，短路保证"说了解就一定解"。</li>
+        <li>验证顺序：pytest（-k "not test_real"）→ 三连文本 → 宕机演练，三步都要留日志证据。</li>
+        <li>实验后 <code>pkill -f llm_server</code> 清理常驻子进程（track_app finally 也会调 stop，但手工跑测试时容易漏）。</li>
+        <li><b>不要自行放宽门控</b>：fail-closed 是安全核心，任何"不确定锁谁"都不执行工具。</li>
+      </ul>
+      <table>
+        <thead><tr><th>⚠️ 常见坑</th><th>现象 → 解法</th></tr></thead>
+        <tbody>
+          <tr><td>模型把闲聊误吐成 track_ids</td><td>0.8B 对非指令误吐工具调用 → 门控分支②回落对话、不执行工具，这正是 fail-closed 的关键安全</td></tr>
+          <tr><td>「清除」了却仍锁定</td><td>clear_words 未命中 → 补词表；模型误导时一律以 clear_words 短路强制 clear_track（L325-335）</td></tr>
+          <tr><td>幻觉 ID 直接锁车</td><td>没做数值对齐 → 分支③查检测池，不对齐回「未找到该 ID 目标」，绝不 submit</td></tr>
+          <tr><td>「追踪」后不带 id 产空 submit</td><td>空集会清掉当前锁定 → L67 特判返回 None：追踪但解析不出 id ≠ 可放行指令</td></tr>
+          <tr><td>关掉 LLM 后闲聊没了</td><td>规则兜底只支持追踪/清除/列目标，闲聊无规则匹配回"没听懂"——是设计取舍非 bug</td></tr>
+          <tr><td>8080 被残留子进程占住</td><td>server_manager 常驻复用 → <code>pkill -f llm_server</code>；enabled=false 重启也要清</td></tr>
+          <tr><td>闲聊污染指令上下文</td><td>闲聊回落必须用干净请求（不写 llm_chat.history），否则工具轮串进对话历史</td></tr>
+          <tr><td>等 LLM 卡死画面</td><td>_handle 入口已 engine.pending.set() 暂停读帧（L254），副作用走 submit_effect 单线程回主循环——慢在预期，卡死才查线程</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="blk" id="s10">
+      <h2><span class="no">10</span>总结与思考</h2>
+      <div class="kgrid">
+        <div class="kcard"><h3>工具面收窄</h3><p>NATIVE_TOOLS 只暴露 track_ids / clear_track / save_snapshot 三个函数，模型再能说会道也越不了权。</p></div>
+        <div class="kcard"><h3>门控五条路由</h3><p>清除短路、非指令回落、ID 对齐、描述转 VLM、确知执行——每条路径有明确出口，默认出口是拒绝。</p></div>
+        <div class="kcard"><h3>fail-closed</h3><p>"不确定锁谁"就不动作、只回引导：误锁成本远高于不动作，这是机器人场景的底线设计。</p></div>
+        <div class="kcard"><h3>常驻与清理</h3><p>server_manager 复用 8080 提速，stop 只杀自己拉起的子进程；pkill -f llm_server 是标准收尾动作。</p></div>
+        <div class="kcard"><h3>三层防线</h3><p>FunctionCall 解析 → 门控 → parse_instruction 规则兜底，任一层失败向更保守层退，追踪/清除永不失联。</p></div>
+        <div class="kcard"><h3>技能收获</h3><p>FunctionCall 解析（JSON+原生标签）、门控路由与 fail-closed 设计、LLM 子进程生命周期管理——三件可迁移的机器人技能。</p></div>
+      </div>
+      <table>
+        <thead><tr><th>评分项</th><th>分值</th></tr></thead>
+        <tbody>
+          <tr><td>pytest 门控用例（全绿）</td><td>20 分</td></tr>
+          <tr><td>_native_gate 门控路由图（顺序正确 + fail-closed 标注）</td><td>25 分</td></tr>
+          <tr><td>文本全链路验证（追踪 / 清除 / 闲聊三例日志）</td><td>35 分</td></tr>
+          <tr><td>LLM 进程管理与规则兜底语义</td><td>20 分</td></tr>
+        </tbody>
+      </table>
+      <div class="tip violet"><span class="lab">🤔 思考题 1</span>_native_gate 路由顺序为什么是"清除 &gt; 非指令回落 &gt; id &gt; 描述 VLM &gt; 放行"？如果把 ID 对齐挪到清除短路之前，「清除」在模型误吐 track_ids 时会发生什么？结合 L325-335 的实测注记想一想。</div>
+      <div class="tip violet"><span class="lab">🤔 思考题 2</span>"闲聊回落"为什么要用干净请求（不写 history）？若每个闲聊轮都写进 llm_chat.history，追踪指令的上下文会被怎样污染，门控误判率又会朝哪个方向漂移？</div>
+    </section>
+
+    <nav class="expnav">
+      <a href="../exp-04-deepsort-tracking/index.html"><span class="lb">← 上一个实验</span>EXP-04 DeepSORT 追踪底座</a>
+      <a class="next" href="../exp-06-vlm-selection/index.html"><span class="lb">下一个实验 →</span>EXP-06 VLM 描述选目标</a>
+    </nav>
+    <footer>
+      <span>CASE-04 · 通用目标追踪综合项目 · EXP-05 LLM 指令门控（FunctionCall）</span>
+      <span>4 学时 · 综合性 · 基于 object_tracking 实验讲义改编</span>
+    </footer>
+  </main>
+</div>
+
+<script>
+var GATE_POOL=[2,3,7];
+var CLEAR_WORDS=['清除','解除','取消','不追','恢复全','不跟'];
+var TRACK_WORDS=['追踪','追','锁定','识别','找','看','跟','停'];
+var COLOR_WORDS=['红','蓝','白','黑','绿','黄','灰','粉','紫'];
+function gateIo(html){document.getElementById('gateIo').innerHTML=html;}
+function gateCase(k){
+  var out={
+    track:'<span class="ok">分支③对齐放行</span>：FunctionCall=track_ids(ids=[3]) → 不含清除词 → 是追踪指令 → id=3 在检测池（id2/3/7）中 → 执行 <b>registry.call(track_ids)</b>，日志 <b>[cmd] track_ids {3}</b>，播报「好的，只追踪 id3」。',
+    ghost:'<span class="bad">分支③拦截（fail-closed）</span>：0.8B 幻觉出 ids=[99]，检测池一查数值不对齐 → <b>不 submit_effect</b>，只回「未找到该 ID 目标」。模型说得再笃定也以画面为准，锁定集保持不变。',
+    clear:'<span class="ok">分支①短路</span>：命中 clear_words（清除/解除/取消/停/不追/恢复全/不跟，track_config.yaml L76）→ <b>强制 clear_track</b>，日志 <b>[cmd] 清除语义指令，执行 clear_track</b>，播报「好的，已解除全部锁定」；即便模型同时误吐 track_ids 也忽略（L325-335 注释场景）。',
+    desc:'<span class="warn">分支④转 VLM</span>：含 color_words（红色）无 id → 不猜 ID，转 <b>track_vlm</b> 视觉选车（EXP-06 接力）；若 VLM 也找不到 → _vlm_none（L402-405）回引导，同样零脏状态。',
+    noid:'<span class="bad">回引导（fail-closed）</span>：句子有追踪词却既无 id 数字也无描述词 → 按路由图「无 id 且无描述」分支回「请提供目标 id」。<b>绝不产生空 submit</b>——空集会把当前锁定清掉（评审 P0-2 防误清锁）。',
+    chat:'<span class="ok">分支②回落闲聊</span>：解析不出追踪/清除动作 → 非指令 → 回落 LLM 自然回复，日志 <b>[LLM]</b> 前缀、[cmd] 不存在；且用<b>干净请求</b>（不写 llm_chat.history），绝不执行工具。',
+    reset:'<span class="ok">已复位</span>：五条路由待命——清除短路 / 非指令回落 / ID 对齐 / 描述转 VLM / 确知执行，任一分支拿不准就 fail-closed。检测池示例：id2、id3、id7。'
+  };
+  gateIo(out[k]);
+}
+function gateCustom(){
+  var txt=(document.getElementById('gateIn').value||'').trim();
+  if(!txt){gateIo('<span class="warn">请输入一句话再判定。</span>示例：帮我锁定 id7 / 解除追踪 / 追蓝色卡车 / 停 / 今天周末吗');return;}
+  var low=txt.toLowerCase(),i,pool='id2, id3, id7',html='';
+  for(i=0;i<CLEAR_WORDS.length;i++){if(txt.indexOf(CLEAR_WORDS[i])>=0){
+    gateIo('<span class="ok">命中分支① clear_words（"'+CLEAR_WORDS[i]+'"）</span>：语义短路 → <b>强制 clear_track</b> 解除全部锁定，日志 [cmd] 清除语义指令。<span class="dim">清除是安全操作：宁可多解，不可锁错。</span>');
+    return;}}
+  var isTrack=false;for(i=0;i<TRACK_WORDS.length;i++){if(txt.indexOf(TRACK_WORDS[i])>=0){isTrack=true;}}
+  if(!isTrack){
+    gateIo('<span class="ok">分支②非指令回落</span>：句中无追踪/清除类词 → is_instruction=false → 回落 LLM 对话回复，<b>不执行任何工具</b>，日志 [LLM] 前缀、写干净请求。<span class="dim">当前池：'+pool+'</span>');
+    return;}
+  var m=low.match(/id\s*(\d+)/);if(!m){m=txt.match(/(\d+)/);}
+  if(m){
+    var id=parseInt(m[1],10),inPool=false;
+    for(i=0;i<GATE_POOL.length;i++){if(GATE_POOL[i]===id){inPool=true;}}
+    if(inPool){
+      html='<span class="ok">分支③对齐放行</span>：解析出 id='+id+' 且与检测池数值对齐（'+pool+'）→ 执行 track_ids，日志 [cmd] track_ids {'+id+'}。';
+    }else{
+      html='<span class="bad">分支③拦截（fail-closed）</span>：解析出 id='+id+' 但检测池为 '+pool+' → 数值不对齐 → 只回「未找到该 ID 目标」，<b>不 submit_effect</b>，当前锁不受影响。';
+    }
+  }else{
+    var hasDesc=false;for(i=0;i<COLOR_WORDS.length;i++){if(txt.indexOf(COLOR_WORDS[i])>=0){hasDesc=true;}}
+    if(hasDesc){
+      html='<span class="warn">分支④描述转 TrackEngine</span>：无 id 但含描述词 → 转 <b>track_vlm</b> 视觉选车（网格海选、cell_cap=16，EXP-06 展开）；选不到由 _vlm_none 回引导。';
+    }else{
+      html='<span class="bad">回引导（fail-closed）</span>：有追踪词，但既无 id 数字也无描述词 → 按路由图回「请提供目标 id」，<b>绝不产生空 submit</b>——空集会把当前锁定清掉（L67 特判 / 评审 P0-2 防误清锁）。';
+    }
+  }
+  gateIo(html||'<span class="dim">未命中任何分支，请换个说法。</span>');
+}
+</script>
+<script src="../shared/tutorial.js" defer></script>
+</body>
+</html>

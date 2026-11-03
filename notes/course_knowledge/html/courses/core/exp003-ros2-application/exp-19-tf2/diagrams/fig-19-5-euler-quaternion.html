@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>图 19-5 · 三维旋转：欧拉角、四元数与万向锁</title>
+<style>
+:root{--bg-page:#ffffff;--text:#0f172a;--text2:#475569;--muted:#94a3b8;--border:#e2e8f0;
+  --teal:#0891b2;--green:#059669;--purple:#7c3aed;--orange:#ea580c;--red:#e11d48;--gray:#64748b;
+  --blue:#2563eb;--teal-bg:rgba(8,145,178,.08);--red-bg:rgba(225,29,72,.08);
+  --font-mono:"Cascadia Mono","JetBrains Mono",Consolas,monospace}
+*{box-sizing:border-box}
+body{margin:0;background:#fff;color:var(--text);font-family:system-ui,"PingFang SC","Microsoft YaHei",sans-serif;padding:16px 14px 12px}
+.hd h1{font-size:15px;margin:0 0 4px}
+.hd .q{font-size:12px;color:var(--text2);margin:0 0 8px}
+.stage{display:grid;grid-template-columns:minmax(0,1fr) 310px;gap:12px;align-items:stretch}
+#cvbox{position:relative;height:430px;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:#fff;cursor:grab;touch-action:none}
+#cvbox.dragging{cursor:grabbing}
+.orbitHint{position:absolute;left:10px;bottom:8px;z-index:2;font-size:11px;color:var(--muted);background:rgba(255,255,255,.85);border:1px solid var(--border);border-radius:6px;padding:2px 8px;pointer-events:none}
+#cvbox canvas{display:block}
+#glfail{position:absolute;inset:0;display:none;align-items:center;justify-content:center;text-align:center;font-size:13px;color:var(--red);padding:20px}
+.panel{border:1px solid var(--border);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.pt{font-size:12.5px;font-weight:700;color:var(--text);letter-spacing:.5px}
+.ctl{display:flex;align-items:center;gap:8px}
+.ctl label{font-family:var(--font-mono);font-size:12.5px;font-weight:700;color:var(--text);min-width:118px}
+.ctl label small{font-family:system-ui,"PingFang SC",sans-serif;font-weight:400;color:var(--text2);font-size:11px}
+.ctl input[type=range]{flex:1;min-width:70px;accent-color:var(--blue);height:20px}
+.ctl .val{font-family:var(--font-mono);font-size:12px;color:var(--blue);background:#eef4ff;border:1px solid #dbeafe;border-radius:6px;padding:1px 7px;min-width:52px;text-align:center}
+.btns{display:flex;gap:8px}
+.btn{font-size:12.5px;border:1px solid var(--border);background:#fff;color:var(--text2);border-radius:8px;padding:5px 12px;cursor:pointer}
+.btn:hover{border-color:var(--teal);color:var(--teal)}
+.btn.danger{border-color:#fecaca;color:var(--red)}
+.btn.danger:hover{background:var(--red-bg)}
+.qbox{background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:8px 10px}
+.qbox .qn{font-size:11.5px;color:var(--text2);margin-bottom:4px}
+.qv{font-family:var(--font-mono);font-size:13.5px;font-weight:700;color:var(--text);letter-spacing:.5px}
+.qhint{font-size:11px;color:var(--green);margin-top:4px;display:none}
+.qhint.on{display:block}
+.glock{display:none;background:var(--red-bg);border:1px solid #fecaca;border-radius:8px;padding:8px 10px;font-size:12px;color:#b91c1c;line-height:1.55}
+.glock.on{display:block}
+.glock b{color:var(--red)}
+.legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:8px;font-size:11.5px;color:var(--text2)}
+.legend i{display:inline-block;width:16px;height:4px;border-radius:2px;margin-right:5px;vertical-align:middle}
+.raxis{font-size:11px;color:var(--muted);line-height:1.5}
+.dock{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.dock span{font-size:11.5px;border-radius:999px;padding:3px 10px;line-height:1.6}
+.ok{background:#ecfdf5;color:#047857;border:1px solid #a7f3d0}
+.warn{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca}
+.evid{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}
+.ft{font-size:10.5px;color:var(--muted);margin-top:8px;text-align:right}
+@media(max-width:820px){.stage{grid-template-columns:1fr}#cvbox{height:340px}}
+</style>
+</head>
+<body>
+<div class="hd">
+  <h1>图 19-5 · 三维旋转：欧拉角、四元数与万向锁</h1>
+  <p class="q">本图回答的问题：三个姿态角怎么直观拖出来看？万向锁在什么姿势下出现？四元数又怎么绕开它？</p>
+</div>
+<div class="stage">
+  <div>
+    <div id="cvbox">
+      <div id="glfail">三维引擎未能加载（three.min.js 缺失或页面离线），本图降级为文字讲解：右侧滑杆区说明不变。</div>
+      <div class="orbitHint">左键拖拽旋转 · 右键或 Shift+拖拽平移 · 滚轮缩放 · 双击复位</div>
+    </div>
+    <div class="legend">
+      <span><i style="background:#0891b2"></i>偏航环（绕 Z · 水平）</span>
+      <span><i style="background:#ea580c"></i>俯仰环（绕 Y · 侧立）</span>
+      <span><i style="background:#7c3aed"></i>横滚环（绕 X · 立式）</span>
+      <span><i style="background:#e11d48"></i>变红 = 该环与另一环重合（万向锁）</span>
+      <span>长轴带字母 X/Y/Z = 固定世界系（Z 竖直朝上）；机身短轴 = 机体系</span>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="pt">姿态角（欧拉角 · 右手定则）</div>
+    <div class="ctl"><label>yaw 偏航 <small>绕 Z</small></label><input id="yaw" type="range" min="-180" max="180" step="1" value="0"><span class="val" id="yawV">0°</span></div>
+    <div class="ctl"><label>pitch 俯仰 <small>绕 Y</small></label><input id="pitch" type="range" min="-90" max="90" step="1" value="0"><span class="val" id="pitchV">0°</span></div>
+    <div class="ctl"><label>roll 横滚 <small>绕 X</small></label><input id="roll" type="range" min="-180" max="180" step="1" value="0"><span class="val" id="rollV">0°</span></div>
+    <div class="btns">
+      <button class="btn" id="btnZero">回零</button>
+      <button class="btn danger" id="btnGlock">触发万向锁（俯仰→90°）</button>
+    </div>
+    <div class="glock" id="glockBox"><b>万向锁进行中：</b>偏航环与横滚环已重合成一根轴，三个角只剩两个独立自由度。把"偏航"和"横滚"各自从 0 拖到 90° 对比——飞机姿态完全相同。</div>
+    <div class="qbox">
+      <div class="qn">同一姿态的四元数 q = (x, y, z, w) —— TF 消息里存的就是它</div>
+      <div class="qv" id="qOut">（引擎加载中…）</div>
+      <div class="qhint" id="qHint">✓ 全零姿态 = 单位四元数 (0, 0, 0, 1)，正是 04 节第 5 步 tf2_echo 的输出</div>
+    </div>
+    <div class="raxis">合成顺序 R = Rz(偏航) · Ry(俯仰) · Rx(横滚)；红 X / 绿 Y / 蓝 Z = 机体系三轴（X 指机头）。TF 不落盘欧拉角，四个分量即 <code>rotation.x/y/z/w</code>。场景为 Z 轴竖直朝上的 ROS 习惯，字母轴 = 固定世界系，可对照滑杆转角。</div>
+  </div>
+</div>
+<div class="dock">
+  <span class="ok">✅ 结论：欧拉角给人看、四元数给机器存——姿态用三个角表达，落盘永远是 (x, y, z, w)</span>
+  <span class="warn">⚠️ 风险：俯仰 ±90° 触发万向锁，偏航与横滚并成一根轴</span>
+  <span class="evid">🔍 验证：全零读数 (0,0,0,1) 对照 04 节第 5 步 tf2_echo；04 节 IX-19A 拖 yaw=180° 复核半角公式</span>
+</div>
+<div class="ft">EXP-19 · TF2 坐标系变换</div>
+<script src="three.min.js" onerror="document.getElementById('glfail').style.display='flex'"></script>
+<script>
+(function(){
+  var box = document.getElementById('cvbox');
+  if (typeof THREE === 'undefined'){ document.getElementById('glfail').style.display='flex';
+    document.getElementById('qOut').textContent = '(0.000, 0.000, 0.000, 1.000)'; return; }
+
+  var scene = new THREE.Scene();
+  scene.background = new THREE.Color(0xffffff);
+  var camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+  var INIT_POS = new THREE.Vector3(4.5, 3.4, 5.8);
+  camera.position.copy(INIT_POS);
+  camera.lookAt(0, 0, 0);
+  var renderer = new THREE.WebGLRenderer({antialias:true});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  box.appendChild(renderer.domElement);
+
+  scene.add(new THREE.HemisphereLight(0xffffff, 0xd0d7de, 0.95));
+  var dl = new THREE.DirectionalLight(0xffffff, 0.7);
+  dl.position.set(4, 6, 3);
+  scene.add(dl);
+
+  // ---- ROS/TF 坐标习惯：Z 轴朝上。root 把 three.js 的 Y-up 世界旋转成 Z-up 内容系 ----
+  var root = new THREE.Group();
+  root.rotation.x = -Math.PI/2;
+  scene.add(root);
+
+  var grid = new THREE.GridHelper(10, 20, 0xcbd5e1, 0xe2e8f0);
+  grid.rotation.x = Math.PI/2;   // 落到 root 的 XY 平面 = 地面（垂直于 Z）
+  grid.position.z = -2.1;
+  root.add(grid);
+
+  // ---- 固定世界坐标轴 X/Y/Z + 字母圆牌，对照滑杆转角 ----
+  root.add(new THREE.AxesHelper(2.5));
+  function axisLabel(ch, hex){
+    var c = document.createElement('canvas'); c.width = c.height = 64;
+    var g = c.getContext('2d');
+    g.beginPath(); g.arc(32, 32, 30, 0, Math.PI * 2);
+    g.fillStyle = 'rgba(255,255,255,0.92)'; g.fill();
+    g.lineWidth = 3; g.strokeStyle = hex; g.stroke();
+    g.font = 'bold 40px system-ui, sans-serif'; g.fillStyle = hex;
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(ch, 32, 34);
+    var s = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: new THREE.CanvasTexture(c), transparent: true, depthTest: false
+    }));
+    s.scale.set(0.44, 0.44, 1);
+    return s;
+  }
+  var lx = axisLabel('X', '#d92b2b'); lx.position.set(2.7, 0, 0); root.add(lx);
+  var ly = axisLabel('Y', '#16a34a'); ly.position.set(0, 2.7, 0); root.add(ly);
+  var lz = axisLabel('Z', '#2563eb'); lz.position.set(0, 0, 2.7); root.add(lz);
+
+  function mat(c){ return new THREE.MeshStandardMaterial({color:c, metalness:0.1, roughness:0.6}); }
+
+  // ---- 简易飞机：机头指向 +X ----
+  function buildPlane(){
+    var g = new THREE.Group();
+    var body = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.26, 0.26), mat(0x2563eb));
+    g.add(body);
+    var nose = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.5, 18), mat(0x0d9488));
+    nose.rotation.z = -Math.PI/2;
+    nose.position.x = 1.45;
+    g.add(nose);
+    var wing = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.06, 2.7), mat(0x60a5fa));
+    wing.position.set(0.15, 0, 0);
+    g.add(wing);
+    var tail = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.05, 1.15), mat(0xd97706));
+    tail.position.set(-1.02, 0.02, 0);
+    g.add(tail);
+    var fin = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.55, 0.05), mat(0xd97706));
+    fin.position.set(-1.02, 0.32, 0);
+    g.add(fin);
+    var axes = new THREE.AxesHelper(1.15);
+    g.add(axes);
+    g.userData.axes = axes;
+    return g;
+  }
+
+  // ---- 万向环层级：世界 → 偏航 → 俯仰 → 横滚 → 飞机 ----
+  var ringYawWorld = new THREE.Mesh(new THREE.TorusGeometry(2.05, 0.022, 12, 96),
+    new THREE.MeshBasicMaterial({color:0x0891b2}));
+  root.add(ringYawWorld);
+
+  var pivotYaw = new THREE.Group();   root.add(pivotYaw);
+  var ringPitch = new THREE.Mesh(new THREE.TorusGeometry(1.6, 0.022, 12, 96),
+    new THREE.MeshBasicMaterial({color:0xea580c}));
+  ringPitch.rotation.x = Math.PI/2;   // 法向 +Y
+  pivotYaw.add(ringPitch);
+
+  var pivotPitch = new THREE.Group(); pivotYaw.add(pivotPitch);
+  var ringRoll = new THREE.Mesh(new THREE.TorusGeometry(1.25, 0.022, 12, 96),
+    new THREE.MeshBasicMaterial({color:0x7c3aed}));
+  ringRoll.rotation.y = Math.PI/2;    // 法向 +X
+  pivotPitch.add(ringRoll);
+
+  var pivotRoll = new THREE.Group();  pivotPitch.add(pivotRoll);
+  var plane = buildPlane();
+  plane.rotation.x = Math.PI / 2;                 // 机模摆正：机头 +X、翼展 ±Y、垂尾朝 Z
+  plane.scale.setScalar(0.55);                    // 缩小机身，给三层万向环留出层次
+  plane.userData.axes.scale.setScalar(1 / 0.55);  // 机体系短轴抵消缩放，保持原长度
+  pivotRoll.add(plane);
+
+  var yawI = document.getElementById('yaw'), pitchI = document.getElementById('pitch'), rollI = document.getElementById('roll');
+  var qOut = document.getElementById('qOut'), qHint = document.getElementById('qHint'),
+      glockBox = document.getElementById('glockBox');
+  var D2R = Math.PI/180;
+  var q = new THREE.Quaternion();
+  var qe = new THREE.Euler();
+
+  function update(){
+    var y = +yawI.value, p = +pitchI.value, r = +rollI.value;
+    document.getElementById('yawV').textContent = y + '°';
+    document.getElementById('pitchV').textContent = p + '°';
+    document.getElementById('rollV').textContent = r + '°';
+
+    pivotYaw.rotation.z = y * D2R;
+    pivotPitch.rotation.y = -p * D2R;   // 正俯仰 = 机头上仰
+    pivotRoll.rotation.x = r * D2R;
+
+    var locked = Math.abs(p) >= 89;
+    glockBox.classList.toggle('on', locked);
+    // 万向锁时：偏航环与横滚环同时变红（重合 = 不可分辨）
+    ringYawWorld.material.color.setHex(locked ? 0xe11d48 : 0x0891b2);
+    ringRoll.material.color.setHex(locked ? 0xe11d48 : 0x7c3aed);
+
+    // 姿态四元数直接按 R = Rz(偏航)·Ry(-俯仰)·Rx(横滚) 合成（root 即 Z-up 内容系 = ROS 约定）
+    qe.set(r * D2R, -p * D2R, y * D2R, 'ZYX');
+    q.setFromEuler(qe);
+    qOut.textContent = '(' + q.x.toFixed(3) + ', ' + q.y.toFixed(3) + ', ' +
+                       q.z.toFixed(3) + ', ' + q.w.toFixed(3) + ')';
+    qHint.classList.toggle('on', y===0 && p===0 && r===0);
+  }
+
+  function fit(){
+    var w = box.clientWidth, h = box.clientHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+  window.addEventListener('resize', fit);
+
+  document.getElementById('btnZero').onclick = function(){
+    yawI.value = 0; pitchI.value = 0; rollI.value = 0; update();
+  };
+  document.getElementById('btnGlock').onclick = function(){
+    pitchI.value = 90; yawI.value = 30; rollI.value = 0; update();
+  };
+  [yawI, pitchI, rollI].forEach(function(el){ el.addEventListener('input', update); });
+
+  // ---- 鼠标控制视角：左键旋转 / 右键或 Shift 平移 / 滚轮缩放 / 双击复位 ----
+  box.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+  var orbit = new THREE.Spherical().setFromVector3(camera.position);
+  var orbitTarget = new THREE.Vector3(0, 0, 0);
+  function applyOrbit(){
+    camera.position.setFromSpherical(orbit);
+    camera.position.add(orbitTarget);
+    camera.lookAt(orbitTarget);
+  }
+  var camRight = new THREE.Vector3(), camUp = new THREE.Vector3();
+  function applyPan(dx, dy){
+    var k = 2 * orbit.radius / box.clientHeight;
+    camRight.set(1, 0, 0).applyQuaternion(camera.quaternion);
+    camUp.set(0, 1, 0).applyQuaternion(camera.quaternion);
+    // 内容跟着指针走：指针右移 → 相机向左移；指针下移 → 相机向上移
+    var mx = -dx * k, my = dy * k;
+    orbitTarget.addScaledVector(camRight, mx).addScaledVector(camUp, my);
+    camera.position.addScaledVector(camRight, mx).addScaledVector(camUp, my);
+    camera.lookAt(orbitTarget);
+  }
+  var dragging = false, panning = false, lastX = 0, lastY = 0;
+  box.addEventListener('pointerdown', function(e){
+    dragging = true;
+    panning = (e.button === 2 || e.shiftKey);
+    lastX = e.clientX; lastY = e.clientY;
+    box.classList.add('dragging');
+    if (box.setPointerCapture) { try { box.setPointerCapture(e.pointerId); } catch (err) {} }
+  });
+  box.addEventListener('pointermove', function(e){
+    if (!dragging) return;
+    var dx = e.clientX - lastX, dy = e.clientY - lastY;
+    lastX = e.clientX; lastY = e.clientY;
+    if (panning){
+      applyPan(dx, dy);
+      return;
+    }
+    orbit.theta -= dx * 0.0055;
+    orbit.phi   -= dy * 0.0055;
+    orbit.phi = Math.max(0.12, Math.min(Math.PI - 0.12, orbit.phi));
+    applyOrbit();
+  });
+  ['pointerup', 'pointercancel'].forEach(function(t){
+    box.addEventListener(t, function(){ dragging = false; panning = false; box.classList.remove('dragging'); });
+  });
+  box.addEventListener('wheel', function(e){
+    e.preventDefault();
+    orbit.radius = Math.max(3.5, Math.min(16, orbit.radius * (1 + e.deltaY * 0.0012)));
+    applyOrbit();
+  }, {passive:false});
+  box.addEventListener('dblclick', function(){
+    orbitTarget.set(0, 0, 0);
+    camera.position.copy(INIT_POS);
+    orbit.setFromVector3(INIT_POS);
+    camera.lookAt(orbitTarget);
+  });
+
+  fit(); update();
+  (function loop(){ renderer.render(scene, camera); requestAnimationFrame(loop); })();
+})();
+</script>
+<script>
+(function(){if(window===parent)return;function send(){try{parent.postMessage({type:'figh',h:document.body.scrollHeight},'*')}catch(e){}}window.addEventListener('load',send);window.addEventListener('resize',function(){clearTimeout(window.__fighT);window.__fighT=setTimeout(send,120)});send();})();
+</script>
+</body>
+</html>

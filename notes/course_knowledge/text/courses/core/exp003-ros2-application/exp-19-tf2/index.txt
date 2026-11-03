@@ -1,0 +1,1095 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp003-ros2-application/exp-19-tf2/index.html
+TITLE: EXP-19 · TF2 坐标系变换 — 机器人 ROS2 应用与开发
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+EXP-19 · TF2 坐标系变换 — 机器人 ROS2 应用与开发
+🧠 具身智能课程 ·
+教程首页
+核心课程
+/
+ROS2 应用与开发
+/ EXP-19
+本页目录
+★ 课程目标
+01 引例：这束激光该画在哪
+02 先看现象：启动案例 · 打印 TF 树 · 看画面
+03 原理讲解
+04 实验步骤
+05 注意事项与验收
+06 本课总结与验证题
+CH3 · 建模进阶
+EXP-19 TF2 坐标系变换
+EXP-20 URDF 机器人建模
+其它篇章
+EXP-01 ROS2 简介
+EXP-06 话题通信 · MQ5
+EXP-08 动作通信 · RFID
+EXP-12 DDS 底层原理
+EXP-17 Launch 启动文件
+EXP-19 · ⭐⭐ · 2 学时
+TF2 坐标系变换：让机器人知道自己"在哪、朝哪"
+雷达一帧有 360 个点、摄像头一张图有几万个像素，但它们各自活在自己的坐标系里。本实验吃透 TF2 的树状变换原理与四元数表示，实现静态/动态坐标发布，并用 tf2_echo / view_frames 完成可视化验证。
+话题通信实战
+tf2_ros
+四元数
+view_frames
+前置：EXP-06 话题通信
+硬件：实验箱 B2 / 小车 C1
+目标
+本课学完，你应该能做到
+① 说清结构
+为什么是树
+能阐述 TF2 变换树的结构原理——为什么坐标系必须组织成"有向无环图（DAG）"，以及
+/tf
+与
+/tf_static
+分别承载动态 / 静态变换的设计意图。
+② 掌握 API
+Broadcaster / Listener
+能正确使用
+StaticTransformBroadcaster
+发固定偏移、
+TransformBroadcaster
+定时发动变换，用
+Buffer + TransformListener
+查询任意两个坐标系的相对位姿。
+③ 独立完成
+建一棵 TF 树
+独立编写节点发布
+base_link → lidar_frame → camera_frame
+的变换树，并用
+tf2_echo
+与
+view_frames
+验证。
+④ 迁移应用
+给真实传感器定位
+能在 B2 或 C1 上，为结构光深度相机、激光雷达发布它们在底盘坐标系下的 TF2 变换。
+本课的重点与难点
+重点
+：
+/tf_static
+只用一次发布 + Transient Local（后加入的节点也能拿到）；动态变换必须持续重发。
+难点
+：旋转为什么用四元数而不是欧拉角——以及
+tf2_echo
+输出的那个四元数该怎么读。
+和前后的关系
+本课的 TF 树是
+EXP-20 URDF 的运转前提
+：URDF 定义"长什么样"，TF2 决定"画在哪"。
+01
+引例：这束激光该画在哪
+先回忆
+EXP-15 rviz2 里的 Fixed Frame 下拉框、EXP-06 消息 header 里的
+frame_id
+字段——它们背后都指向同一个问题：
+不同坐标系里的数据怎么对齐
+。本章的 TF2 就是这个问题的系统性答案，也是后面 URDF 与导航的地基。
+1
+场景
+：小车顶部装了一台 2D 激光雷达，正前方 30cm 处有一个障碍物——这是
+相对雷达自己
+的说法（活在
+laser_link
+）。
+2
+问题
+：建图算法、导航算法、机械臂抓取……它们需要的都是
+相对车体中心
+（
+base_link
+）甚至
+相对世界原点
+（
+map
+）的坐标。30cm 的雷达读数，直接丢给建图节点，地图就歪了。
+3
+需求
+：必须有一个"翻译官"，随时回答——
+"雷达系里的点 (30, 0)，换算到车体系是多少？换算到地图系又是多少？"
+4
+答案
+：ROS2 的
+TF2（Transform Library）
+。它把机器人身上的每个部件定义为一个坐标系，维护一张
+"坐标系变换树"
+，任何两个坐标系之间都能算出变换关系。
+💡 核心定位
+TF2 不是可有可无的辅助库——
+没有 TF2，多传感器融合、SLAM、导航、机械臂抓取全部无从谈起
+。它是"多坐标系数据能对齐"的地基。
+02
+先看现象：启动案例，打印 TF 树，对照仿真画面
+三步、两分钟：启动 EXP-15 的 rviz 仿真案例 → 终端里打印出 TF 树 → 对照仿真画面——本节只复制粘贴；树怎么建、五种玩法在 04 节。
+本课先用实验环境里
+现成的 car1_description 仿真案例
+看现象：一条
+ros2 launch car1_description display.launch.py
+同时拉起三个节点——
+joint_state_publisher_gui
+（关节滑块窗）、
+robot_state_publisher
+（读 URDF，把整车坐标系发布成 TF 树——现象的"发布者"就是它）、
+rviz2
+（仿真画面）。下面每条命令都可
+直接复制到终端执行
+，
+命令之后紧跟"应该看到的结果"
+与排错提示；三步跑通后，再对照图 19-1 把现象还原成"谁发、走哪条话题、谁读"的系统逻辑：
+终端 A
+启动仿真案例
+1
+一条 launch 拉起三个节点
+终端 A
+生产者×2（滑块窗喂关节角、robot_state_publisher 算并发布 TF）+ 展示×1（rviz2）——从这一刻起，整车 TF 树开始对外发布：
+ros2 launch car1_description display.launch.py
+# [INFO] [joint_state_publisher_gui]: ...        ← 关节滑块窗弹出
+# [INFO] [robot_state_publisher]: ...            ← TF 发布者已上线
+# [INFO] [rviz2]: ...                            ← rviz2 主窗弹出（Grid + 小车 + TF 轴）
+✔ rviz 里看到小车模型与密集的 RGB 坐标轴——
+car1.rviz
+已自动勾选 Grid / RobotModel / TF，Fixed Frame =
+base_footprint
+；启动画面实拍见下方步骤 ③。
+ℹ 报
+Cannot find launch file
+→ 本终端还没
+source
+工作空间；launch 占着这个终端别关——
+TF 挂在这个进程上，关了后面的查询全部 Waiting
+，其余操作请开新终端。
+终端 B
+打印 TF 树
+新终端
+2
+view_frames 导出整棵树
+终端 B
+先
+source
+同一套环境，再订阅 /tf 与 /tf_static 共 5 秒——统计每个 frame 的发布情况并把树画成 PDF：
+source /opt/ros/humble/setup.bash && source ~/ros2_ws/install/setup.bash
+ros2 run tf2_tools view_frames
+✔ 打开生成的
+frames_*.pdf
+：应是一棵以
+base_footprint
+为根的合法树——
+单父、无环
+，能数出 base_link、四个 wheel、laser_link、arm 各节等 frame——这就是本课要交付的第一条证据（不想开 PDF 时，
+cat frames_*.gv
+或回看终端 Result 段也能按文本核对父子边）。
+⚠ 若某 frame 报超时/压根没出现 = 它的发布者没跑：九成是步骤 ① 的 launch 没起、被 Ctrl+C 关了、或两个终端
+ROS_DOMAIN_ID
+不一致（互相看不见）。
+3
+对照 RViz 仿真画面
+看屏幕
+终端里的树"字长什么样"已经见过，再看它"画长什么样"——这就是启动后桌面上该有的样子（EXP-15 图 15-1 实拍）：
+EXP-15 图 15-1 实拍 · 左=关节滑块窗（拖动即发 /joint_states，动态 TF 的输入）→ 中=rviz2 主窗（Displays 已勾 Grid/RobotModel/TF，Fixed Frame=base_footprint）→ 右视口=车模上密集的 RGB 三轴与帧名，就是那棵 TF 树本体
+✔ 三样东西逐一对上：坐标轴原点都钉在模型的关节/部件位置（树=模型结构）、帧名能和 frames.pdf 里的名字互相点名、拖任意关节滑块 → 部件转、对应坐标轴跟着动（这背后是哪条链路、静态/动态两类边怎么分工——04 节第 2、3 块拆开讲）。
+三步都跑通之后，
+回过头看这个系统的逻辑关系
+——启动、发树、读树、看画，各环节在链路里怎么咬合：
+图 19-1 · 最小系统：两个终端，一场发与收｜本图回答：一条 launch 拉起后，TF 树从哪个节点发出、走哪条话题、被谁读走？
+✅ 结论：发布者是 robot_state_publisher——发一次持续读，链路一图看懂
+⚠️ 风险：launch 提前退出或 frame 拼错 → 查询端永远 Waiting
+🔍 验证：上方 3 个步骤逐条对应图中 ① ～ ③
+先记住这个反差
+三步里没有一步要你现在动笔写代码——启动现成案例、打印一棵树、对照一张画，机器人在数字世界里的
+位置关系
+就已经成立。树为什么必须是树、静态/动态两类边怎么分工——下一节拆开讲；案例里的 URDF 和 launch 长什么样、五种玩法怎么做——04 节五步拆。
+03
+原理讲解
+TF2 树：单父、无环、两条话题
+建立在 EXP-06 话题与 QoS 之上——坐标系之间的"关系"也是靠两条话题发出来的。
+先记住这一句：TF 的定义
+TF 用一棵树，记录各个坐标系之间随时间变化的相对位姿（位置 + 朝向），不存障碍物、机器人这类空间点
+——点云、栅格地图、机器人模型各在
+/scan
+、
+/map
+、
+/robot_description
+自己的话题里，TF 只负责"换算"：把点从一个坐标系搬到另一个坐标系该去的位置。展开读这个定义：树里直接存的是每条
+父子边
+，任意两个远隔坐标系的位姿是查询时沿树链式组合出来的；每条边 = 一段平移 (x,y,z) + 一段旋转四元数，
+都带时间戳
+——动态边（/tf）随时间更新，静态边（/tf_static）恒定但同样带时间戳。坐标系是一把把尺子，一条 TF 变换就是"
+B 尺子摆在 A 尺子的什么位置、朝什么方向
+"；把所有尺子的摆放关系串成一棵树，就是
+TF 树
+。
+图 19-2 · TF2 变换树｜本图回答：机器人身上的坐标系怎么组织，为什么必须是一棵树？
+✅ 结论：单父、无环、路径唯一，查询必有解
+⚠️ 风险：两个节点抢同一 child 配不同 parent → 报冲突
+🔍 验证：02 节步骤 ② · 04 节第 4 步树形核对要点
+TF2 把机器人身上所有坐标系组织成一棵树：
+每个坐标系最多一个父坐标系，不能成环
+。典型结构：
+map                              ← 世界原点（SLAM 维护）
+└── odom                         ← 里程计原点（会漂移）
+      └── base_link               ← 车体中心
+           ├── laser_frame        ← 雷达（安装位置 = 静态变换）
+           ├── camera_link        ← 相机
+           └── arm_base
+                └── gripper_link  ← 夹爪
+意思很直白：
+laser_frame 的父是 base_link，base_link 的父是 odom，odom 的父是 map
+。任何两个坐标系之间只有一条路——所以查变换永远有唯一解。
+ROOT · 世界
+map
+全局地图原点，由 SLAM / 定位节点维护，漂移会被不断修正。
+里程计系
+odom
+轮式里程计原点，短时间平滑但会长期漂移。
+车体系
+base_link
+机器人本体中心，一切传感器都最终挂到它身上。
+传感器系
+laser_frame / camera_link
+雷达、相机各自的测量原点，安装位置即静态变换。
+✦ 失败模式：为什么禁止成环？
+一旦 A 是 B 的父、B 又是 A 的父，沿父指针
+向上爬就永远爬不到头
+，查询陷入死循环。所以 TF2 强制一棵树——树形结构正是查询能在有限步内结束的前提。两个节点抢同一个 child 的 parent 时，TF2 会直接报错警告。
+话题
+内容
+QoS / 频率
+设计意图
+/tf
+动态
+变换（odom→base_link、机械臂关节角…）
+10 ~ 100 Hz 普通 Reliable + KeepLast(100)
+量大、值一直在变，
+新订阅者只需拿到"最新值"
+，历史旧值没有意义 → KeepLast 限深
+/tf_static
+静态
+变换（雷达到车体的安装位姿…）
+一次性发布
+，QoS =
+Transient Local
+（latch）
+装好就不变；
+后启动的节点也必须能拿到
+→ 靠 Transient Local "重放"最后一条给新订阅者（同 ROS2 参数的
+transient_local
+语义）
+🔁 和 EXP-06 QoS 的呼应（别和 EXP-10 参数搞混）
+/tf_static
+的 latch 语义，用的就是 EXP-06 里讲过的
+QoS Durability = Transient Local
+：发布者替"迟到的订阅者"保留最后一条。
+注意它不是参数的机制
+——参数走的是"参数服务 + 参数事件"这套独立设施，和话题 QoS 无关。这里真正要迁移的知识只有一个：
+凡是"后加入的节点也必须拿到"的数据，就该给它 Transient Local。
+两类角色
+，分工和话题的 pub/sub 一模一样——一个广播，一个监听：
+角色 1 · 广播器 Broadcaster
+告诉所有人："父→子"的变换现在是多少
+谁来发：
+里程计节点发 odom→base_link；robot_state_publisher 读 URDF 发传感器位姿；标定好相机外参后发 base_link→camera_link。
+两种：
+静态
+（装好不变）用 StaticTransformBroadcaster，
+只发一次
+；
+动态
+（一直在变）用 TransformBroadcaster，
+持续重发
+。
+角色 2 · 监听器 Listener
+订阅 TF，随时被问"A 到 B 的变换是多少"
+谁来听：
+SLAM 把点云转到 map；Nav2 判断目标点相对车体多远；视觉识别到物体后转到 base_link 做抓取。
+查询要给三样：
+目标坐标系、源坐标系、时间戳——TF 带时间缓存，可以回查过去几秒（查询入口见下一主场）。
+✦ 为什么这么设计？三句话
+①
+解耦
+：雷达节点只管发雷达系的数据，装在哪、map 长什么样它不关心——坐标系关系全由 TF 统一维护，谁都能查；
+②
+自动链式
+：你只发布"自己负责的那一条边"，连乘合成、跨树查询交给 tf2，永远不用手写 4×4 矩阵；
+③
+带时间缓存
+：传感器数据有延迟，查询时可以"回查"几秒内的历史变换，用
+数据自己的时间戳
+去对齐，点云才不会飘。
+一条变换里在算什么：先旋转、后平移
+承接上一主场：每条边存的是"平移 + 旋转"两个量——先在二维世界里拖动它们，看子坐标系的读数怎么变成父坐标系的坐标：
+图 19-3 · 二维 TF 变换：子坐标系 base_link → 父坐标系 map｜本图回答：同一个点在 base_link 里的读数，怎么换算成 map 里的坐标？
+✅ 结论：先旋转对齐轴向、再平移加原点偏移——顺序固定，右侧公式与图实时对账
+⚠️ 风险：顺序换成"先平移后旋转"结果就错；θ 逆时针为正
+🔍 验证：θ 拖到 0 → 旋转部分变单位阵，与 04 节第 5 步 tf2_echo 打印的 Matrix 左上 3×3 逐位一致
+怎么读（可照抄入口 · 与 04 节第 2 步命令二逐字对应）
+图中 t
+x
+/ t
+y
+/ θ 就是那条命令里的
+--x --y --yaw
+（三维再加
+--z
+）；点 P 的读数好比雷达点在
+laser_frame
+里的坐标，右侧两行公式就是 tf2 替你做的事——04 节代码 A 把 (x, y, z, 四元数) 写进
+Transform
+，落的正是这组量。
+✦ 失败模式：顺序不可颠倒
+把公式换成"先加平移、再乘旋转"会得到另一个点——ROS 固定
+先旋转、后平移
+。自检法：θ 归 0 后旋转部分必须是单位阵，此时平移列 = 04 节命令二
+--x / --z
+的设定值、逐位对得上；真车实测值 [0.000, 0.000, 0.029] 在 04 节第 5 步。
+一次 TF 查询的全过程
+接上一主场的"监听者"——要问"雷达系里的点 (0.3, 0)，在 map 里是哪"，tf2 只干两件事：
+先向上爬，再向下拼
+，全程不用你手写矩阵：
+从
+laser_frame
+沿父指针一路
+向上爬
+，收集沿途每一段变换；
+从
+map
+也向上爬，找到两条路第一次相遇的
+共同祖先
+（汇合点）；
+从汇合点
+按下回程
+，该取逆的取逆、该连乘的连乘，拼出 A→B 的总变换。
+图 19-4 · 一次 TF 查询的全过程｜本图回答：
+lookup_transform('map','laser_frame')
+背后做了哪三步？
+✅ 结论：三次爬树 + 连乘 = 唯一解，全程无需手写矩阵
+⚠️ 风险：时间戳超出缓存窗口 → extrapolation 错误
+🔍 验证：04 节第 5 步 tf2_echo 实测 + 代码 B
+怎么设置（可照抄入口 · 查询两行起手式）
+先挂监听再查询：
+self.buffer = Buffer()
+→
+self.listener = TransformListener(self.buffer, self)
+→
+self.buffer.lookup_transform('map', 'laser_frame', rclpy.time.Time(), timeout=rclpy.duration.Duration(seconds=1.0))
+。
+三个参数的含义
+：目标系（转到哪）、源系（数据原来在哪）、时刻（
+Time()
+= 最新；传具体时刻则用缓存历史插值）——04 节代码 B 是它的完整形态。
+静态边
+base_link → laser_frame
+出厂安装决定，一次发布，靠 /tf_static 的 Transient Local 让后加入节点也能读到。
+动态边
+map → odom → base_link
+定位/里程计 10-100Hz 持续刷新，新订阅者只取最新一条（KeepLast）。
+合成责任
+谁都不用管全树
+每个节点只发布自己那一段边，跨 4 层的变换交给 TF2 自动连乘。
+时效对齐
+时间戳插值
+查询带时间戳 t 时，对两条动态边在 t 附近做插值/外推，保证"同一时刻"的几何一致。
+✅ 结论：每节点只发布自己那条边，跨树查询交给 TF2
+⚠️ 风险：多源数据不传同一时间戳 → 插值错位、点云漂移
+🔍 验证：04 节第 5 步 tf2_echo 持续刷新的数值（拖滑块即变）
+旋转为什么要用四元数
+承接上一主场：查询链里每一段的"旋转"在 TF 中都以四元数存储与连乘——先把三个姿态角拖出肌肉记忆，再看欧拉角为什么在 ±90° 会出事：
+图 19-5 · 三维旋转：欧拉角、四元数与万向锁｜本图回答：姿态角怎么直观表达？万向锁什么时候出现、四元数为什么是 TF 的标准？
+✅ 结论：欧拉角给人看、四元数给机器存——TF 消息里永远只有 (x, y, z, w)
+⚠️ 风险：俯仰拖到 ±90° 触发万向锁，偏航与横滚并成一根轴
+🔍 验证：全零姿态读数 = (0, 0, 0, 1)，正是 04 节第 5 步 tf2_echo 的输出
+怎么设置（可照抄入口 · 两种写法互斥）
+欧拉角写法
+--roll --pitch --yaw
+（04 节命令二即此写法，弧度制）；四元数写法
+--qx --qy --qz --qw
+——
+两组同写直接报错
+Cannot specify both quaternion and Euler rotations
+。代码侧填
+t.rotation.x/y/z/w
+：04 节代码 A 的
+rotation.w = 1.0
+就是单位四元数。
+三种表示法对比
+——看 ROS2 为什么只认四元数：
+表示法
+表达
+问题
+欧拉角 (roll, pitch, yaw)
+直观，人眼能理解"偏航 30°"
+①
+万向节死锁
+：俯仰 ±90° 时丢失一个自由度；② 插值不均匀，动画打结；③ 顺序敏感（ZYX vs XYZ 结果不同）
+旋转矩阵 3×3
+9 个数，乘法直接复合
+冗余（只有 3 个自由度却用 9 个数），累积浮点误差后可能不再正交，需周期性重新正交化
+四元数 q=(x,y,z,w)
+4 个数，无奇点
+ROS2 的标准选择
+：万向节死锁不存在、插值用 Slerp 均匀平滑、复合只要哈密顿乘法
+✦ 失败模式：万向锁现场看
+把图 19-5 的俯仰拖到 ±90°——偏航环与横滚环重合成一根轴，三个角只剩两个独立自由度：此时"偏航 30°、横滚 0°"和"偏航 0°、横滚 30°"姿态完全相同。工程上：接近垂直姿态时别把反解出的欧拉角当控制输入，落盘一律用四元数（TF 已经这么做）。
+半角公式（本实验只需 yaw）
+：机器人在地面打转，本质是绕 Z 轴转
+yaw
+角，四元数退化为两个非零分量：
+# 绕 Z 轴旋转 yaw：四元数只有 z、w 两个分量非零
+z = sin(yaw / 2)
+w = cos(yaw / 2)
+# x = y = 0
+# yaw = 90°  ⇒  z = sin45° = 0.7071,  w = cos45° = 0.7071
+# yaw = 180° ⇒  z = sin90° = 1.0,     w = cos90° = 0.0
+# 反解：yaw = 2·atan2(z, w)   ← 看代码时反过来算角度就用它
+💡 记忆锚点
+"
+半角
+"是关键：四元数存的是 yaw/
+2
+的三角函数。验证：yaw=180° 时 w=0、z=1，正好是"转满半圈的信息被编码在半角空间里"。看别人的代码看到
+atan2(z, w) * 2
+就是在从四元数反求偏航角。
+在 ROS2 消息里长什么样
+：
+geometry_msgs/msg/Transform
+=
+translation(x,y,z)
++
+rotation(x,y,z,w)
+；
+Quaternion
+四个字段顺序固定为
+x, y, z, w
+（不是 w,x,y,z！阅读时留心）。
+✅ 结论：绕 Z 时 z=sin(yaw/2)、w=cos(yaw/2)，反解 yaw=2·atan2(z,w)
+⚠️ 风险：字段顺序记成 wxyz → 读出的朝向全错
+🔍 验证：04 节沙盘拖到 180° 看 w=0 的实测
+04
+实验步骤
+围绕 02 节那条
+ros2 launch car1_description display.launch.py
+分五步：① 理解 TF2 变换树概念 → ② 发布静态 TF 变换 → ③ 发布动态 TF 变换 → ④ 可视化验证 TF 树 → ⑤ 查询任意坐标系相对位姿。每步按内容选呈现方式——是命令就逐项解释怎么用，是代码就截关键段，要可视化就把画面放出来，是查询就给命令并逐行解读输出。
+图 19-6 · 工程全景：一条 launch、两个话题、五步验证｜本图回答：本实验动了哪些文件和话题，谁发谁收，验证信号从哪看？
+✅ 结论：URDF 写边、robot_state_publisher 发边，验证各查一段
+⚠️ 风险：未 source 或 launch 中途退出 → 查询端全部 Waiting
+🔍 验证：02 节 3 步现象 + 本节五步逐一核对
+图 19-7 · 五步实验路线：从读懂一棵树到查任意两位姿｜本图回答：五步分别针对案例的哪个部分，动手做什么、看什么？
+✅ 结论：理解→静态→动态→可视化→查询，一步一步对着案例过
+⚠️ 风险：跳过第 ① 步直接查 → frame 名对不上、父子序写反
+🔍 验证：第 ⑤ 步实测 Translation [0.000, 0.000, 0.029] = URDF base_joint 值
+第 1 步 · 理解 TF2 变换树概念
+树不是凭空出现的：案例里 URDF 的每个
+<link>
+= 一个坐标系，每条
+<joint>
+= 一条父子边；launch 把整份 URDF 塞给 robot_state_publisher，它照着 URDF 把树发进两条话题。
+关键代码 · URDF 里的“树根与第一条边”
+（截自
+car1_description/urdf/car1.urdf
+开头）：
+<link name="base_footprint" />
+<!-- 根坐标系：车在地面的投影点 -->
+<joint name="base_joint" type="fixed">
+<!-- 第一条边，静态 -->
+<origin xyz="0 0 0.029" rpy="0 0 0" />
+<!-- 边上存的量：z 抬高 2.9cm -->
+<parent link="base_footprint" />
+<!-- 父 -->
+<child link="base_link" />
+<!-- 子：child 只出现一次 = 单父 -->
+</joint>
+<joint name="wheel_lf_joint" type="continuous">
+<!-- 活动边：随时在变 -->
+<parent link="base_link" /><child link="wheel_lf_link" />
+  <axis xyz="0 1 0" />
+<!-- 绕 y 轴滚 -->
+</joint>
+关键代码 · launch 怎么给树“上电”
+（截自
+display.launch.py
+的骨架）：
+with open(urdf_file, 'r') as f:
+    robot_desc = f.read()
+# ① 整份 URDF 读成字符串
+LaunchDescription([
+    Node(package='joint_state_publisher_gui', ...
+# ② 滑块窗：活动关节角的输入源
+parameters=[{'robot_description': robot_desc}]),
+    Node(package='robot_state_publisher', ...
+# ③ 树的发布者（本课主角）
+parameters=[{'robot_description': robot_desc}], output='screen'),
+    Node(package='rviz2', arguments=['-d', rviz_config])
+# ④ 消费者：读两条话题画轴
+])
+1
+命令：确认三节点在场
+终端 B
+ros2 node list
+列出当前 ROS 图里的全部节点——树的“发布者 / 输入源 / 消费者”是否到齐，一行看清：
+ros2 node list
+# /joint_state_publisher_gui   ← 滑块窗（活动关节角来源）
+# /robot_state_publisher       ← 树的发布者（本课主角）
+# /rviz2                       ← 消费者：读 /tf、/tf_static 画坐标轴
+✔ 三个都在 = launch 活着，后面四步随时可做。
+⚠ 缺
+/robot_state_publisher
+= launch 没起或已退出——回 02 节步骤 ① 重启。
+整棵树的轮廓
+——02 节步骤 ② 导出的 frames.pdf 就是它的实拍版，先在这里把名字认全：
+base_footprint
+# 根
+└── base_link
+# base_joint · fixed（静态边）
+├── wheel_lf/rf/lb/rb_link …
+# 4×continuous（动态边）
+├── laser_link
+# laser_joint · fixed（静态边）
+├── imu_link
+# imu_joint · fixed
+└── arm_base_link → arm_link1…5
+# revolute 链（动态边）
+└── camera… / tcp_link
+# 相机链挂在 arm_link4 下
+✦ 概念落地：两个数字对上号
+URDF 里
+base_joint
+写着
+xyz="0 0 0.029"
+，第 ⑤ 步
+tf2_echo base_footprint base_link
+就打印
+[0.000, 0.000, 0.029]
+——
+URDF 是账本，TF 是账本的实时播报
+；
+fixed
+的边进 /tf_static，
+continuous/revolute
+的边进 /tf，正好是 03 节两条话题表的现场版。
+第 2 步 · 发布静态 TF 变换
+案例里所有
+type="fixed"
+的关节就是静态边：URDF 写好、launch 一启动，robot_state_publisher 一次性发到 /tf_static。下面三条路给你——命令读出它已发布的边、命令再发一条新边、代码怎么写。
+关键代码 · URDF 里两条有代表性的 fixed 边
+（一纯平移、一带旋转）：
+<!-- 雷达安装位：纯平移，车体前方 14.6cm、高 8.7cm -->
+<joint name="laser_joint" type="fixed">
+  <origin xyz="0.146213088049965 0 0.0874000000000005" rpy="0 0 0" />
+  <parent link="base_link" /><child link="laser_link" />
+</joint>
+<!-- 深度相机光学系：rpy 把“z 朝前”的车体系扭成光学约定 -->
+<joint name="camera_depth_optical_joint" type="fixed">
+  <origin xyz="0 0.01655 0" rpy="-1.57079633 0 -1.57079633" />
+  <parent link="camera_depth_link" /><child link="camera_depth_optical_frame" />
+</joint>
+1
+命令一：读出 /tf_static 里的全部静态边
+终端 B
+--qos-durability transient_local
+是这条命令的灵魂——/tf_static 是 latched 话题（03 节 QoS 表），订阅端 durability 不对齐就收不到已发布的最后一条。读完 Ctrl+C 退出：
+ros2 topic echo /tf_static --qos-durability transient_local
+# transforms:                            ← 数组，每条 fixed 边一项
+# - header: {frame_id: base_footprint}   ← 父
+#   child_frame_id: base_link             ← 子
+#   transform: {translation: {z: 0.029},
+#               rotation: {w: 1.0}}      ← 数值 = URDF 里的原值
+# - {frame_id: base_link, child_frame_id: laser_link, ...}
+✔ 条目能和 URDF 里每条 fixed 关节逐一对账；launch 后一次性到齐、之后不再刷新（静态 = 只发一次）。
+⚠ 收不到 → 是没带
+--qos-durability transient_local
+，或 launch 已退出。
+2
+命令二：不写代码，一行命令再发一条静态边
+终端 B
+案例之外想临时加一条边（比如假想加装一台雷达），
+static_transform_publisher
+最快——参数逐项解释：
+# 假想雷达：车体前方 10cm、高 20cm、姿态不转
+ros2 run tf2_ros static_transform_publisher \
+  --x 0.1 --y 0 --z 0.2 \
+  --yaw 0 --pitch 0 --roll 0 \
+  --frame-id base_link --child-frame-id laser_frame
+# --x/--y/--z           平移，单位米
+# --yaw/--pitch/--roll  欧拉角，单位弧度（90° = 1.5708）
+# --frame-id            父坐标系；--child-frame-id 子坐标系（别写反！）
+# 旧式裸位置参数已弃用，与 flag 混用直接报错退出
+✔ 起着这个节点再跑一遍命令一：transforms 里多出 base_link→laser_frame 一项；rviz 视口也多出一根轴。
+⚠ 子系故意叫
+laser_frame
+（URDF 那条叫
+laser_link
+）——同名就两个发布者抢同一个 child，TF2 会报 frame 冲突。
+代码 A · 静态发布节点 StaticTfPub（代码方式）
+同一条边的第三种发法（代码版）——与命令二殊途同归，逐字段含义见注释：
+import
+rclpy
+from
+rclpy.node
+import
+Node
+from
+geometry_msgs.msg
+import
+TransformStamped
+from
+tf2_ros
+import
+StaticTransformBroadcaster
+class
+StaticTfPub(Node):
+def
+__init__
+(self):
+super
+().__init__(
+'static_tf_pub'
+)
+# ① StaticTransformBroadcaster —— 内部自动用 /tf_static + TransientLocal
+self.pub = StaticTransformBroadcaster(self)
+        self.send()
+def
+send
+(self):
+        t = TransformStamped()
+        t.header.stamp = self.get_clock().now().to_msg()
+        t.header.frame_id  =
+'base_link'
+# 父
+t.child_frame_id   =
+'laser_frame'
+# 子（只能有一个父！）
+t.transform.translation.x =
+0.10
+# 雷达在车体前方 10cm
+t.transform.translation.z =
+0.20
+# 高度 20cm（TF2 支持 3D）
+# 无旋转 ⇒ 单位四元数 (x=0, y=0, z=0, w=1)
+t.transform.rotation.w =
+1.0
+self.pub.sendTransform(t)
+# 只发这一次，后加入的订阅者也能收到
+✦ 同一条边的三种打开方式
+URDF 里一行 XML（案例用的）、终端一行命令、Python 里几行 Broadcaster——
+殊途同归：全部以 Transient Local 发进 /tf_static
+。案例选 URDF，是因为上百个零件的安装关系交给模型文件管理才不乱；单发一条临时边，才用命令最省事。
+第 3 步 · 发布动态 TF 变换
+案例里
+continuous / revolute
+关节就是动态边。链路从滑块开始：
+拖滑块 → /joint_states → robot_state_publisher 计算 → /tf 持续刷新
+，rviz 与 tf2_echo 都从这里读“活”值。
+关键代码 · URDF 里两种活动关节
+（轮子无上限、机械臂有限位）：
+<joint name="wheel_lf_joint" type="continuous">
+<!-- 轮子：可无限转 -->
+<origin xyz="0.0973 0.1058 0.0195" rpy="0 0 0" />
+  <parent link="base_link" /><child link="wheel_lf_link" />
+  <axis xyz="0 1 0" />
+<!-- 绕 y 滚动 -->
+</joint>
+<joint name="arm_joint1" type="revolute">
+<!-- 机械臂第一轴：正负限位 -->
+<parent link="arm_base_link" /><child link="arm_link1" />
+  <axis xyz="0 0 1" />
+<!-- 绕 z 转 -->
+<limit lower="-3.14" upper="3.14" effort="100" velocity="1" />
+</joint>
+1
+命令一：量 /tf 的刷新频率
+终端 B
+ros2 topic hz 话题名
+统计每秒收到多少条消息——动态边“到底动没动”，频率是最直接的证据：
+ros2 topic hz /tf
+# average rate: 33.3xx          ← 每秒约 33 条（随滑块活动波动）
+# min: …s  max: …s  window: …s  ← 窗口内最快/最慢间隔
+✔ 数值在跳 = /tf 持续刷新，动态链路活着。
+⚠ 输出停在 0 / 没有话题 = 输入源没了（launch 退出）；对照
+ros2 topic hz /tf_static
+是 no message——静态边不重发，正好验证两条话题的分工。
+2
+命令二：读 /tf 内容，拖滑块看它变
+终端 B + 滑块窗
+先开
+ros2 topic echo /tf
+看结构（child 多为 wheel_*、arm_*，stamp 每条都新），再回滑块窗拖
+arm_joint1
+或任一轮子：
+ros2 topic echo /tf
+# - header: {stamp: {sec: ...}, frame_id: base_link}  ← 时间戳持续前进
+#   child_frame_id: wheel_lf_link                      ← 活动关节的子系
+#   transform: {translation: {...},
+#               rotation: {x, y, z, w}}               ← 数值随滑块实时变
+✔ 三处同步动：echo 里 rotation 变 → rviz 对应轴转 → 第 ⑤ 步
+tf2_echo base_link wheel_lf_link
+的输出跟着变——这就是 03 节“/tf 动态、KeepLast 拿最新”的活体现场。
+⚠ 滑块窗没反应 = 先看终端 A 的 launch 是否还开着。
+3
+命令三：回到链路源头，读 /joint_states
+终端 B + 滑块窗
+/tf 的活值一路往上游追，源头就是关节角本身——
+/joint_states
+由滑块窗（joint_state_publisher_gui）发出，robot_state_publisher 拿它去算 /tf。边拖滑块边看：
+ros2 topic echo /joint_states
+# header: {stamp: {sec: ...}}              ← 拖滑块时时间戳前进
+# name: [arm_joint1, wheel_lb_joint, ...]   ← 关节名列表（对上 URDF 的 joint）
+# position: [0.52, -1.20, ...]              ← 各关节当前角（弧度）——拖哪个，哪个变
+✔ 三段对上账：position 按 name 对号入座 → 同一时刻命令二 /tf 里对应边的 rotation 变 → rviz 轴转。
+这条命令看的是“输入的角”，/tf 看的是“换算出的坐标系”
+——一个活动关节角 ↔ TF 里一条动态边。
+⚠ 拖滑块这里不动 = 滑块窗没开（回 02 步骤 ① 看终端 A 的 launch）。
+三个名词的对应关系
+——joint_state_publisher、/joint_states、TF 各扮什么角色，一次说清：
+环节
+是什么
+在案例里
+joint_state_publisher(_gui)
+关节角的
+生产者
+（真车=底盘驱动 / 编码器；gui 是带滑块的可视化版）
+滑块窗：拖动即产生活动关节角
+/joint_states
+话题，链路
+输入
+：各关节当前角
+name[] + position[]
+（弧度）
+命令三刚读过
+robot_state_publisher
+算工：读
+URDF 结构
+＋ 吃 /joint_states 角度 → 解出每条边的平移/旋转
+launch 里第二个节点（02 节 node list 见过）
+/tf
+←
+/tf_static
+话题，链路
+输出
+：算好的边广播给所有人（fixed → /tf_static 发一次；活动 → /tf 持续发）
+RViz、tf2_echo、rqt_tf_tree、导航全从这读
+✦ 一句话记住整条链
+URDF 定“有哪些边”，joint_state_publisher 给“角”，robot_state_publisher 算“位姿”，TF 负责广播“给所有人查”
+——链路就是
+滑块(真车=驱动) → /joint_states → robot_state_publisher ＋ URDF → /tf → 消费者
+。真车上只是换了输入源（/joint_states 来自底盘、odom→base_link 来自里程计），
+四个环节一一对应，零差别
+。
+第 4 步 · 可视化验证 TF 树
+同一棵树四种看法：终端导出快照（02 步骤 ② 已跑过，这里给检查点）→ RViz
+直播
+：拖滑块看坐标轴实时转动 → rqt_tf_tree
+常驻树图（⟳ 点刷新，要先 apt 装包）
+→ 面板和树图互相对照。命令的现场你都有了，本步给的是“看什么、怎么算对”。
+1
+手段一 · view_frames 导出（检查点清单）
+终端 B
+命令与输出在 02 节步骤 ② 完整跑过（
+ros2 run tf2_tools view_frames
+→ 当前目录生成
+frames_*.pdf/.gv
+，终端同时打印文字版树
+Result: frame_yaml=…
+），这里列拿着树图该核对什么：
+✔ ① 根是 base_footprint；② 每个 child 只有一个父（单父）；③ 无环、全部 frame 连通；④ 看边的频率——fixed 是一次性快照，continuous/revolute 有持续刷新频率。
+⚠ 同名 child 出现两个 parent、或整枝缺失 → 回第 2/3 步查发布者，别急着查数据。
+2
+手段二 · RViz 直接看（display 已配好，可手动复核）
+看 rviz 窗口
+launch 加载的
+car1.rviz
+已勾选 TF 图层；想复核就自己来一遍：左下
+Add → By display type → TF → OK
+，右侧勾
+Frames / Names / Arrows
+，Fixed Frame 保持
+base_footprint
+。
+然后左手拖 arm_joint1 滑块：视口里机械臂的坐标轴实时跟着转、帧名一起摆
+——静态枝（laser_link、base_link 等）纹丝不动，动的只有活动链，这正是“动态 TF 的直播画面”。先看下面两张现场图：
+📸 关键操作与现象截图（2 图）
+TF 图层开满（EXP-15 实拍）· 每个坐标系一组 RGB 轴 + 帧名——轴最密处就是关节；哪根轴消失 = 那条边断了，比 frames.pdf 快照更“直播”
+面板与场景对照 · 左侧帧列表、视口中出现变换轴——列表名字与 frames.pdf 一一对上即验证通过（另车型实拍，帧名不同、看法相同）
+3
+手段三 · rqt_tf_tree 实时看整棵树（view_frames 的“常驻版”）
+终端 B（新窗口）
+⚠ 第一行先装包：
+rqt_tf_tree
+不在 ros-humble 默认安装里
+——不装直接跑第 2 行会报
+command not found
+，装一次即可。view_frames 是按秒数
+拍照
+，rqt_tf_tree 是常驻不关的
+监控窗口
+：数据同样来自
+tf2_frames
+服务（与 view_frames 同源），但随时点工具栏
+⟳ 刷新
+就重新拉一次现场。
+窗口放右屏、滑块 GUI 放左屏，左手拖、右手刷新
+，变换是否在动一目了然：
+sudo apt install ros-humble-rqt-tf-tree
+# ① 只需一次；不装则 ② 直接 command not found
+ros2 run rqt_tf_tree rqt_tf_tree
+# ② 打开常驻树窗口
+# 树画出来后：拖 arm_joint1 滑块 → 点 ⟳ 刷新
+#   · 树形不变 = 拓扑由 URDF 定死，拖滑块不增删边（正常！）
+#   · 变的是边标签： Most recent transform 时间戳往前走、Average rate 显示在频发
+# 数值平移/转角在第 5 步 tf2_echo，轴的转动在刚才的 RViz——三窗同看才完整
+✔ 拖两下关节再 ⟳ 刷新：活动边的
+Most recent transform
+时间戳持续更新 = 变换在实时发布；树形与 frames.pdf 逐枝一致（单父、无环、同根）。
+⚠
+command not found
+= 没先跑第 ① 行安装；窗口空白 /
+No tf data received
+= 终端 A 的 launch 没在跑；
+拖滑块树“没变化”是预期
+——结构看这里，数值看第 5 步、动作看 RViz。
+💡 从“验证”学“调试”
+排查 TF 的三板斧就是本节顺序：
+tf2_echo 查单边 → view_frames 查全树 → RViz 查现场
+（命令在第 5 步和 02 步骤 ②）；嫌反复拍照麻烦，手段三的
+rqt_tf_tree
+就是“不断电的 view_frames”，排障时常驻开着。实际项目里 90% 的“数据对不齐”，用这三步五分钟内能定位到是哪条边断了/错了。
+第 5 步 · 查询任意坐标系相对位姿
+查询是 TF2 的最终出口——任意两个 frame 之间，一条命令出数值。命令行用
+tf2_echo
+，代码里用
+Buffer + lookup_transform
+；两种形态一个语义：
+参数顺序永远是（目标系·父，源系·子）
+。
+1
+命令：tf2_echo 查一条边（输出逐行读）
+终端 B
+用法：
+ros2 run tf2_ros tf2_echo <目标系(父)> <源系(子)>
+——把“子系的读数换算到父系”的那条变换打印出来，持续刷新，Ctrl+C 退出：
+ros2 run tf2_ros tf2_echo base_footprint base_link
+# At time 1792054921.106               ← 查询时刻（默认取最新；TF 全程带时间戳）
+# Translation: [0.000, 0.000, 0.029]    ← 平移，单位米 = URDF base_joint 的 z
+# Rotation: in RPY (radian): [0.000, -0.000, 0.000]   ← 姿态，弧度；全 0 = 无旋转
+# （还会持续打印 Quaternion x y z w 与 4×4 Matrix：左上 3×3 旋转、第四列平移）
+✔ 三样对上账：Translation 的
+0.029
+= 第 ① 步 URDF 的
+xyz="0 0 0.029"
+；RPY 全 0 = 静态边无旋转；数值稳定不跳 = 静态边（拖滑块的活动边才会变）。
+⚠ 一直
+Waiting for transform
+/
+frame does not exist
+→ launch 没跑（回 02 步骤 ①），或两个参数写反、frame 名拼错。
+2
+换坐标系练手感：只改两个参数
+终端 B
+tf2_echo 的语义不随 frame 名变化——多查几组，整棵树就在手里“活”了：
+# 查雷达安装位（静态边）
+ros2 run tf2_ros tf2_echo base_link laser_link
+#   Translation ≈ [0.146, 0.000, 0.087]     ← URDF laser_joint 的 xyz 原值
+# 两参数对调 = 求逆：数字取反
+ros2 run tf2_ros tf2_echo base_link base_footprint
+#   Translation ≈ [0.000, 0.000, -0.029]    ← 第一条查询的逆
+# 查活动边：拖 arm_joint1 滑块，输出实时变
+ros2 run tf2_ros tf2_echo base_link arm_link1
+✔ 任意一对名字都查得到 = 树全连通（TF2 沿树自动拼接、需要时自动取逆）；对调两参数数字取反 = 逆变换——06 节验证题 2/3 的结论在这里直接可测。
+💡 跨多级查询（如 wheel_lf_link → camera_depth_optical_frame）不用你指定中间经过谁——走到共同祖先那一段，TF2 自己拼。
+代码 B · 查询节点 Buffer + Listener（代码方式）
+from
+tf2_ros
+import
+Buffer, TransformListener
+
+self.buffer = Buffer()
+self.listener = TransformListener(self.buffer, self)
+# 监听 /tf + /tf_static 填充 buffer
+# 查询 laser_frame 的数据 → map 系；超时 1.0s（树还没齐时阻塞等待）
+t = self.buffer.lookup_transform(
+'map'
+,
+'laser_frame'
+,
+    rclpy.time.Time(),
+# Time()=最新时刻；传具体时间则做历史插值
+timeout=rclpy.duration.Duration(seconds=
+1.0
+))
+tx = t.transform.translation.x
+qz, qw = t.transform.rotation.z, t.transform.rotation.w
+yaw =
+2.0
+* math.atan2(qz, qw)
+# 03 节半角公式反解
+✦ 设计看点
+① 查不到时不是崩溃而是
+超时等待
+——因为发布者可能后启动；②
+TransformListener
+就是普通的订阅节点，把两条话题的值缓存进
+Buffer
+；③ 发布者只发一条边，查询者却能跨整棵树——
+解耦靠的就是 /tf 这对公共话题
+，和 EXP-06 的话题解耦完全同构。
+沙盘探究：四元数换算 + TF 链查询
+回到 03 节"查询全过程"与"四元数"两块主场，这里用两块沙盘动手验证：①拖动偏航角，观察四元数分量与朝向实时变化；②自选两端坐标系，看 TF2 如何拼出查询路径。
+IX-19A · 四元数 ↔ 偏航角 实时换算台
+x
+y
+yaw 正方向
+yaw = 0°
+yaw 偏航角（°）
+30
+预设
+0°
+90°
+180°
+-90°
+观察点：yaw=180° 时 w 变为 0、|z| 最大 = 1 —— 正是半角公式在编码"转了半圈"；反解验证 yaw = 2·atan2(z,w)。
+IX-19B · TF 链查询沙盘（选两端 · 看拼接路径）
+起点坐标系 source
+map（世界）
+odom（里程计）
+base_link（车体）
+laser_frame（雷达）
+camera_link（相机）
+目标坐标系 target
+map（世界）
+odom（里程计）
+base_link（车体）
+laser_frame（雷达）
+camera_link（相机）
+lookup_transform()
+两坐标系相同或选择无效时也可尝试——TF2 会告诉你"同一坐标系，恒等变换"。
+05
+注意事项与验收
+注意事项（七条红线）
+类别
+说明
+禁环防空转
+TF2 是有根树，
+严禁成环
+；同一 child_frame 被两个节点配不同 parent 发布时会报错警告（"frame conflicts"）。
+frame 名字一个字符都不能差
+laser_link
+写成
+laser_Link
+（大小写）或多一个空格 → 报
+Frame does not exist
+。排查时先
+ros2 run tf2_ros tf2_monitor
+或 view_frames 对名字。
+别把父子顺序写反
+lookup_transform(target, source)
+是"把 source 的数据转到 target"——写反等于求逆变换，坐标直接飞出地图。记法：
+目标在前，源在后
+（数据从后往前流）。
+时间戳一致
+动态查询默认按
+最新时刻
+对齐；多源数据融合时显式传时间戳，否则插值错位会出现"点在地图上漂"。
+静态用对 Broadcaster
+静态变换务必用
+StaticTransformBroadcaster
+（/tf_static + latch）。用普通 TransformBroadcaster 循环重发静态值 → 占带宽、后加入节点仍可能漏。
+四元数单位化
+rotation 必须满足 x²+y²+z²+w²=1；(0,0,0,1) 表示零旋转；自算角度后记得转四元数再塞进消息。
+牢记报错就在现场
+Lookup would require extrapolation
+= 时间戳超出缓冲窗口（常见于缓冲太短或时间不同步），先检查各节点
+use_sim_time
+是否一致。
+验收标准（六条全绿才算过）
+ros2 launch car1_description display.launch.py
+一条命令拉起三节点，滑块窗与 rviz2 同时弹出，车模 + TF 轴可见
+tf2_echo base_footprint base_link
+输出平移 [0.000, 0.000, 0.029]（与 URDF base_joint 逐位一致）、旋转零姿态
+view_frames
+生成 frames.pdf，肉眼确认以 base_footprint 为根、单父、无环
+独立终端
+ros2 topic echo /tf_static --qos-durability transient_local
+能读到 base_footprint→base_link 等 fixed 边
+拖动任一关节滑块，四段链路依次对上账：
+ros2 topic echo /joint_states
+的 position 变 →
+ros2 topic echo /tf
+对应边数值变 → rviz 对应轴随动，RViz TF display 各 frame 标签正确且与 frames.pdf 互点得上
+页面交互台：拖 yaw 到 180° 能说出 w=0 的原因；链查询能报出跨 3 层的拼接路径
+06
+本课总结与验证题
+成果
+跑通 launch 案例的五步闭环
+一条 display.launch.py 拉起三节点；URDF 写边、robot_state_publisher 发边，树（frames.pdf）、单边（tf2_echo）、画面（RViz）三重验证全通过。
+原理
+树 + 连乘 + 缓冲
+TF2 = 有根树（无环保证查询终止）+ 边的连乘合成 + 带时间戳的 Buffer 缓冲插值。
+QoS
+动态 KeepLast vs 静态 Transient Local
+/tf 要"最新"（KeepLast）、/tf_static 要"后到也有"（Transient Local）——同一套 Durability 开关的两种业务化用法，与 EXP-06 的 QoS 三要素一脉相承。
+迁移
+四元数反解 yaw
+2·atan2(z, w) 是读码必备；机械臂姿态、相机位姿都是同一套四元数。
+验证题（改动型 · 每题先自己作答，再展开核对）
+1（目标①②·改 QoS）
+把发布静态变换的代码从
+StaticTransformBroadcaster
+换成普通
+TransformBroadcaster
+（默认 KeepLast + Volatile），仍每 100ms 重发一次。之后启动的
+view_frames
+与新节点还能拿到这条边吗？从 Durability 语义说明。
+参考答案与得分点
+得分点：①Volatile 不为迟到者保留历史，新订阅者只能等下一条到达——在"只发一次"的静态场景里就是彻底丢失 ②换回 StaticTransformBroadcaster（/tf_static + Transient Local）才对 ③动态边之所以可以 Volatile，是因为它持续重发。（①③各 40%，② 20%）
+2（目标②·改命令参数）
+把 04 节第 2 步"命令二"里的
+--frame-id base_link
+与
+--child-frame-id laser_frame
+值对调，写成
+--yaw 0 --pitch 0 --roll 0 --frame-id laser_frame --child-frame-id base_link
+。
+tf2_echo base_link laser_frame
+会打印什么？坐标还对吗？
+参考答案与得分点
+得分点：①父子角色互换，发布的是 laser_frame→base_link，查询结果变成平移约
+[-0.1, 0, -0.2]
+（等于原来的逆变换）②坐标"飞出"：换算到 map 的点整体错位 ③记法：
+--frame-id
+写父、
+--child-frame-id
+写子，与 lookup_transform 的"目标 源"是两套顺序。（①②各 40%，③ 20%）
+3（目标②③·改代码）
+把
+lookup_transform('map','laser_frame', ...)
+的两个 frame 参数对调成
+lookup_transform('laser_frame','map', ...)
+。返回的平移和四元数与原来是什么关系？
+参考答案与得分点
+得分点：①结果为原变换的
+逆
+：平移取反（旋转取共轭四元数）②语义从"把 laser 数据转到 map"变成"把 map 转到 laser"，用错用途就会把坐标系方向画反 ③参数顺序是（target, source）＝（目标在前、源在后）。（①②各 40%，③ 20%）
+4（目标①·改结构）
+如果里程计节点把
+odom→base_link
+这条一直变化的边发到
+/tf_static
+上，车开动后 TF 树会发生什么？从 QoS 与更新策略两方面解释。
+参考答案与得分点
+得分点：①/tf_static 是 latched 的最后一条快照，车开动后新值发不上来（或只在最后一次重发时被覆盖）②树里这条边"冻住"，map/odom 与 base_link 的关系不再更新，定位在 RViz 里纹丝不动 ③正确做法：动态边走 /tf 持续重发 + KeepLast，静态边才走 /tf_static。（①②各 40%，③ 20%）
+5（目标②③·改时间）
+查询时把
+rclpy.time.Time()
+换成数据消息里
+header.stamp
+对应的时刻，但该时刻早于 buffer 缓存窗口（默认约 10 秒之前）。会得到什么结果？怎么修？
+参考答案与得分点
+得分点：①抛出/报
+Lookup would require extrapolation
+类错误——该时刻的变换已被挤出缓存 ②修复方向：调大 Buffer 缓存时长、或让查询近似用最新时刻、或对齐各节点时钟/增大发布缓存 ③这也是"多源数据要带时间戳"的代价：换精度得拿缓存空间换。（①③各 40%，② 20%）
+← 上一篇
+EXP-18 · 元功能包与一键部署
+下一篇 →
+EXP-20 · URDF 机器人建模
+CORE-01 · 机器人 ROS2 应用与开发 · EXP-19 TF2 坐标系变换
+2 学时 · 基于 ros_practice 实验讲义改编

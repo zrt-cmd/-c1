@@ -1,0 +1,40 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp003-ros2-application/exp-19-tf2/diagrams/fig-19-6-project-overview.html
+TITLE: 图 19-6 · 工程全景
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+图 19-6 · 工程全景
+图 19-6 · 工程全景：一条 launch、两个话题、五步验证
+本图回答的问题：display.launch.py 动了哪些文件、谁发 /tf 与 /tf_static、五步各验证链路的哪一段？
+ros2 launch car1_description
+display.launch.py · 终端 A 一次拉起 3 节点
+启动
+launch 进程 · car1_description（gui · rsp · rviz2 同拉）
+car1.urdf ＋ display.launch.py
+所有边写在 URDF；launch 读入为 robot_description
+解析 · 分发边
+robot_state_publisher
+fixed→/tf_static 一次 · 活动（+/joint_states）→/tf 持续
+static_transform_publisher（免代码）
+--frame-id 父 --child-frame-id 子 · 案例外临时加边用
+等价效果
+/tf_static 话题
+fixed 边 · 一次性发布
+Transient Local · 后到者补收
+/tf 话题
+活动边 · 持续刷新
+KeepLast · 只取最新值
+tf2_echo
+第⑤步 · Translation 对账
+view_frames
+第④步 · frames.pdf 树形
+rviz2 · TF Display
+第④步 · 轴向与帧名
+订阅两条话题
+launch 要活着 · 名字/顺序任一处写错 → 查不到
+未 source · Ctrl+C 关掉 launch · laser_Frame 大小写 · 父子互换
+对不上
+URDF 写边 → robot_state_publisher 发进两条话题 → 五步各查一段——谁都不用维护全树
+✅ 结论：URDF 写边、robot_state_publisher 发边，两条话题供五步复读
+⚠️ 风险：launch 未起 / 关掉 · frame 名大小写 · 父子顺序三类高频错
+🔍 验证：02 节 3 步现象 · 04 节五步实测
+EXP-19 · TF2 坐标系变换

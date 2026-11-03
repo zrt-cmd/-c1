@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>XFLZ-EAI-CAR1 智能小车 · 开箱使用手册</title>
+<style>
+:root{
+  --bg-base:#f8fafc;--bg-card:#fff;--bg-soft:#f1f5f9;--bg-tint:#eef4ff;
+  --border:#e2e8f0;--border-hover:#94a3b8;
+  --accent-blue:#2563eb;--accent-cyan:#0891b2;--accent-teal:#0d9488;
+  --accent-amber:#d97706;--accent-violet:#7c3aed;--accent-rose:#e11d48;
+  --text-primary:#0f172a;--text-body:#334155;--text-secondary:#64748b;--text-muted:#94a3b8;
+  --shadow-glow:0 8px 24px rgba(37,99,235,.10);
+  --font-mono:'Cascadia Code','JetBrains Mono',Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg-base);color:var(--text-body);
+  font-family:"Noto Sans CJK SC","PingFang SC","Microsoft YaHei","Segoe UI",system-ui,sans-serif;
+  background-image:
+    radial-gradient(ellipse 60% 40% at 50% -5%,rgba(37,99,235,.05),transparent),
+    radial-gradient(ellipse 50% 35% at 100% 5%,rgba(13,148,136,.04),transparent);}
+.topbar{position:sticky;top:0;z-index:50;height:60px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 40px;background:rgba(255,255,255,.85);backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;color:var(--text-primary);font-size:15px;text-decoration:none}
+.logo .dot{width:9px;height:9px;border-radius:50%;background:var(--accent-blue);animation:pulse 2.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.top-actions{display:flex;align-items:center;gap:10px}
+.btn{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:600;text-decoration:none;
+  border-radius:9px;padding:8px 16px;transition:.28s;border:1px solid var(--border);color:var(--text-secondary);background:var(--bg-card)}
+.btn:hover{border-color:var(--border-hover);color:var(--accent-blue)}
+.btn.primary{background:linear-gradient(90deg,var(--accent-blue),var(--accent-cyan));color:#fff;border:none;box-shadow:var(--shadow-glow)}
+.btn.primary:hover{transform:translateY(-1px);color:#fff}
+.hero{max-width:980px;margin:0 auto;padding:48px 40px 6px;text-align:center}
+.hero .eyebrow{display:inline-block;font-size:12.5px;letter-spacing:.14em;color:var(--accent-blue);
+  background:var(--bg-tint);border:1px solid #dbeafe;border-radius:100px;padding:5px 14px;font-family:var(--font-mono)}
+.hero h1{margin:16px 0 12px;font-size:34px;line-height:1.25;color:var(--text-primary);font-weight:800}
+.hero h1 .grad{background:linear-gradient(90deg,var(--accent-blue),var(--accent-cyan),var(--accent-teal));
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.hero p{max-width:780px;margin:0 auto;font-size:15px;line-height:1.85;color:var(--text-secondary)}
+.badges{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:20px 0 0}
+.badge{font-size:12.5px;padding:5px 12px;border-radius:100px;background:var(--bg-card);
+  border:1px solid var(--border);color:var(--text-secondary)}
+.specbar{max-width:980px;margin:26px auto 0;padding:0 40px}
+.specbar table{width:100%;border-collapse:collapse;font-size:13px;background:var(--bg-card);
+  border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.specbar td{padding:8px 14px;border-bottom:1px solid var(--border);color:var(--text-secondary)}
+.specbar tr:last-child td{border-bottom:none}
+.specbar td:first-child{color:var(--text-muted);width:150px;background:var(--bg-soft)}
+.specbar code{font-family:var(--font-mono);font-size:12.5px;color:var(--accent-teal);font-weight:600}
+.toc{max-width:980px;margin:28px auto 0;padding:0 40px;display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.toc a{display:block;background:var(--bg-card);border:1px solid var(--border);border-radius:14px;
+  padding:18px 22px;text-decoration:none;transition:.28s}
+.toc a:hover{transform:translateY(-4px);box-shadow:var(--shadow-glow);border-color:var(--border-hover)}
+.toc .n{font-family:var(--font-mono);font-size:12px;font-weight:700;color:#fff;display:inline-block;
+  background:linear-gradient(90deg,var(--accent-blue),var(--accent-cyan));border-radius:7px;padding:3px 9px}
+.toc h3{margin:10px 0 6px;font-size:16.5px;color:var(--text-primary)}
+.toc p{margin:0;font-size:13px;line-height:1.7;color:var(--text-secondary)}
+.toc .sub{margin-top:8px;font-size:12px;color:var(--text-muted);font-family:var(--font-mono)}
+.section{max-width:980px;margin:0 auto;padding:50px 40px 6px;scroll-margin-top:72px}
+.section-head{display:flex;align-items:baseline;gap:14px;margin-bottom:6px;flex-wrap:wrap}
+.section-head h2{margin:0;font-size:22px;color:var(--text-primary);display:flex;align-items:center;gap:10px}
+.section-head h2 .idx{font-family:var(--font-mono);font-size:12px;font-weight:700;color:#fff;
+  background:linear-gradient(90deg,var(--accent-blue),var(--accent-cyan));border-radius:7px;padding:3px 9px}
+.section-head .sub{font-size:13.5px;color:var(--text-muted)}
+.section .desc{font-size:14px;color:var(--text-secondary);line-height:1.8;margin:8px 0 20px;max-width:880px}
+.step{background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:22px 26px;
+  margin-bottom:18px;position:relative;overflow:hidden;transition:.28s;scroll-margin-top:76px}
+.step::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;transform:scaleX(0);transform-origin:left;
+  background:linear-gradient(90deg,var(--accent-blue),var(--accent-cyan));transition:transform .35s cubic-bezier(.4,0,.2,1)}
+.step:hover{border-color:var(--border-hover);box-shadow:0 2px 10px rgba(15,23,42,.05)}
+.step:hover::before{transform:scaleX(1)}
+.step h3{margin:0 0 4px;font-size:17px;color:var(--text-primary);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.step h3 .sn{font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--accent-teal);
+  background:#f0fdfa;border:1px solid #ccfbf1;border-radius:7px;padding:2px 9px;flex:none}
+.step h3 .anchor{margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--text-muted);font-weight:400}
+.step h4{margin:18px 0 2px;font-size:14.5px;color:var(--text-primary);font-weight:700}
+.step p{margin:8px 0 0;font-size:14px;line-height:1.85;color:var(--text-secondary)}
+.step p b{color:var(--text-primary)}
+.step .substeps{margin:8px 0 0;padding-left:20px;font-size:14px;line-height:2;color:var(--text-secondary)}
+.step .substeps b{color:var(--text-primary)}
+.step figure{margin:16px 0 0;background:var(--bg-soft);border:1px solid var(--border);border-radius:12px;padding:10px;text-align:center}
+.step figure img{max-width:100%;display:block;border-radius:8px;margin:0 auto}
+.step figcaption{font-size:12.5px;color:var(--text-muted);padding-top:8px}
+.figrow{display:grid;gap:12px;margin-top:16px}
+.figrow.c2{grid-template-columns:1fr 1fr}
+.figrow.c3{grid-template-columns:repeat(3,1fr)}
+.figrow figure{margin:0}
+.figrow figure img{width:100%;height:auto;object-fit:contain}
+.cmd{margin-top:14px;background:#0f172a;border-radius:11px;padding:14px 18px;position:relative}
+.cmd .lbl{font-family:var(--font-mono);font-size:11px;color:#7dd3fc;letter-spacing:.08em}
+.cmd code{display:block;margin-top:6px;font-family:var(--font-mono);font-size:13.5px;color:#e2e8f0;word-break:break-all}
+.cmd .hint{font-size:12px;color:#94a3b8;margin-top:8px}
+.tip{margin-top:14px;border-radius:11px;padding:13px 16px;font-size:13.5px;line-height:1.8}
+.tip b.lab{display:block;margin-bottom:3px}
+.tip.amber{background:#fffbeb;border:1px solid #fde68a;color:#92400e}
+.tip.rose{background:#fff1f2;border:1px solid #fecdd3;color:#9f1239}
+.tip.teal{background:#f0fdfa;border:1px solid #ccfbf1;color:#115e59}
+.tip.blue{background:var(--bg-tint);border:1px solid #dbeafe;color:#1e40af}
+.creds{display:inline-grid;grid-template-columns:auto auto;gap:6px 18px;margin-top:10px;
+  background:var(--bg-soft);border:1px solid var(--border);border-radius:10px;padding:10px 16px;font-size:13.5px}
+.creds .k{color:var(--text-muted)}
+.creds .v{font-family:var(--font-mono);font-weight:700;color:var(--text-primary)}
+table.tbl{width:100%;border-collapse:collapse;margin-top:14px;font-size:13.5px}
+table.tbl th{background:var(--bg-soft);color:var(--text-primary);text-align:left;padding:9px 12px;
+  border:1px solid var(--border);font-weight:600;font-size:13px}
+table.tbl td{padding:9px 12px;border:1px solid var(--border);color:var(--text-secondary);vertical-align:top}
+table.tbl tr:nth-child(even) td{background:#fcfdfe}
+table.tbl code{font-family:var(--font-mono);font-size:12.5px;background:var(--bg-soft);
+  border:1px solid var(--border);border-radius:4px;padding:1px 5px;color:var(--accent-teal)}
+.checks{list-style:none;padding:0;margin:14px 0 0}
+.checks li{padding:7px 0 7px 28px;position:relative;font-size:13.8px;color:var(--text-secondary);
+  border-bottom:1px dashed var(--border)}
+.checks li:last-child{border-bottom:none}
+.checks li::before{content:"✓";position:absolute;left:4px;top:7px;color:var(--accent-teal);font-weight:700}
+.flowbox{margin-top:16px;background:var(--bg-soft);border:1px solid var(--border);border-radius:12px;padding:16px 18px}
+.flowrow{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.fstep{flex:1 1 130px;background:var(--bg-card);border:1px solid var(--border);border-radius:10px;
+  padding:10px 12px;min-width:130px}
+.fstep .fn{font-family:var(--font-mono);font-size:11px;font-weight:700;color:#fff;display:inline-block;
+  background:linear-gradient(90deg,var(--accent-blue),var(--accent-cyan));border-radius:5px;padding:1px 7px;margin-bottom:5px}
+.fstep .ft{font-size:13px;font-weight:600;color:var(--text-primary)}
+.fstep .fd{font-size:11.5px;color:var(--text-muted);margin-top:2px}
+.farr{color:var(--border-hover);font-size:15px;flex:none}
+footer{max-width:980px;margin:52px auto 0;padding:24px 40px 44px;border-top:1px solid var(--border);
+  text-align:center;font-size:12.5px;color:var(--text-muted)}
+.reveal{opacity:0;transform:translateY(16px);transition:opacity .5s,transform .5s}
+.reveal.visible{opacity:1;transform:none}
+html{scroll-behavior:smooth}
+.sidenav{display:none;position:fixed;top:0;left:0;bottom:0;width:248px;overflow-y:auto;background:rgba(255,255,255,.96);
+  border-right:1px solid var(--border);padding:20px 14px 40px;z-index:60}
+.sidenav::-webkit-scrollbar{width:5px}
+.sidenav::-webkit-scrollbar-thumb{background:var(--border);border-radius:99px}
+.sidenav .nav-title{font-family:var(--font-mono);font-size:11px;font-weight:800;letter-spacing:.14em;
+  color:var(--text-muted);margin:2px 10px 10px}
+.sidenav a{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:9px;color:var(--text-secondary);
+  text-decoration:none;font-size:12.8px;line-height:1.45;transition:.18s;border-left:2px solid transparent;margin-bottom:1px}
+.sidenav a:hover{background:var(--bg-tint);color:var(--accent-blue)}
+.sidenav a .d{width:6px;height:6px;border-radius:50%;background:var(--border-hover);flex:none;transition:.18s}
+.sidenav a.grp{font-weight:700;color:var(--text-primary);font-size:13.2px;margin-top:4px}
+.sidenav a.grp .d{width:8px;height:8px;background:linear-gradient(90deg,var(--accent-blue),var(--accent-cyan))}
+.sidenav a.sub{margin-left:16px;font-size:12.2px;padding:5px 10px}
+.sidenav a.on{background:linear-gradient(90deg,rgba(37,99,235,.12),rgba(8,145,178,.06));
+  color:var(--accent-blue);border-left-color:var(--accent-blue);font-weight:700}
+.sidenav a.on .d{background:var(--accent-blue);box-shadow:0 0 0 3px rgba(37,99,235,.18)}
+@media (min-width:1100px){body{padding-left:248px}.sidenav{display:block}}
+@media (max-width:760px){
+  .topbar,.hero,.specbar,.toc,.section,footer{padding-left:20px;padding-right:20px}
+  .toc{grid-template-columns:1fr}.hero h1{font-size:27px}
+  .figrow.c2,.figrow.c3{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="logo" href="../../../courses/index.html" title="返回课程首页"><span class="dot"></span>具身智能课程 · 快速上手</a>
+  <div class="top-actions">
+    <a class="btn" href="../index.html">小车 C1 产品介绍</a>
+    <a class="btn primary" href="../../../courses/index.html">← 返回总首页</a>
+  </div>
+</div>
+
+<nav class="sidenav" id="sidenav" aria-label="章节导航">
+  <div class="nav-title">CONTENTS · 目录</div>
+  <a class="grp" href="#safety"><span class="d"></span>安全须知</a>
+  <a class="sub" href="#electrical"><span class="d"></span>电气安全</a>
+  <a class="sub" href="#mechanical"><span class="d"></span>机械安全</a>
+  <a class="sub" href="#optical"><span class="d"></span>光学与激光安全</a>
+  <a class="sub" href="#env"><span class="d"></span>使用环境</a>
+  <a class="sub" href="#emergency"><span class="d"></span>紧急情况处置</a>
+
+  <a class="grp" href="#ch1"><span class="d"></span>一、产品清单</a>
+  <a class="sub" href="#materials"><span class="d"></span>1.1 随箱发货物料</a>
+  <a class="sub" href="#accept"><span class="d"></span>1.2 签收与核对</a>
+  <a class="sub" href="#appearance"><span class="d"></span>1.3 整机外观</a>
+  <a class="sub" href="#ports"><span class="d"></span>1.4 接口与开关位置</a>
+
+  <a class="grp" href="#ch2"><span class="d"></span>二、开机流程</a>
+  <a class="sub" href="#flow"><span class="d"></span>2.1 流程总览</a>
+  <a class="sub" href="#precheck"><span class="d"></span>2.2 使用前检查清单</a>
+  <a class="sub" href="#power"><span class="d"></span>2.3 供电准备</a>
+  <a class="sub" href="#poweron"><span class="d"></span>2.4 上电启动</a>
+  <a class="sub" href="#wait"><span class="d"></span>2.5 等待系统启动</a>
+  <a class="sub" href="#login"><span class="d"></span>2.6 系统登录</a>
+  <a class="sub" href="#verify"><span class="d"></span>2.7 验证联网</a>
+  <a class="sub" href="#bootdone"><span class="d"></span>2.8 开机完成检查清单</a>
+
+  <a class="grp" href="#ch3"><span class="d"></span>三、遥控器操控</a>
+  <a class="sub" href="#rcprep"><span class="d"></span>3.1 使用前准备</a>
+  <a class="sub" href="#rcbase"><span class="d"></span>3.2 底盘操控</a>
+  <a class="sub" href="#rcarm"><span class="d"></span>3.3 机械臂操控</a>
+  <a class="sub" href="#rcreset"><span class="d"></span>3.4 一键复位</a>
+  <a class="sub" href="#rctips"><span class="d"></span>3.5 使用要点</a>
+
+  <a class="grp" href="#ch4"><span class="d"></span>四、日常维护</a>
+  <a class="sub" href="#battery"><span class="d"></span>4.1 电池与供电</a>
+  <a class="sub" href="#clean"><span class="d"></span>4.2 清洁与场地</a>
+  <a class="sub" href="#structure"><span class="d"></span>4.3 机械结构</a>
+  <a class="sub" href="#rcstore"><span class="d"></span>4.4 遥控器与存放</a>
+  <a class="sub" href="#firmware"><span class="d"></span>4.5 软件与固件</a>
+  <a class="sub" href="#storage"><span class="d"></span>4.6 存放与运输</a>
+  <a class="sub" href="#maintcycle"><span class="d"></span>4.7 保养周期表</a>
+  <a class="sub" href="#trouble"><span class="d"></span>4.8 常见故障速查</a>
+
+  <a class="grp" href="#ch5"><span class="d"></span>五、术语表</a>
+  <a class="grp" href="#appendix"><span class="d"></span>附录</a>
+  <a class="sub" href="#appa"><span class="d"></span>A 关键参数速查</a>
+  <a class="sub" href="#appb"><span class="d"></span>B 随附工具与软件</a>
+  <a class="sub" href="#appc"><span class="d"></span>C 技术支持</a>
+</nav>
+
+<header class="hero reveal">
+  <span class="eyebrow">UNBOXING GUIDE · XFLZ-EAI-CAR1</span>
+  <h1>XFLZ-EAI-CAR1 智能小车<br><span class="grad">开箱使用手册</span></h1>
+  <p>从开箱清点到遥控器试车，完整走一遍。第一次用建议按章节顺序来：先读安全须知，再清点物料、上电联网、试遥控器。全程配实拍图，图中红圈红箭头即操作位置。</p>
+  <div class="badges">
+    <span class="badge">📋 文档版本 V1.1</span>
+    <span class="badge">🔌 3S 锂电池 · 按键开关</span>
+    <span class="badge">🖥️ RK3576 · Ubuntu 22.04.5 · ROS 2</span>
+    <span class="badge">🎮 遥控器手动操控</span>
+  </div>
+</header>
+
+<div class="specbar reveal">
+  <table>
+    <tr><td>产品型号</td><td>XFLZ-EAI-CAR1</td></tr>
+    <tr><td>文档名称</td><td>开箱使用手册</td></tr>
+    <tr><td>文档版本</td><td>V1.1</td></tr>
+    <tr><td>上位机平台</td><td>RK3576 / Ubuntu 22.04.5 LTS / ROS 2</td></tr>
+    <tr><td>下位机平台</td><td>STM32F407VET6 / FreeRTOS</td></tr>
+    <tr><td>默认登录账号</td><td><code>iflytek</code></td></tr>
+    <tr><td>默认登录密码</td><td><code>admin123456</code></td></tr>
+    <tr><td>默认 SSH 端口</td><td><code>22</code></td></tr>
+    <tr><td>调试串口波特率</td><td><code>1500000</code>（8N1）</td></tr>
+    <tr><td>出厂固件</td><td>已烧录完成，用户无需自行烧写</td></tr>
+  </table>
+</div>
+
+<nav class="toc reveal">
+  <a href="#safety">
+    <span class="n">安全须知</span>
+    <h3>读之前先看这个</h3>
+    <p>电气、机械、光学三条安全红线，使用环境要求，以及五种紧急情况的处置方式</p>
+    <div class="sub">#electrical · #mechanical · #optical</div>
+  </a>
+  <a href="#ch1">
+    <span class="n">第一章</span>
+    <h3>产品清单</h3>
+    <p>清点 5 项物料、核对编号、四步外观检查、认清 6 个接口与开关</p>
+    <div class="sub">#materials · #appearance · #ports</div>
+  </a>
+  <a href="#ch2">
+    <span class="n">第二章</span>
+    <h3>开机流程（上电 → 联网）</h3>
+    <p>上电前检查 → 按键开机 → 等待 30 秒 → 串口登录 → 配 WiFi → SSH → 验证联网</p>
+    <div class="sub">#poweron · #login · #verify</div>
+  </a>
+  <a href="#ch3">
+    <span class="n">第三章</span>
+    <h3>遥控器操控</h3>
+    <p>装电池、HOME 配对、黄灯开底盘、红灯动机械臂、START 一键复位</p>
+    <div class="sub">#rcprep · #rcbase · #rcarm</div>
+  </a>
+  <a href="#ch4">
+    <span class="n">第四章</span>
+    <h3>日常维护</h3>
+    <p>电池、清洁、机械结构、遥控器存放、固件版本、保养周期、故障速查</p>
+    <div class="sub">#battery · #structure · #trouble</div>
+  </a>
+  <a href="#ch5">
+    <span class="n">第五章</span>
+    <h3>术语表与附录</h3>
+    <p>18 个术语解释、关键参数速查、随附工具、技术支持联系方式</p>
+    <div class="sub">#ch5 · #appa · #appb · #appc</div>
+  </a>
+</nav>
+
+<section class="section" id="safety">
+  <div class="section-head">
+    <h2><span class="idx">安全</span>安全须知</h2>
+    <span class="sub">请在使用前完整阅读本节</span>
+  </div>
+  <p class="desc">本产品含锂电池、运动机械结构与激光传感器。下面每一条都不是套话，违反了会伤人或者弄坏设备。</p>
+
+  <article class="step reveal" id="electrical">
+    <h3><span class="sn">电气</span>电气安全<span class="anchor">#electrical</span></h3>
+    <ul class="substeps">
+      <li>仅使用随箱附带的<b>电源充电器</b>充电，禁止使用非原装或参数不符的充电器。</li>
+      <li><b>禁止边充电边运行抓取任务</b>。充电与运行请分开进行。</li>
+      <li>充电时请全程有人看护，远离可燃物。</li>
+      <li>出现冒烟、焦味、异常发热时<b>立即断开电源</b>，不要试图自行拆解。</li>
+      <li>长期停用时请按下电源按键关机，并取出遥控器电池。</li>
+    </ul>
+  </article>
+
+  <article class="step reveal" id="mechanical">
+    <h3><span class="sn">机械</span>机械安全<span class="anchor">#mechanical</span></h3>
+    <ul class="substeps">
+      <li>通电后机械臂会自动进入运动状态，<b>手部和身体请始终离开机械臂运动范围</b>。</li>
+      <li>禁止将手指放入夹爪开合范围内。</li>
+      <li>搬运时请托住底盘，<b>不要提拉机械臂立柱或线束</b>。</li>
+      <li>机械臂立柱若受外力变形，会直接导致抓取失败，请勿倚靠或施压。</li>
+    </ul>
+  </article>
+
+  <article class="step reveal" id="optical">
+    <h3><span class="sn">光学</span>光学与激光安全<span class="anchor">#optical</span></h3>
+    <ul class="substeps">
+      <li>本产品配备激光雷达与深度相机。<b>禁止用眼睛直视雷达出光口与深度相机镜头</b>。</li>
+      <li>清洁镜头请使用镜头纸或气吹，禁止用手、纸巾或粗糙布料擦拭。</li>
+    </ul>
+  </article>
+
+  <article class="step reveal" id="env">
+    <h3><span class="sn">环境</span>使用环境<span class="anchor">#env</span></h3>
+    <table class="tbl">
+      <tr><th style="width:100px">项目</th><th>要求</th></tr>
+      <tr><td>温度</td><td>0 ℃ ~ 40 ℃</td></tr>
+      <tr><td>湿度</td><td>小于 80%，无凝露</td></tr>
+      <tr><td>地面</td><td>平整硬质地面；避免地毯、门槛、强反光地面</td></tr>
+      <tr><td>光照</td><td>避免阳光直射镜头与场地标记</td></tr>
+      <tr><td>干扰</td><td>远离强磁场、大功率电机与变频设备</td></tr>
+      <tr><td>人员</td><td>禁止在人员密集或狭窄通道内全速运行</td></tr>
+    </table>
+  </article>
+
+  <article class="step reveal" id="emergency">
+    <h3><span class="sn">应急</span>紧急情况处置<span class="anchor">#emergency</span></h3>
+    <table class="tbl">
+      <tr><th style="width:220px">现象</th><th>处置方式</th></tr>
+      <tr><td>发出异响、机构卡死</td><td><b>立即按下电源按键关机</b></td></tr>
+      <tr><td>小车失控、无法停止</td><td><b>立即按下电源按键关机</b></td></tr>
+      <tr><td>冒烟、焦味、异常发烫</td><td>立即断电，远离设备，联系售后</td></tr>
+      <tr><td>电池鼓包、漏液</td><td>停止使用，单独隔离存放，联系售后</td></tr>
+      <tr><td>机械臂撞到异物</td><td>断电后检查立柱与线束，确认无变形再上电</td></tr>
+    </table>
+  </article>
+</section>
+
+<section class="section" id="ch1">
+  <div class="section-head">
+    <h2><span class="idx">第一章</span>一、产品清单</h2>
+    <span class="sub">清点 → 核对 → 检查 → 认接口</span>
+  </div>
+  <p class="desc">拆箱先别急着上电。清点物料、核对编号、看一眼外观，这三件事花不了五分钟，但能避免后面一堆麻烦。</p>
+
+  <article class="step reveal" id="materials">
+    <h3><span class="sn">1.1</span>随箱发货物料<span class="anchor">#materials</span></h3>
+    <p>按表格逐项清点数量，检查外观是否完好。</p>
+    <table class="tbl">
+      <tr><th style="width:56px">序号</th><th style="width:190px">物料名称</th><th style="width:70px">数量</th><th>用途说明</th></tr>
+      <tr><td>1</td><td>产品手册</td><td>1 份</td><td>即本手册，请妥善保管</td></tr>
+      <tr><td>2</td><td>质检书</td><td>1 份</td><td>出厂质检记录，售后与保修凭据，<b>请勿丢弃</b></td></tr>
+      <tr><td>3</td><td>Apriltag 物块和颜色物块</td><td>1 套</td><td>视觉识别、抓取与搬运任务的场地道具</td></tr>
+      <tr><td>4</td><td>遥控器</td><td>1 个</td><td>手动控制小车移动</td></tr>
+      <tr><td>5</td><td>电源充电器</td><td>1 个</td><td>小车电池充电</td></tr>
+    </table>
+  </article>
+
+  <article class="step reveal" id="accept">
+    <h3><span class="sn">1.2</span>签收与核对<span class="anchor">#accept</span></h3>
+    <p><b>步骤 1 · 清点物料</b>：按 1.1 表格逐项清点数量，检查外观是否完好。</p>
+    <p><b>步骤 2 · 核对编号</b>：检查<b>质检书</b>上的产品编号与小车机身标签编号是否完全一致。</p>
+    <p><b>步骤 3 · 外观检查</b>：</p>
+    <ul class="checks">
+      <li>外壳无裂纹、无明显磕碰</li>
+      <li>机械臂立柱无弯曲</li>
+      <li>四个麦克纳姆轮转动顺畅、无卡滞</li>
+      <li>夹爪可徒手轻微开合</li>
+    </ul>
+    <p style="margin-top:14px"><b>步骤 4 · 异常反馈</b>：出现缺件、损伤或编号不符时，<b>请勿自行拆机</b>，按附录 C 的联系方式反馈，并保留原包装。</p>
+  </article>
+
+  <article class="step reveal" id="appearance">
+    <h3><span class="sn">1.3</span>整机外观<span class="anchor">#appearance</span></h3>
+    <p>先认一下整机三个视角，后面看接口和检查外观都要用。</p>
+    <div class="figrow c3">
+      <figure>
+        <img src="assets/image-20260920110907058.png" alt="主视图">
+        <figcaption>主视图</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/image-20260920110933155.png" alt="俯视图">
+        <figcaption>俯视图</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/image-20260920110942802.png" alt="左视图">
+        <figcaption>左视图</figcaption>
+      </figure>
+    </div>
+  </article>
+
+  <article class="step reveal" id="ports">
+    <h3><span class="sn">1.4</span>接口与开关位置<span class="anchor">#ports</span></h3>
+    <p>整车接口与板端接口分开看。下面第一张是整车上能摸到的几个口，第二张是板子上的细部。</p>
+    <figure>
+      <img src="assets/image-20260920111117443.png" alt="整车接口与开关">
+      <figcaption>整车接口与开关位置（对应下方编号 1~4）</figcaption>
+    </figure>
+    <figure>
+      <img src="assets/fig-02-board-ports.png" alt="板端接口位置">
+      <figcaption>图 1-2 板端接口位置（对应下方编号 5~6）</figcaption>
+    </figure>
+    <table class="tbl">
+      <tr><th style="width:56px">编号</th><th style="width:150px">名称</th><th>说明</th></tr>
+      <tr><td>1</td><td>电源开关</td><td>负责小车整体供电开关</td></tr>
+      <tr><td>2</td><td>充电口</td><td>电池充电口</td></tr>
+      <tr><td>3</td><td>OTG 接口</td><td>Type-C，用于接电脑调试</td></tr>
+      <tr><td>4</td><td>调试串口</td><td>接串口线查看系统启动日志</td></tr>
+      <tr><td>5</td><td>电源开关</td><td>板端开关；整车对外的开机 / 关机按键见下方说明</td></tr>
+      <tr><td>6</td><td>MASKROM 按键</td><td>仅维修重装系统时使用，<b>日常禁止按压</b></td></tr>
+    </table>
+    <div class="tip amber"><b class="lab">整车电源控制</b>小车采用<b>按键式开关</b>，<b>按一下开机，再按一下关机</b>。不是拨动开关，别硬掰。</div>
+  </article>
+</section>
+
+<section class="section" id="ch2">
+  <div class="section-head">
+    <h2><span class="idx">第二章</span>二、开机流程（上电 → 联网）</h2>
+    <span class="sub">准备 → 上电 → 登录 → 联网 → 完成</span>
+  </div>
+  <p class="desc">出厂时小车没有联网，所以<b>串口是唯一可用的入口</b>。顺序是：上电 → 串口登录 → 配 WiFi → 之后就能用 SSH 远程登录了。</p>
+
+  <article class="step reveal" id="flow">
+    <h3><span class="sn">2.1</span>流程总览<span class="anchor">#flow</span></h3>
+    <div class="flowbox">
+      <div class="flowrow">
+        <div class="fstep"><span class="fn">① 准备</span><div class="ft">开箱核对物料</div><div class="fd">供电准备 / 充电</div><div class="fd">接入调试串口线</div></div>
+        <span class="farr">→</span>
+        <div class="fstep"><span class="fn">② 上电启动</span><div class="ft">按下电源按键</div><div class="fd">等待系统启动约 30 秒</div></div>
+        <span class="farr">→</span>
+        <div class="fstep"><span class="fn">③ 登录 · 联网</span><div class="ft">串口登录</div><div class="fd">配置 WiFi → 验证联网</div></div>
+        <span class="farr">→</span>
+        <div class="fstep"><span class="fn">④ 完成</span><div class="ft">开机完成</div><div class="fd">之后改用 SSH</div></div>
+      </div>
+    </div>
+    <div class="tip blue"><b class="lab">登录方式说明</b>首次开机请走<b>串口登录 → 配置 WiFi</b>（见 2.6.1、2.6.2）。本地登录（HDMI + 键鼠）与 SSH 登录为替代方式；<b>SSH 必须在完成 WiFi 配置后才能使用</b>。</div>
+  </article>
+
+  <article class="step reveal" id="precheck">
+    <h3><span class="sn">2.2</span>首次使用前检查清单<span class="anchor">#precheck</span></h3>
+    <p>上电前请逐项确认：</p>
+    <ul class="checks">
+      <li>物料已清点完毕，质检书编号与机身标签一致</li>
+      <li>电池已完成首次充电（建议先充满再用）</li>
+      <li>小车放置在平整地面，周围留有至少 1 m 空间</li>
+      <li>机械臂运动范围内无人员、无异物</li>
+      <li>外壳螺丝无松动，立柱无变形</li>
+      <li>电源处于关闭状态</li>
+    </ul>
+  </article>
+
+  <article class="step reveal" id="power">
+    <h3><span class="sn">2.3</span>供电准备<span class="anchor">#power</span></h3>
+    <p>小车使用随箱<b>电源充电器</b>充电。首次使用前建议先充满电。</p>
+    <div class="tip amber"><b class="lab">注意</b>充电时请勿运行抓取任务。充电器接入充电口后，指示灯亮起表示正在充电。</div>
+  </article>
+
+  <article class="step reveal" id="poweron">
+    <h3><span class="sn">2.4</span>上电启动<span class="anchor">#poweron</span></h3>
+    <p><b>步骤 1</b> 确认电源处于关闭状态。</p>
+    <p><b>步骤 2</b> 按下电源按键开机。</p>
+    <p><b>步骤 3</b> 观察下表现象：</p>
+    <table class="tbl">
+      <tr><th style="width:250px">现象</th><th>含义</th></tr>
+      <tr><td>板载 LED 规律闪烁（心跳模式）</td><td>系统已通电并开始运行</td></tr>
+      <tr><td>蜂鸣器发出"滴"提示音</td><td>下位机固件启动正常</td></tr>
+      <tr><td>可听到风扇转动声</td><td>上位机已上电</td></tr>
+      <tr><td>串口终端输出启动日志</td><td>系统启动流程正常</td></tr>
+    </table>
+  </article>
+
+  <article class="step reveal" id="wait">
+    <h3><span class="sn">2.5</span>等待系统启动<span class="anchor">#wait</span></h3>
+    <p>上电到系统可用约需 <b>30 秒</b>（上位机启动过程约 20 ~ 30 秒）。正常启动后，登录横幅显示如下版本信息：</p>
+    <div class="cmd">
+      <div class="lbl">登录横幅</div>
+      <code>Welcome to Ubuntu 22.04.5 LTS (GNU/Linux 6.1.99-rk3576 aarch64)</code>
+    </div>
+    <figure>
+      <img src="assets/fig-05-login-banner.png" alt="系统登录横幅">
+      <figcaption>图 2-1 系统登录横幅</figcaption>
+    </figure>
+  </article>
+
+  <article class="step reveal" id="login">
+    <h3><span class="sn">2.6</span>系统登录<span class="anchor">#login</span></h3>
+    <p>本节介绍三种登录方式。<b>出厂未联网时串口是唯一可用的入口</b>，因此首次开机建议按 2.6.1 → 2.6.2 的顺序操作，完成联网后即可改用 2.6.3 / 2.6.4 的方式。</p>
+
+    <h4>2.6.1 方式一：串口登录（首次开机建议使用）</h4>
+    <p>接线方式：<b>先将串口线接好，再给小车通电。</b></p>
+    <div class="tip amber"><b class="lab">重要顺序</b>系统启动日志在上电瞬间就开始输出，后接串口会错过关键日志。<b>如需观察启动日志，请务必先接线、后上电</b>；若已上电后再接串口，重新上电一次即可复现完整日志。</div>
+    <p style="margin-top:14px">接线，将电脑和小车连接：</p>
+    <div class="figrow c2">
+      <figure>
+        <img src="assets/fig-03-wiring.png" alt="接线示意">
+        <figcaption>图 2-2 接线示意</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/fig-04-serial-session.png" alt="串口工具会话设置">
+        <figcaption>图 2-3 串口工具会话设置</figcaption>
+      </figure>
+    </div>
+    <p style="margin-top:16px"><b>串口参数</b></p>
+    <table class="tbl">
+      <tr><th style="width:190px">参数</th><th>值</th></tr>
+      <tr><td>串口设备</td><td>带 CH340 芯片的 USB 串口（如 <code>COM41</code>）</td></tr>
+      <tr><td>波特率</td><td><b><code>1500000</code></b></td></tr>
+      <tr><td>数据位 / 校验 / 停止位</td><td><b>8N1</b></td></tr>
+    </table>
+    <div class="creds" style="margin-top:14px">
+      <span class="k">用户名</span><span class="v">iflytek</span>
+      <span class="k">密码</span><span class="v">admin123456</span>
+    </div>
+
+    <h4>2.6.2 配置 WiFi 联网</h4>
+    <table class="tbl">
+      <tr><th style="width:180px">配网方式</th><th>快速了解</th></tr>
+      <tr><td>方式 1</td><td>需要配合串口登录</td></tr>
+      <tr><td>方式 2（推荐）</td><td>不需任何连接，无线网页配网</td></tr>
+    </table>
+
+    <p style="margin-top:16px"><b>方式 1：命令行配网</b>，在已登录的小车终端中执行：</p>
+    <div class="cmd">
+      <div class="lbl">在 小车 终端执行</div>
+      <code>sudo nmcli dev wifi connect &lt;wifi_ssid&gt; password &lt;wifi_password&gt;</code>
+      <div class="hint">示例：sudo nmcli dev wifi connect xxx password xxx</div>
+    </div>
+    <p style="margin-top:14px">连接成功的提示形如：</p>
+    <div class="cmd">
+      <div class="lbl">成功提示</div>
+      <code>Device 'wlan0' successfully activated with 'b25b3fe8-6a35-4add-b712-e39bbdd8a700'.</code>
+    </div>
+    <figure>
+      <img src="assets/image-20260920112653326.png" alt="nmcli 配网成功">
+      <figcaption>命令行配网成功的终端画面</figcaption>
+    </figure>
+
+    <p style="margin-top:16px"><b>方式 2（推荐）：手机无线网页配网</b>。打开手机，寻找配网 WiFi（名称为 <code>XFLZ_xxxx</code>），连接后<b>自动跳转配网界面</b>，手动输入对应 WiFi 名称与密码进行配网。安卓、苹果都可以使用。</p>
+    <figure>
+      <img src="assets/image-20261015133638551.png" alt="手机配网界面" style="max-width:420px">
+      <figcaption>手机连上 XFLZ_xxxx 热点后自动弹出的配网页面，填 WiFi 名称与密码</figcaption>
+    </figure>
+    <div class="tip teal"><b class="lab">配网完成后</b>它会自动连接对应 WiFi，成功就会关闭这个配网热点。<b>需要去对应路由器上找到分配给小车的 IP</b>，后面 SSH 要用。</div>
+
+    <h4>2.6.3 方式二：本地登录（HDMI + 键鼠）</h4>
+    <p>用 HDMI 线连接小车与显示器，在拓展坞上接入鼠标键盘，即可直接在本机操作。</p>
+    <div class="tip blue"><b class="lab">说明</b>此方法较为繁琐，建议先用上面的方式。</div>
+
+    <h4>2.6.4 方式三：远程 SSH 登录（推荐）</h4>
+    <p>接线，将电脑和小车连接，使用随箱工具中的终端软件，按下表配置：</p>
+    <figure>
+      <img src="assets/fig-06-ssh-session.png" alt="SSH 会话设置">
+      <figcaption>图 2-4 SSH 会话设置</figcaption>
+    </figure>
+    <table class="tbl">
+      <tr><th style="width:150px">配置项</th><th>值</th></tr>
+      <tr><td>协议</td><td>SSH</td></tr>
+      <tr><td>主机</td><td>小车联网后分配到的 IP（示例 <code>192.168.1.197</code>）</td></tr>
+      <tr><td>端口</td><td><code>22</code></td></tr>
+      <tr><td>用户名</td><td><code>iflytek</code></td></tr>
+      <tr><td>密码</td><td><code>admin123456</code></td></tr>
+    </table>
+    <div class="tip rose"><b class="lab">注意</b><b>首次开机时小车尚未联网，此时没有 IP，无法使用 SSH。</b>请先通过 2.6.1（串口登录）或 2.6.3（本地登录）完成 2.6.2 的联网配置，之后即可改用 SSH 远程连接。</div>
+  </article>
+
+  <article class="step reveal" id="verify">
+    <h3><span class="sn">2.7</span>验证联网<span class="anchor">#verify</span></h3>
+    <p><b>步骤 1 · 查看本机地址</b></p>
+    <div class="cmd">
+      <div class="lbl">在 小车 终端执行</div>
+      <code>ifconfig</code>
+    </div>
+    <p style="margin-top:14px">在 <code>wlan0</code> 段落中找到 <code>inet</code> 后面的地址，即为小车 IP。</p>
+    <figure>
+      <img src="assets/fig-07-ifconfig.png" alt="查看 IP 地址">
+      <figcaption>图 2-5 查看 IP 地址（图中 wlan0 的 inet 为 192.168.1.197）</figcaption>
+    </figure>
+    <p style="margin-top:16px"><b>步骤 2 · 按下表判定</b></p>
+    <table class="tbl">
+      <tr><th style="width:220px">检查项</th><th>判定标准</th></tr>
+      <tr><td><code>wlan0</code> 状态</td><td>处于 <code>UP / RUNNING</code></td></tr>
+      <tr><td><code>wlan0</code> 地址</td><td>已分配到 <code>inet</code> 地址</td></tr>
+      <tr><td>电脑 <code>ping</code> 小车 IP</td><td>有回包</td></tr>
+      <tr><td>外网连通</td><td><code>ping -c 4 www.baidu.com</code> 有回包</td></tr>
+    </table>
+  </article>
+
+  <article class="step reveal" id="bootdone">
+    <h3><span class="sn">2.8</span>开机完成检查清单<span class="anchor">#bootdone</span></h3>
+    <ul class="checks">
+      <li>电源已开机，心跳 LED 规律闪烁</li>
+      <li>蜂鸣器有启动提示音</li>
+      <li>已登录系统（本地或 SSH）</li>
+      <li>WiFi 已连接，<code>ifconfig</code> 可见 <code>wlan0</code> 的 IP</li>
+      <li>电脑能 <code>ping</code> 通小车 IP</li>
+      <li>遥控器已连接，推动摇杆小车四轮正常响应</li>
+    </ul>
+  </article>
+</section>
+
+<section class="section" id="ch3">
+  <div class="section-head">
+    <h2><span class="idx">第三章</span>三、遥控器操控</h2>
+    <span class="sub">准备 → 底盘 → 机械臂 → 复位</span>
+  </div>
+  <p class="desc">遥控器用于手动控制小车底盘移动与机械臂动作，是日常使用和现场检查的主要手段。不开电脑也能让车动起来。</p>
+
+  <article class="step reveal" id="rcprep">
+    <h3><span class="sn">3.1</span>使用前准备<span class="anchor">#rcprep</span></h3>
+    <p><b>步骤 1 · 连接接收器</b>：将遥控器接收器插入小车<b>下位机的 USB 接口</b>，确认插入牢固。</p>
+    <figure>
+      <img src="assets/image-20260920112859102.png" alt="接收器插入下位机 USB 接口">
+      <figcaption>接收器插入位置（红框处）。整车出厂已安装，通常不需要操作这一步</figcaption>
+    </figure>
+    <p style="margin-top:14px"><b>步骤 2 · 装入电池</b>：为遥控器装入电池。</p>
+    <p><b>步骤 3 · 配对</b>：按住遥控器中间 <b>HOME</b> 键，直到指示灯由<b>闪烁变为常亮（亮黄色灯）</b>，表示配对成功，此时可以开始控制。</p>
+    <p><b>步骤 4 · 切换模式</b>：多次按下 <b>HOME</b> 键切换模式，对应指示灯<b>亮黄色灯、红色灯反复切换</b>。</p>
+    <div class="tip amber"><b class="lab">注意</b>遥控器为通用型。同一场地有多台小车时，遥控器可能连接到<b>其他小车</b>上。使用前请确认只有目标小车响应。</div>
+
+    <h4>遥控器长什么样</h4>
+    <div class="figrow c2">
+      <figure>
+        <img src="assets/image-20261015103234972.png" alt="遥控器全貌与接收器">
+        <figcaption>所配遥控器与 USB 接收器</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/image-20261015111207648.png" alt="L1L2R1R2 按键位置">
+        <figcaption>L1 / L2 / R1 / R2 扳机键的位置</figcaption>
+      </figure>
+    </div>
+    <table class="tbl">
+      <tr><th style="width:160px">灯光</th><th>模式</th></tr>
+      <tr><td><b>亮黄色灯</b></td><td>底盘操控模式（摇杆控底盘，十字键控机械臂）</td></tr>
+      <tr><td><b>亮红灯</b></td><td>机械臂操控模式（右摇杆控关节，十字键控底盘）</td></tr>
+    </table>
+
+    <h4>机械臂关节对应的舵机 ID</h4>
+    <p>后面按键表里的"ID 0 ~ ID 5"就指这张图上的编号。<b>ID 5 是夹爪，ID 0 位于底盘隐藏处</b>。</p>
+    <figure>
+      <img src="assets/image-20261015110705866.png" alt="机械臂舵机 ID 编号" style="max-width:400px">
+      <figcaption>关节与舵机 ID 对应关系（ID 0 在底盘内，图中红箭头标注）</figcaption>
+    </figure>
+  </article>
+
+  <article class="step reveal" id="rcbase">
+    <h3><span class="sn">3.2</span>底盘操控（摇杆）<span class="anchor">#rcbase</span></h3>
+    <p><b>亮黄色灯模式下</b></p>
+    <table class="tbl">
+      <tr><th style="width:100px">摇杆</th><th style="width:110px">推动方向</th><th>功能</th></tr>
+      <tr><td>左摇杆</td><td>上 / 下</td><td>底盘前进 / 后退</td></tr>
+      <tr><td>左摇杆</td><td>左 / 右</td><td>底盘左平移 / 右平移</td></tr>
+      <tr><td>右摇杆</td><td>左 / 右</td><td>底盘原地逆时针 / 顺时针旋转</td></tr>
+      <tr><td>右摇杆</td><td>上 / 下</td><td>未映射功能</td></tr>
+    </table>
+    <p style="margin-top:16px"><b>亮红灯模式下</b></p>
+    <table class="tbl">
+      <tr><th style="width:100px">摇杆</th><th style="width:110px">推动方向</th><th>功能</th></tr>
+      <tr><td>左摇杆</td><td>上 / 下</td><td>底盘前进 / 后退</td></tr>
+      <tr><td>左摇杆</td><td>左 / 右</td><td>底盘左平移 / 右平移</td></tr>
+      <tr><td>右摇杆</td><td>左 / 右</td><td>关节 4（ID 4）动作（顺时针旋转）</td></tr>
+      <tr><td>右摇杆</td><td>上 / 下</td><td>关节 3（ID 3）动作（顺时针旋转）</td></tr>
+    </table>
+    <p style="margin-top:14px"><b>操作要点</b></p>
+    <ul class="substeps">
+      <li>摇杆设有 <b>±20 死区</b>，轻微推动不响应属于正常现象。</li>
+      <li><b>摇杆松手回中，小车立即停止</b>，不会持续漂移。</li>
+      <li>左右平移是麦克纳姆轮特有的运动方式：四个轮子协同工作，<b>车身朝向保持不变</b>。</li>
+    </ul>
+  </article>
+
+  <article class="step reveal" id="rcarm">
+    <h3><span class="sn">3.3</span>机械臂操控（按键）<span class="anchor">#rcarm</span></h3>
+    <p>按键采用<b>边沿触发</b>：按下瞬间机械臂开始动作，<b>松开按键后停在该位置并保持</b>，不会自动回位。每个动作的持续时间为 2000 ms。</p>
+
+    <p style="margin-top:14px"><b>亮黄色灯模式下</b></p>
+    <table class="tbl">
+      <tr><th style="width:120px">按键</th><th>功能</th><th style="width:180px">对应关节（舵机 ID）</th></tr>
+      <tr><td><b>HOME</b></td><td>切换模式</td><td>无</td></tr>
+      <tr><td><b>START</b></td><td>机械臂复位</td><td>无</td></tr>
+      <tr><td><b>L2</b></td><td>夹爪张开</td><td>夹爪（ID 5）</td></tr>
+      <tr><td><b>R2</b></td><td>夹爪闭合</td><td>夹爪（ID 5）</td></tr>
+      <tr><td><b>L1</b></td><td>关节低位动作（顺时针旋转）</td><td>关节 4（ID 4）</td></tr>
+      <tr><td><b>R1</b></td><td>关节高位动作（逆时针旋转）</td><td>关节 4（ID 4）</td></tr>
+      <tr><td><b>X</b></td><td>关节低位动作（逆时针旋转）</td><td>关节 3（ID 3）</td></tr>
+      <tr><td><b>B</b></td><td>关节高位动作（顺时针旋转）</td><td>关节 3（ID 3）</td></tr>
+      <tr><td><b>A</b></td><td>关节低位动作（逆时针旋转）</td><td>关节 2（ID 2）</td></tr>
+      <tr><td><b>Y</b></td><td>关节高位动作（顺时针旋转）</td><td>关节 2（ID 2）</td></tr>
+      <tr><td><b>↓（下）</b></td><td>关节低位动作（逆时针旋转）</td><td>关节 1（ID 1）</td></tr>
+      <tr><td><b>↑（上）</b></td><td>关节高位动作（顺时针旋转）</td><td>关节 1（ID 1）</td></tr>
+      <tr><td><b>←（左）</b></td><td>关节低位动作（顺时针旋转）</td><td>关节 0（ID 0）</td></tr>
+      <tr><td><b>→（右）</b></td><td>关节高位动作（逆时针旋转）</td><td>关节 0（ID 0）</td></tr>
+    </table>
+
+    <p style="margin-top:16px"><b>亮红色灯模式下</b>（注意十字键改成控底盘）</p>
+    <table class="tbl">
+      <tr><th style="width:120px">按键</th><th>功能</th><th style="width:180px">对应关节（舵机 ID）</th></tr>
+      <tr><td><b>HOME</b></td><td>切换模式</td><td>无</td></tr>
+      <tr><td><b>START</b></td><td>机械臂复位</td><td>无</td></tr>
+      <tr><td><b>L2</b></td><td>夹爪张开</td><td>夹爪（ID 5）</td></tr>
+      <tr><td><b>R2</b></td><td>夹爪闭合</td><td>夹爪（ID 5）</td></tr>
+      <tr><td><b>L1</b></td><td>关节低位动作（顺时针旋转）</td><td>关节 4（ID 4）</td></tr>
+      <tr><td><b>R1</b></td><td>关节高位动作（逆时针旋转）</td><td>关节 4（ID 4）</td></tr>
+      <tr><td><b>X</b></td><td>关节低位动作（逆时针旋转）</td><td>关节 3（ID 3）</td></tr>
+      <tr><td><b>B</b></td><td>关节高位动作（顺时针旋转）</td><td>关节 3（ID 3）</td></tr>
+      <tr><td><b>A</b></td><td>关节低位动作（逆时针旋转）</td><td>关节 2（ID 2）</td></tr>
+      <tr><td><b>Y</b></td><td>关节高位动作（顺时针旋转）</td><td>关节 2（ID 2）</td></tr>
+      <tr><td><b>↓（下）</b></td><td>底盘后退</td><td>无</td></tr>
+      <tr><td><b>↑（上）</b></td><td>底盘前进</td><td>无</td></tr>
+      <tr><td><b>←（左）</b></td><td>底盘左平移</td><td>无</td></tr>
+      <tr><td><b>→（右）</b></td><td>底盘右平移</td><td>无</td></tr>
+    </table>
+    <div class="tip blue"><b class="lab">高位 / 低位是什么</b>分别对应舵机的两个极限方向，实际动作幅度以现场观察为准。</div>
+  </article>
+
+  <article class="step reveal" id="rcreset">
+    <h3><span class="sn">3.4</span>一键复位<span class="anchor">#rcreset</span></h3>
+    <p><b>同时按下 SELECT + START，或单独按下 START</b>，全部 6 个舵机（5 个关节 + 夹爪）将回到<b>中位</b>，复位过程约 2000 ms。</p>
+    <div class="tip teal"><b class="lab">复位后</b>机械臂呈竖直姿态。此操作常用于动作错乱或需要重新开始时。</div>
+  </article>
+
+  <article class="step reveal" id="rctips">
+    <h3><span class="sn">3.5</span>使用要点与注意事项<span class="anchor">#rctips</span></h3>
+    <table class="tbl">
+      <tr><th style="width:56px">#</th><th>要点</th></tr>
+      <tr><td>1</td><td><b>必须处于运动模式</b>（亮黄色灯），否则摇杆无效。</td></tr>
+      <tr><td>2</td><td><b>防止串车</b>：遥控器通用，多车场地使用前务必确认响应的是目标小车。</td></tr>
+      <tr><td>3</td><td><b>边沿触发</b>：按下动作、松开停住；需要连续动作时反复按动，而非长按不动。</td></tr>
+      <tr><td>4</td><td><b>摇杆死区 ±20</b>：轻微推动无响应属正常。</td></tr>
+      <tr><td>5</td><td><b>方向指示灯</b>：小车会根据摇杆输入自动判断运动方向，并通过灯带显示方向状态。</td></tr>
+      <tr><td>6</td><td>若上位机程序正在运行并下发过底盘控制指令，遥控器可能<b>暂时失效</b>（见 4.8 故障表）。</td></tr>
+    </table>
+  </article>
+</section>
+
+<section class="section" id="ch4">
+  <div class="section-head">
+    <h2><span class="idx">第四章</span>四、日常维护</h2>
+    <span class="sub">电池 · 清洁 · 机械 · 存放 · 故障</span>
+  </div>
+  <p class="desc">这台车用了锂电池和麦克纳姆轮，维护重点就这两块：电池别亏电存放，轮子别沾灰。剩下的按周期检查一次就行。</p>
+
+  <article class="step reveal" id="battery">
+    <h3><span class="sn">4.1</span>电池与供电<span class="anchor">#battery</span></h3>
+    <table class="tbl">
+      <tr><th style="width:130px">项目</th><th>要求</th></tr>
+      <tr><td>充电时机</td><td>出现动力明显变弱、动作迟滞时即充电</td></tr>
+      <tr><td>长期不用</td><td>每 1 ~ 2 个月补电一次，避免亏电存放</td></tr>
+      <tr><td>充电环境</td><td>常温、通风、远离可燃物，充电时人不离开</td></tr>
+      <tr><td>禁止事项</td><td>禁止亏电长期存放；禁止使用非随箱充电器；<b>禁止边充边跑任务</b></td></tr>
+      <tr><td>电池外观</td><td>出现鼓包、变形、漏液<b>立即停用并隔离</b></td></tr>
+      <tr><td>电池规格</td><td>3S 锂电池，充满电电压约 <b>12.4 ~ 12.6 V</b></td></tr>
+    </table>
+  </article>
+
+  <article class="step reveal" id="clean">
+    <h3><span class="sn">4.2</span>清洁与场地<span class="anchor">#clean</span></h3>
+    <table class="tbl">
+      <tr><th style="width:130px">项目</th><th>要求</th></tr>
+      <tr><td>轮组</td><td>每次使用后用干布擦拭麦克纳姆轮辊子，防止积尘导致打滑与定位漂移</td></tr>
+      <tr><td>场地</td><td>每次测试前铺设防尘布，防止轮子沾灰</td></tr>
+      <tr><td>镜头</td><td>用镜头纸或气吹清洁深度相机与雷达窗口，禁止用手或粗糙纸巾擦拭</td></tr>
+      <tr><td>机身</td><td>断电后用微湿软布擦拭，禁止直接冲水，禁止使用有机溶剂</td></tr>
+    </table>
+  </article>
+
+  <article class="step reveal" id="structure">
+    <h3><span class="sn">4.3</span>机械结构<span class="anchor">#structure</span></h3>
+    <table class="tbl">
+      <tr><th style="width:150px">项目</th><th>要求</th></tr>
+      <tr><td>立柱垂直度</td><td>机械臂立柱应保持竖直，目视不可倾斜</td></tr>
+      <tr><td>钣金 / 铝型材</td><td>若发生弯曲会导致抓取失败，可徒手轻微回正；反复变形需返修</td></tr>
+      <tr><td>摄像头与夹爪对中</td><td>摄像头中心应尽量对准夹爪中心</td></tr>
+      <tr><td>上下盖合体</td><td>合盖时注意不要压到线束</td></tr>
+      <tr><td>螺丝</td><td>每季度检查一遍关键部位螺丝松紧</td></tr>
+    </table>
+    <div class="figrow c3">
+      <figure>
+        <img src="assets/image-20260920110942802.png" alt="立柱应保持竖直">
+        <figcaption>立柱应保持竖直</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/fig-09-camera-gripper-align.png" alt="摄像头中心对准夹爪中心">
+        <figcaption>摄像头中心对准夹爪中心</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/fig-10-parallelism.png" alt="顶部与底盘基本平行">
+        <figcaption>顶部与底盘基本平行</figcaption>
+      </figure>
+    </div>
+  </article>
+
+  <article class="step reveal" id="rcstore">
+    <h3><span class="sn">4.4</span>遥控器电池与存放<span class="anchor">#rcstore</span></h3>
+    <ul class="substeps">
+      <li>遥控器为无线手柄，接收器插入小车下位机 USB 接口后由下位机直接解析。<b>操控方法见第三章。</b></li>
+      <li>长期不用请取出电池，避免漏液腐蚀。</li>
+    </ul>
+    <div class="tip amber"><b class="lab">重要特性</b>上位机程序下发过底盘控制命令后，系统会进入"逐轮直驱模式"，此时遥控器摇杆暂时失效，<b>这是正常现象</b>。重启小车即可恢复遥控器控制。</div>
+  </article>
+
+  <article class="step reveal" id="firmware">
+    <h3><span class="sn">4.5</span>软件与固件版本<span class="anchor">#firmware</span></h3>
+    <table class="tbl">
+      <tr><th style="width:150px">项目</th><th>维护要求</th></tr>
+      <tr><td>下位机固件</td><td>出厂已烧录。<b>请勿自行重烧</b>，如需升级请联系技术支持</td></tr>
+      <tr><td>舵机固件</td><td>出厂已烧录。关节舵机与夹爪舵机固件版本不同，<b>不可混用</b>，如需重烧请联系技术支持</td></tr>
+      <tr><td>导航配置</td><td>出厂配置完成。如需修改，请先备份原配置文件</td></tr>
+      <tr><td>系统时间</td><td>联网后应自动校时，请确认时间正确</td></tr>
+    </table>
+  </article>
+
+  <article class="step reveal" id="storage">
+    <h3><span class="sn">4.6</span>存放与运输<span class="anchor">#storage</span></h3>
+    <table class="tbl">
+      <tr><th style="width:130px">项目</th><th>要求</th></tr>
+      <tr><td>存放环境</td><td>干燥、常温、无强磁干扰；建议原箱存放</td></tr>
+      <tr><td>电池</td><td>半电存放（约 50%），每 1 ~ 2 个月补电</td></tr>
+      <tr><td>运输</td><td>固定机械臂立柱与夹爪，避免运输中受力变形；设备与物块分开包装</td></tr>
+      <tr><td>长期停用</td><td>按下电源按键关机，取出遥控器电池</td></tr>
+    </table>
+  </article>
+
+  <article class="step reveal" id="maintcycle">
+    <h3><span class="sn">4.7</span>保养周期表<span class="anchor">#maintcycle</span></h3>
+    <table class="tbl">
+      <tr><th style="width:150px">周期</th><th>保养内容</th></tr>
+      <tr><td>每次使用前</td><td>检查电量；擦拭轮组；检查立柱垂直度；确认遥控器可用</td></tr>
+      <tr><td>每次使用后</td><td>清洁轮组与镜头；关机断电；清点物块</td></tr>
+      <tr><td>每月</td><td>检查线束是否磨损；充电保养电池</td></tr>
+      <tr><td>每季度</td><td>紧固螺丝；检查夹爪开合；验证联网与定位功能</td></tr>
+    </table>
+  </article>
+
+  <article class="step reveal" id="trouble">
+    <h3><span class="sn">4.8</span>常见故障速查<span class="anchor">#trouble</span></h3>
+    <p>遇到问题先查表，八成问题这里都有答案。</p>
+    <table class="tbl">
+      <tr><th style="width:200px">现象</th><th style="width:190px">可能原因</th><th>处理方法</th></tr>
+      <tr><td>上电后无心跳闪烁</td><td>电量低 / 未按下电源按键</td><td>充电后重试；确认已按下电源按键开机</td></tr>
+      <tr><td>串口无日志输出</td><td>波特率错误 / 串口线未接好</td><td>波特率设为 <code>1500000</code>；重插串口线</td></tr>
+      <tr><td>无法 SSH 登录</td><td>小车未联网、无 IP</td><td>先用本地登录完成联网</td></tr>
+      <tr><td>电脑 <code>ping</code> 不通小车</td><td>电脑与小车不在同一网段</td><td>确认两者连接同一 WiFi 热点</td></tr>
+      <tr><td>遥控器摇杆完全无反应</td><td>未进入 ANALOG 模式</td><td>按 <b>ANALOG</b> 键，红灯亮起后重试（见 3.1）</td></tr>
+      <tr><td>遥控器 HOME 绿灯一直闪烁</td><td>未配对成功</td><td>按住 HOME 键直到绿灯由闪烁变常亮</td></tr>
+      <tr><td>遥控器控制到其他小车</td><td>遥控器为通用型，多车同场</td><td>只给目标小车通电，或逐台单独操作</td></tr>
+      <tr><td>遥控器推摇杆不动</td><td>处于"逐轮直驱模式"</td><td>重启小车（见 4.4）</td></tr>
+      <tr><td>机械臂抖动、动作无力</td><td>供电电流异常</td><td>检查电池电量，确认供电接线正常</td></tr>
+      <tr><td>电机转向相反</td><td>电机线接反</td><td>停止使用，联系技术支持</td></tr>
+      <tr><td>抓取抓不到</td><td>摄像头偏移 / 夹爪位置偏 / 钣金弯曲</td><td>重新对准摄像头与夹爪中心；回正钣金</td></tr>
+      <tr><td>定位漂移</td><td>轮子沾灰打滑</td><td>清洁轮组；确认场地平整</td></tr>
+      <tr><td>小车第一次启动报 odom 错误</td><td>历史残留自启服务</td><td>重启后确认；持续出现请联系技术支持</td></tr>
+      <tr><td>舵机无响应</td><td>舵机固件或 ID 异常</td><td>停止使用，联系技术支持</td></tr>
+      <tr><td>机械臂动作幅度异常</td><td>立柱变形 / 舵机异常</td><td>断电检查立柱，联系技术支持</td></tr>
+    </table>
+  </article>
+</section>
+
+<section class="section" id="ch5">
+  <div class="section-head">
+    <h2><span class="idx">第五章</span>五、术语表</h2>
+    <span class="sub">18 个会反复出现的词</span>
+  </div>
+
+  <article class="step reveal">
+    <h3><span class="sn">术语</span>术语表</h3>
+    <table class="tbl">
+      <tr><th style="width:170px">术语</th><th>含义</th></tr>
+      <tr><td>上位机</td><td>小车上的主控计算机（RK3576），运行 Ubuntu 与 ROS 2</td></tr>
+      <tr><td>下位机</td><td>小车上的运动控制板（STM32F407VET6），负责电机、舵机、IMU、遥控器</td></tr>
+      <tr><td>麦轮 / 麦克纳姆轮</td><td>可实现全向移动的特殊轮组，四个轮协同可前后、横移、原地旋转</td></tr>
+      <tr><td>夹爪</td><td>机械臂末端的抓取执行器</td></tr>
+      <tr><td>舵机</td><td>机械臂关节的驱动电机，共 6 个：关节 5 个 + 夹爪 1 个</td></tr>
+      <tr><td>Apriltag</td><td>一种视觉定位标记，用于识别物块与场地位置</td></tr>
+      <tr><td>深度相机</td><td>可同时获取彩色图像与距离信息的相机，用于识别与抓取</td></tr>
+      <tr><td>激光雷达</td><td>通过旋转激光测距构建环境地图的传感器</td></tr>
+      <tr><td>心跳 LED</td><td>板载状态指示灯，规律闪烁表示系统正常运行</td></tr>
+      <tr><td>逐轮直驱模式</td><td>上位机直接控制单个轮子速度的模式，此模式下遥控器失效</td></tr>
+      <tr><td>ANALOG 模式</td><td>遥控器的一种工作模式，只有在此模式下摇杆才有效（ANALOG 红灯亮）</td></tr>
+      <tr><td>死区</td><td>摇杆轻微推动时不产生输出的范围，本产品为 ±20</td></tr>
+      <tr><td>中位 / 零位</td><td>所有舵机回到中间位置（1500 μs），机械臂呈竖直姿态</td></tr>
+      <tr><td>高位 / 低位</td><td>关节的两个极限动作方向，分别对应舵机的两个极限位置</td></tr>
+      <tr><td>IP 地址</td><td>设备在局域网中的地址，SSH 连接时需要</td></tr>
+      <tr><td>SSH</td><td>一种远程登录协议，可通过网络在电脑上操作小车</td></tr>
+      <tr><td>调试串口</td><td>用于输出系统启动日志的硬件串口</td></tr>
+      <tr><td>固件</td><td>烧写在硬件芯片中的底层程序</td></tr>
+    </table>
+  </article>
+</section>
+
+<section class="section" id="appendix">
+  <div class="section-head">
+    <h2><span class="idx">附录</span>附录</h2>
+    <span class="sub">参数 · 工具 · 技术支持</span>
+  </div>
+
+  <article class="step reveal" id="appa">
+    <h3><span class="sn">A</span>关键参数速查<span class="anchor">#appa</span></h3>
+    <table class="tbl">
+      <tr><th style="width:190px">项目</th><th>值</th></tr>
+      <tr><td>系统登录账号</td><td><code>iflytek</code></td></tr>
+      <tr><td>系统登录密码</td><td><code>admin123456</code></td></tr>
+      <tr><td>SSH 端口</td><td><code>22</code></td></tr>
+      <tr><td>调试串口波特率</td><td><code>1500000</code>（8N1）</td></tr>
+      <tr><td>联网命令</td><td><code>sudo nmcli dev wifi connect &lt;ssid&gt; password &lt;password&gt;</code></td></tr>
+      <tr><td>查看 IP</td><td><code>ifconfig</code>（关注 <code>wlan0</code> 的 <code>inet</code> 行）</td></tr>
+      <tr><td>上位机系统</td><td>Ubuntu 22.04.5 LTS（RK3576）</td></tr>
+      <tr><td>下位机芯片</td><td>STM32F407VET6</td></tr>
+      <tr><td>开机 / 关机</td><td>按键式开关：按一下开机，再按一下关机</td></tr>
+      <tr><td>电池</td><td>3S 锂电池，满电约 12.4 ~ 12.6 V</td></tr>
+      <tr><td>供电额定电流</td><td>≤ 10 A</td></tr>
+      <tr><td>遥控器配对</td><td>按住 HOME 键至绿灯常亮；摇杆需 ANALOG 模式（红灯亮）</td></tr>
+      <tr><td>网络要求</td><td>小车与电脑需处于同一局域网</td></tr>
+    </table>
+  </article>
+
+  <article class="step reveal" id="appb">
+    <h3><span class="sn">B</span>随附工具与软件<span class="anchor">#appb</span></h3>
+    <table class="tbl">
+      <tr><th style="width:190px">工具</th><th>用途</th></tr>
+      <tr><td>MobaXterm</td><td>SSH 远程登录与串口终端</td></tr>
+      <tr><td>串口驱动</td><td>CH340 USB 转串口驱动（连接调试串口时需要）</td></tr>
+    </table>
+  </article>
+
+  <article class="step reveal" id="appc">
+    <h3><span class="sn">C</span>技术支持<span class="anchor">#appc</span></h3>
+    <p>如遇本手册未覆盖的问题，请提供以下信息并联系技术支持：</p>
+    <ul class="checks">
+      <li>产品编号（见机身标签与质检书）</li>
+      <li>故障现象描述与复现步骤</li>
+      <li>调试串口日志（从 2.6.1 的串口终端完整复制）</li>
+      <li>故障照片或视频</li>
+    </ul>
+    <p style="margin-top:18px"><a href="../../../courses/index.html#core" class="btn primary" style="text-decoration:none">前往核心课程 →</a></p>
+  </article>
+</section>
+
+<footer>
+  XFLZ-EAI-CAR1 智能小车 · 开箱使用手册 &middot; 文档版本 V1.1<br>
+  出厂固件已烧录完成，用户无需自行烧写
+</footer>
+
+<script>
+(function () {
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('visible'); io.unobserve(e.target); } });
+  }, { threshold: 0.08 });
+  document.querySelectorAll('.reveal').forEach(function (el) { io.observe(el); });
+
+  var links = [].slice.call(document.querySelectorAll('#sidenav a'));
+  var targets = links.map(function (a) {
+    var id = a.getAttribute('href').slice(1);
+    return { a: a, el: document.getElementById(id) };
+  }).filter(function (t) { return t.el; });
+
+  function spy() {
+    var cur = targets[0];
+    targets.forEach(function (t) {
+      if (t.el.getBoundingClientRect().top < 120) cur = t;
+    });
+    links.forEach(function (a) { a.classList.remove('on'); });
+    if (cur) cur.a.classList.add('on');
+  }
+  window.addEventListener('scroll', spy, { passive: true });
+  spy();
+})();
+</script>
+</body>
+</html>

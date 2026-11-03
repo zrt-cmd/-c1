@@ -1,0 +1,269 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp004-slam-navigation/exp-02-slam-toolbox/index.html
+TITLE: EXP-02 · SLAM Toolbox 建图 — 机器人 SLAM 与自主导航
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+EXP-02 · SLAM Toolbox 建图 — 机器人 SLAM 与自主导航
+🧠 具身智能课程 ·
+教程首页
+核心课程
+/
+SLAM 与自主导航
+/ EXP-02
+本页目录
+01 问题引入：怎么把房间"扫"成一张图
+02 原理通俗讲解：前端配准与回环
+03 关联知识点
+04 实验目标
+05 实验环境与准备
+06 动画讲解：关键帧与回环闭合
+07 互动讲解：关键帧阈值演练台
+08 实操步骤：启动 → 逛圈 → 存图
+09 重点与易错点
+10 总结与思考
+CH1 · 建模与建图
+EXP-01 原理与 URDF
+EXP-02 SLAM Toolbox 建图
+CH2 · 定位与导航
+EXP-03 Nav2 导航
+EXP-04 AMCL 定位
+EXP-05 DWA/TEB 避障
+CH3 · 进阶
+EXP-06 多点导航
+EXP-07 RTAB-Map 3D
+EXP-02 · 第 1 章 · 设计性 · 4 学时
+SLAM Toolbox 建图
+这节课是整门课的第一个"高光时刻"——你将用键盘遥控小车在房间里逛一圈，然后得到一张跟户型图一样的二维地图。全程只做三件事：启动建图 → 遥控逛圈 → 保存地图。
+难度 ⭐⭐ · 4 学时
+SLAM Toolbox
+扫描匹配
+回环检测
+map_saver
+01
+问题引入：怎么把房间"扫"成一张图
+EXP-01 里我们知道雷达每 0.1 秒扫一圈，可一圈只看到"眼前一环"。要把整个房间拼成一张图，小车必须
+边走边拼
+，而拼图本身又有两个麻烦：
+1
+手推购物车走一圈回原点，因打滑"记的步数"和实际走的对不上——起点终点接不拢
+2
+每圈扫描都要和上一圈对齐（前端扫描配准），错一点，越拼越歪
+3
+逛回出发点时"咦，这面墙刚才见过"——回环检测：把首尾接上，一键把累积误差摊平
+4
+SLAM Toolbox 把这三步做成了现成节点：你只管启动、逛圈、存图
+💡 一句话读懂
+这节课是整门课的第一个"高光时刻"——你将用键盘遥控小车在房间里逛一圈，然后得到一张跟户型图一样的二维地图。全程只做三件事：启动建图 → 遥控逛圈 → 保存地图。
+02
+原理通俗讲解：前端配准与回环
+🧩 拼撕碎的地图
+把户型图撕成 360 张碎纸叠在一起（每 0.1 秒一张扫描），最后
+只留一小叠（关键帧）
+。每次拿新碎纸和上一张对齐——这叫
+前端扫描配准
+（像玩"大家来找茬"：平移旋转着挪，直到两张图严丝合缝）。等你逛回起点，发现最后一张和第一张原本就是同一面墙——这叫
+回环检测
+，把整叠地图"首尾一捋"，之前累计的手抖全被摊平。地图从"歪扭"变"方正"，靠的就是这一捋。
+前端
+Scan Matching 扫描配准
+在 ±0.5 m 的搜索窗（correlation_search_space_dimension 0.5）、1 cm 步进（resolution 0.01）内微调位姿，让新一帧扫描与当前地图最吻合。
+后端
+Ceres 图优化
+把关键帧当节点、匹配与回环当边，用 Ceres（LEVENBERG_MARQUARDT 信赖域 + SPARSE_NORMAL_CHOLESKY 求解）整体调位置，误差被摊到每一条边上。
+回环
+Loop Closure
+回到旧地时在 8 m 范围（loop_search_space_dimension 8.0）内搜索候选，粗匹配响应 >0.35、细匹配响应 >0.45 才认账，防"认错墙"。
+关键帧
+不是每帧都存
+走超 0.01 m 或转超 0.02 rad 才开新关键帧——存太密图臃肿算不动，存太疏拼不上。
+频率
+地图 10 Hz 刷新
+mode: mapping，map_update_interval 0.1 s：RViz 里能看到地图"实时长出来"。
+量程
+max_laser_range 12.0
+与 COIN-D6 雷达一致；超范围的点直接丢弃，避免把远处无关噪声当地标。
+03
+关联知识点
+知识点 1
+位姿图
+关键帧节点 + 约束边构成的图，SLAM 后端优化的就是它；回环边是"首尾相接"的那根超强约束。
+知识点 2
+odom → base_footprint
+建图期间 TF 链：map→odom 由 slam_toolbox 发，odom→base_footprint 由轮式里程计（EKF）发，缺一不可。
+知识点 3
+map 文件二件套
+.pgm 是灰度位图（
+254 空闲 / 0 占据 / 205 未知
+），.yaml 记分辨率 0.05、origin 原点、occupied_thresh 0.65 / free_thresh 0.25——成对才能被 Nav2 加载。
+知识点 4
+QoS 匹配
+/scan 是 Best Effort（尽力而为）：订阅端若用 Reliable 会收不到数据，RViz 里 LaserScan 的 Reliability Policy 必须改成 Best Effort。
+知识点 5
+launch 延迟启动
+TimerAction period=10.0：等 bringup 的 odom/TF 与雷达 /scan 稳定 10 秒再起 slam，避免刚上电 TF 不全报错。
+知识点 6
+好地图四标准
+墙单线（厚 < 0.1 m）、尺寸误差 < 2%、四角直角 ≈90°、闭环处无错位。地图不过关，导航全白搭。
+04
+实验目标
+跑通
+slam.launch.py
+建图节点，RViz 中地图随遥控实时生长
+用
+slam_teleop
+（w/s/a/d/空格，0.2 m/s、0.5 rad/s）遥控逛完整圈并完成闭环
+用
+map_save
+（
+-p map_name:=
+）或 map_saver_cli 保存出 map_01.pgm + map_01.yaml
+按四标准验收地图：墙单线、尺寸 < 2%、直角、
+闭环错位 < 0.1 m
+会诊断 5 类常见问题：QoS、地图不更新、双墙、回环不触发、保存失败
+05
+实验环境与准备
+项目
+要求
+系统
+Ubuntu 22.04 + ROS2 Humble，car1_slam 功能包已编译（含 slam/teleop/map_save 节点与 launch）
+硬件
+小车 C1 满电（逛圈耗电）、COIN-D6 雷达（/scan 10 Hz Best Effort）、平整 3 m × 3 m 以上场地
+参数文件
+car1_slam/config/slam.yaml（mode: mapping、do_loop_closing: true、max_laser_range: 12.0）
+前置实验
+EXP-01 TF 树正常（base_footprint 为根），否则建图节点起不来
+RViz 配置
+launch 已自带 slam.rviz：Fixed Frame = map，Map（/map，Transient Local）+ LaserScan（/scan，Best Effort）+ TF 已配好
+💡 关键参数速记
+resolution 0.05 · map_update_interval 0.1 · minimum_travel_distance 0.01 · minimum_travel_heading 0.02 · correlation_search_space_dimension 0.5 · loop_search_space_dimension 8.0 · loop_match_minimum_response_coarse 0.35 · loop_match_minimum_response_fine 0.45（均取自 car1_slam/config/slam.yaml）。
+06
+动画讲解：关键帧与回环闭合
+上：小车沿房间行进，每隔一小段落一个关键帧（蓝点），扫描扇形不断把墙画上图；下：逛回起点附近触发
+回环
+（金色虚线），原本错开的"双重墙"被对齐成单线。
+建图行进 → 关键帧 → 回环闭合纠正漂移
+回环检测：末帧 ≈ 首帧 · 误差整段摊平
+蓝点 = 关键帧（每 0.01 m / 0.02 rad 一枚）· 扫描扇形实时补墙
+双墙 → 单墙
+动画 2-1｜小车 7 秒逛一圈：关键帧逐个落点，第 78% 时刻触发回环金线，累积漂移被 Ceres 后端摊平
+07
+互动讲解：关键帧阈值与回环触发演练台
+遥控手法直接决定关键帧密度和回环能不能触发——点按钮模拟三种逛圈方式，看系统判定：
+逛圈手法演练台 · KeyFrame Lab
+🐢 慢速平移 + 走大圈
+🏎 高速甩尾 + 小圈
+🔄 原地打转不挪窝
+// 选择一种遥控手法，观察关键帧与回环判定
+推荐：0.2 m/s 平移、≤1.0 rad/s 转向、走"8 字"或大圈并在起点收尾
+slam.yaml 参数
+默认值
+作用
+minimum_travel_distance
+0.01
+移动超 1 cm 才存关键帧——静止时空转不刷关键帧
+minimum_travel_heading
+0.02
+转角超约 1.15° 才存新帧
+loop_match_minimum_response_fine
+0.45
+精细匹配响应度门槛，太低易误回环、太高难触发
+do_loop_closing
+true
+回环总开关；关掉 = 永远画不出"闭合"的图
+08
+实操步骤：启动 → 逛圈 → 存图
+1
+终端 1：source 后启动建图（launch 内置 10 秒 TimerAction 延迟起 slam 节点）
+2
+终端 2：启动键盘遥控；RViz 确认 Fixed Frame = map、/scan 点云随车移动
+3
+慢速逛完整圈回到出发点，看到回环连线跳动、双墙合一后，先存图再停车
+# ① 启动 SLAM 建图（含底盘 bringup、雷达、10 秒延迟起的 slam_toolbox 与 rviz）
+ros2
+launch car1_slam slam.launch.py
+#   不想开 rviz：追加 use_rviz:=false
+# ② 另开终端：键盘遥控（w/s 前后 0.2m/s，a/d 左右转 0.5rad/s，空格停）
+ros2
+run car1_slam slam_teleop
+#   注意：必须在真终端（tty）里运行，IDE 内嵌终端读不到按键
+# ③ 逛圈前自检：雷达 10Hz、里程计 TF 正常
+ros2
+topic hz /scan
+ros2
+run tf2_ros tf2_echo odom base_footprint
+# ④ 保存地图（逛完圈、触发回环之后再执行）
+ros2
+run car1_slam map_save
+--ros-args -p map_name:=map_01
+#   默认写到 install/.../car1_slam/maps/ ；想改目录再加 -p map_dir:=/绝对/路径
+#   注意 map_save 读的是参数 map_name，不是位置参数——直接写 map_01 不会生效
+# 方式二：nav2 官方 CLI（transient_local 才能收到 latched 的 /map）
+ros2
+run nav2_map_server map_saver_cli -f map_01 \
+  --ros-args -p map_subscribe_transient_local:=true
+# ⑤ 停掉遥控（Ctrl+C 前先保存）
+pkill
+-f slam_teleop
+保存产物
+map_01.yaml
+关键字段（与仓库示例 slam_map.yaml 一致）：image: map_01.pgm · mode: trinary · resolution: 0.05 · origin: [-0.381, -0.482, 0] · negate: 0 · occupied_thresh: 0.65 · free_thresh: 0.25。其中 origin 是地图左下角在 map 坐标系里的位姿。
+09
+重点与易错点
+⚠️ 重点
+回环是建图质量的分水岭：走大圈 + 回到起点多停 2 秒，给系统一次"认出老家"的机会。验收时量闭环处——两段墙必须并成单线，错位 < 0.1 m、航向差 < 5°。
+⚠️ 常见坑
+现象 → 解法
+RViz 无扫描点
+LaserScan 空白 → QoS Reliability 改
+Best Effort
+（雷达即尽力而为）
+地图不生长
+/map 不更新 → 确认 slam 节点在跑（ros2 node list）且 /scan 有数据
+墙出现双影
+回环没触发/配准失败 → 降低车速、走规则大圈、回起点停一停再看
+回环永不触发
+闭环区域特征太弱或太快掠过 → 回起点减速正对原方向；检查 do_loop_closing: true
+保存失败
+map_saver 等不到 /map → 加
+-p map_subscribe_transient_local:=true
+，或用 car1_slam 的 map_save
+存下来的还是旧名字
+误把
+map_01
+当位置参数传 → 必须写成
+--ros-args -p map_name:=map_01
+文件名踩坑
+路径含中文/空格 → 改英文文件名；先保存再 Ctrl+C
+地图墙厚
+< 0.1 m 单线
+、整体尺寸误差
+< 2%
+、四角直角 90°±2°
+回到起点处
+闭环无错位
+（< 0.1 m / 航向 < 5°）
+map_01.pgm + map_01.yaml
+成对存在
+，origin/thresholds 齐全
+逛圈全程
+低速（≤1.0 rad/s 转向）
+、先存图后停车、电量充足
+10
+总结与思考
+✅ 完成成果
+一张可用的户型图
+slam.launch + slam_teleop 逛圈，map_save 产出 map_01.pgm/yaml 并通过四标准验收。
+🧠 原理收获
+前端 + 后端 + 回环
+扫描配准堆关键帧，Ceres 图优化摊误差，回环检测是"一捋正"的关键。
+🛠 技能收获
+三步操作肌肉记忆
+启动 → 遥控逛圈 → 保存；map_save 的参数式调用与 map_saver_cli 的 transient_local 参数套路。
+❓ 排障思路
+双墙排查链
+QoS → /scan 频率 → 车速 → 闭环 → do_loop_closing 参数，逐级定位。
+📝 思考题 1
+如果把 minimum_travel_distance 从 0.01 m 调大到 0.5 m，关键帧会变少还是变多？地图更新会变得"卡顿"还是"更丝滑"？对回环检测的精度又有什么影响？
+📝 思考题 2
+为什么"先建图、后导航"的顺序不能颠倒？假设没有 map，AMCL 的粒子该往哪里对齐、Nav2 的全局规划又在什么上画线？把你的理由讲给同桌听。
+CORE-04 · 机器人 SLAM 与自主导航 · EXP-02 SLAM Toolbox 建图
+4 学时 · 设计性 · 基于 slam_practice 实验讲义改编

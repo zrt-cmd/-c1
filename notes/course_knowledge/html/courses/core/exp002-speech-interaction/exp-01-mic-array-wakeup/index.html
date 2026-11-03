@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-01 · 六麦阵列串口唤醒 — 机器人自然语言交互应用</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+:root{--theme:#7c3aed;--theme-deep:#6d28d9;--theme-bg:#ede9fe;--theme-bd:#ddd6fe}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit" title="返回课程首页">🧠 具身智能课程 · <i>教程首页</i></a>
+  <div class="crumb"><a href="../../../index.html#core">核心课程</a> / <a href="../index.html">自然语言交互应用</a> / EXP-01</div>
+</div>
+
+<div class="wrap">
+
+<aside class="side">
+  <h4>本页目录</h4>
+  <a href="#s1" class="now">01 问题引入：机器人怎么知道"你在叫它"</a>
+  <a href="#s2">02 原理通俗讲解：六只耳朵怎么听声辨位</a>
+  <a href="#s3">03 关联知识点</a>
+  <a href="#s4">04 实验目标</a>
+  <a href="#s5">05 实验环境与准备</a>
+  <a href="#s6">06 动画讲解：声波 → 波束成形 → 唤醒事件</a>
+  <a href="#s7">07 互动讲解：唤醒词模拟与防抖实验台</a>
+  <a href="#s8">08 实操步骤：读通 XFM 阵列帧数据</a>
+  <a href="#s9">09 重点与易错点</a>
+  <a href="#s10">10 总结与思考</a>
+  <h4>CORE-03 · 自然语言交互</h4>
+  <a href="../exp-01-mic-array-wakeup/index.html">EXP-01 六麦阵列串口唤醒</a>
+  <a href="../exp-02-asr/index.html">EXP-02 ASR 语音识别</a>
+  <a href="../exp-03-tts/index.html">EXP-03 TTS 语音合成</a>
+  <a href="../exp-04-voice-dialog/index.html">EXP-04 端到端语音对话</a>
+  <a href="../exp-05-llm-understanding/index.html">EXP-05 大模型语义理解</a>
+  <a href="../exp-06-emotion-perception/index.html">EXP-06 情绪感知</a>
+</aside>
+
+<main class="content">
+
+<div class="exp-head">
+  <span class="code">EXP-01 · 第 1 章 · 验证性 · 4 学时</span>
+  <h1>六麦阵列串口唤醒：机器人耳朵的第一课</h1>
+  <p class="desc">本实验从<b>"机器人如何知道你在叫它"</b>出发，讲清六麦环形阵列用 TDOA 波束成形"听声辨位"的通俗原理，逐字节拆解讯飞 XFM 阵列的 <b>AIUI 串口帧协议</b>（0xA5 帧头、校验和、小端序），实现 3 秒防抖 + wakeup_lock 的可靠唤醒，并用 Tkinter 界面把波束角度与唤醒事件画出来。</p>
+  <div class="meta">
+    <span class="tag hl">难度 ⭐ · 4 学时</span>
+    <span class="tag">六麦阵列</span><span class="tag">AIUI 串口协议</span>
+    <span class="tag">TDOA 波束</span><span class="tag">pyserial · Tkinter</span>
+  </div>
+</div>
+
+<!-- 01 -->
+<section class="blk" id="s1">
+  <h2><span class="no">01</span>问题引入：机器人怎么知道"你在叫它"</h2>
+  <p>你对着智能音箱喊一声"小飞小飞"，它灯带一转、应声而答；可要是两个人隔着房间聊天，它却不该随口插嘴。这个"该醒才醒"的问题，拆开是三连问：</p>
+  <div class="flow">
+    <div class="step"><span class="n">1</span><b>叫没叫？</b>——麦克风时刻都在收音，如何从环境噪声中认出唤醒词</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span><b>谁在叫？</b>——房间里多人说话，如何判断声音来自哪个方向</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span><b>叫了几遍？</b>——一句话尾音会重复触发，如何避免 1 秒内醒来 5 次</div>
+  </div>
+  <div class="tip amber"><span class="lab">💡 思路</span>本课程用<b>硬件分工</b>解决：讯飞 XFM 六麦环形阵列在<b>单片机内实时跑波束成形 + 唤醒词模型</b>，一旦命中就通过串口吐出一条 <code>ivw</code> 事件帧 —— 工控主机只管读帧、做防抖，完全不用自己算声学算法。这就是"专业的人干专业的事"。</div>
+</section>
+
+<!-- 02 -->
+<section class="blk" id="s2">
+  <h2><span class="no">02</span>原理通俗讲解：六只耳朵怎么听声辨位</h2>
+  <p><b>生活比喻：操场上的"听声辨位"。</b>蒙上眼睛听人喊你，你先意识到"有人叫我"，还会下意识转头找方向 —— 单耳判断有无，双耳靠声音到达两耳的<b>时间差</b>判断方向。六麦阵列就是把这对"耳朵"扩成六只：</p>
+  <div class="flow">
+    <div class="step"><span class="n">1</span><b>拾音 = 顺风耳</b>：6 个麦克风均匀排成一圈，同一句话到达每个麦的时刻略有不同，这个微小时间差就是 <b>TDOA（到达时间差）</b></div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span><b>唤醒 = 抠门铃名</b>：芯片提取特征，比对内置的"小飞小飞"声纹模板 —— 类似门铃只认自家那声"叮咚"，别人按门铃不开门</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span><b>防抖 = 挂门挡</b>：门铃刚响过就挂上门挡（wakeup_lock），3 秒内的重复按铃一律忽略；这就是 3 秒防抖</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span><b>上报 = 递纸条</b>：命中后阵列通过串口发一帧 JSON 事件，工控机读到即"机器人醒了"</div>
+  </div>
+  <table>
+    <thead><tr><th>概念</th><th>生活类比</th><th>本实验对应</th></tr></thead>
+    <tbody>
+      <tr><td>波束成形</td><td>把六只耳朵的听到的内容"对表合并"，只放大某个方向的声音</td><td>TDOA 波束 → 波束号 0~5 / 角度 0~360°</td></tr>
+      <tr><td>唤醒词检测（KWS）</td><td>门铃只认自家叮咚</td><td>ivw 事件（"小飞小飞"等）</td></tr>
+      <tr><td>防抖（debounce）</td><td>挂门挡，短时间内不再响应</td><td>3 秒冷却 + wakeup_lock</td></tr>
+      <tr><td>串口协议</td><td>两人约定好的"电报格式"</td><td>0xA5 帧头 + 7+N+1 帧结构 + 校验和</td></tr>
+    </tbody>
+  </table>
+  <div class="tip tealb"><span class="lab">🔍 串口是什么</span>串口（UART）就像一条<b>只允许一个字节一个字节排队通过的窄门</b>：发送方按约定格式打包（帧头 → 类型 → 长度 → 数据 → 校验），接收方按同样规则拆包。双方规则必须一字不差，否则满屏乱码 —— 这正是本实验大部分 Bug 的藏身处。</div>
+</section>
+
+<!-- 03 -->
+<section class="blk" id="s3">
+  <h2><span class="no">03</span>关联知识点</h2>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">硬件</div><div class="kt">讯飞 XFM 六麦环形阵列</div><p>6 麦克风环形布局，板载唤醒 / 识别固件，USB 转串口上机：<code>VID=0x1a86</code>、<code>PID=0x55d4</code>（CH340 系列），设备节点 <code>/dev/ttyACM0</code>，波特率 <b>115200</b>。</p></div>
+    <div class="kcard"><div class="kd">协议</div><div class="kd">AIUI 串口帧 7+N+1</div><p>帧头 <code>0xA5</code>、类型、长度、N 字节负载、校验和 <code>(~sum+1)&0xFF</code>；整数按<b>小端序</b>（低字节在前）拼装。</p></div>
+    <div class="kcard"><div class="kd">事件</div><div class="kt">ivw 与波束角度</div><p>唤醒事件携带波束号（0~5，对应六个麦克风方向）与 0~360° 角度；配合 PINYIN_MAP 把拼音事件映射为命令。</p></div>
+    <div class="kcard"><div class="kd">软件</div><div class="kt">pyserial + 线程 + Tkinter</div><p>后台线程读串口入队，GUI 主线程 <code>queue + after(50ms)</code> 轮询刷新 —— <b>GUI 不能阻塞</b>是这条链的铁律。</p></div>
+  </div>
+</section>
+
+<!-- 04 -->
+<section class="blk" id="s4">
+  <h2><span class="no">04</span>实验目标</h2>
+  <ul class="check">
+    <li>能用 <code>lsusb</code> / <code>arecord -l</code> 确认阵列的 VID:PID 与声卡编号，找到 <code>/dev/ttyACM0</code></li>
+    <li>能默画 AIUI 帧结构，手工算出一帧的校验和，并解释小端序的含义</li>
+    <li>用 pyserial 打开 115200-8-N-1 串口，边收边解析，实时打印波束号与角度</li>
+    <li>喊出"小飞小飞"触发 ivw 唤醒事件，程序打印 <span class="ok">[WAKEUP]</span> 日志</li>
+    <li>实现 3 秒防抖 + wakeup_lock，对连续触发的事件只响应第一次</li>
+    <li>（进阶）跑通 <code>xf_mic_array_gui.py</code>，在 Tkinter 界面看到角度指针随声源转动</li>
+  </ul>
+</section>
+
+<!-- 05 -->
+<section class="blk" id="s5">
+  <h2><span class="no">05</span>实验环境与准备</h2>
+  <pre><span class="c"># ① 硬件：讯飞 XFM 六麦阵列 → USB 接入工控主机</span>
+<span class="g">lsusb</span> | grep -i 1a86
+<span class="y">Bus 001 Device 005: ID 1a86:55d4 QinHeng CH340 serial converter</span>
+
+<span class="c"># ② 确认设备节点（可能是 ttyACM0 或 ttyUSB0）</span>
+<span class="g">ls</span> -l /dev/ttyACM*
+<span class="y">crw-rw---- 1 root dialout 188, 0 ... /dev/ttyACM0</span>
+
+<span class="c"># ③ 把当前用户加进 dialout 组（否则 Permission denied）</span>
+<span class="g">sudo</span> usermod -aG dialout $USER   <span class="c"># 重新登录后生效</span>
+
+<span class="c"># ④ 依赖与素材</span>
+<span class="g">pip3</span> install pyserial
+<span class="c"># 确认 xf_mic_array.py / uv_device.py / 讲义 resources/ 在实验目录就位</span></pre>
+  <div class="tip"><span class="lab">💡 准备清单</span>阵列平放桌面、远离音箱（避免自唤醒）；关闭可能占用串口的串口调试助手；记录你机器上阵列的<b>真实设备号</b>，后续所有命令都以它为准。</div>
+</section>
+
+<!-- 06 -->
+<section class="blk" id="s6">
+  <h2><span class="no">06</span>动画讲解：声波 → 波束成形 → 唤醒事件</h2>
+  <p class="lead">下图从左到右完整展示一个唤醒周期：声波抵达六个麦克风（时间差高亮）→ 波束定向算出角度 → ivw 唤醒帧经串口飞向工控主机 → 防抖计时期内忽略重复触发。</p>
+  <div class="anim-box">
+    <svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="六麦阵列波束成形与串口唤醒事件动画">
+      <rect x="8" y="8" width="704" height="284" rx="12" fill="#111827" stroke="#334155"/>
+      <!-- 左：六麦环形阵列 -->
+      <text x="120" y="38" text-anchor="middle" font-size="13" font-weight="700" fill="#c4b5fd">① 六麦环形阵列 · TDOA</text>
+      <circle cx="120" cy="150" r="66" fill="none" stroke="#475569" stroke-dasharray="5 5"/>
+      <g fill="#7c3aed" stroke="#c4b5fd" stroke-width="1.5">
+        <circle cx="120" cy="84" r="8"/><circle cx="177" cy="117" r="8"/><circle cx="177" cy="183" r="8"/>
+        <circle cx="120" cy="216" r="8"/><circle cx="63" cy="183" r="8"/><circle cx="63" cy="117" r="8"/>
+      </g>
+      <!-- 入射声波：三道扩散弧线从左上角来 -->
+      <g fill="none" stroke="#60a5fa" stroke-width="2.4">
+        <path d="M 14 70 Q 50 60 78 88">
+          <animate attributeName="stroke-opacity" values="0.15;1;0.15" dur="1.6s" repeatCount="indefinite"/>
+        </path>
+        <path d="M 8 48 Q 56 40 92 74">
+          <animate attributeName="stroke-opacity" values="0.15;1;0.15" dur="1.6s" begin="0.5s" repeatCount="indefinite"/>
+        </path>
+        <path d="M 4 26 Q 60 18 104 60">
+          <animate attributeName="stroke-opacity" values="0.15;1;0.15" dur="1.6s" begin="1s" repeatCount="indefinite"/>
+        </path>
+      </g>
+      <!-- 被"点亮"的最近麦：左上 M5 → 左 M4 → 下 M3，展示到达时间差 -->
+      <circle cx="63" cy="117" r="13" fill="none" stroke="#fbbf24" stroke-width="2" opacity="0">
+        <animate attributeName="opacity" values="0;1;0" keyTimes="0;0.18;0.36" dur="1.6s" repeatCount="indefinite"/>
+      </circle>
+      <circle cx="63" cy="183" r="13" fill="none" stroke="#fbbf24" stroke-width="2" opacity="0">
+        <animate attributeName="opacity" values="0;1;0" keyTimes="0.3;0.48;0.66" dur="1.6s" repeatCount="indefinite"/>
+      </circle>
+      <circle cx="120" cy="216" r="13" fill="none" stroke="#fbbf24" stroke-width="2" opacity="0">
+        <animate attributeName="opacity" values="0;1;0" keyTimes="0.6;0.78;0.96" dur="1.6s" repeatCount="indefinite"/>
+      </circle>
+      <text x="120" y="272" text-anchor="middle" font-size="11" fill="#94a3b8">到达时间差 Δt → 定向 0~360°</text>
+
+      <!-- 中：波束形成 -->
+      <line x1="216" y1="150" x2="268" y2="150" stroke="#475569" stroke-width="2" stroke-dasharray="6 5">
+        <animate attributeName="stroke-dashoffset" values="0;-22" dur="1.1s" repeatCount="indefinite"/>
+      </line>
+      <text x="242" y="136" text-anchor="middle" font-size="16" fill="#64748b">→</text>
+      <text x="330" y="38" text-anchor="middle" font-size="13" font-weight="700" fill="#c4b5fd">② 波束成形 · 定向</text>
+      <circle cx="330" cy="150" r="58" fill="#1e293b" stroke="#334155"/>
+      <!-- 指向声源方向(左上)的主瓣 -->
+      <path d="M 330 150 L 282 96 A 66 66 0 0 1 326 86 Z" fill="#7c3aed" opacity="0.85">
+        <animate attributeName="opacity" values="0.45;0.95;0.45" dur="1.6s" repeatCount="indefinite"/>
+      </path>
+      <circle cx="330" cy="150" r="7" fill="#fbbf24"/>
+      <text x="330" y="240" text-anchor="middle" font-size="11" fill="#94a3b8">波束号 4 · 角度 ≈ 315°</text>
+
+      <!-- 右：ivw 帧经串口到工控机 -->
+      <line x1="404" y1="150" x2="456" y2="150" stroke="#475569" stroke-width="2" stroke-dasharray="6 5">
+        <animate attributeName="stroke-dashoffset" values="0;-22" dur="1.1s" repeatCount="indefinite"/>
+      </line>
+      <text x="430" y="136" text-anchor="middle" font-size="16" fill="#64748b">→</text>
+      <text x="560" y="38" text-anchor="middle" font-size="13" font-weight="700" fill="#c4b5fd">③ 串口上报 · 防抖</text>
+      <rect x="460" y="70" width="70" height="52" rx="10" fill="#1e293b" stroke="#7c3aed" stroke-width="2"/>
+      <text x="495" y="94" text-anchor="middle" font-size="11.5" fill="#c4b5fd">XFM</text>
+      <text x="495" y="110" text-anchor="middle" font-size="11.5" fill="#c4b5fd">阵列</text>
+      <rect x="600" y="60" width="88" height="76" rx="10" fill="#1e293b" stroke="#4ade80" stroke-width="2"/>
+      <text x="644" y="94" text-anchor="middle" font-size="12" fill="#86efac">工控主机</text>
+      <text x="644" y="112" text-anchor="middle" font-size="11" fill="#86efac">read → 解析</text>
+      <!-- 飞行的帧方块 -->
+      <rect x="530" y="142" width="70" height="16" rx="4" fill="#312e81" stroke="#818cf8">
+        <animate attributeName="x" values="530;600;530" keyTimes="0;0.5;1" dur="2.2s" repeatCount="indefinite"/>
+        <animate attributeName="y" values="142;92;142" keyTimes="0;0.5;1" dur="2.2s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.1;0.9;1" dur="2.2s" repeatCount="indefinite"/>
+      </rect>
+      <text x="536" y="176" font-size="10.5" fill="#a5b4fc">A5 … ivw … CS</text>
+      <!-- 唤醒提示 -->
+      <text x="580" y="216" font-size="12" font-weight="700" fill="#4ade80">🔔 [WAKEUP] 小飞小飞</text>
+      <g opacity="0">
+        <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.1;0.75;1" dur="4s" repeatCount="indefinite"/>
+        <rect x="566" y="230" width="160" height="30" rx="8" fill="#3b0764" stroke="#fbbf24" stroke-dasharray="5 4">
+          <animate attributeName="stroke-dashoffset" values="0;-18" dur="1.2s" repeatCount="indefinite"/>
+        </rect>
+        <text x="646" y="250" text-anchor="middle" font-size="11.5" fill="#fbbf24">⚠ 3s 防抖中… 忽略</text>
+      </g>
+      <text x="580" y="284" font-size="10.5" fill="#64748b">重复 ivw 事件被 wakeup_lock 拦下</text>
+    </svg>
+  </div>
+  <div class="anim-cap">动画 1-1｜左：声波依次点亮六个麦克风（时间差即方向）；中：波束主瓣对准声源；右：ivw 帧串口入主机，防抖期内重复唤醒被拦截（4 秒循环）</div>
+</section>
+
+<!-- 07 -->
+<section class="blk" id="s7">
+  <h2><span class="no">07</span>互动讲解：唤醒词模拟与防抖实验台</h2>
+  <p class="lead">选择事件类型点击发送，观察 3 秒防抖 + wakeup_lock 如何过滤"连环唤醒"：</p>
+  <div class="ix-panel">
+    <div class="ix-title">唤醒事件模拟器 · Wakeup Debounce Lab</div>
+    <div class="ctl-row">
+      <button class="btn" onclick="sendWk('ivw','小飞小飞',315)">🔔 发送 ivw 唤醒</button>
+      <button class="btn ghost" onclick="sendWk('ivw','小飞小飞',300)">⚡ 1 秒后再喊一次</button>
+      <button class="btn ghost" onclick="sendWk('asr','xiao fei xiao fei',315)">📨 发送普通 ASR 帧</button>
+      <button class="btn ghost" onclick="resetWk()">↺ 复位（秒表归零）</button>
+    </div>
+    <div class="io" id="wkIo"><span class="dim">// 待机：system_ts = 0.0s，wakeup_lock = False，随时可唤醒</span>
+<span class="ok">提示：先点"发送 ivw 唤醒"，再立刻点"1 秒后再喊一次"看防抖效果</span></div>
+  </div>
+  <div class="tip violet"><span class="lab">🧪 实验变式</span>把防抖窗口从 3.0s 改成 0.5s 再试：连续喊唤醒词时日志会变成什么样？<b>防抖太短 = 机器人"一惊一乍"，太长 = 迟钝叫不醒</b> —— 权衡点就在这个数字里。</div>
+</section>
+
+<!-- 08 -->
+<section class="blk" id="s8">
+  <h2><span class="no">08</span>实操步骤：读通 XFM 阵列帧数据</h2>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>接线自检：<code>lsusb</code> 看到 <code>1a86:55d4</code>，<code>/dev/ttyACM0</code> 存在且当前用户在 dialout 组</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>打开串口：115200 波特率、8 数据位、无校验、1 停止位（115200-8-N-1），置 <code>timeout=0.05</code> 非阻塞轮询</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>状态机拆帧：找 0xA5 帧头 → 读类型 → 读长度 → 收满 N 字节 → 校验 → 派发事件</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span>喊"小飞小飞"触发 ivw，打印日志；再跑 3 秒防抖验证连喊只剩一条日志</div>
+  </div>
+  <pre><span class="c"># —— 核心：帧校验与小端解析（xf_mic_array.py 节选）——</span>
+<span class="g">def</span> _checksum(data: bytes) -> int:
+    <span class="g">return</span> (~sum(data) + 1) & 0xFF      <span class="c"># 一元反码 +1，即二补码</span>
+
+HDR, BEAM_EVT, IVW_EVT = 0xA5, 0x09, 0x12
+buf += ser.read(ser.in_waiting)            <span class="c"># 非阻塞灌入接收缓冲</span>
+<span class="g">if</span> buf and buf[0] != HDR: buf = buf[1:]   <span class="c"># 丢弃错位字节，重新找帧头</span>
+ptype, plen = buf[1], buf[2]
+frame, buf = buf[:7+plen+1], buf[7+plen+1:]  <span class="c"># 7 字节头 + N 载荷 + 1 校验</span>
+<span class="g">if</span> _checksum(frame[:7+plen]) != frame[-1]:
+    <span class="g">raise</span> ValueError(<span class="s">"checksum mismatch"</span>)
+payload = frame[7:7+plen]
+<span class="g">if</span> ptype == BEAM_EVT:                    <span class="c"># 波束事件：小端取角度</span>
+    beam = payload[0]; angle = payload[1] | (payload[2] << 8)
+    print(f<span class="s">"[BEAM] id={beam} angle={angle}°"</span>)
+<span class="g">elif</span> ptype == IVW_EVT:                   <span class="c"># 唤醒事件 → 防抖后上报</span>
+    now = time.time()
+    <span class="g">if not</span> wakeup_lock and now - system_ts > 3.0:
+        system_ts, wakeup_lock = now, True
+        print(f<span class="s">"[WAKEUP] beam={beam} {angle}°"</span>)
+
+<span class="c"># —— 运行与自检 ——</span>
+<span class="g">python3</span> -m xfmicarray.uv_device            <span class="c"># 枚举并直读原始帧</span>
+<span class="c"># [BEAM] id=4 angle=315° ...（手指绕阵列走，看角度跟着转）</span>
+<span class="c"># [WAKEUP] beam=4 angle=300°（喊"小飞小飞"）</span>
+<span class="g">python3</span> xf_mic_array_gui.py                <span class="c"># Tkinter 界面：指针 + 事件日志</span></pre>
+  <div class="tip amber"><span class="lab">⚠️ GUI 铁律</span>串口读取放<b>后台线程</b>，结果进 <code>queue</code>；界面用 <code>after(50ms)</code> 轮询取队列刷新 —— 直接在 Tkinter 主线程 <code>read()</code> 会让窗口卡死，这是讲义标注的头号易错点。</div>
+</section>
+
+<!-- 09 -->
+<section class="blk" id="s9">
+  <h2><span class="no">09</span>重点与易错点</h2>
+  <div class="tip tealb"><span class="lab">🎯 本实验三重点</span>① 7+N+1 帧结构与状态机拆包；② 校验和 <code>(~sum+1)&0xFF</code> 与小端序的亲手演算；③ 3 秒防抖 + wakeup_lock 的状态维护。三者都对，硬件链路才算通。</div>
+  <table>
+    <thead><tr><th>⚠️ 常见坑</th><th>现象 → 解法</th></tr></thead>
+    <tbody>
+      <tr><td>权限不足</td><td><code>Permission denied: /dev/ttyACM0</code> → <code>usermod -aG dialout $USER</code> 后<b>重新登录</b></td></tr>
+      <tr><td>乱码 / 校验失败</td><td>波特率设成 9600 或按大端解析 → 用 <code>xxd</code> 对照十六进制，确认 115200-8-N-1 与小端序</td></tr>
+      <tr><td>设备号漂移</td><td>重插后 <code>ttyACM0</code> 变 <code>ttyACM1</code> → 用 <code>ls -l /dev/serial/by-id/</code> 的稳定软链</td></tr>
+      <tr><td>唤醒不触发</td><td>阵列被遮挡 / 音箱自唤醒干扰 / 唤醒词不对 → 平放桌面、离音箱 1m+，对照固件唤醒词表</td></tr>
+      <tr><td>一秒内重复唤醒</td><td>忘记防抖或 ts 每次事件都刷新 → 冻结首次时间戳，窗口内直接丢帧并打印 DIM 日志</td></tr>
+      <tr><td>GUI 卡死</td><td>主线程阻塞读串口 → 后台线程 + queue + after(50) 轮询模式</td></tr>
+    </tbody>
+  </table>
+  <ul class="check">
+    <li><code>lsusb</code> 可见 <code>1a86:55d4</code>，且能稳定读到 <code>A5</code> 开头的完整帧</li>
+    <li>手工演算任取 8 字节的校验和，与程序输出一致</li>
+    <li>绕阵列走动，<code>[BEAM]</code> 角度随方位连续变化（0~360° 回绕正常）</li>
+    <li>喊唤醒词出现 <span class="ok">[WAKEUP]</span>；1 秒内连喊两次只出一条日志</li>
+    <li>能用自己的话向同伴讲清"防抖期 = 挂门挡"的类比</li>
+  </ul>
+</section>
+
+<!-- 10 -->
+<section class="blk" id="s10">
+  <h2><span class="no">10</span>总结与思考</h2>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">✅ 完成成果</div><div class="kt">串口唤醒链路贯通</div><p>从 VID/PID 自检到 ivw 事件日志再到 GUI 指针，硬件"耳朵"就位。</p></div>
+    <div class="kcard"><div class="kd">🧠 原理收获</div><div class="kt">TDOA + 帧协议 + 防抖</div><p>时间差定向、7+N+1 拆包、校验与小端序，三个抽象落到具体字节。</p></div>
+    <div class="kcard"><div class="kd">🛠 技能收获</div><div class="kt">pyserial 稳定读串口</div><p>状态机拆包、非阻塞轮询、线程 + 队列 + after() 的 GUI 协作范式。</p></div>
+    <div class="kcard"><div class="kd">➡ 去向</div><div class="kt">EXP-02 拿到文字</div><p>唤醒只是开门，门后的声音还要靠声学模型转成文字。</p></div>
+  </div>
+  <div class="tip violet"><span class="lab">📝 思考题 1</span>校验和只能发现"传错"，发现不了"传慢"。同一房间两台阵列互相串台（A 机收到 B 机主机的配置帧）时，仅靠 <code>0xA5 + 校验和</code> 能防住吗？你会在帧里加什么字段？</div>
+  <div class="tip violet"><span class="lab">📝 思考题 2</span>如果唤醒词要从"小飞小飞"换成"你好小飞"，栈上要改哪几层（固件 / 协议 / 主机解析 / 防抖）？哪种改法成本最高？</div>
+</section>
+
+<nav class="expnav">
+  <a href="../index.html"><span class="lb">← 返回</span>课程目录 · 自然语言交互应用</a>
+  <a class="next" href="../exp-02-asr/index.html"><span class="lb">下一个实验 →</span>EXP-02 声学模型 ASR 语音识别</a>
+</nav>
+
+<footer>
+  <span>CORE-03 · 机器人自然语言交互应用 · EXP-01 六麦阵列串口唤醒</span>
+  <span>4 学时 · 验证性 · 基于 speech_practice 实验讲义改编</span>
+</footer>
+
+</main>
+</div>
+
+<script>
+// 唤醒防抖实验台
+var wkState={lock:false,ts:0,clock:0};
+var wkInit='<span class="dim">// 待机：system_ts = 0.0s，wakeup_lock = False，随时可唤醒</span>';
+function sendWk(type,word,angle){
+  var io=document.getElementById('wkIo');
+  wkState.clock+=1.0;
+  var t=wkState.clock.toFixed(1);
+  var head='<span class="dim">// t='+t+'s 收到帧：'+(type==='ivw'?'[12] ivw 事件':'[0A] ASR 结果')+
+           ' beam=4 '+angle+'°</span>\n';
+  if(type!=='ivw'){
+    io.innerHTML=head+'<span class="ok">✅ 普通 ASR 帧直接进入识别队列（不参与唤醒防抖）</span>\n'+io.innerHTML;
+    return;
+  }
+  if(wkState.lock && (wkState.clock-wkState.ts)<=3.0){
+    io.innerHTML=head+'<span class="bad">✘ [WAKEUP] 被拦截 —— 距上次唤醒仅 '+(wkState.clock-wkState.ts).toFixed(1)+
+      's &lt; 3.0s，wakeup_lock=True</span>\n'+io.innerHTML;
+    return;
+  }
+  wkState.lock=true; wkState.ts=wkState.clock;
+  io.innerHTML=head+'<span class="ok">🔔 [WAKEUP] “'+word+'” 唤醒成功！三态机 IDLE → 等待 ASR</span>\n'+
+    '<span class="warn">⚠ 启动 3.0s 防抖计时（t='+wkState.ts.toFixed(1)+'s ~ '+(wkState.ts+3.0).toFixed(1)+'s），期间重复 ivw 一律丢弃</span>\n'+io.innerHTML;
+}
+function resetWk(){
+  wkState={lock:false,ts:0,clock:0};
+  document.getElementById('wkIo').innerHTML=wkInit+
+    '\n<span class="ok">提示：先点"发送 ivw 唤醒"，再立刻点"1 秒后再喊一次"看防抖效果</span>';
+}
+</script>
+<script src="../shared/tutorial.js" defer></script>
+</body>
+</html>

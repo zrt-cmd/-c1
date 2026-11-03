@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-03 · 多边形轮廓拟合 — 机器人视觉入门课</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<link rel="stylesheet" href="../shared/beginner.css">
+<style>:root{--theme:#059669;--theme-deep:#047857;--theme-bg:#d1fae5;--theme-bd:#a7f3d0}</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit">🧠 具身智能课程 · <i>机器人视觉入门</i></a>
+  <div class="crumb"><a href="../../../index.html#core">核心课程</a> / <a href="../index.html">视觉入门课</a> / EXP-03</div>
+</div>
+
+<div class="wrap">
+
+<aside class="side">
+  <h4>本页步骤</h4>
+  <a href="#s1" class="now">01 这个实验解决什么问题</a>
+  <a href="#s2">02 三分钟讲懂：从一团像素到几个顶点</a>
+  <a href="#s3">03 先认识 4 个词</a>
+  <a href="#s4">04 它吃什么、吐什么</a>
+  <a href="#s5">05 三步跑起来</a>
+  <a href="#s6">06 你该看到的画面</a>
+  <a href="#s7">07 改一个参数看变化</a>
+  <a href="#s8">08 踩坑速查</a>
+  <a href="#s9">09 进阶（可选）</a>
+  <a href="#s10">10 随堂小测</a>
+  <h4>本课程实验</h4>
+  <a href="../exp-01-color-hsv/index.html">EXP-01 颜色识别</a>
+  <a href="../exp-02-qrcode/index.html">EXP-02 二维码</a>
+  <a href="../exp-03-contour-polygon/index.html" style="color:#0f766e;font-weight:700">EXP-03 多边形轮廓</a>
+  <a href="../exp-04-industrial-defect/index.html">EXP-04 工业缺陷检测</a>
+  <a href="../exp-05-garbage-classification/index.html">EXP-05 垃圾分类</a>
+  <a href="../exp-06-semantic-segmentation/index.html">EXP-06 语义分割</a>
+  <a href="../exp-07-deepsort-tracking/index.html">EXP-07 多目标跟踪</a>
+  <a href="../exp-08-face-landmarks/index.html">EXP-08 人脸关键点</a>
+  <a href="../exp-09-pose-landmark/index.html">EXP-09 骨骼关键点</a>
+  <a href="../exp-10-depth-3d/index.html">EXP-10 深度 3D</a>
+  <a href="../exp-11-pose-control/index.html">EXP-11 体感控制</a>
+  <a href="../exp-12-hand-control/index.html">EXP-12 手势识别</a>
+</aside>
+
+<main class="content">
+
+<div class="exp-head">
+  <span class="code">EXP-03 · 第 1 阶段 · 传统视觉 · 设计性 · 4 学时</span>
+  <h1>多边形轮廓：把"一团像素"简化成"几个顶点"</h1>
+  <p class="desc">上个实验我们已经能挑出目标区域了，但那只是一堆白色像素 —— 一堆点没法用。这个实验要把它压缩成<b>几个顶点坐标</b>：三角形给我 3 个点，四边形给我 4 个点。有了坐标，机器人才能算"往哪走、差多少"。</p>
+  <div class="meta">
+    <span class="tag hl">难度 ⭐⭐ · 4 学时</span>
+    <span class="tag">二值化</span><span class="tag">凸包</span>
+    <span class="tag">approxPolyDP</span><span class="tag">质心</span>
+  </div>
+</div>
+
+<div class="pathline">
+  <span>01 颜色</span><span>02 二维码</span><span class="cur">03 轮廓</span><span>04 检测</span><span>05 分类</span><span>06 分割</span><span>07 跟踪</span><span>08 人脸</span><span>09 骨骼</span><span>10 3D</span><span>11 体感</span><span>12 手势</span>
+</div>
+
+<section class="blk" id="s1">
+  <h2><span class="no">01</span>这个实验解决什么问题</h2>
+
+  <div class="idea">
+    <span class="tag1">CORE IDEA · 一句话原理</span>
+    <p class="big">轮廓有几千个点太啰嗦，<b>用一条"松紧带"把它勒紧</b>，几千个点就变成几个顶点。</p>
+    <p class="analogy"><b>打个比方：</b>就像你要跟朋友描述一个形状 —— 说"这里有 3847 个像素点"没人听得懂，说"这是个三角形，三个角大概在这儿"一下就懂了。<b>approxPolyDP 干的就是这个"精简描述"的工作。</b></p>
+  </div>
+
+  <p>为什么机器人需要顶点坐标？举个具体的例子：</p>
+
+  <table>
+    <thead><tr><th style="width:26%">任务</th><th>需要什么</th><th>拿不到会怎样</th></tr></thead>
+    <tbody>
+      <tr><td>抓取三角形积木</td><td>三个角在哪，才能定抓取角度</td><td>只能知道"大概在画面中间"，抓歪</td></tr>
+      <tr><td>沿地上的线巡线</td><td>线的中心在哪，偏左还是偏右</td><td>只能知道"有线"，不知道该往哪拐</td></tr>
+      <tr><td>判断工件是不是正方形</td><td>四个顶点的坐标，量边长和角度</td><td>判断不了，只能看面积</td></tr>
+    </tbody>
+  </table>
+
+  <p><b>共同点：都需要"结构化的坐标"，而不是"一堆像素"。</b>这个实验就是把像素变成坐标。</p>
+
+  <div class="oneline"><span>本实验的目标：<b>画面里放三角形、四边形、圆形，程序各自找出来，标出顶点数、画出中心点、还在终端打印面积。</b></span></div>
+</section>
+
+<section class="blk" id="s2">
+  <h2><span class="no">02</span>三分钟讲懂：从一团像素到几个顶点</h2>
+
+  <p class="lead">四步"层层瘦身"：像素 → 边界 → 凸包 → 顶点。每一步都在减少数据量。</p>
+
+  <div class="anim-box">
+    <svg viewBox="0 0 760 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="轮廓简化四步：原图二值化 找外轮廓 求凸包 多边形逼近得到顶点">
+      <rect x="6" y="6" width="748" height="238" rx="12" fill="#111827" stroke="#334155"/>
+
+      <!-- ① 二值化 -->
+      <text x="94" y="32" text-anchor="middle" font-size="11.5" font-weight="700" fill="#6ee7b7" font-family="sans-serif">① 二值化</text>
+      <rect x="26" y="46" width="136" height="106" rx="5" fill="#1e293b" stroke="#475569"/>
+      <rect x="26" y="46" width="136" height="106" fill="#000" rx="5" opacity=".8"/>
+      <path d="M62,120 L94,66 L126,120 Z" fill="#fff"/>
+      <text x="94" y="170" text-anchor="middle" font-size="9.5" fill="#64748b" font-family="sans-serif">只有黑与白，没有灰色</text>
+      <text x="94" y="188" text-anchor="middle" font-size="9" fill="#4ade80" font-family="monospace">threshold</text>
+
+      <path d="M172 99 L204 99" stroke="#475569" stroke-width="2" stroke-dasharray="5 4" fill="none">
+        <animate attributeName="stroke-dashoffset" values="0;-18" dur="1s" repeatCount="indefinite"/>
+      </path>
+
+      <!-- ② 轮廓 -->
+      <text x="288" y="32" text-anchor="middle" font-size="11.5" font-weight="700" fill="#6ee7b7" font-family="sans-serif">② 找外轮廓</text>
+      <rect x="220" y="46" width="136" height="106" rx="5" fill="#0f172a" stroke="#475569"/>
+      <path d="M256,120 L288,66 L320,120 Z" fill="none" stroke="#4ade80" stroke-width="2" stroke-dasharray="3 3"/>
+      <g fill="#4ade80">
+        <circle cx="256" cy="120" r="2"/><circle cx="288" cy="66" r="2"/><circle cx="320" cy="120" r="2"/>
+        <circle cx="272" cy="93" r="2"/><circle cx="304" cy="93" r="2"/>
+      </g>
+      <text x="288" y="170" text-anchor="middle" font-size="9.5" fill="#64748b" font-family="sans-serif">几千个边界点</text>
+      <text x="288" y="188" text-anchor="middle" font-size="9" fill="#4ade80" font-family="monospace">findContours</text>
+
+      <path d="M366 99 L398 99" stroke="#475569" stroke-width="2" stroke-dasharray="5 4" fill="none">
+        <animate attributeName="stroke-dashoffset" values="0;-18" dur="1s" repeatCount="indefinite"/>
+      </path>
+
+      <!-- ③ 凸包 -->
+      <text x="482" y="32" text-anchor="middle" font-size="11.5" font-weight="700" fill="#6ee7b7" font-family="sans-serif">③ 勒一条松紧带</text>
+      <rect x="414" y="46" width="136" height="106" rx="5" fill="#0f172a" stroke="#475569"/>
+      <!-- 一个带凹槽的形状 -->
+      <path d="M450,120 L450,80 L470,80 L470,96 L488,96 L488,80 L508,80 L508,120 Z" fill="none" stroke="#94a3b8" stroke-width="1.6" stroke-dasharray="2 3"/>
+      <path d="M450,120 L450,80 L508,80 L508,120 Z" fill="none" stroke="#facc15" stroke-width="2.2"/>
+      <text x="482" y="170" text-anchor="middle" font-size="9.5" fill="#64748b" font-family="sans-serif">凹进去的地方被"绷直"</text>
+      <text x="482" y="188" text-anchor="middle" font-size="9" fill="#facc15" font-family="monospace">convexHull</text>
+
+      <path d="M560 99 L592 99" stroke="#475569" stroke-width="2" stroke-dasharray="5 4" fill="none">
+        <animate attributeName="stroke-dashoffset" values="0;-18" dur="1s" repeatCount="indefinite"/>
+      </path>
+
+      <!-- ④ 逼近 -->
+      <text x="676" y="32" text-anchor="middle" font-size="11.5" font-weight="700" fill="#6ee7b7" font-family="sans-serif">④ 只剩顶点</text>
+      <rect x="608" y="46" width="136" height="106" rx="5" fill="#0f172a" stroke="#475569"/>
+      <path d="M644,120 L676,66 L708,120 Z" fill="none" stroke="#f472b6" stroke-width="2.4"/>
+      <g fill="#f472b6">
+        <circle cx="644" cy="120" r="4"/><circle cx="676" cy="66" r="4"/><circle cx="708" cy="120" r="4"/>
+      </g>
+      <text x="644" y="136" font-size="8.5" fill="#f9a8d4" font-family="monospace">(0,0)</text>
+      <text x="662" y="60" font-size="8.5" fill="#f9a8d4" font-family="monospace">(1,1)</text>
+      <text x="700" y="136" font-size="8.5" fill="#f9a8d4" font-family="monospace">(2,0)</text>
+      <text x="676" y="170" text-anchor="middle" font-size="9.5" fill="#64748b" font-family="sans-serif">3 个坐标，就能描述完</text>
+      <text x="676" y="188" text-anchor="middle" font-size="9" fill="#f472b6" font-family="monospace">approxPolyDP</text>
+
+      <text x="380" y="222" text-anchor="middle" font-size="11.5" fill="#6ee7b7" font-family="sans-serif">数据量：几十万像素 → 几千个边界点 → 十几个凸包点 → 3 个顶点</text>
+    </svg>
+  </div>
+  <div class="cap">图 5-1｜瘦身过程。注意第③步的"松紧带"：它会把凹进去的地方绷直，所以凸包永远是个凸多边形。</div>
+
+  <h3>四步分别叫什么、干什么</h3>
+  <table>
+    <thead><tr><th style="width:24%">函数</th><th style="width:22%">中文</th><th>干什么</th></tr></thead>
+    <tbody>
+      <tr><td><code>threshold</code></td><td>二值化</td><td>把灰度图按一个分界线切成纯黑纯白。<b>adaptive</b> 模式会按局部区域自动算分界线，适合光照不均。</td></tr>
+      <tr><td><code>findContours</code></td><td>找轮廓</td><td>沿着白色区域走一圈，把边界点收集起来。<code>RETR_EXTERNAL</code> 表示只要最外层，不要里面的洞。</td></tr>
+      <tr><td><code>convexHull</code></td><td>凸包</td><td>把所有边界点用一根"松紧带"包起来。<b>凹的地方会被绷直</b>，结果永远是凸的。</td></tr>
+      <tr><td><code>approxPolyDP</code></td><td>多边形逼近</td><td>在凸包基础上，把"几乎成一条直线"的相邻点合并。<b>参数 epsilon 决定合并的松紧程度。</b></td></tr>
+    </tbody>
+  </table>
+
+  <div class="tip tealb"><span class="lab">🔍 epsilon 是什么？为什么它最关键</span>epsilon = 允许多大的偏差。想象你用直尺去量一条曲线：<b>epsilon 小</b> = 尺子贴着曲线走，点很多、很准；<b>epsilon 大</b> = 尺子跨得远，点很少、但形状失真。<br>
+  本实验的算法是 <code>epsilon = approx_epsilon × 轮廓周长</code>。配置里写 0.02，意味着"允许偏差是周长的 2%"。这个比例很聪明 —— 大物体和小物体都能用同一个参数。</div>
+
+  <div class="oneline"><span><b>一句话记住：</b>轮廓 = 沿着边走一圈，凸包 = 绷紧松紧带，approxPolyDP = 把接近直线的点合并。<b>三个函数，一个目的：少给点数据，但别丢形状。</b></span></div>
+</section>
+
+<section class="blk" id="s3">
+  <h2><span class="no">03</span>先认识 4 个词</h2>
+  <div class="terms">
+    <div class="term"><div class="w">二值化 <em>threshold</em></div><p class="m">把图切成只有黑和白。这是所有传统视觉流程的第一步 —— <b>先分黑白，再谈形状</b>。</p></div>
+    <div class="term"><div class="w">凸包 <em>hull</em></div><p class="m">把一堆点用最小的凸多边形包起来。凹的地方会被绷直，所以结果一定没有凹角。</p></div>
+    <div class="term"><div class="w">epsilon</div><p class="m">逼近的"容差"。越大越简化（顶点少），越小越贴合（顶点多）。</p></div>
+    <div class="term"><div class="w">质心 <em>centroid</em></div><p class="m">形状的面积中心（不一定是顶点之一）。巡线、抓取都要用它 —— <b>它是"目标在哪"的最佳答案</b>。</p></div>
+  </div>
+
+  <details class="deep">
+    <summary>invert 这个参数是干什么的？<em>选读 30 秒</em></summary>
+    <div class="deep-body">
+      <p><code>invert: false</code> 表示"亮的是目标，暗的是背景"；改成 <code>true</code> 就是"暗的是目标，亮的是背景"。</p>
+      <p>怎么判断该用哪个？看你画面上<b>要找的东西是深色还是浅色</b>：白色的纸片在黑桌面上 → 用 false；黑色的胶带在白地板上 → 用 true。</p>
+      <p>配置注释里写了"板上实测暗底亮物场景用 false" —— 意思是这个实验默认按"深色桌面 + 浅色工件"调好了。<b>如果换到白桌子上，必须改成 true，否则一个轮廓都找不到。</b></p>
+    </div>
+  </details>
+</section>
+
+<section class="blk" id="s4">
+  <h2><span class="no">04</span>它吃什么、吐什么</h2>
+
+  <div class="io2">
+    <div class="cellbox in">
+      <span class="lb">INPUT · 喂进去</span>
+      <div class="v">相机画面 / 图片</div>
+      <p class="d">有清晰形状的场景。实验里要放三角形、四边形、圆形积木或纸片。</p>
+    </div>
+    <div class="arw">→</div>
+    <div class="cellbox out">
+      <span class="lb">OUTPUT · 吐出来</span>
+      <div class="v">每个形状的：顶点坐标 + 顶点数 + 面积 + 质心</div>
+      <p class="d">画面黑底 + 彩色轮廓 + 顶点标注；终端每帧打印一行 <code>顶点数 / 面积</code>。这些数字就是机器人做决策的输入。</p>
+    </div>
+  </div>
+
+  <pre><span class="c"># 关键配置（config/line_config.yaml）</span>
+<span class="b">preprocess:</span>
+  threshold_mode: adaptive    <span class="c"># binary | adaptive</span>
+  threshold_value: 50
+  <span class="y">invert: false</span>               <span class="c"># ← 亮物暗底用 false，暗物亮底改 true</span>
+  morph_kernel: 3
+
+<span class="b">contour:</span>
+  min_area: 100               <span class="c"># 小于这个面积的轮廓直接丢掉（滤噪）</span>
+
+<span class="b">polygon:</span>
+  <span class="y">approx_epsilon: 0.02</span>       <span class="c"># ← 最该调的那个数</span>
+  <span class="y">use_hull: true</span>              <span class="c"># 先凸包再逼近</span></pre>
+</section>
+
+<section class="blk" id="s5">
+  <h2><span class="no">05</span>三步跑起来</h2>
+
+  <ol class="steps3">
+    <li>
+      <span class="st">进目录，看一眼两个关键参数<em>约 2 分钟</em></span>
+      <pre><span class="g">cd</span> ~/ros2_ws/src/xflz_eai_car1/vision/05_line_following
+<span class="g">cat</span> config/line_config.yaml</pre>
+      <div class="expect"><i># 这个实验也没有模型文件，全靠传统算法</i>
+
+preprocess:
+  invert: false        <i>← 记住这个，换背景要改</i>
+polygon:
+  approx_epsilon: 0.02 <i>← 记住这个，控制顶点数</i>
+  use_hull: true</div>
+    </li>
+
+    <li>
+      <span class="st">开相机，放几个形状看效果<em>约 3 分钟</em></span>
+      <p>终端 1 起相机：</p>
+      <pre><span class="g">source</span> /opt/ros/humble/setup.bash &amp;&amp; <span class="g">source</span> ~/ros2_ws/install/setup.bash
+<span class="g">export</span> ROS_DOMAIN_ID=2
+<span class="g">ros2</span> launch ascamera hp60c.launch.py</pre>
+      <p>终端 2 跑轮廓检测：</p>
+      <pre><span class="g">cd</span> ~/ros2_ws/src/xflz_eai_car1/vision/05_line_following
+<span class="g">python</span> src/app.py --ros</pre>
+      <div class="expect">frame 30  contours=3  vertices=[3, 4, 8]  area=[12480, 18900, 6200]
+frame 60  contours=3  vertices=[3, 4, 8]  area=[12470, 18910, 6210]</div>
+      <p><b>这行输出就是本实验的精华：</b><code>vertices=[3,4,8]</code> 表示识别出一个三角形（3 顶点）、一个四边形（4 顶点）、一个圆（8 顶点以上）。</p>
+      <p>浏览器：<code>http://&lt;板子IP&gt;:8080/polygon.mjpg</code></p>
+    </li>
+
+    <li>
+      <span class="st">换背景，体会 invert 的必要性<em>约 5 分钟</em></span>
+      <p>这一步非常重要，是很多人卡住的地方。</p>
+      <p>先把浅色纸片放在深色桌面上（正常情况），看它是怎么被找出来的。然后<b>把纸片放到一张白纸上</b>，再看 —— 轮廓应该全没了。</p>
+      <p>现在改配置：</p>
+      <pre><span class="g">nano</span> config/line_config.yaml
+<span class="c"># 把 invert: false 改成 true</span></pre>
+      <p>重新跑，白色背景上的纸片又被找到了。</p>
+      <div class="expect"><i>invert: false → 找"亮的区域"（暗底亮物）</i>
+<i>invert: true  → 找"暗的区域"（亮底暗物）</i></div>
+      <p><b>亲手体验一次这个切换，比读十遍注释都管用。</b>以后换场景第一件事就是判断该用哪个。</p>
+    </li>
+  </ol>
+
+  <div class="oneline"><span>三条命令跑完你就掌握了完整链路：<b>二值化 → 找轮廓 → 凸包 → 逼近 → 标顶点</b>。这条链路是所有传统形状识别的基础。</span></div>
+</section>
+
+<section class="blk" id="s6">
+  <h2><span class="no">06</span>你该看到的画面</h2>
+
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">画面 A · 正常</div><div class="kt">黑底 + 彩色多边形</div><p>每个形状被描出彩色边，顶点上标着序号，形状中心有个十字或圆点（质心）。这种"黑底彩色"模式是为了看清楚轮廓本身。</p></div>
+    <div class="kcard"><div class="kd">画面 B · 圆形</div><div class="kt">顶点数很多（8 以上）</div><p>圆没法用少量直线段描述，所以逼近后会剩很多顶点。程序按"顶点数 ≥ 8 就当作圆"来分类。</p></div>
+    <div class="kcard"><div class="kd">画面 C · 一片空白</div><div class="kt">一个轮廓都没有</div><p>先查 <code>invert</code> 对不对，再查 <code>min_area</code> 是不是太大，最后查光照是否均匀。</p></div>
+  </div>
+
+  <div class="tip tealb"><span class="lab">🔍 为什么用"顶点数"分形状？</span>因为这是最省事的办法：3 个顶点是三角形，4 个是四边形，很多就是圆。<b>但它很不严谨</b> —— 一个画歪的正方形可能被逼近成 5 个顶点。想要更准，得量边长和角度。本实验刻意用简单规则，是为了让你把注意力放在"逼近"这件事上。</div>
+</section>
+
+<section class="blk" id="s7">
+  <h2><span class="no">07</span>改一个参数看变化</h2>
+  <p class="lead">这个实验最值得玩的就是 <code>approx_epsilon</code>。拖一拖，看顶点数怎么变 —— 这是理解"逼近"最快的方式。</p>
+
+  <div class="lab2">
+    <div class="lh">⚡ 参数实验台 · epsilon 如何改变顶点数</div>
+    <div class="lr">
+      <label>approx_epsilon</label>
+      <input id="ep" type="range" min="1" max="120" step="1" value="20">
+      <output id="ep_o">0.020</output>
+    </div>
+    <div class="vis">
+      <svg viewBox="0 0 420 160" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="epsilon 增大时多边形逼近的顶点数变化">
+        <rect x="0" y="0" width="420" height="160" rx="8" fill="#0b1220"/>
+        <!-- 圆心轮廓点（模拟一个略不规则的圆） -->
+        <path id="orig" d="" fill="none" stroke="#334155" stroke-width="1.4" stroke-dasharray="3 3"/>
+        <polygon id="poly" points="" fill="none" stroke="#34d399" stroke-width="2"/>
+        <g id="vtx" fill="#f472b6"></g>
+        <text x="20" y="24" font-size="10" fill="#64748b" font-family="sans-serif">虚线 = 原始轮廓（细碎边缘）</text>
+        <text x="20" y="150" font-size="10.5" fill="#5eead4" font-family="monospace" id="vtxt">顶点数 = 16</text>
+      </svg>
+    </div>
+    <div class="say" id="say"></div>
+  </div>
+
+  <h3>三个典型 epsilon 值</h3>
+  <table>
+    <thead><tr><th style="width:20%">epsilon</th><th style="width:26%">顶点数</th><th>适合什么</th></tr></thead>
+    <tbody>
+      <tr><td>0.005</td><td>很多（15+）</td><td>想要精确轮廓，比如测量不规则缺陷的形状。几乎每条小起伏都保留。</td></tr>
+      <tr><td><b>0.02</b></td><td>适中（4~8）</td><td><b>默认值。</b>能分出三角形 / 四边形 / 圆，是工程上的常用起点。</td></tr>
+      <tr><td>0.10</td><td>很少（3~4）</td><td>只想粗分形状类别。圆也会被压成四五边形 —— 这时候"按顶点数分类"就失效了。</td></tr>
+    </tbody>
+  </table>
+
+  <p><b>调参思路：</b>先设 0.02 看效果，如果顶点数明显偏多（一个四边形出现了 7、8 个顶点），说明噪声多或者 epsilon 太小，往上调；如果圆的顶点数掉到 4、5 个，说明 epsilon 太大，往下调。</p>
+
+  <div class="oneline"><span><b>epsilon 的本质是一个"要不要计较"的阈值。</b>真实图像总有毛刺，epsilon 就是告诉程序"拐这么小的弯就别算了，忽略掉"。</span></div>
+</section>
+
+<section class="blk" id="s8">
+  <h2><span class="no">08</span>踩坑速查</h2>
+
+  <table class="pit2">
+    <thead><tr><th>现象</th><th>原因</th><th>怎么办</th></tr></thead>
+    <tbody>
+      <tr><td>换成白背景后一个轮廓都没有</td><td><code>invert</code> 没改，还在找"亮的区域"</td><td>暗底亮物用 <code>false</code>，亮底暗物用 <code>true</code></td></tr>
+      <tr><td>一个四边形被标成 7 个顶点</td><td>epsilon 太小，把边缘毛刺也算成拐点了</td><td>把 <code>approx_epsilon</code> 从 0.02 调到 0.04</td></tr>
+      <tr><td>圆形只认成 4 个顶点</td><td>epsilon 太大，圆被压成四边形了</td><td>把 epsilon 调小到 0.01 左右</td></tr>
+      <tr><td>满屏都是小轮廓</td><td><code>min_area</code> 太小，把噪点也当目标了</td><td>从 100 提到 300~500</td></tr>
+      <tr><td>目标被切成好几块</td><td>光照不均，adaptive 阈值分块了</td><td>换 <code>threshold_mode: binary</code> 并手调 <code>threshold_value</code></td></tr>
+      <tr><td>轮廓边缘坑坑洼洼</td><td>没有做形态学平滑</td><td>把 <code>morph_kernel</code> 从 3 提到 5（但别太大，会吃掉小目标）</td></tr>
+    </tbody>
+  </table>
+
+  <div class="tip amber"><span class="lab">💡 排查口诀</span><b>先看有没有轮廓，再看顶点对不对。</b>没轮廓 = 二值化问题（invert / 阈值 / 光照）；有轮廓但顶点数不对 = epsilon 问题；轮廓碎成好几块 = 形态学/阈值模式问题。</div>
+</section>
+
+<section class="blk" id="s9">
+  <h2><span class="no">09</span>进阶（可选）</h2>
+
+  <details class="deep">
+    <summary>进阶 1 · 用面积和周长区分形状<em>约 30 分钟</em></summary>
+    <div class="deep-body">
+      <p>"按顶点数分类"太粗糙。更靠谱的办法是算 <b>圆度</b>：</p>
+      <pre>圆度 = 4π × 面积 / 周长²</pre>
+      <p>完美的圆，圆度 = 1。正方形约 0.785，细长条会更小。用它判断"是不是圆"比数顶点稳定得多。</p>
+      <p>代码里形状的面积和周长都已经算好了（<code>contourArea</code> / <code>arcLength</code>），加几行就能试。</p>
+    </div>
+  </details>
+
+  <details class="deep">
+    <summary>进阶 2 · 从质心偏移算转向指令<em>约 40 分钟</em></summary>
+    <div class="deep-body">
+      <p>这是"巡线"真正需要的一步。质心的 x 坐标相对画面中心的偏移量，直接决定该往哪拐：</p>
+      <pre>offset = (质心x - 画面中心x) / (画面宽/2)   # 归一化到 -1 ~ +1
+
+角速度 = -k × offset       # 正偏移（偏右）→ 负角速度（左转）</pre>
+      <p><code>k</code> 是比例系数，从 0.5 开始试。<b>这个"偏移 × 系数 → 控制量"的结构，就是最简单的比例控制器（P 控制）。</b></p>
+      <p>注意方向别搞反：物在右边，车要往右转才追得上 —— 但车右转的角速度是负的。第一次调都要试错几次。</p>
+    </div>
+  </details>
+
+  <details class="deep">
+    <summary>进阶 3 · 为什么用凸包而不是直接用轮廓<em>选读 50 秒</em></summary>
+    <div class="deep-body">
+      <p>因为真实图像里，目标边缘很少是光滑的。手指挡住一点、反光、阴影，都会在轮廓上咬出一个小凹口。</p>
+      <p>如果直接对原始轮廓做逼近，这些小凹口会被当成真实的拐点保留下来，顶点数就不准了。<b>凸包先把所有凹口"绷平"，再逼近，形状判断就稳定多了。</b></p>
+      <p>代价是：如果目标本身就有真实的凹角（比如一个 L 形工件），凸包会把它吃掉变成一个矩形。<b>所以配置里留了 <code>use_hull</code> 开关</b> —— 判断凸形状时打开它，识别凹形状时必须关掉。</p>
+    </div>
+  </details>
+</section>
+
+<section class="blk" id="s10">
+  <h2><span class="no">10</span>随堂小测</h2>
+
+  <div class="quiz2">
+    <div class="qq"><span class="qn">Q1</span>你把浅色纸片从黑桌子挪到白纸上，程序突然一个轮廓都找不到了。改哪个参数？</div>
+    <div class="opt" data-right="0">把 min_area 调小</div>
+    <div class="opt" data-right="1">把 invert 从 false 改成 true</div>
+    <div class="opt" data-right="0">把 approx_epsilon 调大</div>
+    <div class="fb"><b>对。</b><code>invert: false</code> 是找"亮的区域"。白纸上纸片和背景都亮，就分不出来了。改成 <code>true</code> 变成找"暗的区域" —— 但纸片本身也是亮的，所以更准确的说法是：换到白纸场景后，得改成"找和背景不同的那块"，通常需要用颜色而不是灰度。</div>
+  </div>
+
+  <div class="quiz2">
+    <div class="qq"><span class="qn">Q2</span>一个方方正正的四边形，程序报了 7 个顶点。最该怎么调？</div>
+    <div class="opt" data-right="0">把 epsilon 从 0.02 调到 0.005</div>
+    <div class="opt" data-right="1">把 epsilon 从 0.02 调到 0.04 左右</div>
+    <div class="opt" data-right="0">把 min_area 调大</div>
+    <div class="fb"><b>对。</b>顶点多说明程序把边缘的小毛刺都当成了拐点。epsilon 是"允许多大偏差"，调大就会合并更多相邻点，顶点数下降。调小反而更糟。</div>
+  </div>
+
+  <div class="quiz2">
+    <div class="qq"><span class="qn">Q3</span>为什么在逼近之前要先算凸包？</div>
+    <div class="opt" data-right="0">因为凸包算得快，能提速</div>
+    <div class="opt" data-right="1">因为真实轮廓上有很多小凹口（阴影、遮挡），凸包先把它绷平，顶点数就稳定了</div>
+    <div class="opt" data-right="0">因为凸包能算出面积</div>
+    <div class="fb"><b>对。</b>凸包的作用是"消除假凹角"。但注意：如果目标本身就是凹形状（L 形、C 形），凸包会把它吃成矩形 —— 所以配置里留了 <code>use_hull</code> 开关。</div>
+  </div>
+</section>
+
+<nav class="expnav">
+  <a href="../exp-02-qrcode/index.html"><span class="lb">← 上一个</span>EXP-02 二维码</a>
+  <a class="next" href="../exp-04-industrial-defect/index.html"><span class="lb">下一个实验 →</span>EXP-04 工业缺陷检测</a>
+</nav>
+
+<footer>
+  <span>机器人视觉入门 · EXP-03 多边形轮廓</span>
+  <span>4 学时 · 基于 vision/05_line_following 源码</span>
+</footer>
+
+</main>
+</div>
+
+<script src="../shared/tutorial.js" defer></script>
+<script src="../shared/beginner.js" defer></script>
+<script>
+(function(){
+  var ep=document.getElementById('ep'); if(!ep) return;
+  var CX=210, CY=82, R=56, N=32;
+  var orig=[], i;
+  /* 造一个带毛刺的圆 */
+  for(i=0;i<N;i++){
+    var a=i/N*Math.PI*2;
+    var r=R + (i%3===0?3:0) - (i%5===0?2:0) + (i===7?4:0);
+    orig.push([CX+Math.cos(a)*r, CY+Math.sin(a)*r]);
+  }
+  var d='M';
+  for(i=0;i<orig.length;i++){ d += (i?' L':'') + orig[i][0].toFixed(1)+','+orig[i][1].toFixed(1); }
+  d+=' Z';
+  document.getElementById('orig').setAttribute('d',d);
+
+  var poly=document.getElementById('poly'), vtx=document.getElementById('vtx');
+  var say=document.getElementById('say'), vtxt=document.getElementById('vtxt');
+
+  /* 简化版 Douglas-Peucker */
+  function perp(p,a,b){
+    var dx=b[0]-a[0], dy=b[1]-a[1];
+    var L=Math.sqrt(dx*dx+dy*dy)||1;
+    return Math.abs(dy*p[0]-dx*p[1]+b[0]*a[1]-b[1]*a[0])/L;
+  }
+  function dp(pts,eps){
+    if(pts.length<3) return pts;
+    var dmax=0, idx=0;
+    for(var k=1;k<pts.length-1;k++){
+      var dd=perp(pts[k],pts[0],pts[pts.length-1]);
+      if(dd>dmax){ dmax=dd; idx=k; }
+    }
+    if(dmax>eps){
+      var L=dp(pts.slice(0,idx+1),eps);
+      var R=dp(pts.slice(idx),eps);
+      return L.slice(0,-1).concat(R);
+    }
+    return [pts[0],pts[pts.length-1]];
+  }
+
+  function upd(){
+    var e=parseInt(ep.value,10)/1000;
+    document.getElementById('ep_o').textContent=e.toFixed(3);
+    var eps = 1 + e*900;   /* 把 0.001~0.12 映射成像素容差 */
+    var pts = orig.concat([orig[0]]);
+    var res = dp(pts, eps);
+    var out = res.map(function(p){ return p[0].toFixed(1)+','+p[1].toFixed(1); }).join(' ');
+    poly.setAttribute('points', out);
+    var s='';
+    for(var k=0;k<res.length-1;k++){
+      s+='<circle cx="'+res[k][0].toFixed(1)+'" cy="'+res[k][1].toFixed(1)+'" r="3.2"/>';
+    }
+    vtx.innerHTML=s;
+    var n=res.length-1;
+    vtxt.textContent='顶点数 = '+n;
+    var m='';
+    if(n>=14) m='<b>epsilon 很小</b>（'+e.toFixed(3)+'）：轮廓几乎原样保留，连毛刺都算进去了。顶点数 '+n+' —— 一个圆会被当成"很多边形"。';
+    else if(n>=7) m='<b>epsilon 适中</b>（'+e.toFixed(3)+'）：顶点数 '+n+'。按"顶点数≥8 算圆"的规则，这个边界附近很不稳定 —— 稍微波动就从圆变成多边形。';
+    else if(n===4) m='<b>epsilon 偏大</b>（'+e.toFixed(3)+'）：已经只剩 4 个顶点，圆被压成了四边形。这时"按顶点数分类"彻底失效。';
+    else m='<b>epsilon 太大</b>（'+e.toFixed(3)+'）：只剩 '+n+' 个顶点，形状信息基本丢光了。';
+    say.innerHTML=m;
+  }
+  ep.addEventListener('input',upd); upd();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1166 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp003-ros2-application/exp-08-action/index.html
+TITLE: EXP-08 · 动作通信：RFID 读卡 — 机器人 ROS2 应用与开发
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+EXP-08 · 动作通信：RFID 读卡 — 机器人 ROS2 应用与开发
+🧠 具身智能课程 ·
+教程首页
+核心课程
+/
+ROS2 应用与开发
+/ EXP-08
+本页目录
+★ 课程目标
+01 跑出现象：一步步跑通 RFID 读卡
+02 问题引入：刷卡等 30 秒，服务为什么不够
+03 核心原理：五通道 · 时序 · 状态机
+04 实验步骤：源码位置 → 框架 → 关键代码
+05 动手任务：按操作验证实验目标
+06 注意事项与验收清单
+07 本课总结与思考题
+CH2 · 通信机制
+EXP-05 节点
+EXP-06 话题
+EXP-07 服务
+EXP-08 动作
+EXP-09 自定义接口
+EXP-10 参数
+EXP-08 · 第 2 章 · 设计性 · 4 学时
+动作通信：等刷卡这件事交给 Action
+服务能"等到答案"，但等待期间是
+黑盒
+：不知道进展、不能中途放弃。动作（Action）= 服务的目标语义 + 话题的持续流——Goal 发出立即返回，服务端边执行边发 Feedback，完成后回 Result，全程可取消。本课以 RFID 读卡为载体讲透三通道与三种结局。
+难度 ⭐⭐⭐
+4 学时
+设计性
+关键词 action · feedback · cancel
+实验箱 B2
+目标
+本课学完，你应该能做到
+① 说清模型
+三通道异步
+能阐述 Goal / Feedback / Result 三通道模型：发目标后立即返回、执行期间周期反馈、完成后给结果且可随时取消，并说清它与服务（同步短调用）的本质区别。
+② 掌握链路
+服务端与客户端
+掌握
+rfid_action_server
+与
+rfid_action_client
+从
+ActionServer
+/
+ActionClient
+、
+send_goal_async
+、
+publish_feedback
+到
+succeed()/abort()/canceled()
+的完整异步链路。
+③ 独立验证
+看清状态流转
+能独立运行并观察 "SCANNING → CARD_FOUND → READING_UID → VERIFYING" 的状态反馈，用
+ros2 action send_goal --feedback
+调试并实现超时 / 取消。
+④ 迁移应用
+长任务都靠它
+能把「长耗时等待 → 动作封装 → 异步反馈」迁移到导航、机械臂运动、长时间采集等场景，并理解 SPI 外设的驱动封装方法。
+本课的重点与难点
+重点
+：服务端三个回调分别管什么（目标到达 / 取消请求 / 执行完毕），以及
+goal_handle
+的状态机。
+难点
+：理解"一个动作在底层其实是 3 条服务线 + 2 条话题线"——这是本课难度最高的地方。
+和前后的关系
+到此
+三种通信范式（话题 / 服务 / 动作）全部学完
+。EXP-09 会回头把它们的接口定义统一讲一遍。
+01
+跑出现象：一步步跑通 RFID 读卡
+先别急着啃原理和读代码——按命令卡把"自检 → 服务端 → 客户端 → CLI 观察反馈流"四个现象亲手跑出来，特别是三种结局（成功 / 超时 / 取消）都要亲眼看到一遍。
+现象对上了，再带着「为什么会这样」的疑问进入后面的原理与 04 实验步骤
+，每一行你都知道自己在学什么。
+终端 A
+编译 + 脱机自检驱动
+把硬件故障和 ROS 逻辑故障分开排查
+1
+编译两个包并加载环境
+终端 A
+接口包（
+ros_sensor_interfaces
+，
+.action
+定义在里面）与节点包（
+ros_sensor
+）都要编——本课要发的是自定义动作，接口不编就没有消息类型。
+# ① 进工作空间，并先加载 ROS2 本体（underlay）
+cd ~/ros2_ws
+source /opt/ros/humble/setup.bash
+# ② 只编译本实验需要的两个包：接口包 + 节点包（顺序由 colcon 按依赖自动排）
+colcon build --packages-select ros_sensor ros_sensor_interfaces
+# ③ 把工作空间注册进当前终端（新终端必做，不能省）
+source install/setup.bash
+✔ 编译后忘了 source，
+ros2 run
+就找不到包——每次新开终端都要 source。
+2
+先配权限：让普通用户能碰 SPI 和 GPIO
+终端 A
+读卡芯片 MFRC522 走
+SPI 总线
+，另外还要用
+两个 GPIO
+做片选（CS）和复位（RST）。Linux 默认把这些设备归 root 独占，普通用户一碰就是
+Permission denied
+。
+下面一次性放开权限，之后就不用每次都 sudo 了
+——命令只需执行一次，重启后要重做（见下方提示卡）。
+① SPI 设备（读卡数据通道）
+# 把 SPI 设备交给 dialout 组（iflytek 已在该组内）
+sudo chgrp dialout /dev/spidev1.0
+# 组内成员可读写该设备（660 = 属主读写 + 组读写）
+sudo chmod 660 /dev/spidev1.0
+② GPIO 114（CS 片选）与 116（RST 复位）
+# 先把这两个引脚"导出"到用户空间，才会出现 gpio114/116 目录
+sudo sh -c 'echo 114 > /sys/class/gpio/export; echo 116 > /sys/class/gpio/export'
+# 放开 114 的方向与电平文件：666 让任何用户都能读写
+sudo chmod 666 /sys/class/gpio/gpio114/direction /sys/class/gpio/gpio114/value
+# 同样放开 116，复位引脚也是普通用户要拉的
+sudo chmod 666 /sys/class/gpio/gpio116/direction /sys/class/gpio/gpio116/value
+⚠️
+这三组命令分别在做什么
+·
+chgrp dialout
+：SPI 设备的属组改成
+dialout
+（串口/总线设备的标准组），你的账号
+iflytek
+本来就在这个组里，所以改完就自动有权限。
+·
+chmod 660
+：属主和属组可读写、其他人无权限——比
+666
+更安全，因为不放开给所有用户。
+·
+export
+：Linux 的 GPIO 默认在内核里，要先"导出"给用户空间，
+/sys/class/gpio/gpio114/
+这样的目录才会被创建出来。
+没导出就直接 chmod，会报 "No such file or directory"
+。
+·
+chmod 666（GPIO）
+：
+direction
+（输入/输出方向）和
+value
+（高低电平）必须是普通用户可写，程序才能拉片选。
+🔁
+重启后权限会失效
+（
+/dev
+是内存文件系统）。三条路任选：
+① 重启后重跑上面 5 条命令（最省事，本课推荐）；
+② 写成 udev 规则固化（一劳永逸，适合长期开发）；
+③ 临时用
+sudo
+跑节点——但 sudo 会清掉 ROS 环境变量，反而更麻烦。
+✔ 验证：
+ls -l /dev/spidev1.0
+应显示
+crw-rw---- 1 root dialout
+；
+ls -l /sys/class/gpio/gpio114/
+能看到
+direction
+与
+value
+两个文件。
+3
+脱离 ROS 自检 MFRC522
+终端 A
+SPI 接线、GPIO、供电问题都会在这一步暴露，不会污染 ROS 层的判断。
+权限配好之后，这条命令不再需要 sudo
+。
+# 进驱动目录，跑脱离 ROS 的裸硬件自检
+cd src/xflz_eai_car1/driver/ros_sensor/ros_sensor/ros_sensor
+# 自检 MFRC522：读版本寄存器 + 回读验证，PASS 即硬件通路正常
+python3 rc522_reader.py --test
+$ python3 rc522_reader.py --test
+RC522 RFID Reader on RK3588
+  SPI      : /dev/spidev1.0
+  CS GPIO  : 114
+  RST GPIO : 116
+  Speed    : 500000 Hz
+--------------------------------------
+  VersionReg(0x37) =
+0xB2
+TmodeReg write 0x8D -> read 0x8D
+PASS
+初始化完成
+✔ VersionReg 读出
+0x00 或 0xFF
+= 芯片没应答：查 CS=114 / RST=116 接线、3.3V 供电、
+python-periphery
+是否安装。
+若报
+Permission denied
+，说明步骤 2 的权限没配好或重启后失效了。
+实拍｜
+自检通过的样子
+：
+VersionReg(0x37) = 0xB2
+（芯片在线）、TmodeReg 写 0x8D 回读一致（SPI 通路正常）、最后
+PASS
+。
+这三个值任意一个不对，就先别往下走
+——ROS 层再怎么写也读不到卡。
+实拍｜
+RFID 模块在哪
+：实验箱上标着"RFID模块"的那块板，MFRC522 芯片就在上面。
+刷卡时把卡轻贴天线区域
+（板子上线圈的位置），离太远读不到。
+终端 B
+启动动作服务端
+保持运行，别停
+4
+起 ActionServer
+终端 B
+cd ~/ros2_ws
+source install/setup.bash
+ros2 run ros_sensor rfid_action_server
+[INFO] RFID Action 服务端已启动 (action: /rfid_scan)
+# 服务端进入待命：等待 /rfid_scan 上的 Goal
+终端 C
+客户端发 Goal，边看反馈边刷卡
+30 秒窗口
+5
+发起读卡目标
+终端 C
+参数
+30
+是 Goal 里的
+timeout_sec
+。启动后
+把 MIFARE 白卡贴上天线
+，盯住反馈流的变化。
+cd ~/ros2_ws
+source install/setup.bash
+ros2 run ros_sensor rfid_action_client 30
+[INFO] Goal 已接受
+Feedback: SCANNING
+Feedback: SCANNING
+Feedback: CARD_FOUND
+Feedback: READING_UID
+Feedback: VERIFYING
+结果: success=True uid=7E1A3B02 type=MIFARE Classic msg=读卡成功
+✔ 反馈流从 SCANNING 一路推进到 VERIFYING——这就是 03 节图 8-3 状态机的实况。服务端终端同时会打印收到的 Goal 与读卡结果。
+实拍｜
+服务端那边同时发生了什么
+：收到 Goal（
+timeout_sec=30
+）→ 开始读卡 → 读卡成功
+uid=B4D20307
+。
+注意 Goal 那一行是"已接受"而不是"已阻塞"
+——服务端接单后就自己在后台干活了。
+终端 D
+CLI 观察反馈流与三种结局
+终端 B 保持运行，一次只发一个 Goal
+6
+自省：列出动作与类型
+终端 D
+ros2 action list
+ros2 action info /rfid_scan
+/rfid_scan
+Action: ros_sensor_interfaces/action/RfidScan
+Action clients: 0
+Action servers: 1
+7
+不写一行客户端，直接发 Goal 并看反馈
+终端 D
+这条命令是整节课的
+核心观察点
+——不写任何 Python 代码，直接用命令行发一个 Goal 出去。
+--feedback
+是动作与服务
+最直观的分界线
+：服务 call 出来只有最终一行，动作能看到整条状态流。
+ros2 action send_goal /rfid_scan ros_sensor_interfaces/action/RfidScan "{timeout_sec: 30}" --feedback
+逐段拆开看：5 个部分各是什么
+片段
+是什么
+为什么这么写
+ros2 action send_goal
+ROS2 的
+动作命令行工具
++ 子命令"发送目标"
+相当于"手工扮演一次客户端"。它自己会建 ActionClient、发 Goal、订阅 Feedback、等 Result——
+你不用写代码，它就替你把客户端的活全干了
+/rfid_scan
+动作名
+（要发给谁）
+就是服务端启动时注册的那个名字（步骤 4 的日志里印过）。
+名字对不上就找不到服务端
+——可以用上一步
+action list
+确认
+ros_sensor_interfaces/action/RfidScan
+动作消息类型
+（走什么格式）
+格式必须是
+包名/action/类型名
+。它告诉命令行"按哪个 .action 文件的结构去解析后面的 YAML"。
+写错类型名，字段就对不上
+"{timeout_sec: 30}"
+Goal 的内容
+（用 YAML 写）
+这是发给服务端的"目标参数"。
+timeout_sec: 30
+意思是
+最多等 30 秒
+，超时就 abort。
+字段名必须和 .action 里 Goal 段一字不差
+：是
+timeout_sec
+不是
+timeout
+，也不是
+timeoutSec
+。外层双引号不能省，否则 shell 会把花括号当特殊字符处理
+--feedback
+开关：顺便打印反馈流
+不加这个参数，命令行发完 Goal 就
+静静等着
+，中途什么也不显示，直到 Result 才输出一行。
+加上它，每收到一条 Feedback 就打一行
+——这就是你能看到 SCANNING 滚动的原因
+🔍
+怎么知道 Goal 该写哪些字段？
+不用背——用
+ros2 interface show ros_sensor_interfaces/action/RfidScan
+就能看到三段结构。第一个
+---
+上方就是 Goal 段，本实验里只有一个字段
+int32 timeout_sec
+。
+先 show 再发，命中率 100%
+。
+$ ros2 action send_goal /rfid_scan ros_sensor_interfaces/action/RfidScan "{timeout_sec: 30}" --feedback
+Goal accepted with ID: …
+Feedback: SCANNING
+Feedback: SCANNING
+Result: success=True uid=7E1A3B02 type=MIFARE Classic msg=读卡成功
+✔
+对照输出里的三段
+：①
+Goal accepted with ID
+= 服务端
+收下了
+目标（只是收下，还没完成）；② 一串
+Feedback: SCANNING
+= 正在找卡，
+这就是 --feedback 带来的
+；③
+Result
+= 最终结局，
+只出现一次
+。这三段正好对应动作的三条通道。
+⚠️ Goal 的 YAML 字段名必须与 .action 完全一致——写错直接解析失败（05 节动手任务 5 专门让你踩这个坑）。
+8
+复现另外两种结局
+终端 D
+超时与取消也要亲眼各看一遍——三种结局合起来才是完整的动作语义。
+命令结构和上一步完全一样
+，只改了
+timeout_sec
+的值、以及"你怎么打断它"：
+# 结局 2 · 超时 abort：故意不放卡，等 timeout_sec 秒
+# 与上一步唯一区别：把 30 改成 10，这样不用干等半分钟
+ros2 action send_goal /rfid_scan ros_sensor_interfaces/action/RfidScan "{timeout_sec: 10}" --feedback
+# → SCANNING 持续滚动 10s → Result: success=False msg=读卡超时
+# 结局 3 · 取消 canceled：上一条跑起来后按 Ctrl+C（CLI 会发 cancel）
+# 这次 timeout_sec 写大一点（如 60），才有时间在中途按 Ctrl+C
+# → Feedback 中断 → Result: success=False msg=已取消
+✔
+三种结局其实是同一个 Goal 的三种走路方式
+：贴卡 → 成功（succeed）；不贴卡等满 timeout → 超时（abort）；中途 Ctrl+C → 取消（canceled）。
+三者的 Result 都会回来
+，区别只在
+success
+字段和
+msg
+文案——这就是"Result 必达"的含义。
+02
+问题引入：刷卡要等 30 秒，为什么服务不够用
+你刚跑通了指纹验证（EXP-07）——那是"一问一答、几秒出结果"的典型。现在换个真实场景：
+给实验室装一套 RFID 门禁考勤
+。
+🚪
+场景：学生站在闸机前刷卡
+程序发出"开始读卡"的指令后，要
+等学生把卡贴上来
+——可能 1 秒就刷了，也可能 30 秒都没人。这段时间里，门禁系统必须做到三件事：
+①
+知道还在读
+（不能像卡死一样，屏幕上要显示"请刷卡…"）；
+②
+能中途放弃
+（学生走了，管理员得能取消这次读卡，而不是干等 30 秒）；
+③
+有明确结局
+（读到了 / 超时了 / 被取消了，三种情况都要有交代）。
+这正是机器人的常态：
+导航到目标点、机械臂抓取、读卡等待
+——这些任务都
+耗时长、进度不确定、用户可能中途改主意
+。它们和"传感器每秒发一次数据"（话题）不一样，也和"问一句答一句"（服务）不一样。
+🏠
+生活里所有"长时间等待"都长这样
+：点外卖时 APP 给你实时进度（骑手到哪了）、取消按钮（临时有事能退单）、送达确认（结果不会丢）；导航软件随时说"还剩 3 公里"，堵车了还能改路线；下载文件有进度条，能暂停取消。
+共同点：任务耗时长且不确定，所以必须有进度、能放弃、有最终交代。
+那用上一课的服务来做"等刷卡"行不行？直接撞上三堵墙：
+📞 用服务"等刷卡"：像打了个被永久 hold 住的客服电话
+客户端阻塞在
+spin_until_future_complete
+：
+黑盒
+，进展全靠猜
+想放弃？
+没有取消入口
+，只能 Ctrl+C 杀进程——底层读卡循环还在跑
+超时了只有一个失败应答，
+没有"过程性"信息
+可复盘
+若硬轮询发多次服务调用，每次都要重新开串口、重新初始化
+📦 用动作"等刷卡"：像点了一份有进度条的外卖
+Goal 立即返回
+：客户端发完目标继续干别的，执行在服务端后台进行
+Feedback 流
+：SCANNING → CARD_FOUND → …，像看骑手位置一样看进度
+Cancel 随时插队
+：服务端在循环里查取消请求，优雅收场
+Result 必达
+：成功/超时/被取消，三种结局都有明确交代
+服务 = 打客服电话（等到底）
+动作 = 点外卖（全程可见）
+call → 阻塞中…
+✗ 进度？
+没有，什么也看不到
+✗ 取消？
+没有入口
+✗ 结局？
+成功 or 失败，二选一
+send_goal → 立即返回
+✓ 进度？
+Feedback ×N 随时报
+✓ 取消？
+Cancel 随时插队
+✓ 结局？
+Result 必有，恰一次
+一行等到底 · 全程不可放弃
+进度可见 · 可放弃 · 结局有交代
+VS
+图 8-1｜同样的"等待"：服务是打了就挂不掉的黑盒电话，动作是带进度条和取消按钮的外卖订单
+定义 Action
+客户端发送
+Goal
+（目标）后立即返回，服务端在后台执行并周期发布
+Feedback
+（反馈），执行结束回传
+Result
+（结果）；执行期间客户端可随时请求
+Cancel
+（取消）。它底层压在 ROS2 的通信原语之上：一个 Action 端点其实封装了
+5 个隐藏端点
+（3 个服务：发目标/取消/取结果 + 2 个话题：反馈流/状态流）——下一节拆开看。
+03
+核心原理：五条隐藏通道 · 时序 · 三回调与状态机
+你在代码里写的
+ActionClient
+/
+ActionServer
+各只是一个端点，但 ROS2 在底下悄悄建了
+5 条线
+：3 条服务线（发 Goal、发 Cancel、取 Result）+ 2 条话题线（Feedback 流、Status 流）。也就是说——
+你已经把前面三课全用上了
+：动作 = 服务的配对语义 + 话题的流式能力，封装成一个好用的抽象。把两个节点拆开看全貌（图 8-2）：
+ActionClient
+DDS 传输层
+ActionServer
+send_goal_async
+发送目标 →
+/rfid_scan/_action/send_goal
+① 服务线 · 客户端 → 服务端
+goal_callback
+收到目标，决定收不收
+feedback_callback
+← 接收进度
+/rfid_scan/_action/feedback
+② 话题线 · 服务端 → 客户端
+publish_feedback
+在循环里周期推送
+cancel_goal
+请求取消 →
+/rfid_scan/_action/cancel_goal
+③ 服务线 · 客户端 → 服务端
+cancel_callback
+同不同意取消
+result_future
+← 取回结局
+/rfid_scan/_action/get_result
+④ 服务线 · 服务端 → 客户端
+succeed/abort/canceled
+三种结局，Result 必达
+status 订阅
+← 状态变更
+/rfid_scan/_action/status
+⑤ 话题线 · 服务端 → 客户端
+goal handle
+推进任务状态机
+5 条线各走各的 —— 你在代码里只写 ActionClient / ActionServer 一个端点，封装前后感知不到
+图 8-2｜一个 Action 端点 = 5 条隐藏线路：3 条服务线（① Goal ③ Cancel ④ Result）+ 2 条话题线（② Feedback ⑤ Status）
+三通道各管什么
+通道 1 · Goal
+客户端 → 服务端
+携带任务参数（timeout_sec: 30）。发送后先拿到"接受/拒绝"的答复（goal_response），再等最终结果。
+通道 2 · Feedback
+服务端 → 客户端（多次）
+执行期间周期推送状态：SCANNING → CARD_FOUND → READING_UID → VERIFYING。
+通道 3 · Result
+服务端 → 客户端（一次）
+终态交付：success / card_uid / card_type / message。无论哪种结局，必有且仅有一条。
+隐藏通道 · Cancel
+客户端 → 服务端
+服务端在循环里查 is_cancel_requested，同意则就地收场回 canceled。
+维度
+话题（EXP-06）
+服务（EXP-07）
+动作（本课）
+调用语义
+持续数据流，一对多
+单次请求/响应，一对一
+长耗时目标+反馈+结果
+异步/同步
+异步
+同步
+异步（执行后台化）
+中间反馈
+无（值到即反馈）
+无
+有
+（Feedback 状态机）
+可取消
+否
+否
+是
+典型场景
+MQ5 浓度发布
+指纹验证
+刷卡等待、导航、抓取
+时序：一次完整 Action 生命周期
+上面讲的是"线路怎么铺"，这里讲"一次任务怎么走"。下面这张时序图 5.5 秒循环一次：①Goal 出发 → ②Feedback 反复流回 → ③（可选）Cancel 插队 → ④Result 终态。对照图 8-2 认线路：①走 Goal 服务线，②走 Feedback 话题线，④走 Result 服务线。
+ActionClient
+ActionServer
+① send_goal_async(timeout_sec: 30) → ACCEPTED 立即返回
+② publish_feedback × N：SCANNING → CARD_FOUND → READING_UID …
+③（可选）cancel_goal → 服务端循环内 is_cancel_requested 生效
+④ result：success=True uid=7E1A3B02 type=MIFARE Classic（恰好一次）
+三种结局：succeed() 成功 · abort() 失败 · canceled() 被取消——Result 必有，Feedback 可零可多
+Goal 立回、Feedback 流式、Result 一次性、Cancel 随时插队——四条时序合成一个"像打电话又像看下载进度条"的抽象。
+三回调：服务端为什么拆成三个函数
+服务端只有一个回调（收到请求就处理），动作服务端却拆成
+三个
+——因为一个长任务要回答三个问题：这个目标接不接？取消同不同意？活怎么干？
+goal_callback
+收不收这个目标
+在 execute 之前被调：默认 ACCEPT，可拒绝（如已有任务在跑）。
+cancel_callback
+同不同意取消
+决定 cancel 请求的 ACCEPT/REJECT；同意后 execute 内的 is_cancel_requested 才会置位。
+execute_callback
+干活的主体（async）
+任务全程在此：循环查取消、发反馈、推进状态机、以 succeed/abort/canceled 收尾并 return result。
+反馈状态机：Feedback 里流的是什么
+SCANNING
+寻卡未果
+CARD_FOUND
+拿到 ATQA
+READING_UID
+读出 4 字节卡号
+VERIFYING
+判定卡类型
+succeed
+Result
+无卡则 sleep(0.1) 再循环
+abort
+等满 timeout 仍无卡
+canceled
+循环内查到取消请求
+← 没卡时走这两条出口
+三个出口都会回一条 Result —— 差别只在 success 字段与 message 文案
+图 8-3｜读卡反馈状态机：SCANNING 原地循环等卡，卡来了沿主链四步走到 succeed；超时与取消是两个旁路出口
+易错点
+为什么
+execute 必须
+async def
+动作执行体是协程，同步函数无法正确挂起/恢复
+取消检查必须在循环体内
+循环外检查 = 只看一次，任务起跑后再也收不到取消令
+结果状态要查 STATUS_SUCCEEDED
+超时/取消对应其它状态码，直接当成功会误报
+一次只发一个 Goal
+多 Goal 并发抢同一 SPI 天线会造成读卡竞争
+04
+实验步骤：源码在哪、怎么串起来、关键几行在干什么
+这一节不逐行讲全部代码，只解决三件事：
+源码文件在哪个目录 → 三份文件怎么串成一条链 → 哪几行是必须看懂的
+。看完你能自己打开源码定位到对应位置，比记住语法有用得多。
+第 1 步 · 先找源码：三份文件，一个目录
+本实验的全部源码都在同一个目录里，
+录入门禁脚本、动作服务端、动作客户端共用这一套驱动
+：
+# 源码目录（用一条命令即可跳到）
+cd ~/ros2_ws/src/xflz_eai_car1/driver/ros_sensor/ros_sensor/ros_sensor
+ls *.py
+文件
+它负责什么
+本实验什么时候用到
+rc522_reader.py
+驱动层
+：SPI 读写 MFRC522 寄存器，寻卡 + 防冲突拿 UID。
+不依赖 ROS
+，可独立跑
+--test
+自检
+步骤 2 的脱机自检、服务端的读卡循环
+rfid_action_server.py
+动作服务端
+：三回调 + 执行循环，把读卡包装成
+/rfid_scan
+动作
+步骤 3 启动，步骤 4/6 被调用
+rfid_action_client.py
+动作客户端
+：发 Goal、收 Feedback、等 Result、发 Cancel
+步骤 4 启动（带
+30
+秒参数）
+ros_sensor_interfaces/action/RfidScan.action
+接口定义
+：Goal / Feedback / Result 三段字段
+步骤 1 编译时生成 Python 类，两个节点 import
+📍
+找不到文件？先确认这三件事
+：① 路径里有两层
+ros_sensor/
+（外层是包，里层同名目录才放 .py）；② 如果
+ls *.py
+有输出，说明位置对了；③ 想看 action 定义，去
+~/ros2_ws/src/xflz_eai_car1/driver/ros_sensor/ros_sensor_interfaces/action/
+。
+第 2 步 · 再看框架：三份文件怎么串成一条链
+先记住分工，再看代码就不会迷路。
+① rc522_reader.py · 驱动层（不碰 ROS）
+对外只暴露
+read_uid()
+：进门先问"卡在不在场"（
+request_a
+），在就读出 4 字节卡号（
+anticoll
+）。
+它不懂 Goal/Feedback
+，只懂寄存器。
+↓ 被 import
+② rfid_action_server.py · 动作服务端
+用
+ActionServer
+注册
+/rfid_scan
+；
+execute_callback
+里跑循环：
+每轮调 read_uid → 发一条 Feedback → 查有没有取消
+，最后按结局调 succeed / abort / canceled。
+↓ Goal 走服务线，Feedback 走话题线，Result 走服务线
+③ rfid_action_client.py · 动作客户端
+发 Goal（立即返回）→ 注册 Feedback 回调（打印进度）→ 注册 Result 回调（收结局）→ 需要时发 Cancel。
+全程不阻塞
+。
+🧩
+一句话记住分工
+：
+rc522_reader.py
+负责
+跟芯片说话
+，
+rfid_action_server.py
+负责
+把读卡包装成一个长任务
+，
+rfid_action_client.py
+负责
+下单、听进度、收结果
+。
+中间的 Goal/Feedback/Result 三条通道你不用自己写
+——
+ActionServer
+已经替你建好了（这就是 03 节说的"5 条隐藏线"）。
+第 3 步 · 再读关键代码：三处非讲不可的地方
+下面只挑最能说明问题的几段。每段都标了
+文件 + 行号
+，你可以直接打开源码跳过去对照。
+① 驱动层：REQA 寻卡 → 防冲突 → 拿 UID
+MFRC522 是寄存器驱动的 13.56MHz 读卡芯片，主控通过 SPI 读写它的寄存器。引脚在文件头定义：CS→GPIO114、SCK→112、MOSI→113、MISO→115、RST→116。动作服务端实际只调一个方法
+read_uid()
+：
+# 来源：rc522_reader.py L296-305（完整读卡流程：寻卡 + 防冲突两步串成一步）
+def
+read_uid(self) -> tuple:
+    ok, atqa = self.request_a()
+# ① REQA 寻卡：卡在不在射频场里？
+if not
+ok:
+return
+False
+,
+""
+, b
+''
+#    不在 → SCANNING 下一轮再来
+ok, uid = self.anticoll()
+# ② AntiCollision 防冲突读 UID
+if not
+ok:
+return
+False
+,
+f"ATQA=0x{atqa:04X}"
+, b
+''
+uid_str =
+"%02X%02X%02X%02X"
+% (uid[
+0
+], uid[
+1
+], uid[
+2
+], uid[
+3
+])
+return
+True
+, uid_str, uid
+# (成功, 卡号十六进制串, 原始字节)
+逐行看点
+它在干什么
+request_a()
+返回 ATQA
+"卡在不在场"的应答信号——
+先确认在场
+，才谈得上读卡号；顺序不可颠倒
+anticoll()
+防冲突
+ISO14443A 下多卡同场会信号冲突：用
+0x93 0x20
+命令帧逐位选出唯一卡，读 4 字节 UID 并做异或校验（L283-294）
+uid_str
+拼接
+4 字节拼成
+7E1A3B02
+这样的十六进制串——这就是 Result 里 card_uid 的来源
+open→hw_reset→self_test→init
+服务端 execute 开头的初始化四连；
+--test
+命令行的自检也是这套（VersionReg 读 0xB2 即正常）
+② 服务端：三回调 + 执行循环
+# 来源：rfid_action_server.py L41-48（三个回调一次注册）
+self._action_server = ActionServer(
+    self, RfidScan,
+'rfid_scan'
+,
+    execute_callback=self.execute_cb,
+# 干活的主体（协程）
+goal_callback=self.goal_cb,
+# 收/拒目标
+cancel_callback=self.cancel_cb)
+# 同意/拒绝取消
+# 来源：rfid_action_server.py L100-141（执行循环：查取消 → 发反馈 → 读卡）
+async def
+execute_cb(self, goal_handle):
+    deadline = time.time() + (goal_handle.request.timeout_sec
+or
+30
+)
+    feedback = RfidScan.Feedback()
+while
+time.time() < deadline:
+if
+goal_handle.is_cancel_requested:
+# ← 必须在循环体内！
+goal_handle.canceled()
+#    同意取消，就地收场
+result.success =
+False
+result.message =
+'已取消'
+return
+result
+        feedback.status =
+'SCANNING'
+# 每轮都发反馈
+goal_handle.publish_feedback(feedback)
+        ok, atqa = rc.request_a()
+# 寻卡
+if not
+ok:
+            time.sleep(
+0.1
+);
+continue
+# 没卡：0.1s 后再来
+feedback.status =
+'CARD_FOUND'
+goal_handle.publish_feedback(feedback)
+        ok, uid = rc.anticoll()
+# 读 UID
+...
+# READING_UID → VERIFYING 反馈 → classify_card 判型
+goal_handle.abort()
+# deadline 耗尽仍无卡
+result.message =
+'读卡超时'
+return
+result
+# 来源：rfid_action_server.py L19-29（卡类型判定：ATQA + UID 长度）
+def
+classify_card(atqa, uid):
+if
+atqa == 0x0044
+and
+len
+(uid) ==
+7
+:
+return
+'MIFARE Ultralight'
+if
+atqa == 0x4400:
+return
+'MIFARE Ultralight C'
+if
+atqa == 0x0344:
+return
+'MIFARE DESFire'
+if
+atqa
+in
+(0x0002, 0x0003, 0x0004):
+return
+'MIFARE Classic'
+return
+'Unknown'
+逐行看点
+为什么这么写
+async def
+执行体是协程：sleep/等待期间让出控制权，反馈、取消、其它回调才有机会被处理
+is_cancel_requested
+在循环内
+每轮都查一次，取消请求最多延迟 0.1s 生效；放循环外 = 只查一次，起跑后再也收不到取消令
+publish_feedback
+每轮一条
+SCANNING 也在发——"还在正常找"本身就是重要信息；不发反馈客户端就像瞎了
+三种结局各归其位
+取消→
+canceled()
+，超时→
+abort()
+，读成功→
+succeed()
+；每种都 return 一份 Result
+初始化放循环外
+open→hw_reset→self_test→init
+只做一次；每轮重复初始化会拖慢寻卡节奏
+③ 客户端：异步回调链
+# 来源：rfid_action_client.py L51-66（发送 Goal：三层回调接力）
+def
+send(self, timeout=
+30
+):
+if not
+self._client.wait_for_server(timeout_sec=
+3.0
+):
+        self.get_logger().error(
+'RFID Action 服务不可用'
+)
+return
+False
+goal = RfidScan.Goal()
+    goal.timeout_sec = timeout
+# Goal 参数从这里进
+future = self._client.send_goal_async(
+        goal, feedback_callback=self.feedback_cb)
+# 反馈回调随 Goal 一起挂
+future.add_done_callback(self.goal_response_cb)
+# 第 1 环：接受了吗？
+while
+rclpy.ok()
+and not
+self._done:
+# 必须轮转执行器！
+rclpy.spin_once(self, timeout_sec=
+0.1
+)
+# 回调全靠它驱动
+return
+self._ok
+# 回调链的接力顺序（示意）
+goal_response_cb(goal_future)
+# 第 1 环：ACCEPTED？
+└─ goal_handle = goal_future.result()
+    └─ result_future = goal_handle.get_result_async()
+    └─ result_future.add_done_callback(self.result_cb)
+# 第 2 环：终态
+feedback_cb(feedback_msg)
+# 插播：执行期间随时被调
+└─ self.get_logger().info(
+f'Feedback: {feedback_msg.feedback.status}'
+)
+result_cb(result_future)
+# 第 2 环：读 Result，按状态判定
+└─ status == GoalStatus.STATUS_SUCCEEDED ?
+'成功'
+:
+'超时或被取消'
+└─ self._done =
+True
+# 放行 send() 里的 while 循环
+逐行看点
+为什么这么写
+wait_for_server
+与服务端同名（'rfid_scan'），3 秒等不到就报错返回——先确认再说
+send_goal_async
+不阻塞
+发送立即返回 Future；"接受/拒绝"由第 1 环回调处理，主线程继续往下走
+spin_once(0.1)
+循环
+三层回调
+全部
+靠执行器驱动：忘了 spin，回调永远不会发生，程序卡死
+STATUS_SUCCEEDED
+判定
+超时（abort）和取消（canceled）也回 Result——不查状态码会把失败当成功
+回调链的接力顺序
+send_goal_async 的 Future 完成于
+goal_response
+（是否被接受）→ 在其 done 回调里取 result_future 加
+result_cb
+→ 中途由
+feedback_cb
+打印状态。三层回调串起一条异步链，任何一层忘了 spin 都会卡死。对照图 8-2：三环正好对应 Goal/Result 服务线与 Feedback 话题线。
+05
+动手任务：按操作验证本课的四个目标
+01 节是"跟着看一遍"，这一节是"
+你自己操作，验证目标达成了没有
+"。四个任务分别对应课程目标里的四项能力——做完这四题，你就能说自己掌握动作通讯了。
+每题都要求先写下预期，再动手验证。
+📌
+先立规矩
+：动手前在纸上写一行"我预期会看到 ___"。跑完对照——
+预期错了，才是真正的学习点
+。
+目标① · 说清"动作比服务多什么"
+操作
+：先在不放卡的情况下发一个 Goal（
+ros2 run ros_sensor rfid_action_client 30
+），
+盯住终端 30 秒
+；然后回想 EXP-07 那种"发完什么都不显示"的等待。
+要记录
+：这 30 秒里终端
+打印了多少条 Feedback
+、分别是什么状态。
+过关标准
+：能说出"反馈流"解决的是服务的哪个缺陷。
+目标② · 掌握三种结局的触发条件
+操作
+：连做三次，分别造出
+成功 / 超时 / 取消
+——① 发 Goal 后立刻贴卡；② 发 Goal 后手不碰卡等满 30 秒；③ 发 Goal 后按 Ctrl+C。
+要记录
+：三次的 Result 文案（
+success
+字段 +
+message
+）各是什么。
+过关标准
+：能说出三种结局分别由代码里哪个调用产生（succeed / abort / canceled）。
+目标③ · 会用 CLI 独立观察动作
+操作
+：
+不写一行客户端代码
+，只用三条命令完成一次读卡：
+ros2 action list
+→
+ros2 action info /rfid_scan
+→
+ros2 action send_goal … --feedback
+。
+要记录
+：
+action info
+输出里 Action 类型是什么、
+send_goal
+打印的反馈流。
+过关标准
+：下次客户端起不来时，你能用 CLI 证明"服务端是好的"。
+目标④ · 分清硬件层和 ROS 层的故障
+操作
+：
+先把服务端停掉
+，直接跑
+sudo python3 rc522_reader.py --test
+看自检；再故意把 CS 引脚号写错（改文件头的
+GPIO_CS
+），重跑自检。
+先预判
+：VersionReg 会读到什么？
+要记录
+：正常与改错后的两次
+VersionReg
+值。
+过关标准
+：能说出"先自检、再跑 ROS"为什么能少走弯路。
+目标⑤ · 改一处新东西（进阶）
+操作
+：把
+rfid_action_server.py
+里每轮
+sleep
+的时间从
+0.1
+改成
+0.5
+，重编后重跑。
+先预判
+：Feedback 的滚动速度会怎么变？取消还灵敏吗？
+要记录
+：改前改后每分钟 Feedback 条数。
+这题让你体会"循环节奏"同时影响反馈密度和取消响应速度。
+目标⑥ · 选型判断（可交报告）
+设计题，不用写代码
+：下面三件事各该用话题 / 服务 / 动作中的哪个？
+① MQ5 浓度每秒上报；② 查询当前电量；③ 机械臂移动到指定坐标（约 20 秒，需中途可停）。
+要记录
+：三个选择 + 每个的理由（从"要不要反馈""要不要等""能不能取消"三个角度说）。
+🎯
+任务与目标的对应
+：①②③④ 是"必须过关"的基础验证，直接对应课程目标的四项；⑤⑥ 是拉开差距的进阶题——⑤ 考你敢不敢改源码，⑥ 考你能不能把三机制用对地方。
+如果时间紧，至少做完 ①②③。
+#
+你要做的操作
+要记录的证据
+对应目标
+1
+发 Goal 不放卡，观察 30 秒
+期间收到的 Feedback 条数与内容
+说清动作比服务多什么
+2
+造出成功 / 超时 / 取消
+三种 Result 的文案对照
+掌握三种结局的触发条件
+3
+只用 CLI 跑一次读卡
+action info 输出 + send_goal 反馈
+会用 CLI 独立观察
+4
+自检 + 故意改错引脚
+两次 VersionReg 值对比
+分清硬件层与 ROS 层故障
+5
+改 sleep 参数重编
+改前/改后 Feedback 密度
+理解循环节奏的影响
+6
+无（设计题）
+三个选型 + 理由
+能把三机制用对地方
+06
+注意事项与验收清单
+能画出 Goal/Feedback/Result/Cancel 四条通道并标方向（对照图 8-2 说出底层 5 条线）
+说出三回调各管什么、execute 为什么必须 async
+复现反馈流转：SCANNING → CARD_FOUND → READING_UID → VERIFYING
+用
+--feedback
+观察到反馈流并成功拿到 Result
+分别演示超时（不放卡）与取消两种非成功结局
+能完成三机制选型表，说出"服务无法取消"对体验的影响
+理解 REQA 寻卡与 AntiCollision 防冲突的先后关系
+能独立配好 SPI 与 GPIO 权限（步骤 2 的 5 条命令），并用
+ls -l
+验证权限已生效
+坑
+症状
+解法
+权限没配
+自检报
+Permission denied
+或
+/dev/spidev1.0
+打不开
+执行 01 节步骤 2 的 5 条命令；
+重启后需重做
+GPIO 未导出
+chmod 报
+No such file or directory
+先
+echo 114 > /sys/class/gpio/export
+再 chmod
+SPI 自检失败
+VersionReg=0x00/0xFF
+查 CS=114/RST=116 接线、3.3V 供电、python-periphery 是否安装
+服务不可用
+客户端报 RFID Action 服务不可用
+先启动 server，
+ros2 action list
+确认 /rfid_scan
+一直 SCANNING
+反馈不前进
+卡贴天线；确认是 13.56MHz 卡型；必要时加大 timeout_sec
+Goal 字段写错
+YAML 解析失败
+字段名必须与 .action 完全一致：
+{timeout_sec: 30}
+取消不生效
+cancel 后任务照跑
+检查 execute 循环体内是否有 is_cancel_requested
+多 Goal 抢卡
+读卡结果错乱
+一次只允许一个客户端发 Goal
+忘了 source
+ros2 run 找不到包
+每个新终端
+cd ~/ros2_ws && source install/setup.bash
+07
+本课总结与思考题
+模型
+三通道 + 取消
+Goal 立回、Feedback 流式、Result 一次性，长耗时任务的标准形态；底层是 5 条隐藏线路。
+服务端
+三回调 + 状态机
+goal/cancel 决定准入，async execute 内查取消、发反馈、三种结局收尾。
+客户端
+异步回调链
+goal_response → result 两环接力，feedback 中途插播，spin 贯穿始终。
+硬件层
+REQA → 防冲突 → UID
+先 ATQA 确认在场、再取唯一卡号——顺序不可颠倒；自检先行分层排障。
+思考题
+① ATQA=0x0004 且 UID 为 4 字节应判什么卡？出现 Unknown 可能是什么原因？（对照 04 节 ② 的 classify_card 源码）
+② 当前读卡 succeed 后动作即结束，无法感知"卡被拿走"——要设计持续监控卡在/离场的门禁，对比"动作+长循环反馈"与"话题持续发布"两种方案并给出你的选型。
+③ execute_cb 里的 time.sleep(0.1) 轮询和 async 协程是否冲突？如果用 await asyncio.sleep 替换，对 cancel 的响应速度有何影响？
+CORE-01 · 机器人 ROS2 应用与开发 · EXP-08 动作通信 · RFID 读卡
+4 学时 · 设计性 · 基于 ros_practice 实验讲义改编

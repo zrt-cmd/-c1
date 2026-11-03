@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-04 · 真机推理与鲁棒性评估 | IND-04 家庭整理应用场景</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+  :root{
+    --theme:#0284c7;
+    --theme-deep:#0369a1;
+    --theme-bg:#f0f9ff;
+    --theme-bd:#bae6fd;
+  }
+  figure.shot{margin:18px 0;border:1px solid var(--theme-bd);border-radius:12px;overflow:hidden;background:#fff}
+  figure.shot img{display:block;width:100%;height:auto}
+  figure.shot figcaption{padding:10px 14px;font-size:13px;color:#075985;background:var(--theme-bg);border-top:1px solid var(--theme-bd)}
+  .tag.hl{background:var(--theme-bg);border-color:var(--theme-bd);color:var(--theme-deep)}
+  /* ── 五星学习法 · 课程分段 ── */
+  .fivestar-note{font-size:13px;color:#5b6b78;margin-top:12px}
+  .fs-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:14px}
+  .fs-cell{border:1px solid var(--theme-bd);border-radius:12px;padding:10px 8px;text-align:center;background:var(--theme-bg)}
+  .fs-cell .st{font-size:12.5px;font-weight:800;color:var(--theme-deep)}
+  .fs-cell .tm{font-family:var(--font-mono,monospace);font-size:11px;color:#0f766e;margin-top:3px;font-weight:700}
+  .fs-cell .ds{font-size:11.5px;color:#5b6b78;margin-top:4px;line-height:1.5}
+  .seg{display:inline-block;font-size:11px;font-weight:700;font-family:var(--font-mono,monospace);background:var(--theme-bg);color:var(--theme-deep);border:1px solid var(--theme-bd);border-radius:99px;padding:2px 10px;margin-left:8px;vertical-align:middle;white-space:nowrap}
+  .tl{width:100%;border-collapse:collapse;font-size:13px;margin-top:14px;background:#fff}
+  .tl th,.tl td{border:1px solid #e2ece9;padding:7px 10px;text-align:left;vertical-align:top}
+  .tl th{background:var(--theme-bg);color:var(--theme-deep);font-size:12.5px;white-space:nowrap}
+  .tl .m{font-family:var(--font-mono,monospace);color:var(--theme-deep);font-weight:700;white-space:nowrap}
+  @media(max-width:900px){.fs-grid{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="bar-in">
+    <a class="logo" href="../../../index.html"><b>课程</b>家庭</a>
+    <nav class="crumb"><a href="../../../index.html#ind">总首页</a> / <a href="../index.html">IND-04 家庭整理</a> / EXP-04</nav>
+  </div>
+</header>
+
+<div class="wrap">
+  <aside class="side">
+    <h4>本页目录 · 五星学习法</h4>
+    <a href="#s0">00 课程节奏 · 8 段微课</a>
+    <a href="#s1" class="now">01 学习目标 ①聚焦问题</a>
+    <a href="#s2">02 原理 ①聚焦 ②激活</a>
+    <a href="#s3">03 硬件与环境 ③示证新知</a>
+    <a href="#s4">04 操作步骤 ④应用新知</a>
+    <a href="#s5">05 关键命令 ④应用新知</a>
+    <a href="#s6">06 动画 ③示证新知</a>
+    <a href="#s7">07 互动 ④应用新知</a>
+    <a href="#s8">08 常见问题 ⑤融会贯通</a>
+    <a href="#s9">09 拓展 ⑤融会贯通</a>
+    <a href="#s10">10 思考题 ⑤融会贯通</a>
+    <h4>兄弟实验</h4>
+    <a href="../exp-01-case-overview/index.html">EXP-01 案例总览</a>
+    <a href="../exp-02-teleop-collection/index.html">EXP-02 遥操作采集</a>
+    <a href="../exp-03-data-training/index.html">EXP-03 转换与训练</a>
+  </aside>
+
+  <main class="content">
+    <div class="exp-head">
+      <div class="code">EXP-04 · 8 学时</div>
+      <h1>真机推理与鲁棒性评估</h1>
+      <p class="desc">把训练好的 ACT checkpoint 部署回真机：三终端跑通「硬件层 → 推理节点 → 服务开关」，先 DRY_RUN 干跑再接真机复现开盖-取物-入罐-盖盖闭环，最后用摆放偏移检验策略的鲁棒性。</p>
+      <div class="meta"><span class="tag hl">机房实训</span><span class="tag">ROS2 推理节点</span><span class="tag">鲁棒性评估</span></div>
+    </div>
+
+    <!-- 00 -->
+    <section class="blk" id="s0">
+      <h2><span class="no">00</span>课程节奏：五星学习法 · 8 段微课（每段 ≤ 15 min）</h2>
+      <p>本实验按<b>五星学习法</b>组织：先用"checkpoint 部署回真机却猛甩臂"的真实故障<b>聚焦问题</b>，再用「开车眼手脚循环」<b>激活旧知</b>，接着<b>示证新知</b>（ROS2 接口 + 安全机制 + 双线程节拍动画），然后动手<b>应用新知</b>完成三终端启动与真机复现，最后借排障与拓展<b>融会贯通</b>。全程切成 <b>8 段微课、每段不超过 15 分钟</b>，段间停顿 1~2 分钟消化；纯讲授合计约 100 分钟，其余课时用于动手实操与个别辅导。</p>
+      <div class="fs-grid">
+        <div class="fs-cell"><div class="st">① 聚焦问题</div><div class="tm">课段 1 · 12 min</div><div class="ds">"checkpoint 部署后猛甩臂"故障引入</div></div>
+        <div class="fs-cell"><div class="st">② 激活旧知</div><div class="tm">课段 2 · 8 min</div><div class="ds">开车眼手脚 · 双线程 · 三层平滑</div></div>
+        <div class="fs-cell"><div class="st">③ 示证新知</div><div class="tm">课段 3~4 · 27 min</div><div class="ds">ROS2 接口安全 + 摆放偏移动画</div></div>
+        <div class="fs-cell"><div class="st">④ 应用新知</div><div class="tm">课段 5~7 · 40 min</div><div class="ds">三终端启动 + 真机复现 + 鲁棒性评估</div></div>
+        <div class="fs-cell"><div class="st">⑤ 融会贯通</div><div class="tm">课段 8 · 13 min</div><div class="ds">排障口诀 · 拓展 · 思考题</div></div>
+      </div>
+      <table class="tl">
+        <tr><th>课段</th><th>五星阶段</th><th>时长</th><th>对应章节</th><th>本段任务</th></tr>
+        <tr><td class="m">课段 1</td><td>聚焦问题</td><td class="m">12 min</td><td>§01 + §02 前半</td><td>抛出"checkpoint 部署后猛甩臂"的故障，明确推理部署目标</td></tr>
+        <tr><td class="m">课段 2</td><td>激活旧知</td><td class="m">8 min</td><td>§02 后半</td><td>用"开车眼手脚循环"旧知解释双线程推理与三层平滑</td></tr>
+        <tr><td class="m">课段 3</td><td>示证新知</td><td class="m">15 min</td><td>§03</td><td>认识 ROS2 接口（订阅/发布/服务）与 DRY_RUN 等安全机制</td></tr>
+        <tr><td class="m">课段 4</td><td>示证新知</td><td class="m">12 min</td><td>§06</td><td>看摆放偏移容忍带与双线程节拍动画</td></tr>
+        <tr><td class="m">课段 5</td><td>应用新知</td><td class="m">15 min</td><td>§04 + §05 前半</td><td>三终端启动、DRY_RUN=True 干跑验证动作合理性</td></tr>
+        <tr><td class="m">课段 6</td><td>应用新知</td><td class="m">15 min</td><td>§05 后半</td><td>切 DRY_RUN=False、SetBool 启停、真机复现开盖入罐闭环</td></tr>
+        <tr><td class="m">课段 7</td><td>应用新知</td><td class="m">10 min</td><td>§07</td><td>用摆放偏移鲁棒性评估台预判复现表现</td></tr>
+        <tr><td class="m">课段 8</td><td>融会贯通</td><td class="m">13 min</td><td>§08~§10</td><td>排障口诀收口，拓展阅读与思考题拔高迁移</td></tr>
+      </table>
+      <p class="fivestar-note">讲课提示：课段 1/2 以讲授 + 提问为主；课段 3~4 用接口表 + 动画；课段 5~6 边讲边演（先干跑再真机）；课段 7 学员独立完成；课段 8 答疑拔高。段间停顿 1~2 分钟。</p>
+    </section>
+
+    <!-- 01 学习目标 -->
+    <section class="blk" id="s1">
+      <h2><span class="no">01</span>学习目标<span class="seg">课段 1 · 聚焦问题 · 12 min</span></h2>
+      <ul class="check">
+        <li>读懂推理节点的双线程结构：50Hz 推理线程出目标、100Hz 发布线程经限速平滑后发指令。</li>
+        <li>掌握三终端启动法与 /model_ifrun 服务开关，理解 DRY_RUN 安全开关的干跑验证流程。</li>
+        <li>能按案例步骤完成家庭收纳闭环真机复现，并记录成功/失败现象。</li>
+        <li>理解「摆放偏移鲁棒性」评估的意义：数据覆盖范围决定策略能容忍多大的场景变化。</li>
+      </ul>
+      <div class="tip amber"><b>安全第一（案例原文）：</b>确保推理开始之前，机械臂附近没有人活动；抓取范围内不能站人，桌面做适当保护。</div>
+    </section>
+
+    <!-- 02 原理 -->
+    <section class="blk" id="s2">
+      <h2><span class="no">02</span>原理：双线程推理与三层平滑<span class="seg">课段 1 收尾 + 课段 2 · 激活旧知 · 8 min</span></h2>
+      <div class="tip amber"><span class="lab">❓ 聚焦问题（课段 1）</span>checkpoint 部署回真机，机械臂却猛地一甩——一查发现忘了先 DRY_RUN 干跑，Ramp 起步也没等。问题出在哪？带着这个故障听完全课——到课段 5 你会亲手跑通三终端安全启动。</div>
+      <p>推理节点像一位「边看边喊话的指挥」：<b>推理线程每 20ms（50Hz）</b>看一眼三路相机 + 16 维关节状态，让 ACT 算出「接下来该怎么动」；但机器人不能听完就猛动——<b>发布线程每 10ms（100Hz）</b>把目标动作先「磨平」再发出去。为什么要磨平？网络输出偶尔会抖，直接执行等于手臂突然哆嗦。平滑分三层：<b>① 滑动窗口平均</b>（取最近 5 个目标求均值，抹平单点毛刺）、<b>② EMA 平滑</b>（α=0.15，每次只朝目标挪一小步，像轻推弹簧）、<b>③ 硬性限速</b>（臂关节每拍最多变 0.003 rad、夹爪 0.02，物理上封顶）。三层过滤后，动作既跟得上策略又稳如人手。</p>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">动作块 chunk</div><div class="kt">ACT 一次预测未来 100 步动作，存进 FIFO 队列逐步弹出，队列空了再重新推理——动作天然连贯不碎蹦。</div></div>
+        <div class="kcard"><div class="kd">恒等映射</div><div class="kt">fixed 版转换脚本已修复列偏移 bug，数据集 16 维顺序 = ROS 物理顺序，部署侧不做任何循环移位。</div></div>
+        <div class="kcard"><div class="kd">Ramp 起步</div><div class="kt">首次推理从「当前实测关节角」出发逼近目标，避免从零位突然跳变——上电不甩臂。</div></div>
+        <div class="kcard"><div class="kd">鲁棒性</div><div class="kt">行为克隆只认「画面→动作」映射；摆放超出采集覆盖范围，画面陌生化，策略就会露怯。</div></div>
+      </div>
+      <div class="tip teal"><span class="lab">↺ 激活旧知（课段 2）</span>回忆开车：眼睛看路（感知）、大脑判断（决策）、手脚操作（执行），三者不停循环。推理节点也是这样：50Hz 看一眼算目标、100Hz 磨平后发指令，三层平滑保证手臂不哆嗦。</div>
+      <div class="tip tealb"><b>一句话原理：</b>推理管「想什么」，发布管「怎么动」——想得快（50Hz）、动得稳（100Hz + 限速），真机才既灵敏又安全。</div>
+    </section>
+
+    <!-- 03 硬件与环境 -->
+    <section class="blk" id="s3">
+      <h2><span class="no">03</span>硬件与环境：ROS2 接口与安全机制<span class="seg">课段 3 · 示证新知 · 15 min</span></h2>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">三路相机</div><div class="kt">/dev/cam_head、/dev/cam_left、/dev/cam_right，720×1280 输入策略。</div></div>
+        <div class="kcard"><div class="kd">订阅（输入）</div><div class="kt">/cerebellum_sdk/arm/joint_states（双臂 14 关节实时）+ /slave/gripper/{left,right}/states（夹爪位置 q）。</div></div>
+        <div class="kcard"><div class="kd">发布（输出）</div><div class="kt">joint_commands 与左右夹爪 cmds 均 100Hz：14 关节目标位置段 + 左右夹爪目标 q。</div></div>
+        <div class="kcard"><div class="kd">服务（开关）</div><div class="kt">/model_ifrun（SetBool：true 启动 / false 停止推理）、joint_mode（MotorMode：切从动臂位置控制模式）。</div></div>
+      </div>
+      <div class="tip violet"><span class="lab">🧯 关机三项安全开关</span>接真机前先把这三道保险关上，出错也不会砸手：① <b>DRY_RUN=True</b> 只打印动作不发布到机械臂——测新模型<b>必开</b>；② <b>硬性限速</b> 臂 0.003 rad/tick、夹爪 0.02/tick，防止动作突变；③ <b>Ramp 准备</b> 从当前实际位置起手，不跳变。此外节点启动前会做<b>消息就绪检查</b>（所有关节/夹爪/相机就绪才放行），并用<b>双线程分离</b>保证推理 50Hz 偶尔卡顿时发布仍保持 100Hz。</div>
+    </section>
+
+    <!-- 04 操作步骤 -->
+    <section class="blk" id="s4">
+      <h2><span class="no">04</span>操作步骤：从干跑到真机复现<span class="seg">课段 5~6 · 应用新知 · 2×15 min</span></h2>
+      <div class="flow">
+        <div class="step"><b class="n">S1</b>部署模型<br><small>回传 checkpoint，改 MODEL_PATH 指向 pretrained_model</small></div>
+        <div class="arr">→</div>
+        <div class="step"><b class="n">S2</b>DRY_RUN=True 干跑<br><small>三终端启动，只打印动作验证合理性</small></div>
+        <div class="arr">→</div>
+        <div class="step"><b class="n">S3</b>DRY_RUN=False 真机<br><small>确认无异常后改 False，服务开关启动执行</small></div>
+        <div class="arr">→</div>
+        <div class="step"><b class="n">S4</b>复现与鲁棒性评估<br><small>恢复采集场景跑闭环，再平移摆放测偏移</small></div>
+      </div>
+      <ol style="margin:14px 0 6px;padding-left:22px;line-height:1.9">
+        <li><b>环境准备</b>：把 lerobot_inference_node_act.py 放入 /home/lindenbot/lerobot-0.4.1/，修改 MODEL_PATH 指向本任务 checkpoint。</li>
+        <li><b>终端 1 硬件层</b>：运行 01start_robot_act.sh（臂 SDK + 夹爪 + 碰撞检测）。</li>
+        <li><b>终端 2 推理节点</b>：运行 run_act_node.sh，看到「节点初始化完成，等待 /model_ifrun 启动指令」。</li>
+        <li><b>终端 3 干跑</b>：先保持 DRY_RUN=True，SetBool true 启动，查看打印的 L_arm/R_arm 动作序列是否合理。</li>
+        <li><b>切真机</b>：改 DRY_RUN=False 重启节点，SetBool true，机械臂自主完成开盖-取物-入罐-盖盖；SetBool false 停止。</li>
+        <li><b>鲁棒性评估</b>：环境恢复至采集阶段先跑通闭环；随后将罐子/芒果平移少量位置重复测试，记录成功与失败边界。</li>
+      </ol>
+      <div class="tip teal"><span class="lab">🧭 真机判据（复现是否成功）</span>把环境按采集阶段恢复——芒果放桌面、不锈钢收纳盒带盖摆好（对应实拍图 order：左洞芒果、右盒带盖）——点 <code>SetBool true</code> 后，机械臂应自主完成「开盖 → 取芒果 → 入盒 → 盖盖」。判据就一句话：<b>机械臂能自主把芒果放进不锈钢盒，即任务完成</b>。</div>
+      <div class="tip amber"><span class="lab">🔍 失败排查（照这个顺序）</span>万一机械臂没完成任务，别急着重跑——按序看三级原因：① <b>环境没对上</b>（桌面布景、相机视角与采集阶段不一致）；② <b>数据不够</b>（简单任务一般建议采集 200 组左右）；③ <b>训练不充分</b>（训练步数建议 500000 步以上）。前两项都能复现、只是集/训不足时，才考虑补数据重训。</div>
+    </section>
+
+    <!-- 05 关键命令 -->
+    <section class="blk" id="s5">
+      <h2><span class="no">05</span>关键命令（三终端）<span class="seg">随课段 5 / 6 对照使用</span></h2>
+      <pre><span class="c"># ──终端1：机器人硬件层（臂 SDK + 夹爪 + 碰撞检测，无 CamerasNode）──</span>
+bash /home/lindenbot/iflytek_armtele_project/start_bash/04model_run_demo/<span class="b">01start_robot_act.sh</span>
+
+<span class="c"># ──终端2：ACT 推理节点（首次测新模型务必先 DRY_RUN=True）──</span>
+bash /home/lindenbot/lerobot-0.4.1/<span class="b">run_act_node.sh</span>
+
+<span class="c"># ──终端3：启动 / 停止推理──</span>
+source /home/lindenbot/iflytek_armtele_project/install/setup.bash
+ros2 service call /model_ifrun std_srvs/srv/SetBool <span class="g">"{data: true}"</span>   <span class="c"># 启动</span>
+ros2 service call /model_ifrun std_srvs/srv/SetBool <span class="y">"{data: false}"</span>  <span class="c"># 停止</span></pre>
+      <div class="tip tealb"><b>干跑判读：</b>终端 2 打印 <code>DRY_RUN=True：只打印动作，不发布到机械臂</code>，step=0/10/20… 的 L_arm/R_arm 数列应连续缓变；若出现跳变或方向明显反常，先回 EXP-03 查数据与训练，不要急着接真机。</div>
+      <div class="tip teal"><span class="lab">🖥️ 启动日志对照（DRY_RUN=True 干跑，原文 04-推理）</span>
+        <pre style="margin-top:8px">🚀 LeRobot ACT 推理节点启动
+⚠️  <span class="b">DRY_RUN=True：只打印动作，不发布到机械臂</span>
+   ✓ 相机设备: /dev/cam_head
+   ✓ 相机设备: /dev/cam_left
+   ✓ 相机设备: /dev/cam_right
+📦 加载 ACT 模型 ...
+🖥️  设备: cuda
+✅ ACT 模型/处理器加载成功 (chunk_size=100)
+📡 创建订阅者 ...
+   ✓ 机械臂状态: /cerebellum_sdk/arm/joint_states
+   ✓ 夹爪状态: /slave/gripper/{left,right}/states
+📤 创建发布者 ...
+   ✓ 臂命令 /cerebellum_sdk/arm/joint_commands + 夹爪命令
+✅ 节点初始化完成，等待 /model_ifrun 启动指令
+🎬 启动推理
+🔎 /joint_states 实际关节名(14): [left_shoulder_pitch_joint, left_shoulder_roll_joint, ...]
+🪜 ramp 起点(ROS顺序) L_pitch=+0.123 R_pitch=-0.456 -&gt; 目标 L_pitch=+0.130 R_pitch=-0.450
+🔄 推理循环启动 (50 Hz)
+📡 发布线程启动 (100 Hz, slew限速)
+step=0 L_arm[+0.130 -0.200 +0.100 -0.050 +0.300 +0.010 -0.150] L_grip=0.750 ...
+step=10 L_arm[+0.135 -0.205 +0.098 -0.048 +0.305 +0.012 -0.148] L_grip=0.752 ...</pre>
+      </div>
+      <div class="tip amber"><span class="lab">🔧 DRY_RUN=False 真机切换</span>把 `DRY_RUN` 改为 False 后重启节点，启动日记多一行 <code>🔴 DRY_RUN=False：将真正发布命令到机械臂！</code>，开始推理后会出现 <code>✅ 已切换臂控制模式 mode=1</code>；停止时打印 <code>⏸️ 停止推理 / 🛑 推理循环结束 / 🛑 发布线程结束</code>。</div>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">MODEL_PATH 指哪</div><div class="kt">家庭任务指向 …/output/put_fruit_in_box/last/pretrained_model（文档默认示例为 …/act_fac/050000/pretrained_model）。</div></div>
+        <div class="kcard"><div class="kd">怎么确认就绪</div><div class="kt">相机三路 ✓、模型 chunk_size=100 ✓、订阅/发布者 ✓、等待 /model_ifrun 指令——四连 ✓ 才可继续。</div></div>
+        <div class="kcard"><div class="kd">切换真机后</div><div class="kt">启动会打印「已切换臂控制模式 mode=1」与 ramp 起点→目标，再进入 50Hz 推理循环。</div></div>
+        <div class="kcard"><div class="kd">怎么收工</div><div class="kt">SetBool false 打印「推理循环结束 / 发布线程结束」，硬件层终端随后关闭。</div></div>
+      </div>
+    </section>
+
+    <!-- 06 动画 -->
+    <section class="blk" id="s6">
+      <h2><span class="no">06</span>动画：摆放偏移容忍带与双线程节拍<span class="seg">课段 4 · 示证新知 · 12 min</span></h2>
+      <div class="anim-box">
+        <svg viewBox="0 0 720 300" width="100%" role="img" aria-label="摆放偏移容忍带与双线程节拍动画">
+          <defs>
+            <marker id="a04e" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#38bdf8"/></marker>
+          </defs>
+          <g font-size="14" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif">
+            <!-- 上：摆放偏移容忍带（桌面俯视） -->
+            <text x="60" y="26" fill="#7dd3fc" font-size="12" text-anchor="start">桌面俯视 · 罐子摆放偏移</text>
+            <rect x="40" y="38" width="420" height="96" rx="10" fill="#0f172a" stroke="#334155" stroke-width="1.5"/>
+            <rect x="80" y="52" width="300" height="68" rx="8" fill="#0284c7" opacity="0.18" stroke="#38bdf8" stroke-dasharray="5 4"/>
+            <text x="230" y="130" fill="#7dd3fc" font-size="11">小范围变动可复现（采集覆盖的容忍带）</text>
+            <rect x="170" y="66" width="64" height="40" rx="6" fill="none" stroke="#94a3b8" stroke-dasharray="4 3"/>
+            <text x="202" y="91" fill="#94a3b8" font-size="11">基准位</text>
+            <g>
+              <rect x="170" y="66" width="64" height="40" rx="6" fill="#0369a1" stroke="#38bdf8" stroke-width="2"/>
+              <text x="202" y="91" fill="#e0f2fe" font-size="12">罐子</text>
+              <animateTransform attributeName="transform" type="translate"
+                values="0 0; 120 0; -60 0; 0 0" dur="7s" repeatCount="indefinite"/>
+            </g>
+            <line x1="500" y1="46" x2="500" y2="126" stroke="#f87171" stroke-width="2" stroke-dasharray="6 4"/>
+            <text x="600" y="90" fill="#f87171" font-size="12">超出容忍带</text>
+            <text x="600" y="110" fill="#f87171" font-size="12">→ 画面陌生 → 易失败</text>
+            <line x1="460" y1="86" x2="492" y2="86" stroke="#f87171" stroke-width="2" marker-end="url(#a04e)"/>
+            <!-- 下：双线程节拍 -->
+            <text x="60" y="172" fill="#7dd3fc" font-size="12" text-anchor="start">推理 50Hz → 目标动作 → 发布 100Hz（限速平滑）</text>
+            <rect x="40" y="184" width="270" height="88" rx="10" fill="#0c4a6e" stroke="#38bdf8" stroke-width="2"/>
+            <text x="175" y="208" fill="#e0f2fe" font-weight="bold">推理线程 · 50Hz</text>
+            <text x="175" y="228" fill="#7dd3fc" font-size="11">看三路相机 → ACT 算出目标</text>
+            <g fill="#fbbf24">
+              <circle cx="75" cy="252" r="6"><animate attributeName="opacity" values="0.25;1;0.25" dur="0.5s" repeatCount="indefinite"/></circle>
+              <circle cx="115" cy="252" r="6"><animate attributeName="opacity" values="0.25;1;0.25" dur="0.5s" begin="0.1s" repeatCount="indefinite"/></circle>
+              <circle cx="155" cy="252" r="6"><animate attributeName="opacity" values="0.25;1;0.25" dur="0.5s" begin="0.2s" repeatCount="indefinite"/></circle>
+              <circle cx="195" cy="252" r="6"><animate attributeName="opacity" values="0.25;1;0.25" dur="0.5s" begin="0.3s" repeatCount="indefinite"/></circle>
+              <circle cx="235" cy="252" r="6"><animate attributeName="opacity" values="0.25;1;0.25" dur="0.5s" begin="0.4s" repeatCount="indefinite"/></circle>
+              <circle cx="275" cy="252" r="6"><animate attributeName="opacity" values="0.25;1;0.25" dur="0.5s" begin="0.5s" repeatCount="indefinite"/></circle>
+            </g>
+            <line x1="315" y1="228" x2="360" y2="228" stroke="#38bdf8" stroke-width="2" marker-end="url(#a04e)"/>
+            <circle r="6" fill="#4ade80"><animateMotion dur="1.2s" repeatCount="indefinite" path="M315,228 L360,228"/></circle>
+            <rect x="365" y="184" width="315" height="88" rx="10" fill="#0f2a3d" stroke="#38bdf8" stroke-width="2"/>
+            <text x="522" y="208" fill="#e0f2fe" font-weight="bold">发布线程 · 100Hz</text>
+            <text x="522" y="228" fill="#7dd3fc" font-size="11">滑窗 5 帧均值 → EMA(0.15) → 硬限速</text>
+            <g fill="#38bdf8">
+              <circle cx="395" cy="252" r="5"><animate attributeName="opacity" values="0.25;1;0.25" dur="0.5s" repeatCount="indefinite"/></circle>
+              <circle cx="430" cy="252" r="5"><animate attributeName="opacity" values="0.25;1;0.25" dur="0.5s" begin="0.05s" repeatCount="indefinite"/></circle>
+              <circle cx="465" cy="252" r="5"><animate attributeName="opacity" values="0.25;1;0.25" dur="0.5s" begin="0.1s" repeatCount="indefinite"/></circle>
+              <circle cx="500" cy="252" r="5"><animate attributeName="opacity" values="0.25;1;0.25" dur="0.5s" begin="0.15s" repeatCount="indefinite"/></circle>
+              <circle cx="535" cy="252" r="5"><animate attributeName="opacity" values="0.25;1;0.25" dur="0.5s" begin="0.2s" repeatCount="indefinite"/></circle>
+              <circle cx="570" cy="252" r="5"><animate attributeName="opacity" values="0.25;1;0.25" dur="0.5s" begin="0.25s" repeatCount="indefinite"/></circle>
+              <circle cx="605" cy="252" r="5"><animate attributeName="opacity" values="0.25;1;0.25" dur="0.5s" begin="0.3s" repeatCount="indefinite"/></circle>
+              <circle cx="640" cy="252" r="5"><animate attributeName="opacity" values="0.25;1;0.25" dur="0.5s" begin="0.35s" repeatCount="indefinite"/></circle>
+            </g>
+          </g>
+        </svg>
+        <div class="anim-cap">动画：上半部分罐子在采集形成的容忍带内往复平移表示「小范围摆放变动仍可复现」，越过红线区域画面变陌生则易失败；下半部分 50Hz 推理黄点较慢、100Hz 发布蓝点更密，绿点表示磨平后的指令持续送往双臂。</div>
+      </div>
+      <div class="tip violet"><span class="lab">观察</span>推理点稀、发布点密——即使某一帧推理稍慢，发布线程仍按 100Hz 把现有目标限速平滑地送出去，手臂不会「卡一下抖一下」。<b>鲁棒性的本质</b>：容忍带不是画出来的，是采集时用足够多、覆盖足够宽的示范「铺」出来的。</div>
+    </section>
+
+    <!-- 07 互动 -->
+    <section class="blk" id="s7">
+      <h2><span class="no">07</span>互动：摆放偏移鲁棒性评估台<span class="seg">课段 7 · 应用新知 · 10 min</span></h2>
+      <div class="ix-panel">
+        <div class="ix-title">调节场景变化，预判复现表现（滑杆分档为教学示意，文档未给出具体厘米阈值）</div>
+        <div class="ctl-row">
+          <label>摆放偏移 <b id="offV">2</b> 档
+            <input type="range" id="offR" min="0" max="10" value="2" step="1" style="width:220px;vertical-align:middle">
+          </label>
+          <label>桌面-基座距离
+            <select id="distSel" style="padding:6px 10px;border:1px solid var(--theme-bd);border-radius:8px;background:#fff">
+              <option value="same" selected>与采集时一致</option>
+              <option value="slight">轻微变化</option>
+              <option value="big">明显变化</option>
+            </select>
+          </label>
+          <label>训练步数
+            <select id="stepSel" style="padding:6px 10px;border:1px solid var(--theme-bd);border-radius:8px;background:#fff">
+              <option value="50000">50000（课堂快训）</option>
+              <option value="500000" selected>500000+（案例口径）</option>
+            </select>
+          </label>
+          <button class="btn" onclick="evalOffset()">评估复现</button>
+          <button class="btn" onclick="resetOffset()">重置</button>
+        </div>
+        <div class="io" id="offIo"><span class="dim">等待评估……</span></div>
+      </div>
+      <p style="margin-top:10px">判读依据均来自案例原文：桌面到机械臂的距离要尽可能保持一致，否则复现效果较差；方位粗略测量、<b>采集数量足够大时场景小范围变动也可以复现</b>；简单任务建议采集 200 次左右、训练步数 500000 步以上。</p>
+    </section>
+
+    <!-- 08 常见问题 -->
+    <section class="blk" id="s8">
+      <h2><span class="no">08</span>常见问题<span class="seg">课段 8 · 融会贯通 · 13 min</span></h2>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">Q 节点起不来 / 报相机找不到？</div><div class="kt">先确认硬件层终端已启动、三路 /dev/cam_* 在线；日志出现「✓相机设备」三连才继续。</div></div>
+        <div class="kcard"><div class="kd">Q 调用 /model_ifrun 无响应？</div><div class="kt">前提「所有 ROS 话题已就绪」：joint_states、夹爪 states 有数据、MODEL_PATH 有效、终端3 记得 source install/setup.bash。</div></div>
+        <div class="kcard"><div class="kd">Q 动作幅度小、像慢动作？</div><div class="kt">正常现象：三层平滑硬限速封顶（臂 0.003 rad/tick、夹爪 0.02/tick），这是安全设计不是故障。</div></div>
+        <div class="kcard"><div class="kd">Q 闭环总在某步失败？</div><div class="kt">按案例排查顺序：先恢复桌面环境参数与预设一致，再核对采集是否 200 次左右、训练是否 500000 步以上。</div></div>
+        <div class="kcard"><div class="kd">Q 忘了 DRY_RUN 就启动？</div><div class="kt">默认 DRY_RUN=True 只打印；改 False 后切换真机会打印「已切换臂控制模式 mode=1」——手放在急停旁再启动。</div></div>
+        <div class="kcard"><div class="kd">Q 换了 checkpoint 要改什么？</div><div class="kt">只改 MODEL_PATH 指向新的 pretrained_model；DRY_RUN 先改回 True 走一遍干跑再接真机。</div></div>
+      </div>
+    </section>
+
+    <!-- 09 拓展 -->
+    <section class="blk" id="s9">
+      <h2><span class="no">09</span>拓展阅读<span class="seg">课段 8 · 融会贯通</span></h2>
+      <ul class="check">
+        <li>《04-聆动机器人推理》：推理源码逐层解析（1.1–1.4）、恒等映射与 cyclic-shift 历史溯源。</li>
+        <li>《聆动机器人案例-家庭场景》第 5 章「复现效果评估」：排查顺序与成功判据原文。</li>
+        <li>LeRobot 官方文档：ACTPolicy.select_action 的 FIFO 动作块机制与推理示例。</li>
+        <li>数据增广思路：若希望容忍更大的摆放偏移，可从采集端扩大示范位置覆盖面（回 EXP-02 规划采集）。</li>
+        <li>对照 IND-03 分拣案例：同一套三终端启动与 /model_ifrun 开关，仅换 checkpoint 与场景布设。</li>
+      </ul>
+    </section>
+
+    <!-- 10 思考题 -->
+    <section class="blk" id="s10">
+      <h2><span class="no">10</span>思考题 · 自测<span class="seg">课段 8 · 融会贯通</span></h2>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">✅ 完成成果</div><div class="kt">干跑日志 + 真机闭环成功记录 + 一张摆放偏移评估表（至少 3 个偏移档位）。</div></div>
+        <div class="kcard"><div class="kd">🧠 原理收获</div><div class="kt">讲清 50Hz/100Hz 双线程分工，以及三层平滑各自防的是什么问题。</div></div>
+        <div class="kcard"><div class="kd">🛠 技能收获</div><div class="kt">独立完成三终端启动、DRY_RUN 切换、SetBool 启停与 MODEL_PATH 配置。</div></div>
+        <div class="kcard"><div class="kd">📐 评分速览</div><div class="kt">真机复现 40% + 鲁棒性评估表 30% + 原理与排查论述 30%。</div></div>
+      </div>
+      <div class="tip violet"><span class="lab">思考 1</span>摆放偏移加大后失败率上升，为什么「加训步数」往往不如「补采不同位置的示范」有效？（提示：模型缺的是经验覆盖，不是参数量。）</div>
+      <div class="tip violet"><span class="lab">思考 2</span>如果允许罐子任意摆放，采集时应该怎样设计示范（位置分层？随机撒点？）才能铺出足够宽的「容忍带」？</div>
+    </section>
+
+    <nav class="expnav">
+      <a class="prev" href="../exp-03-data-training/index.html">← 上一个：EXP-03 数据转换与模型训练</a>
+      <a class="next" href="../index.html">返回课程目录</a>
+    </nav>
+    <footer>
+      <div>IND-04 · 家庭整理应用场景 · EXP-04 真机推理与鲁棒性评估</div>
+      <div>8 学时 · 真机推理实验 · 基于 聆动课程指导文档《04-聆动机器人推理》《聆动机器人案例-家庭场景》改编</div>
+    </footer>
+  </main>
+</div>
+
+<script>
+function evalOffset(){
+  var off = parseInt(document.getElementById('offR').value,10);
+  var dist = document.getElementById('distSel').value;
+  var st = document.getElementById('stepSel').value;
+  var lines = [];
+  if(dist === 'big'){
+    lines.push('<span class="bad">桌面-基座距离明显变化</span> — 案例原文：此距离应尽可能保持一致，否则会出现复现效果较差的情况（一票否决）。');
+  } else if(dist === 'slight'){
+    lines.push('<span class="warn">桌面-基座距离轻微变化</span> — 视觉视野整体平移，先恢复距离再谈偏移结论。');
+  } else {
+    lines.push('<span class="ok">桌面-基座距离与采集一致</span> — 场景底盘对齐，继续评估方位偏移。');
+  }
+  if(off <= 3){
+    lines.push('<span class="ok">偏移 ' + off + ' 档：落在容忍带内</span> — 采集覆盖的小范围变动，预期可复现。');
+  } else if(off <= 6){
+    lines.push('<span class="warn">偏移 ' + off + ' 档：接近容忍带边缘</span> — 需足够采集量支撑，建议每档重复多次统计成功率。');
+  } else {
+    lines.push('<span class="bad">偏移 ' + off + ' 档：超出容忍带</span> — 画面与示范分布差异大，行为克隆易失败；应在采集端补示范。');
+  }
+  if(st === '500000'){
+    lines.push('<span class="ok">训练 500000 步以上</span> — 满足案例复现口径（采集 200 次左右 / 500000 步以上）。');
+  } else {
+    lines.push('<span class="warn">训练仅 50000 步</span> — 低于案例口径 500000 步，复杂偏移下稳定性预期不足。');
+  }
+  document.getElementById('offIo').innerHTML = lines.join('\n');
+}
+function resetOffset(){
+  document.getElementById('offR').value = 2;
+  document.getElementById('offV').textContent = 2;
+  document.getElementById('distSel').value = 'same';
+  document.getElementById('stepSel').value = '500000';
+  document.getElementById('offIo').innerHTML = '<span class="dim">等待评估……</span>';
+}
+document.getElementById('offR').addEventListener('input',function(){
+  document.getElementById('offV').textContent = this.value;
+});
+</script>
+<script src="../shared/tutorial.js" defer></script>
+</body>
+</html>

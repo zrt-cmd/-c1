@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>减速器演示：降速增矩</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:transparent;
+  font-family:'Noto Sans CJK SC','Microsoft YaHei',sans-serif;color:#334155;-webkit-font-smoothing:antialiased}
+.wrap{padding:8px 8px 6px;display:flex;flex-direction:column;align-items:center;gap:7px}
+.hint{font-size:12.5px;color:#64748b;line-height:1.55;text-align:center;max-width:400px}
+.hint b{color:#b91c1c}
+svg{display:block;width:100%;max-width:400px}
+/* 计数器行 */
+.counts{display:flex;width:100%;max-width:400px;gap:6px}
+.c\boxed{flex:1;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:5px 8px;text-align:center}
+.cbox .cn{font-size:11px;color:#64748b;display:block;line-height:1.4}
+.cbox .cv{font-size:17px;font-weight:800;font-family:Consolas,'Courier New',monospace;color:#0f172a}
+.cbox .cu{font-size:10.5px;color:#94a3b8;font-weight:400}
+.ratio{flex:1;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:5px 8px;text-align:center}
+.ratio .cn{font-size:11px;color:#92400e;display:block;line-height:1.4}
+.ratio .cv{font-size:17px;font-weight:800;font-family:Consolas,'Courier New',monospace;color:#b45309}
+/* 控制条 */
+.ctrl{display:flex;align-items:center;gap:10px;width:100%;max-width:400px;flex-wrap:wrap;justify-content:center}
+.slider-row{display:flex;align-items:center;gap:6px;font-size:12px;color:#475569;flex:1;min-width:210px}
+.slider-row input[type=range]{flex:1;accent-color:#d97706;min-width:90px}
+.slider-row .sv{font-family:Consolas,monospace;font-weight:700;color:#b45309;min-width:64px;text-align:right}
+button{font-family:inherit;font-size:12.5px;font-weight:700;border-radius:8px;padding:6px 14px;cursor:pointer;border:1px solid transparent;line-height:1.5}
+#pause{background:#0f766e;color:#fff}
+#pause:hover{background:#115e59}
+#pause.paused{background:#dc2626}
+#pause.paused:hover{background:#b91c1c}
+#rst{background:#fff;color:#475569;border-color:#cbd5e1}
+#rst:hover{background:#f1f5f9}
+/* 扭矩条 */
+.bars{width:100%;max-width:400px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:7px 10px}
+.brow{display:flex;align-items:center;gap:8px;margin:4px 0;font-size:12px}
+.brow .bl{width:76px;color:#475569;font-weight:700;flex-shrink:0}
+.btrack{flex:1;height:14px;background:#e2e8f0;border-radius:7px;overflow:hidden}
+.bfill{height:100%;border-radius:7px}
+.bfill.in{background:#94a3b8;width:40%}
+.bfill.out{background:#dc2626;width:100%}
+.brow .bv{width:74px;font-family:Consolas,monospace;font-weight:700;text-align:right;flex-shrink:0}
+.bcap{font-size:11px;color:#64748b;text-align:center;margin-top:3px;line-height:1.5}
+.verdict{font-size:12.5px;min-height:42px;display:flex;align-items:center;justify-content:center;
+  text-align:center;line-height:1.55;background:#fff;border:1px dashed #cbd5e1;border-radius:8px;
+  padding:7px 10px;width:100%;max-width:400px;color:#475569}
+.verdict.ok{border-color:#16a34a;color:#15803d;font-weight:700}
+.lesson{font-size:12.5px;font-weight:700;color:#0f172a;text-align:center;line-height:1.5}
+.legend{font-size:11.5px;color:#64748b;text-align:center;line-height:1.6;max-width:400px;
+  background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;padding:5px 9px}
+.legend b{color:#334155}
+/* 符号与单位小表 */
+.legend .stt{font-weight:700;color:#475569;display:block;margin-bottom:3px}
+.legend table{width:100%;border-collapse:collapse;font-size:11px;line-height:1.45}
+.legend th,.legend td{border:1px solid #e2e8f0;padding:2.5px 5px;text-align:left}
+.legend th{background:#f1f5f9;color:#475569;font-weight:700}
+.legend td:first-child{text-align:center;font-weight:800;color:#0f172a;width:34px}
+.legend td:nth-child(3){color:#64748b;white-space:nowrap}
+.legend .note{display:block;text-align:left;font-size:10.5px;line-height:1.55;margin-top:4px;color:#64748b}
+.legend .note b{color:#475569}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hint">默认<b>静止</b>——按"<b>▶ 转动</b>"或拖<b>转速滑杆</b>让它转起来：两轮同步变快变慢，盯住<b>减速比</b>，它永远是 2.50</div>
+
+  <svg id="gearSvg" viewBox="0 0 400 270" aria-label="16齿小齿轮带动40齿大齿轮">
+    <!-- 轮心连线（基圆切点提示） -->
+    <line x1="85" y1="145" x2="225" y2="145" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="4 4"/>
+    <path id="g1" fill="#d97706" fill-opacity="0.92" stroke="#92400e" stroke-width="1.5" stroke-linejoin="round"/>
+    <path id="g2" fill="#64748b" fill-opacity="0.9" stroke="#334155" stroke-width="1.5" stroke-linejoin="round"/>
+    <!-- 大齿轮减重孔 -->
+    <g id="holes" fill="#f1f5f9" stroke="#475569" stroke-width="1.2"></g>
+    <!-- 轮毂 -->
+    <circle cx="85" cy="145" r="13" fill="#fff7ed" stroke="#92400e" stroke-width="2"/>
+    <circle cx="85" cy="145" r="4.5" fill="#92400e"/>
+    <circle cx="225" cy="145" r="20" fill="#f8fafc" stroke="#334155" stroke-width="2"/>
+    <circle cx="225" cy="145" r="7" fill="#334155"/>
+    <!-- 标签 -->
+    <g font-size="12" font-weight="700" text-anchor="middle" font-family="Noto Sans CJK SC,Microsoft YaHei,sans-serif">
+      <rect x="34" y="10" width="102" height="22" rx="6" fill="#fff" stroke="#e2e8f0"/>
+      <text x="85" y="25" fill="#b45309">电机 · 16 齿</text>
+      <rect x="168" y="10" width="114" height="22" rx="6" fill="#fff" stroke="#e2e8f0"/>
+      <text x="225" y="25" fill="#334155">输出 · 40 齿</text>
+    </g>
+    <!-- 符号图注 -->
+    <g font-size="11" font-family="Noto Sans CJK SC,Microsoft YaHei,sans-serif">
+      <!-- 小轮转速弧标 -->
+      <path d="M 30 175 A 52 52 0 0 1 45 118" fill="none" stroke="#b45309" stroke-width="1.6"/>
+      <polygon points="45,114 39,124 51,125" fill="#b45309"/>
+      <text x="10" y="170" fill="#b45309" font-weight="700">ω入</text>
+      <text x="2" y="184" fill="#94a3b8">（转速）</text>
+      <!-- 大轮转速弧标 -->
+      <path d="M 320 100 A 55 55 0 0 1 290 70" fill="none" stroke="#475569" stroke-width="1.6"/>
+      <polygon points="287,67 297,70 292,78" fill="#475569"/>
+      <text x="288" y="60" fill="#475569" font-weight="700">ω出 = ω入 ÷ 2.5</text>
+      <!-- 啮合点 -->
+      <circle cx="155" cy="145" r="3" fill="#dc2626"/>
+      <line x1="155" y1="145" x2="155" y2="205" stroke="#dc2626" stroke-width="1" stroke-dasharray="3 3"/>
+      <text x="155" y="220" fill="#b91c1c" text-anchor="middle" font-weight="700">啮合点：两轮过齿速度相同</text>
+      <text x="155" y="234" fill="#b91c1c" text-anchor="middle" font-weight="700">→ 减速比恒 = i = 40 ÷ 16 = 2.5</text>
+      <!-- i 标注在两轴之间 -->
+      <line x1="85" y1="168" x2="225" y2="168" stroke="#94a3b8" stroke-width="1.2"/>
+      <rect x="138" y="158" width="34" height="18" rx="5" fill="#fff" stroke="#94a3b8"/>
+      <text x="155" y="171" text-anchor="middle" font-weight="700" fill="#475569">i=2.5</text>
+    </g>
+    <!-- 方向箭头 -->
+    <path d="M 355 90 A 62 62 0 0 1 355 200" fill="none" stroke="#94a3b8" stroke-width="2" stroke-dasharray="5 4"/>
+    <polygon points="355,204 349,192 361,193" fill="#94a3b8"/>
+    <text x="378" y="149" font-size="10.5" fill="#64748b" text-anchor="middle" transform="rotate(90 378 149)">输出慢 2.5×</text>
+  </svg>
+
+  <div class="counts">
+    <div class="cbox"><span class="cn">电机轴（z₁=16 小轮）</span><span class="cv" id="c1">0.0</span> <span class="cu">圈</span></div>
+    <div class="cbox"><span class="cn">输出轴（z₂=40 大轮）</span><span class="cv" id="c2">0.0</span> <span class="cu">圈</span></div>
+    <div class="ratio"><span class="cn">减速比 = i</span><span class="cv" id="c3">2.50</span></div>
+  </div>
+
+  <div class="ctrl">
+    <div class="slider-row">ω入 电机转速
+      <input type="range" id="spd" min="0" max="180" step="5" value="90">
+      <span class="sv" id="spdv">90 rpm</span>
+    </div>
+    <button id="pause">▶ 转动</button>
+    <button id="rst">↺ 复位</button>
+  </div>
+
+  <div class="bars">
+    <div class="brow"><span class="bl">T 入（电机扭矩）</span><div class="btrack"><div class="bfill in"></div></div><span class="bv">1.0 单位</span></div>
+    <div class="brow"><span class="bl">T 出（输出扭矩）</span><div class="btrack"><div class="bfill out"></div></div><span class="bv">2.5 单位</span></div>
+    <div class="bcap">拖转速：两条<b>都不动</b>——扭矩不由快慢决定，由齿数比决定（功率 P = T · ω 守恒）</div>
+  </div>
+
+  <div class="verdict ok" id="verdict">恒 2.50 ✔ 减速比 = 齿数比 40 ÷ 16，转速多快都不变</div>
+  <div class="lesson">齿数比 = 速度的除法、力矩的乘法（功率不变）。</div>
+  <div class="legend"><span class="stt">图注 · 符号与单位对照</span>
+    <table>
+      <tr><th>符号</th><th>含义</th><th>单位</th></tr>
+      <tr><td>z</td><td>齿数，数颗牙（z₁=16，z₂=40）</td><td>颗（齿）</td></tr>
+      <tr><td>i</td><td>减速比 = z₂ ÷ z₁，纯倍数</td><td>无单位</td></tr>
+      <tr><td>ω</td><td>转速，转多快（rpm = 转/分钟）</td><td>rpm</td></tr>
+      <tr><td>T</td><td>力矩，转的"劲"（N·m = 牛·米）</td><td>N·m</td></tr>
+      <tr><td>P</td><td>功率 = T × ω（W = 瓦）</td><td>W</td></tr>
+    </table>
+    <span class="note"><b>备注 1 · ω 的换算：</b>rpm 和 rad/s 两套单位，rpm × 2π ÷ 60 = rad/s（1 转 = 2π 弧度，1 分钟 = 60 秒）。例：90 rpm × 6.28 ÷ 60 ≈ 9.42 rad/s。<br><b>备注 2 · W 的来历：</b>P = T × ω 中，ω 用 rad/s 时，P 的单位就是 N·m/s，即 1 W = 1 N·m/s（1 焦耳/秒）。其中 N（牛顿）= 质量(kg) × 加速度(m/s²)：让 1 kg 产生 1 m/s² 加速度所需的力；重力下加速度取 9.8 m/s²。</span>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+/* ---- 参数：16 齿 : 40 齿 = 2.5（与 servo-lab 一致，module=5） ---- */
+var Z1 = 16, Z2 = 40, RATIO = Z2 / Z1;        /* 2.5 */
+var C1X = 85, C1Y = 145, R1 = 40;              /* 小轮节圆 */
+var C2X = 225, C2Y = 145, R2 = 100;            /* 大轮节圆 */
+var M = 5;                                     /* 模数 */
+var TIP1 = R1 + M*0.9, ROOT1 = R1 - M*1.05;
+var TIP2 = R2 + M*0.9, ROOT2 = R2 - M*1.05;
+var BASE2 = 180 + (360/Z2)/2;                  /* 让 180° 处是齿隙，对准小轮齿心 */
+
+function polar(r, deg){ var a = deg*Math.PI/180; return [r*Math.cos(a), r*Math.sin(a)]; }
+function gearPath(z, tip, root){
+  var step = 360/z, d = [], i, c, A, B, C, D;
+  for(i=0;i<z;i++){
+    c = i*step;
+    A = polar(root, c - 0.34*step);
+    B = polar(tip,  c - 0.155*step);
+    C = polar(tip,  c + 0.155*step);
+    D = polar(root, c + 0.34*step);
+    d.push((i===0?'M':'L') + A[0].toFixed(2) + ',' + A[1].toFixed(2));
+    d.push('L' + B[0].toFixed(2) + ',' + B[1].toFixed(2));
+    d.push('L' + C[0].toFixed(2) + ',' + C[1].toFixed(2));
+    d.push('L' + D[0].toFixed(2) + ',' + D[1].toFixed(2));
+  }
+  d.push('Z');
+  return d.join(' ');
+}
+var p1 = document.getElementById('g1');
+var p2 = document.getElementById('g2');
+p1.setAttribute('d', gearPath(Z1, TIP1, ROOT1));
+p1.setAttribute('transform', 'translate(' + C1X + ',' + C1Y + ')');
+p2.setAttribute('d', gearPath(Z2, TIP2, ROOT2));
+p2.setAttribute('transform', 'translate(' + C2X + ',' + C2Y + ')');
+/* 减重孔 4 个（大轮） */
+var holes = document.getElementById('holes'), k, hp;
+for(k=0;k<4;k++){
+  hp = polar(62, 45 + k*90);
+  var ci = document.createElementNS('http://www.w3.org/2000/svg','circle');
+  ci.setAttribute('cx', (C2X + hp[0]).toFixed(1));
+  ci.setAttribute('cy', (C2Y + hp[1]).toFixed(1));
+  ci.setAttribute('r', 13);
+  holes.appendChild(ci);
+}
+
+/* ---- 状态 ---- */
+var theta1 = 0;            /* 小轮累计角度（驱动源） */
+var rpm = 90;              /* 默认演示转速 */
+var running = false;        /* 默认静止，操作（按钮/滑杆）才转 */
+var t1 = 0, t2 = 0;        /* 圈数 */
+var spdv = document.getElementById('spdv');
+var c1 = document.getElementById('c1'), c2 = document.getElementById('c2'), c3 = document.getElementById('c3');
+var verdict = document.getElementById('verdict');
+var pauseBtn = document.getElementById('pause');
+
+function upd(){
+  p1.setAttribute('transform', 'translate(' + C1X + ',' + C1Y + ') rotate(' + theta1.toFixed(2) + ')');
+  p2.setAttribute('transform', 'translate(' + C2X + ',' + C2Y + ') rotate(' + (BASE2 - theta1/RATIO).toFixed(3) + ')');
+  t1 = theta1 / 360;
+  t2 = t1 / RATIO;
+  c1.textContent = t1.toFixed(1);
+  c2.textContent = t2.toFixed(1);
+  c3.textContent = RATIO.toFixed(2);
+}
+
+document.getElementById('spd').addEventListener('input', function(e){
+  rpm = +e.target.value;
+  spdv.textContent = rpm + ' rpm';
+  if(!running && rpm > 0){       /* 拖滑杆视作开始操作 */
+    running = true;
+    pauseBtn.textContent = '⏸ 暂停';
+    pauseBtn.classList.remove('paused');
+  }
+});
+pauseBtn.addEventListener('click', function(){
+  running = !running;
+  pauseBtn.textContent = running ? '⏸ 暂停' : '▶ 继续';
+  pauseBtn.classList.toggle('paused', !running);
+});
+document.getElementById('rst').addEventListener('click', function(){
+  theta1 = 0;
+  verdict.innerHTML = '恒 2.50 ✔ 减速比 = 齿数比 40 ÷ 16，转速多快都不变';
+  upd();
+});
+
+var last = performance.now(), vTimer = 0;
+function loop(now){
+  var dt = Math.min((now - last)/1000, 0.05); last = now;
+  if(running && rpm > 0){
+    theta1 += rpm * 6 * dt;          /* rpm → 度/秒 */
+  }
+  upd();
+  /* 判定语低频更新，念得过来；静止时不报"0÷0" */
+  vTimer += dt;
+  if(vTimer > 0.5){
+    vTimer = 0;
+    if(t1 > 0.05){
+      verdict.innerHTML = t1.toFixed(1) + ' ÷ ' + t2.toFixed(1) + ' = <b>2.50</b> ✔ 恒等于齿数比 40 ÷ 16 —— 转多快都是它';
+    }
+  }
+  requestAnimationFrame(loop);
+}
+upd();
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

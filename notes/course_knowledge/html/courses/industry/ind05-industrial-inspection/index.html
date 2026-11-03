@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IND-05 工业巡检应用场景 · 行业应用课程</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f7f8fa; --card:#ffffff; --ink:#0f172a; --ink-2:#334155; --muted:#64748b;
+    --line:#e2e8f0; --shadow:0 1px 2px rgba(15,23,42,.04),0 8px 24px rgba(15,23,42,.06);
+    --shadow-lift:0 2px 4px rgba(15,23,42,.05),0 16px 40px rgba(15,23,42,.10);
+    --teal:#14b8a6; --cyan:#06b6d4; --blue:#2563eb;
+    --theme:#059669; --theme-deep:#047857; --theme-bg:#ecfdf5; --theme-bd:#a7f3d0;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Noto Sans CJK SC','Inter',"PingFang SC","Microsoft YaHei",sans-serif;
+    font-size:14.5px;line-height:1.7;-webkit-font-smoothing:antialiased}
+  .num{font-family:'Space','Inter',monospace;font-weight:600;letter-spacing:.02em}
+  .topbar{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);transition:box-shadow .2s}
+  body.scrolled .topbar{box-shadow:0 4px 16px rgba(15,23,42,.06)}
+  .bar-in{max-width:1280px;margin:0 auto;display:flex;align-items:flex-end;justify-content:space-between;gap:24px;padding:26px 40px 20px}
+  .eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600}
+  .eyebrow b{color:var(--theme);font-weight:700}
+  .title{font-size:44px;line-height:1.15;font-weight:800;letter-spacing:-.01em;margin:8px 0 10px;
+    background:linear-gradient(120deg,#047857 0%,#059669 55%,#34d399 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  .title em{font-style:normal}
+  .badges{display:flex;flex-wrap:wrap;gap:8px}
+  .badge{border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 13px;font-size:12.5px;color:var(--ink-2);font-weight:500}
+  .badge b{color:var(--theme-deep)}
+  .crumb{display:inline-flex;align-items:center;gap:6px;min-height:34px;padding:6px 14px;border:1px solid var(--line);
+    background:#fff;border-radius:999px;font-size:13px;color:var(--muted);text-decoration:none;transition:all .18s;margin:0 8px 14px 0}
+  .crumb:hover{border-color:var(--theme-bd);color:var(--theme-deep);background:var(--theme-bg);transform:translateY(-1px)}
+  .crumb svg{flex:none}
+  .topact{display:flex;flex-direction:column;align-items:flex-end;gap:12px;flex:none}
+  .cta{display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,var(--theme) 0%,var(--theme-deep) 100%);
+    color:#fff;font-weight:600;text-decoration:none;padding:11px 22px;border-radius:999px;font-size:14px;box-shadow:0 6px 18px rgba(5,150,105,.28);transition:transform .18s,box-shadow .18s}
+  .cta:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(5,150,105,.36)}
+  .cta svg{transition:transform .18s}.cta:hover svg{transform:translateX(4px)}
+  .mini{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+  .mini a{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);text-decoration:none;border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 14px;transition:all .18s}
+  .mini a:hover{border-color:var(--theme-bd);color:var(--theme-deep);background:var(--theme-bg)}
+  .wrap{max-width:1280px;margin:0 auto;padding:32px 40px 40px}
+  .hero{display:grid;grid-template-columns:1.5fr 1fr;gap:24px;margin-bottom:44px;scroll-margin-top:96px}
+  .hero-main{background:linear-gradient(135deg,#ecfdf5 0%,#d1fae5 55%,#a7f3d0 100%);border:1px solid var(--theme-bd);border-radius:18px;padding:36px 38px;position:relative;overflow:hidden;box-shadow:var(--shadow)}
+  .hero-main::after{content:"";position:absolute;right:-60px;top:-60px;width:240px;height:240px;border-radius:50%;background:radial-gradient(circle,rgba(5,150,105,.16),transparent 70%)}
+  .hero-main h2{margin:0 0 12px;font-size:26px;font-weight:800;color:var(--theme-deep)}
+  .hero-main p{margin:0 0 14px;color:var(--ink-2);font-size:14.5px}
+  .demo-chip{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.8);border:1px dashed var(--theme);border-radius:12px;padding:10px 14px;font-size:13px;color:var(--theme-deep);font-weight:500}
+  .demo-chip .num{color:var(--theme)}
+  .hero-side{display:flex;flex-direction:column;gap:16px}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 14px;text-align:center;box-shadow:var(--shadow)}
+  .stat .v{font-size:24px;font-weight:800;color:var(--theme);font-family:'Space','Inter',monospace}
+  .stat .l{font-size:12px;color:var(--muted);margin-top:2px}
+  .quote{flex:1;background:var(--card);border:1px solid var(--line);border-left:3px solid var(--theme);border-radius:14px;padding:18px 20px;box-shadow:var(--shadow);font-size:13.5px;color:var(--ink-2)}
+  .quote b{color:var(--theme-deep)}
+  .sec{margin-bottom:48px;scroll-margin-top:96px}
+  .sec-head{display:flex;align-items:baseline;gap:14px;margin-bottom:18px}
+  .sec-head .tag{font-family:'Space',monospace;font-size:12px;font-weight:700;letter-spacing:.1em;color:#fff;background:var(--theme);border-radius:6px;padding:3px 9px}
+  .sec-head h3{margin:0;font-size:21px;font-weight:800}
+  .sec-head p{margin:0;color:var(--muted);font-size:13px}
+  .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 18px;min-height:150px;box-shadow:var(--shadow);transition:transform .2s,box-shadow .2s,border-color .2s}
+  .card:hover{transform:translateY(-4px);box-shadow:var(--shadow-lift);border-color:#cbd5e1}
+  .card .ico{width:36px;height:36px;border-radius:9px;background:var(--theme-bg);border:1px solid var(--theme-bd);display:flex;align-items:center;justify-content:center;margin-bottom:12px;color:var(--theme)}
+  .card h4{margin:0 0 6px;font-size:15.5px;font-weight:700}
+  .card p{margin:0;font-size:13px;color:var(--muted);line-height:1.65}
+  .kcards{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:16px}
+  .kcard{background:linear-gradient(160deg,#ffffff,#f8fafc);border:1px solid var(--line);border-radius:14px;padding:18px;box-shadow:var(--shadow);transition:transform .2s}
+  .kcard:hover{transform:translateY(-3px)}
+  .kcard .b{display:inline-block;font-family:'Space',monospace;font-size:11px;font-weight:700;color:var(--theme-deep);background:var(--theme-bg);border:1px solid var(--theme-bd);border-radius:5px;padding:2px 8px;margin-bottom:10px}
+  .kcard h5{margin:0 0 6px;font-size:14.5px;font-weight:700}
+  .kcard p{margin:0;font-size:12.5px;color:var(--muted);line-height:1.6}
+  .explist{display:flex;flex-direction:column;gap:16px}
+  .exp{display:grid;grid-template-columns:130px 1fr auto;gap:22px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px 26px;box-shadow:var(--shadow);transition:transform .2s,box-shadow .2s,border-color .2s;text-decoration:none;color:inherit;position:relative;overflow:hidden;scroll-margin-top:100px}
+  .exp::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:linear-gradient(180deg,var(--theme),var(--theme-deep));opacity:0;transition:opacity .2s}
+  .exp:hover{transform:translateY(-3px);box-shadow:var(--shadow-lift);border-color:var(--theme-bd)}
+  .exp:hover::before{opacity:1}
+  .e-no{font-family:'Space',monospace;font-size:44px;font-weight:800;line-height:1;color:var(--theme-bd);transition:color .2s}
+  .exp:hover .e-no{color:var(--theme)}
+  .e-body h4{margin:0 0 6px;font-size:19px;font-weight:700;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .e-body h4 .pid{font-family:'Space',monospace;font-size:11px;font-weight:700;color:#fff;background:var(--theme);border-radius:5px;padding:2px 7px;letter-spacing:.06em}
+  .e-body p{margin:0 0 10px;font-size:13.5px;color:var(--muted)}
+  .e-tags{display:flex;flex-wrap:wrap;gap:7px}
+  .e-tags span{font-size:12px;color:var(--ink-2);background:#f1f5f9;border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+  .e-go{display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex:none}
+  .e-go .h{font-size:13px;color:var(--theme-deep);font-weight:600;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+  .e-go .arrow{width:38px;height:38px;border-radius:50%;border:1px solid var(--theme-bd);background:var(--theme-bg);display:flex;align-items:center;justify-content:center;color:var(--theme);transition:transform .2s}
+  .exp:hover .e-go .arrow{transform:translateX(4px) rotate(-45deg)}
+  .e-go .hrs{font-family:'Space',monospace;font-size:12px;color:var(--muted)}
+  .pills{display:flex;flex-wrap:wrap;gap:10px}
+  .pill{display:inline-flex;align-items:center;gap:7px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:8px 16px;font-size:13.5px;box-shadow:var(--shadow);transition:transform .18s}
+  .pill:hover{transform:translateY(-2px)}
+  .pill svg{color:var(--theme)}
+  .path{display:flex;align-items:stretch;gap:0;flex-wrap:wrap}
+  .pstep{flex:1;min-width:200px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;box-shadow:var(--shadow);position:relative;margin-right:26px}
+  .pstep:last-child{margin-right:0}
+  .pstep::after{content:"";position:absolute;right:-20px;top:50%;transform:translateY(-50%);width:0;height:0;border-left:9px solid var(--theme-bd);border-top:7px solid transparent;border-bottom:7px solid transparent}
+  .pstep:last-child::after{display:none}
+  .pstep .n{font-family:'Space',monospace;font-size:12px;font-weight:700;color:var(--theme);letter-spacing:.08em}
+  .pstep h5{margin:6px 0 5px;font-size:15px;font-weight:700}
+  .pstep p{margin:0;font-size:12.5px;color:var(--muted);line-height:1.6}
+  .foot-in{margin-top:56px;background:linear-gradient(135deg,var(--theme) 0%,var(--theme-deep) 100%);color:#fff;border-radius:18px;padding:30px 36px;display:flex;justify-content:space-between;align-items:center;gap:24px;flex-wrap:wrap;box-shadow:0 10px 30px rgba(5,150,105,.25)}
+  .foot-in h4{margin:0 0 6px;font-size:20px;font-weight:800}
+  .foot-in p{margin:0;font-size:13.5px;opacity:.9}
+  .foot-in .fbtns{display:flex;gap:12px;flex-wrap:wrap}
+  .foot-in a.fbtn{display:inline-flex;align-items:center;gap:7px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.4);color:#fff;text-decoration:none;font-weight:600;font-size:13.5px;padding:10px 20px;border-radius:999px;transition:background .18s,transform .18s}
+  .foot-in a.fbtn:hover{background:rgba(255,255,255,.28);transform:translateY(-2px)}
+  .site-foot{text-align:center;color:var(--muted);font-size:12.5px;padding:26px 0 40px}
+  .srctable{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:var(--shadow);font-size:13px}
+  .srctable thead{background:var(--theme-bg)}
+  .srctable th{padding:11px 16px;text-align:left;color:var(--theme-deep);font-weight:700;border-bottom:2px solid var(--theme-bd);font-size:12.5px;letter-spacing:.05em}
+  .srctable td{padding:10px 16px;border-bottom:1px solid var(--line);color:var(--ink-2);vertical-align:top}
+  .srctable tbody tr:last-child td{border-bottom:none}
+  .srctable tbody tr:hover{background:var(--theme-bg)}
+  .srctable td.num{color:var(--theme);font-weight:700;white-space:nowrap}
+  .srcnote{margin:12px 2px 0;font-size:12.5px;color:var(--muted)}
+  .srcnote code{background:var(--theme-bg);border:1px solid var(--theme-bd);border-radius:5px;padding:1px 6px;font-size:12px;color:var(--theme-deep)}
+  .olstep{margin:0;padding:0;list-style:none;counter-reset:cls;display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+  .olstep li{counter-increment:cls;position:relative;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px 14px 52px;font-size:13px;color:var(--ink-2);box-shadow:var(--shadow)}
+  .olstep li::before{content:counter(cls,decimal-leading-zero);position:absolute;left:14px;top:14px;font-family:'Space',monospace;font-weight:700;font-size:13px;color:#fff;background:var(--theme);border-radius:6px;padding:2px 7px}
+  .olstep li b{color:var(--theme-deep)}
+  .klab-note{margin-top:14px;background:var(--theme-bg);border:1px solid var(--theme-bd);border-left:3px solid var(--theme);border-radius:10px;padding:12px 16px;font-size:13px;color:var(--theme-deep);font-weight:500}
+  @media(max-width:680px){.olstep{grid-template-columns:1fr}}
+  .reveal{opacity:1;transform:none}
+  body.js .reveal{opacity:0;transform:translateY(22px);transition:opacity .55s ease,transform .55s ease}
+  body.js .reveal.in{opacity:1;transform:none}
+  @media(max-width:1080px){.hero{grid-template-columns:1fr}.grid4,.kcards{grid-template-columns:repeat(2,1fr)}.exp{grid-template-columns:90px 1fr}.e-go{display:none}}
+  @media(max-width:680px){.wrap{padding:24px 18px}.bar-in{padding:20px 18px 16px;flex-direction:column;align-items:flex-start}.title{font-size:32px}.grid4,.kcards,.stats{grid-template-columns:1fr 1fr}.topact{align-items:flex-start}.mini{justify-content:flex-start}}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="bar-in">
+    <div>
+      <a class="crumb" href="../../index.html">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        总首页
+      </a>
+      <a class="crumb" href="../../index.html#ind">CAT 3 行业应用</a>
+      <div class="eyebrow">INDUSTRY · CAT 3 / <b>IND-05</b></div>
+      <h1 class="title">工业巡检<em>应用场景</em></h1>
+      <div class="badges">
+        <span class="badge">32 学时</span><span class="badge">4 实验</span>
+        <span class="badge">宇树 Go2 Edu 四足机器狗</span><span class="badge">SLAM · Nav2 · YOLOv8</span>
+      </div>
+    </div>
+    <div class="topact">
+      <a class="cta" href="#exp01">从运动控制开始
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </a>
+      <div class="mini">
+        <a href="#s2">课程结构</a><a href="#s6">工具栈</a><a href="#s7">源材料</a><a href="#s8">课时</a><a href="#s10">学习路径</a>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <!-- HERO：巡检闭环预告 -->
+  <section class="hero reveal">
+    <div class="hero-main">
+      <h2>先走通一圈巡检闭环，再拆开建图—定位—识别</h2>
+      <p>本课程以<strong>宇树 Unitree Go2 Edu 四足机器狗</strong>的<strong>工业巡检</strong>真实链路贯穿：3D 激光雷达扫描厂区生成点云地图、AMCL 粒子滤波实时定位、Nav2 规划路径依序到达多个巡检点、相机拍照并用 YOLOv8/ONNX 识别表计读数与异常目标、汇总生成巡检报告，最后自主走回充电桩——完整跑通「<strong>建图 - 定位 - 巡检 - 识别 - 报告 - 回充</strong>」六环闭环。</p>
+      <div class="demo-chip">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l9 5v10l-9 5-9-5V7z"/></svg>
+        开源全栈底座 <b class="num">go2_ros2_sdk</b> · 一条 launch 拉起点云、SLAM、Nav2、RViz、Foxglove 与视觉检测
+      </div>
+    </div>
+    <aside class="hero-side">
+      <div class="stats">
+        <div class="stat"><div class="v num">32</div><div class="l">总学时</div></div>
+        <div class="stat"><div class="v num">04</div><div class="l">实验项目</div></div>
+        <div class="stat"><div class="v num">08</div><div class="l">开源素材源</div></div>
+      </div>
+      <div class="quote">
+        <b>核心理念：</b>移动机器人巡检的本质是「先认识地方，再知道自己在哪，然后按路线办事」。四足只是腿，<b>SLAM 给它地图、AMCL 给它位置、Nav2 给它路线、YOLO 给它眼睛</b>——四样凑齐，机器狗才从遥控玩具变成巡检员工。
+      </div>
+    </aside>
+  </section>
+
+  <!-- 课程结构 -->
+  <section class="sec reveal" id="s2">
+    <div class="sec-head"><span class="tag">STRUCTURE</span><h3>课程结构</h3><p>四步能力阶梯：会动 → 会画 → 会走 → 会看</p></div>
+    <div class="grid4">
+      <div class="card"><div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 17l6-6 4 4 6-7"/><circle cx="4" cy="17" r="1.6"/></svg></div>
+        <h4>SDK 运动控制</h4><p>安装 Unitree SDK 与 ROS2 Go2 驱动，速度指令遥控前进转向、站立趴下、读取状态，打牢巡检的「腿」。</p></div>
+      <div class="card"><div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg></div>
+        <h4>3D 激光建图</h4><p>启动 3D 激光与 slam_toolbox 建图节点，遥控遍历场地，生成 3D 点云与 2D 栅格地图并保存，得到巡检的「地图」。</p></div>
+      <div class="card"><div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-5.5-7-11a7 7 0 0114 0c0 5.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg></div>
+        <h4>定位与多点导航</h4><p>配置 AMCL 初始位姿与 Nav2 参数，编排多个巡检点，让 Go2 依序自主到达并避障——巡检的「路线」。</p></div>
+      <div class="card"><div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M8 11l3 3 5-5"/></svg></div>
+        <h4>视觉闭环与报告</h4><p>巡检点拍照，YOLOv8/ONNX 识别表计读数或异常目标，汇总生成巡检日报并自主回充——巡检的「眼睛和交付」。</p></div>
+    </div>
+    <div class="kcards">
+      <div class="kcard"><span class="b">TASK</span><h5>建图-定位-巡检-识别-报告</h5><p>六环闭环：多点巡检、表计读数、异常检测、自主回充一口气跑完。</p></div>
+      <div class="kcard"><span class="b">STACK</span><h5>ROS2 Humble + Nav2</h5><p>slam_toolbox、AMCL、nav2_waypoint_follower 多点巡逻标配组合。</p></div>
+      <div class="kcard"><span class="b">ROBOT</span><h5>Go2 Edu 40 TOPS</h5><p>3D 激光雷达 + 深度相机 + 高清相机 + Jetson Orin 机载算力。</p></div>
+      <div class="kcard"><span class="b">VISION</span><h5>YOLOv8 / ONNX</h5><p>看图圈目标：表计数字检测、异常目标识别、置信度阈值标定。</p></div>
+    </div>
+  </section>
+
+  <!-- 四个实验 -->
+  <section class="sec reveal" id="exps">
+    <div class="sec-head"><span class="tag">LAB</span><h3>实验项目</h3><p>每实验 8 学时 · 理论融入实验原理章</p></div>
+    <div class="explist">
+      <a class="exp" id="exp01" href="exp-01-sdk-motion/index.html">
+        <div class="e-no">01</div>
+        <div class="e-body">
+          <h4>SDK 运动控制与巡检准备<span class="pid">SDK MOTION</span></h4>
+          <p>融合「四足运动与巡检概述」理论：认识 Go2 Edu 硬件与巡检任务，安装 Unitree SDK 与 ROS2 驱动，速度指令与站立趴下遥控，验收指令驱动四足运动正常。</p>
+          <div class="e-tags"><span>unitree_sdk2py</span><span>unitree_ros2</span><span>速度指令</span><span>低速起步</span></div>
+        </div>
+        <div class="e-go"><span class="h">进入实验</span><span class="arrow"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M12 5l7 7-7 7"/></svg></span><span class="hrs num">8 学时</span></div>
+      </a>
+      <a class="exp" id="exp02" href="exp-02-lidar-slam/index.html">
+        <div class="e-no">02</div>
+        <div class="e-body">
+          <h4>3D 激光建图<span class="pid">LIDAR SLAM</span></h4>
+          <p>启动 3D 激光与建图节点（Mid-360/XT16 多线激光），遥控遍历场地生成 3D 点云与栅格地图，Save/Serialize 保存地图文件，验收生成可用巡检地图。</p>
+          <div class="e-tags"><span>slam_toolbox</span><span>点云建图</span><span>闭合回路</span><span>map.yaml/pgm</span></div>
+        </div>
+        <div class="e-go"><span class="h">进入实验</span><span class="arrow"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M12 5l7 7-7 7"/></svg></span><span class="hrs num">8 学时</span></div>
+      </a>
+      <a class="exp" id="exp03" href="exp-03-amcl-nav2/index.html">
+        <div class="e-no">03</div>
+        <div class="e-body">
+          <h4>定位与多点导航巡检<span class="pid">AMCL &amp; NAV2</span></h4>
+          <p>融合「SLAM/定位/导航原理」理论：AMCL 粒子滤波如何猜位置、Nav2 如何像高德一样规划避障，配置初始位姿与参数，编排巡检点依序自主到达。</p>
+          <div class="e-tags"><span>AMCL 粒子滤波</span><span>Nav2</span><span>Waypoint Follower</span><span>定位收敛</span></div>
+        </div>
+        <div class="e-go"><span class="h">进入实验</span><span class="arrow"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M12 5l7 7-7 7"/></svg></span><span class="hrs num">8 学时</span></div>
+      </a>
+      <a class="exp" id="exp04" href="exp-04-vision-loop/index.html">
+        <div class="e-no">04</div>
+        <div class="e-body">
+          <h4>视觉巡检闭环与报告<span class="pid">VISION LOOP</span></h4>
+          <p>巡检点拍照/录像，YOLOv8/ONNX 识别表计读数或异常目标，脚本汇总生成巡检日报，最后自主回充，完成「建图-定位-巡检-识别-报告」全闭环验收。</p>
+          <div class="e-tags"><span>YOLOv8/ONNX</span><span>表计读数</span><span>巡检报告</span><span>自主回充</span></div>
+        </div>
+        <div class="e-go"><span class="h">进入实验</span><span class="arrow"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M12 5l7 7-7 7"/></svg></span><span class="hrs num">8 学时</span></div>
+      </a>
+    </div>
+  </section>
+
+  <!-- 工具栈 -->
+  <section class="sec reveal" id="s6">
+    <div class="sec-head"><span class="tag">STACK</span><h3>工具与平台</h3><p>全部来自真实开源项目与官方文档</p></div>
+    <div class="pills">
+      <span class="pill"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l9 5v10l-9 5-9-5V7z"/></svg>宇树 Go2 Edu（40 TOPS Jetson Orin）</span>
+      <span class="pill"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>3D 激光雷达 Mid-360 / XT16</span>
+      <span class="pill"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="12" rx="2"/><path d="M7 7V4h10v3"/></svg>unitree_sdk2py · unitree_ros2</span>
+      <span class="pill"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 010 18M12 3a15 15 0 000 18"/></svg>Ubuntu 22.04 + ROS2 Humble</span>
+      <span class="pill"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 17l6-6 4 4 6-7"/></svg>slam_toolbox · AMCL · Nav2</span>
+      <span class="pill"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 12l2 2 4-4"/></svg>YOLOv8 · ONNX Runtime</span>
+      <span class="pill"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16v12H4z"/><path d="M4 10h16"/></svg>RViz2 · Foxglove Studio</span>
+      <span class="pill"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17V7l6 4 6-6 6 8"/></svg>go2_ros2_sdk 全栈 launch</span>
+    </div>
+    <div class="kcards" style="margin-top:16px">
+      <div class="kcard"><span class="b">DOMAIN</span><h5>工业厂区巡检</h5><p>配电房、管廊、厂区通道的表计读数与异常巡线，替代人工重复劳动。</p></div>
+      <div class="kcard"><span class="b">GAIT</span><h5>四足足式运动</h5><p>对角小跑 trot 步态，站立/趴下/速度指令由运动服务统一调度。</p></div>
+      <div class="kcard"><span class="b">SENSE</span><h5>3D 激光 + 相机</h5><p>多线激光雷达建图定位，高清相机识别表计与异常，光照不足配补光。</p></div>
+      <div class="kcard"><span class="b">OPS</span><h5>多点巡逻 + 回充</h5><p>waypoint 依序到达、每点定位收敛后再出发，巡检完自主走回充电桩。</p></div>
+    </div>
+  </section>
+
+  <!-- 源材料清单（真实开源仓库） -->
+  <section class="sec reveal" id="s7">
+    <div class="sec-head"><span class="tag">SOURCE</span><h3>源材料清单</h3><p>培训方案「课程5」+ 8 个已核实开源仓库 · 命令均摘自 README</p></div>
+    <table class="srctable">
+      <thead><tr><th>#</th><th>来源</th><th>用于</th></tr></thead>
+      <tbody>
+        <tr><td class="num">S1</td><td>培训方案 xlsx「课程5」6 行（2 理论 + 4 实践）</td><td>全课结构、学时、验收标准与注意事项的权威依据</td></tr>
+        <tr><td class="num">S2</td><td>unitree_sdk2py（BSD-3）read_highstate / sportmode_test</td><td>EXP-01：状态读取、StandUpDown/VelocityMove 速度与站立控制、前置相机拍照</td></tr>
+        <tr><td class="num">S3</td><td>unitree_ros2 README · /api/sport/request · utlidar/cloud</td><td>EXP-01/02：ROS2 话题与运动请求、RViz 查看点云、go2_stand_example</td></tr>
+        <tr><td class="num">S4</td><td>go2_ros2_sdk（BSD-2）robot.launch.py · SlamToolboxPlugin</td><td>EXP-02/03：一键拉起建图导航栈、Save/Serialize Map、controller_frequency=3.0</td></tr>
+        <tr><td class="num">S5</td><td>Nav2 官方文档：AMCL / waypoint_follower / Docking</td><td>EXP-03/04：粒子滤波参数、多点巡检 follow_waypoints、回充 SimpleChargingDock</td></tr>
+        <tr><td class="num">S6</td><td>Ultralytics CLI · coco_detector（go2_ros2_sdk 内置）</td><td>EXP-04：yolo detect predict、/detected_objects 话题与 detection_threshold</td></tr>
+        <tr><td class="num">S7</td><td>smart-gas-meter（MIT）train_yolo.py / infer_yolo.py</td><td>EXP-04：表计数字检测全流程参照、model_digit_yolo.onnx 部署方式</td></tr>
+        <tr><td class="num">S8</td><td>unitree_rl_gym · unitree_ros go2_description · FAST-LIO</td><td>EXP-03/04 拓展：强化学习、URDF/Gazebo 局限、激光里程图自行核验</td></tr>
+      </tbody>
+    </table>
+    <p class="srcnote">全部命令与参数均摘自上表开源仓库 README / 官方文档，未核实的 API 一律不写；宇树机载 <code>unitree_slam/mid360_driver</code> 为闭源服务，课堂只演示并对比开源方案。</p>
+  </section>
+
+  <!-- 课时分配 -->
+  <section class="sec reveal" id="s8">
+    <div class="sec-head"><span class="tag">SCHEDULE</span><h3>32 学时分配</h3><p>每实验 8 学时 · 讲授 / 演示 / 实操 / 复盘</p></div>
+    <table class="srctable">
+      <thead><tr><th>实验</th><th>主题（含融入理论）</th><th>学时</th><th>课堂节奏（8 学时拆分）</th></tr></thead>
+      <tbody>
+        <tr><td class="num">EXP-01</td><td>SDK 运动控制与巡检准备（融合理论1：硬件与巡检任务）</td><td class="num">8</td><td>2h Go2 硬件与巡检任务 · 1h SDK/驱动安装 · 4h 指令遥控实操 · 1h 安全复盘</td></tr>
+        <tr><td class="num">EXP-02</td><td>3D 激光建图</td><td class="num">8</td><td>1h 点云与 SLAM 原理 · 1h 节点启动 · 5h 遍历建图实操 · 1h 地图质量点评</td></tr>
+        <tr><td class="num">EXP-03</td><td>定位与多点导航巡检（融合理论2：SLAM/AMCL/Nav2 原理）</td><td class="num">8</td><td>2h 粒子滤波与规划原理 · 1h 参数配置 · 4h 多点编排实操 · 1h 收敛判读</td></tr>
+        <tr><td class="num">EXP-04</td><td>视觉巡检闭环与报告</td><td class="num">8</td><td>1h YOLO 与报告链条 · 2h 检测阈值标定 · 3h 闭环串跑 · 2h 报告与回充验收</td></tr>
+        <tr><td class="num">TOT</td><td>合计（2 理论融入 + 4 实践）</td><td class="num">32</td><td>教学动线统一为：先跑通闭环演示 → 再讲原理 → 后分步动手操作</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- 结课成果物 -->
+  <section class="sec reveal">
+    <div class="sec-head"><span class="tag">OUTPUT</span><h3>结课成果物</h3><p>学生需提交的四项留痕材料</p></div>
+    <div class="grid4">
+      <div class="card"><div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l9 5v10l-9 5-9-5V7z"/></svg></div>
+        <h4>巡检地图</h4><p>map.yaml / map/pgm 与 posegraph 序列化文件，RViz 复核无明显重影、走廊无扭曲。</p></div>
+      <div class="card"><div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-5.5-7-11a7 7 0 0114 0c0 5.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg></div>
+        <h4>多点巡检录像</h4><p>Go2 依序到达全部巡检点的录屏，含每次到达后的位姿收敛截图与避障过程。</p></div>
+      <div class="card"><div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M8 11l3 3 5-5"/></svg></div>
+        <h4>识别结果集</h4><p>各巡检点照片 + YOLO 检测框/置信度输出，表读数或异常目标与现场实拍对照。</p></div>
+      <div class="card"><div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h9l4 4v14H6z"/><path d="M9 12h7M9 16h7"/></svg></div>
+        <h4>巡检日报</h4><p>脚本自动生成的巡检报告文本 + 四实验思考题作答与失败归因复盘表。</p></div>
+    </div>
+  </section>
+
+  <!-- 课堂组织 -->
+  <section class="sec reveal">
+    <div class="sec-head"><span class="tag">CLASS</span><h3>课堂组织建议</h3><p>面向真机 + 机房双场景教学</p></div>
+    <ol class="olstep">
+      <li><b>分组：</b>2 人 1 组对标真机作业的「操作手 + 安全员」——一人发指令、一人盯狗避障，角色每轮互换。</li>
+      <li><b>场地固定：</b>巡检场地用胶带标出充电桩 dock 矩形，桌椅陈设中途不挪动，换组时按照片复原。</li>
+      <li><b>低速铁律：</b>所有速度指令从最低档起步，机器人抬腿异常立即趴下断控，避免跌落与碰撞。</li>
+      <li><b>地图版本：</b>每组地图按「组号-日期」命名，Save Map 与 Serialize Map 双落盘，当天归档不留口头。</li>
+      <li><b>演示前置：</b>每实验开场 10 分钟回放上一实验录像或闭环演示，保持「先看再做」动线。</li>
+      <li><b>验收关口：</b>EXP-01 查运动、EXP-02 查地图、EXP-03 查依序到达、EXP-04 查报告与回充，四关不过不进下一实验。</li>
+    </ol>
+    <div class="klab-note">安全底线：机器狗运动范围内不站人，任何异常先发 Stop/趴下指令再排查；狭窄与临边区域禁入，回充桩周围保持净空。</div>
+  </section>
+
+  <!-- 考核权重 -->
+  <section class="sec reveal" id="s9">
+    <div class="sec-head"><span class="tag">RUBRIC</span><h3>考核权重建议</h3><p>过程留痕 70% + 闭环成果 30%</p></div>
+    <div class="kcards">
+      <div class="kcard"><span class="b">15%</span><h5>运动控制分</h5><p>SDK 安装、站立趴下与速度指令遥控动作到位、安全操作规范（EXP-01）。</p></div>
+      <div class="kcard"><span class="b">25%</span><h5>地图质量分</h5><p>点云完整、栅格地图闭合良好无重影、地图文件双格式落盘（EXP-02）。</p></div>
+      <div class="kcard"><span class="b">30%</span><h5>导航执行分</h5><p>多点依序到达率、定位收敛后再出发、避障过程无碰撞（EXP-03）。</p></div>
+      <div class="kcard"><span class="b">30%</span><h5>识别与报告分</h5><p>检出率与阈值标定记录、巡检日报要素齐全、自主回充成功（EXP-04）。</p></div>
+    </div>
+  </section>
+
+  <!-- 巡检闭环数据流 -->
+  <section class="sec reveal" id="s5">
+    <div class="sec-head"><span class="tag">PIPELINE</span><h3>巡检闭环数据流</h3><p>每一环的输出是下一环的输入契约</p></div>
+    <div class="kcards">
+      <div class="kcard"><span class="b">S1 · 建图</span><h5>点云 → 栅格地图</h5><p>3D 激光 utlidar/cloud 经 slam_toolbox 融合成 /map，Save 出 yaml+pgm、Serialize 出 posegraph。</p></div>
+      <div class="kcard"><span class="b">S2 · 定位</span><h5>地图 + 传感器 → 位姿</h5><p>AMCL 一簇粒子不断淘汰修正，输出 odom→map 短正，初始位姿用 2D Pose Estimate 给定。</p></div>
+      <div class="kcard"><span class="b">S3 · 导航</span><h5>位姿 + 巡检点 → 速度</h5><p>Nav2 全局规划 + 局部避障，waypoint_follower 按序下发目标，每点到达等收敛再走。</p></div>
+      <div class="kcard"><span class="b">S4 · 识别与报告</span><h5>图像 → 检测 → 日报</h5><p>巡检点触发拍照，YOLOv8/ONNX 输出框+置信度，脚本汇总成巡检日报并规划回充。</p></div>
+    </div>
+  </section>
+
+  <!-- 验收与 FAQ -->
+  <section class="sec reveal">
+    <div class="sec-head"><span class="tag">REVIEW</span><h3>验收速览与常见疑问</h3><p>结课前对照打钩</p></div>
+    <div class="grid4">
+      <div class="card"><div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg></div>
+        <h4>EXP-01 验收</h4><p>指令驱动四足运动正常：前进转向随令而动、站起趴下到位、状态话题持续刷新。</p></div>
+      <div class="card"><div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg></div>
+        <h4>EXP-02 验收</h4><p>生成可用巡检地图：栅格完整、闭合回路后无明显重影，yaml/pgm/posegraph 齐全。</p></div>
+      <div class="card"><div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg></div>
+        <h4>EXP-03 验收</h4><p>Go2 依序自主到达巡检点：全程不撞、每点出发前定位已收敛、顺序与编排一致。</p></div>
+      <div class="card"><div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg></div>
+        <h4>EXP-04 验收</h4><p>完成「建图-定位-巡检-识别-报告」闭环：日报要素齐全、识别有据、自主回充成功。</p></div>
+    </div>
+    <div class="kcards">
+      <div class="kcard"><span class="b">FAQ 1</span><h5>没有真机也能学吗？</h5><p>能。本课全部基于开源栈，无真机时用 setup_local.sh 回环接口与仿真/录包完成大部分流程。</p></div>
+      <div class="kcard"><span class="b">FAQ 2</span><h5>为什么要先建图再导航？</h5><p>AMCL 定位的本质是「拿当前观测去已知地图里比对」，没有地图就没有可比对的参照物。</p></div>
+      <div class="kcard"><span class="b">FAQ 3</span><h5>Gazebo 里四足能走吗？</h5><p>unitree_ros 的 go2_description 在 Gazebo 只支持底层关节仿真、不支持完整行走——这是明确局限，课上讲清。</p></div>
+      <div class="kcard"><span class="b">FAQ 4</span><h5>检测漏检误检怎么办？</h5><p>两头治理：光照不足先补光，再标定 confidence 阈值——阈值调低多检也多误，调高少误也漏检。</p></div>
+    </div>
+  </section>
+
+  <!-- 学习路径 -->
+  <section class="sec reveal" id="s10">
+    <div class="sec-head"><span class="tag">PATH</span><h3>学习路径</h3><p>32 学时建议节奏：动 → 图 → 路 → 眼</p></div>
+    <div class="path">
+      <div class="pstep"><div class="n">STEP 01</div><h5>让狗动起来</h5><p>认识 Go2 硬件与巡检任务，装好 SDK 与驱动，速度指令与站立趴下全部走通。</p></div>
+      <div class="pstep"><div class="n">STEP 02</div><h5>给厂区画地图</h5><p>3D 激光点云逐帧拼接成栅格地图，闭合回路消除重影，双格式保存地图。</p></div>
+      <div class="pstep"><div class="n">STEP 03</div><h5>按路线巡逻</h5><p>AMCL 粒子收敛锁定位置，Nav2 规划+避障，多巡检点依序自主到达。</p></div>
+      <div class="pstep"><div class="n">STEP 04</div><h5>识读并交报告</h5><p>到点拍照、YOLO 圈出表计与异常，生成巡检日报，最后自主回充收工。</p></div>
+    </div>
+  </section>
+
+  <div class="foot-in reveal">
+    <div>
+      <h4>IND-05 · 工业巡检应用场景</h4>
+      <p>32 学时 · 4 实验 · 基于 培训方案「课程5」与 unitree_sdk2py / unitree_ros2 / go2_ros2_sdk / Nav2 等开源项目改编</p>
+    </div>
+    <div class="fbtns">
+      <a class="fbtn" href="exp-01-sdk-motion/index.html">开始 EXP-01
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </a>
+      <a class="fbtn" href="#top" onclick="window.scrollTo({top:0,behavior:'smooth'});return false;">回到顶部</a>
+    </div>
+  </div>
+  <div class="site-foot">CAT 3 行业应用课程 · IND-05 工业巡检应用场景 · 教学用途</div>
+</main>
+
+<script>
+document.body.classList.add('js');
+window.addEventListener('scroll',function(){document.body.classList.toggle('scrolled',window.scrollY>10)},{passive:true});
+var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{threshold:.08});
+document.querySelectorAll('.reveal').forEach(function(el,i){el.style.transitionDelay=(i*60)+'ms';io.observe(el)});
+</script>
+</body>
+</html>

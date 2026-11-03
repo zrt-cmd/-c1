@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IND-03 物料分拣应用场景 · 行业应用课程</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f7f8fa; --card:#ffffff; --ink:#0f172a; --ink-2:#334155; --muted:#64748b;
+    --line:#e2e8f0; --shadow:0 1px 2px rgba(15,23,42,.04),0 8px 24px rgba(15,23,42,.06);
+    --shadow-lift:0 2px 4px rgba(15,23,42,.05),0 16px 40px rgba(15,23,42,.10);
+    --teal:#14b8a6; --cyan:#06b6d4; --blue:#2563eb;
+    --theme:#d97706; --theme-deep:#b45309; --theme-bg:#fffbeb; --theme-bd:#fde68a;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Noto Sans CJK SC','Inter',"PingFang SC","Microsoft YaHei",sans-serif;
+    font-size:14.5px;line-height:1.7;-webkit-font-smoothing:antialiased}
+  .num{font-family:'Space','Inter',monospace;font-weight:600;letter-spacing:.02em}
+  .topbar{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);transition:box-shadow .2s}
+  body.scrolled .topbar{box-shadow:0 4px 16px rgba(15,23,42,.06)}
+  .bar-in{max-width:1280px;margin:0 auto;display:flex;align-items:flex-end;justify-content:space-between;gap:24px;padding:26px 40px 20px}
+  .eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600}
+  .eyebrow b{color:var(--theme);font-weight:700}
+  .title{font-size:44px;line-height:1.15;font-weight:800;letter-spacing:-.01em;margin:8px 0 10px}
+  .title em{font-style:normal;color:var(--theme)}
+  .badges{display:flex;flex-wrap:wrap;gap:8px}
+  .badge{border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 13px;font-size:12.5px;color:var(--ink-2);font-weight:500}
+  .badge b{color:var(--theme-deep)}
+  .crumb{display:inline-flex;align-items:center;gap:6px;min-height:34px;padding:6px 14px;border:1px solid var(--line);
+    background:#fff;border-radius:999px;font-size:13px;color:var(--muted);text-decoration:none;transition:all .18s;margin-bottom:14px}
+  .crumb:hover{border-color:var(--theme-bd);color:var(--theme-deep);background:var(--theme-bg);transform:translateY(-1px)}
+  .crumb svg{flex:none}
+  .topact{display:flex;flex-direction:column;align-items:flex-end;gap:12px;flex:none}
+  .cta{display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,var(--theme) 0%,var(--theme-deep) 100%);
+    color:#fff;font-weight:600;text-decoration:none;padding:11px 22px;border-radius:999px;font-size:14px;box-shadow:0 6px 18px rgba(217,119,6,.28);transition:transform .18s,box-shadow .18s}
+  .cta:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(217,119,6,.36)}
+  .cta svg{transition:transform .18s}.cta:hover svg{transform:translateX(4px)}
+  .mini{display:flex;gap:8px}
+  .mini a{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);text-decoration:none;border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 14px;transition:all .18s}
+  .mini a:hover{border-color:var(--theme-bd);color:var(--theme-deep);background:var(--theme-bg)}
+  .wrap{max-width:1280px;margin:0 auto;padding:32px 40px 40px}
+  .hero{display:grid;grid-template-columns:1.5fr 1fr;gap:24px;margin-bottom:44px}
+  .hero-main{background:linear-gradient(135deg,#fffbeb 0%,#fef3c7 55%,#fde68a 100%);border:1px solid var(--theme-bd);border-radius:18px;padding:36px 38px;position:relative;overflow:hidden;box-shadow:var(--shadow)}
+  .hero-main::after{content:"";position:absolute;right:-60px;top:-60px;width:240px;height:240px;border-radius:50%;background:radial-gradient(circle,rgba(217,119,6,.16),transparent 70%)}
+  .hero-main h2{margin:0 0 12px;font-size:26px;font-weight:800;color:var(--theme-deep)}
+  .hero-main p{margin:0 0 14px;color:var(--ink-2);font-size:14.5px}
+  .demo-chip{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.8);border:1px dashed var(--theme);border-radius:12px;padding:10px 14px;font-size:13px;color:var(--theme-deep);font-weight:500}
+  .demo-chip .num{color:var(--theme)}
+  .hero-side{display:flex;flex-direction:column;gap:16px}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 14px;text-align:center;box-shadow:var(--shadow)}
+  .stat .v{font-size:24px;font-weight:800;color:var(--theme);font-family:'Space','Inter',monospace}
+  .stat .l{font-size:12px;color:var(--muted);margin-top:2px}
+  .quote{flex:1;background:var(--card);border:1px solid var(--line);border-left:3px solid var(--theme);border-radius:14px;padding:18px 20px;box-shadow:var(--shadow);font-size:13.5px;color:var(--ink-2)}
+  .quote b{color:var(--theme-deep)}
+  .sec{margin-bottom:48px}
+  .sec-head{display:flex;align-items:baseline;gap:14px;margin-bottom:18px}
+  .sec-head .tag{font-family:'Space',monospace;font-size:12px;font-weight:700;letter-spacing:.1em;color:#fff;background:var(--theme);border-radius:6px;padding:3px 9px}
+  .sec-head h3{margin:0;font-size:21px;font-weight:800}
+  .sec-head p{margin:0;color:var(--muted);font-size:13px}
+  .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 18px;min-height:150px;box-shadow:var(--shadow);transition:transform .2s,box-shadow .2s,border-color .2s}
+  .card:hover{transform:translateY(-4px);box-shadow:var(--shadow-lift);border-color:#cbd5e1}
+  .card .ico{width:36px;height:36px;border-radius:9px;background:var(--theme-bg);border:1px solid var(--theme-bd);display:flex;align-items:center;justify-content:center;margin-bottom:12px;color:var(--theme)}
+  .card h4{margin:0 0 6px;font-size:15.5px;font-weight:700}
+  .card p{margin:0;font-size:13px;color:var(--muted);line-height:1.65}
+  .kcards{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:16px}
+  .kcard{background:linear-gradient(160deg,#ffffff,#f8fafc);border:1px solid var(--line);border-radius:14px;padding:18px;box-shadow:var(--shadow);transition:transform .2s}
+  .kcard:hover{transform:translateY(-3px)}
+  .kcard .b{display:inline-block;font-family:'Space',monospace;font-size:11px;font-weight:700;color:var(--theme-deep);background:var(--theme-bg);border:1px solid var(--theme-bd);border-radius:5px;padding:2px 8px;margin-bottom:10px}
+  .kcard h5{margin:0 0 6px;font-size:14.5px;font-weight:700}
+  .kcard p{margin:0;font-size:12.5px;color:var(--muted);line-height:1.6}
+  .explist{display:flex;flex-direction:column;gap:16px}
+  .exp{display:grid;grid-template-columns:130px 1fr auto;gap:22px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px 26px;box-shadow:var(--shadow);transition:transform .2s,box-shadow .2s,border-color .2s;text-decoration:none;color:inherit;position:relative;overflow:hidden}
+  .exp::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:linear-gradient(180deg,var(--theme),var(--theme-deep));opacity:0;transition:opacity .2s}
+  .exp:hover{transform:translateY(-3px);box-shadow:var(--shadow-lift);border-color:var(--theme-bd)}
+  .exp:hover::before{opacity:1}
+  .e-no{font-family:'Space',monospace;font-size:44px;font-weight:800;line-height:1;color:var(--theme-bd);transition:color .2s}
+  .exp:hover .e-no{color:var(--theme)}
+  .e-body h4{margin:0 0 6px;font-size:19px;font-weight:700;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .e-body h4 .pid{font-family:'Space',monospace;font-size:11px;font-weight:700;color:#fff;background:var(--theme);border-radius:5px;padding:2px 7px;letter-spacing:.06em}
+  .e-body p{margin:0 0 10px;font-size:13.5px;color:var(--muted)}
+  .e-tags{display:flex;flex-wrap:wrap;gap:7px}
+  .e-tags span{font-size:12px;color:var(--ink-2);background:#f1f5f9;border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+  .e-go{display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex:none}
+  .e-go .h{font-size:13px;color:var(--theme-deep);font-weight:600;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+  .e-go .arrow{width:38px;height:38px;border-radius:50%;border:1px solid var(--theme-bd);background:var(--theme-bg);display:flex;align-items:center;justify-content:center;color:var(--theme);transition:transform .2s}
+  .exp:hover .e-go .arrow{transform:translateX(4px) rotate(-45deg)}
+  .e-go .hrs{font-family:'Space',monospace;font-size:12px;color:var(--muted)}
+  .pills{display:flex;flex-wrap:wrap;gap:10px}
+  .pill{display:inline-flex;align-items:center;gap:7px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:8px 16px;font-size:13.5px;box-shadow:var(--shadow);transition:transform .18s}
+  .pill:hover{transform:translateY(-2px)}
+  .pill svg{color:var(--theme)}
+  .path{display:flex;align-items:stretch;gap:0;flex-wrap:wrap}
+  .pstep{flex:1;min-width:200px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;box-shadow:var(--shadow);position:relative;margin-right:26px}
+  .pstep:last-child{margin-right:0}
+  .pstep::after{content:"";position:absolute;right:-20px;top:50%;transform:translateY(-50%);width:0;height:0;border-left:9px solid var(--theme-bd);border-top:7px solid transparent;border-bottom:7px solid transparent}
+  .pstep:last-child::after{display:none}
+  .pstep .n{font-family:'Space',monospace;font-size:12px;font-weight:700;color:var(--theme);letter-spacing:.08em}
+  .pstep h5{margin:6px 0 5px;font-size:15px;font-weight:700}
+  .pstep p{margin:0;font-size:12.5px;color:var(--muted);line-height:1.6}
+  .foot-in{margin-top:56px;background:linear-gradient(135deg,var(--theme) 0%,var(--theme-deep) 100%);color:#fff;border-radius:18px;padding:30px 36px;display:flex;justify-content:space-between;align-items:center;gap:24px;flex-wrap:wrap;box-shadow:0 10px 30px rgba(217,119,6,.25)}
+  .foot-in h4{margin:0 0 6px;font-size:20px;font-weight:800}
+  .foot-in p{margin:0;font-size:13.5px;opacity:.9}
+  .foot-in .fbtns{display:flex;gap:12px;flex-wrap:wrap}
+  .foot-in a.fbtn{display:inline-flex;align-items:center;gap:7px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.4);color:#fff;text-decoration:none;font-weight:600;font-size:13.5px;padding:10px 20px;border-radius:999px;transition:background .18s,transform .18s}
+  .foot-in a.fbtn:hover{background:rgba(255,255,255,.28);transform:translateY(-2px)}
+  .site-foot{text-align:center;color:var(--muted);font-size:12.5px;padding:26px 0 40px}
+  .srctable{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:var(--shadow);font-size:13px}
+  .srctable thead{background:var(--theme-bg)}
+  .srctable th{padding:11px 16px;text-align:left;color:var(--theme-deep);font-weight:700;border-bottom:2px solid var(--theme-bd);font-size:12.5px;letter-spacing:.05em}
+  .srctable td{padding:10px 16px;border-bottom:1px solid var(--line);color:var(--ink-2);vertical-align:top}
+  .srctable tbody tr:last-child td{border-bottom:none}
+  .srctable tbody tr:hover{background:#fffbeb}
+  .srctable td.num{color:var(--theme);font-weight:700;white-space:nowrap}
+  .srcnote{margin:12px 2px 0;font-size:12.5px;color:var(--muted)}
+  .srcnote code{background:var(--theme-bg);border:1px solid var(--theme-bd);border-radius:5px;padding:1px 6px;font-size:12px;color:var(--theme-deep)}
+  .olstep{margin:0;padding:0;list-style:none;counter-reset:cls;display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+  .olstep li{counter-increment:cls;position:relative;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px 14px 52px;font-size:13px;color:var(--ink-2);box-shadow:var(--shadow)}
+  .olstep li::before{content:counter(cls,decimal-leading-zero);position:absolute;left:14px;top:14px;font-family:'Space',monospace;font-weight:700;font-size:13px;color:#fff;background:var(--theme);border-radius:6px;padding:2px 7px}
+  .olstep li b{color:var(--theme-deep)}
+  .klab-note{margin-top:14px;background:var(--theme-bg);border:1px solid var(--theme-bd);border-left:3px solid var(--theme);border-radius:10px;padding:12px 16px;font-size:13px;color:var(--theme-deep);font-weight:500}
+  @media(max-width:680px){.olstep{grid-template-columns:1fr}}
+  .reveal{opacity:1;transform:none}
+  body.js .reveal{opacity:0;transform:translateY(22px);transition:opacity .55s ease,transform .55s ease}
+  body.js .reveal.in{opacity:1;transform:none}
+  @media(max-width:1080px){.hero{grid-template-columns:1fr}.grid4,.kcards{grid-template-columns:repeat(2,1fr)}.exp{grid-template-columns:90px 1fr}.e-go{display:none}}
+  @media(max-width:680px){.wrap{padding:24px 18px}.bar-in{padding:20px 18px 16px;flex-direction:column;align-items:flex-start}.title{font-size:32px}.grid4,.kcards,.stats{grid-template-columns:1fr 1fr}.topact{align-items:flex-start}}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="bar-in">
+    <div>
+      <a class="crumb" href="../../index.html">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        总首页 · CAT 3 行业应用
+      </a>
+      <div class="eyebrow">Industry · CAT 3 / <b>IND-03</b></div>
+      <h1 class="title">物料分拣<em>应用场景</em></h1>
+      <div class="badges">
+        <span class="badge">32 学时</span><span class="badge">4 实验</span>
+        <span class="badge">双臂协同</span><span class="badge">LDT-01 遥操作</span>
+      </div>
+    </div>
+    <div class="topact">
+      <a class="cta" href="#exp01">从成果演示开始
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </a>
+      <div class="mini">
+        <a href="#exp01">EXP-01 概览</a><a href="#exp04">EXP-04 真机</a><a href="#path">学习路径</a>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <!-- HERO：成果演示预告 -->
+  <section class="hero reveal">
+    <div class="hero-main">
+      <h2>看一遍成果，再拆开整条流水线</h2>
+      <p>本课程以聆动 LDT-01 双臂机器人的<strong>工厂物料分拣</strong>真实案例贯穿：左手摆放黑色零件入左格、右手摆放银色零件入右格，通过遥操作采集示范数据、转换为 LeRobot v3.0 数据集、训练 ACT 策略，最终在真机上自主复现分拣动作。</p>
+      <div class="demo-chip">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+        成果演示视频 <b class="num">工厂分拣场景.mp4</b> · 内置于 EXP-01 首屏，开课先看演示再学框架
+      </div>
+    </div>
+    <aside class="hero-side">
+      <div class="stats">
+        <div class="stat"><div class="v num">32</div><div class="l">总学时</div></div>
+        <div class="stat"><div class="v num">04</div><div class="l">实验项目</div></div>
+        <div class="stat"><div class="v num">8</div><div class="l">指导文档</div></div>
+      </div>
+      <div class="quote">
+        <b>核心理念：</b>行为克隆 =「我做给你看，你照着学」。机器人不写规则，只从人的示范里学会「看到零件 → 伸手 → 抓稳 → 放格」的完整动作链。<b>数据质量 &gt; 数据数量</b>——采集比想象中更重要。
+      </div>
+    </aside>
+  </section>
+
+  <!-- 课程结构 -->
+  <section class="sec reveal">
+    <div class="sec-head"><span class="tag">STRUCTURE</span><h3>课程结构</h3><p>四段能力阶梯：看懂 → 会采 → 会训 → 会推</p></div>
+    <div class="grid4">
+      <div class="card"><div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg></div>
+        <h4>案例认知</h4><p>观看分拣成果演示，理解双臂分工任务定义，建立「采集→转换→训练→推理」四段流水线的全局地图。</p></div>
+      <div class="card"><div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v6m0 8v6M2 12h6m8 0h6"/><circle cx="12" cy="12" r="3.5"/></svg></div>
+        <h4>遥操作采集</h4><p>LDT-01 主从遥操作、四臂校准、任务管理新建与三路相机录制，掌握高质量示范数据的生产方法。</p></div>
+      <div class="card"><div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h10M4 17h7"/><circle cx="19" cy="16" r="3"/></svg></div>
+        <h4>转换与训练</h4><p>CSV→LeRobot v3.0 转换（parquet+三路视频），配置 ACT 策略超参，用 lerobot-train 完成模型训练。</p></div>
+      <div class="card"><div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 12l2 2 4-4"/></svg></div>
+        <h4>真机推理</h4><p>ROS2 推理节点三终端启动、DRY_RUN 安全开关、50Hz 推理闭环，真机自主复现分拣并复盘优化。</p></div>
+    </div>
+    <div class="kcards">
+      <div class="kcard"><span class="b">STACK</span><h5>LeRobot 0.4.1</h5><p>lerobot-teleoperate / record / train 三件套 CLI。</p></div>
+      <div class="kcard"><span class="b">POLICY</span><h5>ACT 策略</h5><p>Action Chunking + VAE，chunk_size=100 动作块。</p></div>
+      <div class="kcard"><span class="b">DATA</span><h5>v3.0 数据格式</h5><p>parquet 关节帧 + 三路 RGB 视频流对齐。</p></div>
+      <div class="kcard"><span class="b">OPS</span><h5>ROS2 推理闭环</h5><p>50Hz 推理 / 100Hz 限速发布 / SetBool 服务启停。</p></div>
+    </div>
+  </section>
+
+  <!-- 四个实验 -->
+  <section class="sec reveal" id="exps">
+    <div class="sec-head"><span class="tag">LAB</span><h3>实验项目</h3><p>每实验 8 学时 · demo → 框架 → 分步操作</p></div>
+    <div class="explist">
+      <a class="exp" id="exp01" href="exp-01-case-overview/index.html">
+        <div class="e-no">01</div>
+        <div class="e-body">
+          <h4>成果演示与整体框架<span class="pid">CASE OVERVIEW</span></h4>
+          <p>先播放《工厂分拣场景》演示视频看到最终成果，再拆解双臂分拣任务定义与四段流水线动画，建立全课地图。</p>
+          <div class="e-tags"><span>演示视频</span><span>双臂分工</span><span>流水线动画</span><span>任务拆解</span></div>
+        </div>
+        <div class="e-go"><span class="h">进入实验</span><span class="arrow"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M12 5l7 7-7 7"/></svg></span><span class="hrs num">8 学时</span></div>
+      </a>
+      <a class="exp" id="exp02" href="exp-02-teleop-collection/index.html">
+        <div class="e-no">02</div>
+        <div class="e-body">
+          <h4>LDT-01 遥操作与数据采集<span class="pid">TELEOP &amp; RECORD</span></h4>
+          <p>硬件参数与三相机布局、开机与任务管理新建、主从遥操作映射、双臂同步录制与失败标记排除。</p>
+          <div class="e-tags"><span>LDT-01</span><span>四臂校准</span><span>三路相机</span><span>质量优先</span></div>
+        </div>
+        <div class="e-go"><span class="h">进入实验</span><span class="arrow"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M12 5l7 7-7 7"/></svg></span><span class="hrs num">8 学时</span></div>
+      </a>
+      <a class="exp" id="exp03" href="exp-03-data-training/index.html">
+        <div class="e-no">03</div>
+        <div class="e-body">
+          <h4>数据转换与模型训练<span class="pid">CONVERT &amp; TRAIN</span></h4>
+          <p>CSV 转 LeRobot v3.0 数据集、坏组过滤与任务标注，ACT 超参精讲，lerobot-train 训练与日志判读。</p>
+          <div class="e-tags"><span>v3.0 格式</span><span>ACT 超参</span><span>帧-动作对</span><span>训练曲线</span></div>
+        </div>
+        <div class="e-go"><span class="h">进入实验</span><span class="arrow"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M12 5l7 7-7 7"/></svg></span><span class="hrs num">8 学时</span></div>
+      </a>
+      <a class="exp" id="exp04" href="exp-04-real-robot/index.html">
+        <div class="e-no">04</div>
+        <div class="e-body">
+          <h4>真机推理与分拣复现<span class="pid">REAL ROBOT</span></h4>
+          <p>推理节点三终端启动、DRY_RUN 模拟安全先行，真机自主复现放件动作，案例复盘与常见问题排查。</p>
+          <div class="e-tags"><span>ROS2 节点</span><span>50Hz 闭环</span><span>安全开关</span><span>案例复盘</span></div>
+        </div>
+        <div class="e-go"><span class="h">进入实验</span><span class="arrow"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M12 5l7 7-7 7"/></svg></span><span class="hrs num">8 学时</span></div>
+      </a>
+    </div>
+  </section>
+
+  <!-- 工具栈 -->
+  <section class="sec reveal">
+    <div class="sec-head"><span class="tag">STACK</span><h3>工具与平台</h3><p>全部来自真实项目环境</p></div>
+    <div class="pills">
+      <span class="pill"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l9 5v10l-9 5-9-5V7z"/></svg>聆动 LDT-01-STD 双臂平台</span>
+      <span class="pill"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="12" rx="2"/><path d="M7 7V4h10v3"/></svg>LDT-01 遥操作手柄</span>
+      <span class="pill"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="2" width="12" height="20" rx="2"/><path d="M11 18h2"/></svg>localhost:8699 控制平台</span>
+      <span class="pill"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 010 18M12 3a15 15 0 000 18"/></svg>Ubuntu 22.04 + ROS2</span>
+      <span class="pill"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 17l6-6 4 4 6-7"/></svg>LeRobot 0.4.1 · lerobot-train</span>
+      <span class="pill"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18"/></svg>ACT 策略 · PyTorch + CUDA</span>
+      <span class="pill"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16v12H4z"/><path d="M4 10h16"/></svg>RTX 4060 Ti 16GB · i5-13400F</span>
+      <span class="pill"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17V7l6 4 6-6 6 8"/></svg>Hugging Face 数据集规范</span>
+    </div>
+    <div class="kcards" style="margin-top:16px">
+      <div class="kcard"><span class="b">DOMAIN</span><h5>工业物料分拣</h5><p>黑件 / 银色零件分类入格，产线上料与缺陷分拣的典型工位。</p></div>
+      <div class="kcard"><span class="b">SKILL</span><h5>双臂分工协同</h5><p>左手管左件入左格、右手管右件入右格，双手互不串扰。</p></div>
+      <div class="kcard"><span class="b">VISION</span><h5>三相机视觉</h5><p>头部 + 左右手腕相机同时观测，弥补单视角遮挡盲区。</p></div>
+      <div class="kcard"><span class="b">OPS</span><h5>端侧推理部署</h5><p>模型驻留机载 4060 Ti，ROS2 服务热启停，DUST 关急停联动。</p></div>
+      </div>
+  </section>
+
+  <!-- 8 份指导文档（真实内容来源） -->
+  <section class="sec reveal">
+    <div class="sec-head"><span class="tag">SOURCE</span><h3>源材料清单</h3><p>8 份 PDF 指导文档 · 参数命令均摘自原文</p></div>
+    <table class="srctable">
+      <thead><tr><th>#</th><th>文档</th><th>用于</th></tr></thead>
+      <tbody>
+        <tr><td class="num">S1</td><td>聆动机器人案例-工厂场景</td><td>EXP-01 / EXP-04：核心案例、转换/训练/推理真实命令、成功判据</td></tr>
+        <tr><td class="num">S2</td><td>00-聆动机器人硬件参数介绍</td><td>EXP-01 / EXP-02：算力平台、四相机、主从臂与夹爪参数表</td></tr>
+        <tr><td class="num">S3</td><td>01-聆动机器人数据采集流程</td><td>EXP-02：开机、任务创建、三分支采集、坏组标记与安全须知</td></tr>
+        <tr><td class="num">S4</td><td>02-聆动机器人数据转换</td><td>EXP-03：四阶段架构、四种切法、输出目录详解与排错</td></tr>
+        <tr><td class="num">S5</td><td>03-聆动机器人数据训练</td><td>EXP-03：Conda/CUDA 环境、lerobot-train、OOM 与在线训练</td></tr>
+        <tr><td class="num">S6</td><td>04-聆动机器人推理</td><td>EXP-04：节点架构、三层平滑、ramp、三终端与日志判读</td></tr>
+        <tr><td class="num">S7</td><td>遥操作设备LDT-01软件使用流程(开发者版)</td><td>EXP-02：按键/LED/拖拽模式/自检脚本/插补检查/Q&amp;A</td></tr>
+        <tr><td class="num">S8</td><td>聆动机器人案例-家庭场景</td><td>拓展：同流水线换任务对照，体会「场景变、框架不变」</td></tr>
+      </tbody>
+    </table>
+    <p class="srcnote">另参考 <code>行业课程案例\聆动课程\代码\lerobot-0.4.1\command\</code> 1~9 号 sh 脚本、<code>convert_lerobot_data.py</code> 与 <code>src/lerobot/policies/act/</code>，命令章节均为源码/文档摘录，不虚构参数。</p>
+  </section>
+
+  <!-- 课时分配 -->
+  <section class="sec reveal">
+    <div class="sec-head"><span class="tag">SCHEDULE</span><h3>32 学时分配</h3><p>每实验 8 学时 · 讲授 / 演示 / 实操 / 复盘</p></div>
+    <table class="srctable">
+      <thead><tr><th>实验</th><th>主题</th><th>学时</th><th>课堂节奏（8 学时拆分）</th></tr></thead>
+      <tbody>
+        <tr><td class="num">EXP-01</td><td>成果演示与整体框架</td><td class="num">8</td><td>2h 看演示讲任务 · 2h 四段流水线原理 · 2h 动画与互动 · 2h 思考讨论</td></tr>
+        <tr><td class="num">EXP-02</td><td>LDT-01 遥操作与数据采集</td><td class="num">8</td><td>1h 硬件讲解 · 2h 开机自检上手 · 4h 分组采集实操 · 1h 数据质控复盘</td></tr>
+        <tr><td class="num">EXP-03</td><td>数据转换与模型训练</td><td class="num">8</td><td>2h 环境搭建 · 2h 转换四种切法实操 · 2h 训练启动与日志 · 2h 排错与调参</td></tr>
+        <tr><td class="num">EXP-04</td><td>真机推理与分拣复现</td><td class="num">8</td><td>2h 推理架构 · 1h DRY_RUN 空跑 · 3h 真机开闸复现 · 2h 复盘与思考题</td></tr>
+        <tr><td class="num">TOT</td><td>合计</td><td class="num">32</td><td>教学动线统一为：先看演示成果 → 再讲框架原理 → 后分步动手操作</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- 结课成果物 -->
+  <section class="sec reveal">
+    <div class="sec-head"><span class="tag">OUTPUT</span><h3>结课成果物</h3><p>学生需提交的四项留痕材料</p></div>
+    <div class="grid4">
+      <div class="card"><div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/></svg></div>
+        <h4>采集数据包</h4><p>save_data 合格 episode 集 + 坏组剔除记录表，编号连续可追溯。</p></div>
+      <div class="card"><div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h10"/></svg></div>
+        <h4>转换与训练日志</h4><p>v3.0 数据集验证截图、lerobot-train 完整日志与 loss 曲线、checkpoint 路径。</p></div>
+      <div class="card"><div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 10l4.5-2.5v9L15 14"/><rect x="3" y="6" width="12" height="12" rx="2"/></svg></div>
+        <h4>复现视频</h4><p>真机自主分拣连续成功片段（含起点桌面环境对照），配三终端日志同屏更佳。</p></div>
+      <div class="card"><div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg></div>
+        <h4>复盘报告</h4><p>四实验思考题作答、失败案例归因（数据/环境/参数）、改进项清单。</p></div>
+    </div>
+  </section>
+
+  <!-- 课堂组织 -->
+  <section class="sec reveal">
+    <div class="sec-head"><span class="tag">CLASS</span><h3>课堂组织建议</h3><p>面向机房 + 真机工位的双场景教学</p></div>
+    <ol class="olstep">
+      <li><b>分组：</b>2 人 1 组对标真机采集的「双人制」——一人操作、一人安全观察，角色每轮互换。</li>
+      <li><b>设备节拍：</b>真机工位按 2 米半圆清场排班，桌面布置拍照留底，换组时按片复原。</li>
+      <li><b>数据版本：</b>每组 save_data 建目录命名规范（组号-日期），坏组当天标记不过夜。</li>
+      <li><b>训练错峰：</b>本地 4060 Ti 训练穿插讲解排错；大批量放云端并行，课堂只看日志与曲线。</li>
+      <li><b>演示前置：</b>每实验开场 10 分钟回放本课成果视频/上一实验录像，保持「先看再做」动线。</li>
+      <li><b>验收关口：</b>EXP-02 末查数据、EXP-03 末查 checkpoint、EXP-04 末查复现视频，三关不过不进下一实验。</li>
+    </ol>
+    <div class="klab-note">安全底线：真机环节始终双人值守、急停在手；任何异常先急停再排查（故障码 61445 按手册复位）。</div>
+  </section>
+
+  <!-- 考核权重 -->
+  <section class="sec reveal">
+    <div class="sec-head"><span class="tag">RUBRIC</span><h3>考核权重建议</h3><p>过程留痕 70% + 结果复现 30%</p></div>
+    <div class="kcards">
+      <div class="kcard"><span class="b">20%</span><h5>数据质量分</h5><p>有效示范数量与纯净度、坏组剔除记录、任务命名规范（EXP-02）。</p></div>
+      <div class="kcard"><span class="b">25%</span><h5>工程执行分</h5><p>转换一次通过率、训练日志完整度、排错记录（EXP-03）。</p></div>
+      <div class="kcard"><span class="b">25%</span><h5>规范与安全分</h5><p>双人制、清场、DRY_RUN 先行、检查清单执行情况（EXP-02/04）。</p></div>
+      <div class="kcard"><span class="b">30%</span><h5>复现成果分</h5><p>真机连续成功轮次 + 复盘报告归因质量（EXP-04 + 四实验思考题）。</p></div>
+    </div>
+  </section>
+
+  <!-- 四段数据流水线 -->
+  <section class="sec reveal">
+    <div class="sec-head"><span class="tag">PIPELINE</span><h3>四段数据流水线</h3><p>每段的输出是下一段的输入契约</p></div>
+    <div class="kcards">
+      <div class="kcard"><span class="b">S1 · 采集</span><h5>save_data 原始记录</h5><p>编号子目录 + CSV 关节角 + 三路视频帧；最大编号即最新一集，坏组走「本次采集失败」剔除。</p></div>
+      <div class="kcard"><span class="b">S2 · 转换</span><h5>converted_data 标准集</h5><p>data/*.parquet + videos/ 三路 mp4 + meta/ 三件套（info / tasks / stats），--start --end --skip --task 四种切法。</p></div>
+      <div class="kcard"><span class="b">S3 · 训练</span><h5>outputs checkpoint</h5><p>lerobot-train 驱动 ACT：batch_size=12、steps=50000、save_freq=4000、log_freq=100、use_amp=true。</p></div>
+      <div class="kcard"><span class="b">S4 · 推理</span><h5>真机关节指令</h5><p>50Hz 推理 + 100Hz 发布，三层平滑与 ramp 保护，/model_ifrun 服务随时接管或交还控制权。</p></div>
+    </div>
+  </section>
+
+  <!-- 验收与 FAQ -->
+  <section class="sec reveal">
+    <div class="sec-head"><span class="tag">REVIEW</span><h3>验收速览与常见疑问</h3><p>结课前对照打钩</p></div>
+    <div class="grid4">
+      <div class="card"><div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg></div>
+        <h4>数据验收</h4><p>有效示范达标（案例口径约 150 组）、坏组清零、converted_data 三目录齐全、任务名唯一。</p></div>
+      <div class="card"><div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg></div>
+        <h4>训练验收</h4><p>环境 python=3.10 导入 ACTPolicy 成功、loss 总体下降、至少一个可用 checkpoint 落盘。</p></div>
+      <div class="card"><div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg></div>
+        <h4>推理验收</h4><p>DRY_RUN 空跑日志正常、服务开关可启停、真机双臂分拣连续成功、急停随时可用。</p></div>
+      <div class="card"><div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg></div>
+        <h4>文档验收</h4><p>每个实验留档截图与日志、思考题作答完整、复盘表记录环境差异与改进项。</p></div>
+    </div>
+    <div class="kcards">
+      <div class="kcard"><span class="b">FAQ 1</span><h5>必须按 01→04 顺序吗？</h5><p>是。每段的产物是下一段的输入，缺环即断链（无数据不能训、无 checkpoint 不能推）。</p></div>
+      <div class="kcard"><span class="b">FAQ 2</span><h5>本地 4060 Ti 够用吗？</h5><p>够训 ACT，但要控制数据量与 batch_size 防 OOM；大批量可走 gpufree L40S 云端路线。</p></div>
+      <div class="kcard"><span class="b">FAQ 3</span><h5>为什么描述要英文？</h5><p>任务名/描述会写入 tasks 表当训练标签，英文可规避后续文本编码坑（01 文档要求）。</p></div>
+      <div class="kcard"><span class="b">FAQ 4</span><h5>换场景要重做哪些步骤？</h5><p>四段全部重走，但框架命令不变——对照家庭场景文档可快速迁移（场景变、框架不变）。</p></div>
+    </div>
+  </section>
+
+  <!-- 学习路径 -->
+  <section class="sec reveal" id="path">
+    <div class="sec-head"><span class="tag">PATH</span><h3>学习路径</h3><p>32 学时建议节奏：看 → 采 → 训 → 推</p></div>
+    <div class="path">
+      <div class="pstep"><div class="n">STEP 01</div><h5>看懂目标</h5><p>观看分拣演示，掌握任务定义、场景测量与四段流水线总览。</p></div>
+      <div class="pstep"><div class="n">STEP 02</div><h5>采到好数据</h5><p>校准四臂、遥操作上手，完成双臂同步采集与坏组标记。</p></div>
+      <div class="pstep"><div class="n">STEP 03</div><h5>训出模型</h5><p>转换 v3.0 数据集，设好 ACT 超参，读懂训练日志与收敛曲线。</p></div>
+      <div class="pstep"><div class="n">STEP 04</div><h5>真机复现</h5><p>DRY_RUN 先行、服务启停，真机跑通分拣复现并复盘优化。</p></div>
+    </div>
+  </section>
+
+  <div class="foot-in reveal">
+    <div>
+      <h4>IND-03 · 物料分拣应用场景</h4>
+      <p>32 学时 · 4 实验 · 基于《聆动课程指导文档》8 份 PDF 与 LeRobot 0.4.1 真实项目代码改编</p>
+    </div>
+    <div class="fbtns">
+      <a class="fbtn" href="exp-01-case-overview/index.html">开始 EXP-01
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </a>
+      <a class="fbtn" href="#top" onclick="window.scrollTo({top:0,behavior:'smooth'});return false;">回到顶部</a>
+    </div>
+  </div>
+  <div class="site-foot">CAT 3 行业应用课程 · IND-03 物料分拣应用场景 · 教学用途</div>
+</main>
+
+<script>
+document.body.classList.add('js');
+window.addEventListener('scroll',function(){document.body.classList.toggle('scrolled',window.scrollY>10)},{passive:true});
+var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{threshold:.08});
+document.querySelectorAll('.reveal').forEach(function(el,i){el.style.transitionDelay=(i*60)+'ms';io.observe(el)});
+</script>
+</body>
+</html>

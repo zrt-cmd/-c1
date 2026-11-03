@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-08 · LLM 对话与 VLM 复核 — 老人跌倒监护综合项目</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+:root{--theme:#059669;--theme-deep:#047857;--theme-bg:#d1fae5;--theme-bd:#a7f3d0}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit" title="返回课程首页">🧠 具身智能课程 · <i>教程首页</i></a>
+  <div class="crumb"><a href="../../../index.html#case">综合项目</a> / <a href="../index.html">老人跌倒监护</a> / EXP-08</div>
+</div>
+
+<div class="wrap">
+
+<aside class="side">
+  <h4>本页目录</h4>
+  <a href="#s1" class="now">01 问题引入：告警之外，还要会"对话"和"复核"</a>
+  <a href="#s2">02 原理通俗讲解：端侧大脑、记忆条与会诊医生</a>
+  <a href="#s3">03 关联知识点：LLM 服务 · 滑动窗口 · VLM 复核</a>
+  <a href="#s4">04 实验目标</a>
+  <a href="#s5">05 实验环境与准备</a>
+  <a href="#s6">06 动画讲解：流式链路、记忆窗口与图文复核</a>
+  <a href="#s7">07 互动讲解：多轮对话与复核沙盘</a>
+  <a href="#s8">08 实操步骤：llm_chat_test 与 vlm_demo</a>
+  <a href="#s9">09 重点与易错点</a>
+  <a href="#s10">10 总结与思考</a>
+  <h4>CH1 · 需求与配置</h4>
+  <a href="../exp-01-requirements/index.html">EXP-01 需求分析</a>
+  <a href="../exp-02-architecture/index.html">EXP-02 分层架构</a>
+  <a href="../exp-03-config/index.html">EXP-03 配置详解</a>
+  <h4>CH2 · 感知与交互</h4>
+  <a href="../exp-04-voice/index.html">EXP-04 语音交互</a>
+  <a href="../exp-05-pose-detection/index.html">EXP-05 检测与姿态</a>
+  <a href="../exp-06-fall-judgment/index.html">EXP-06 跌倒状态机</a>
+  <h4>CH3 · 告警与验证</h4>
+  <a href="../exp-07-alert-evidence/index.html">EXP-07 告警证据链</a>
+  <a href="../exp-08-llm-vlm/index.html">EXP-08 LLM·VLM</a>
+  <a href="../exp-09-full-verification/index.html">EXP-09 全功能验证</a>
+</aside>
+
+<main class="content">
+
+<div class="exp-head">
+  <span class="code">EXP-08 · 第 3 章 · 综合性 · 8 学时</span>
+  <h1>LLM 对话与 VLM 复核：让监护系统"会说话、会复核"</h1>
+  <p class="desc">跌倒误报会让告警变"狼来了"，冷冰冰的机器播报也安抚不了老人。本实验在端侧跑起 <b>RKLLM + Qwen3.5-0.8B</b>（ctypes 加载 librkllmrt.so、Flask 发 OpenAI 兼容接口、逐 token SSE 流式），用<b>滑动窗口拼接</b>解决 NLU 单条输入的健忘问题，再接 <b>RKLLMVisionJudge 图文复核</b>（vlm.enabled 默认关，按需开）。拆解 server_manager 端口避让与 503 繁忙，并存路由优先级 ALERT＞ASK＞SPEAKING＞闲聊。</p>
+  <div class="meta">
+    <span class="tag hl">难度 ⭐⭐⭐ · 8 学时</span>
+    <span class="tag">RKLLM Qwen3.5</span><span class="tag">滑动窗口 max_history=6</span>
+    <span class="tag">SSE 流式</span><span class="tag">VLM 复核默认关</span>
+  </div>
+</div>
+
+<!-- 01 -->
+<section class="blk" id="s1">
+  <h2><span class="no">01</span>问题引入：告警之外，还要会"对话"和"复核"</h2>
+  <p>前面实验已让系统"看得见、判得准、喊得响"，但两根刺还扎着：一是<b>误报</b>——老人弯腰系鞋带被判跌倒，半夜反复报警把全家吵醒；二是<b>安抚缺失</b>——只会重复一句硬邦邦的告警语。理想监护应该：跌倒时<b>先多问一句确认</b>（VLM 看图复核），无事时能<b>陪老人聊两句</b>（LLM 闲聊），且全程<b>不出家门、不上传云端</b>。</p>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>端侧 NPU 跑 Qwen3.5-0.8B：对话闲聊、语音安抚、上下文记忆</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>滑动窗口把多轮历史拼成一条，治愈"系统记不住我刚才说的话"</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>VLM 复核：跌倒候选帧交给"会诊医生"再看一眼，降低误报</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span>安全优先的并存路由：告警 &gt; 询问 &gt; 播报 &gt; 闲聊，永不抢麦</div>
+  </div>
+  <div class="tip amber"><span class="lab">💡 一个类比</span>整套 LLM/VLM 链路像给家里请了一位<b>住家护工</b>：会陪聊（对话）、记得你刚说过什么（记忆窗口）、看到可疑情况会先凑近看一眼再喊人（视觉复核）—— 而且这位护工<b>从不把家里的事说出去</b>（端侧推理）。</div>
+</section>
+
+<!-- 02 -->
+<section class="blk" id="s2">
+  <h2><span class="no">02</span>原理通俗讲解：端侧大脑、记忆条与会诊医生</h2>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">RKLLM 端侧推理</div><div class="kt">把"大块头"压缩进工控机的书包</div><p>Qwen3.5-0.8B 用 w4a16 量化后权重仅约 0.4G，带激活共约 <b>1.5G</b> 的 .rkllm 文件，由 ctypes 直接加载 <code>/usr/lib/librkllmrt.so</code> 塞进 NPU —— 像把整本词典压缩成口袋书，推理全在板上完成，一个字节都不外发。</p></div>
+    <div class="kcard"><div class="kd">滑动窗口</div><div class="kt">手心上贴一张"记忆便利贴"</div><p>RKLLM 的 get_last_input() 每次只吐最后一条 user 消息，天然健忘。LLMChat 于是取 <b>[-2×max_history:] 条历史</b>拼成「用户：…\n小飞：…」的对话记录，前面加上"请根据上下文自然回答最后一句"的指示 —— 便利贴只留最近几条，旧的撕掉（max_history=6，存两层各 12 条即截断）。</p></div>
+    <div class="kcard"><div class="kd">流式 SSE</div><div class="kt">打字机式的回信</div><p>回调 callback_impl 逐 token 累积 global_text，Flask 端点以 <code>data: {...delta.content...}</code> 逐段下发、以 <code>data: [DONE]</code> 收尾，LLMClient 用纯标准库 urlopen 消费 —— 用户看到回答"一个字一个字蹦出来"，而不是等全文憋 30 秒。客户端 SSE 解析失败还会自动降级非流式（chat.py L56-L59）。</p></div>
+    <div class="kcard"><div class="kd">VLM 复核</div><div class="kt">喊人之前先看一眼照片</div><p>RKLLMVisionJudge 懒加载：收到请求才花 10-60s 载入 1.3G 视觉模型。图片缩到 448×448 → 视觉编码器 → <b>196=(448/32)² 个 patch、每片 1024 维</b>嵌入，以 &lt;img&gt;…&lt;/img&gt; 标记塞进多模态接口；回答三分类 fall/not_fall/uncertain（含"是"不含"否"→0.8 等规则）。</p></div>
+  </div>
+  <div class="tip tealb"><span class="lab">🔔 人文关怀与隐私底线</span>对话与图像全在<b>端侧</b>处理，不依赖公网云 —— 老人的居家影像与言语不出户。vlm.enabled <b>默认 false</b> 不是偷懒：LLM 1.5G + VLM 1.3G ≈ 3.0G+，2G/4G 内存的板子慎开；先把核心监护跑稳，按硬件余量再开复核。</div>
+</section>
+
+<!-- 03 -->
+<section class="blk" id="s3">
+  <h2><span class="no">03</span>关联知识点：LLM 服务 · 滑动窗口 · VLM 复核</h2>
+  <table>
+    <thead><tr><th>知识点</th><th>内容</th><th>源码锚点</th></tr></thead>
+    <tbody>
+      <tr><td>llm_server RKLLM 初始化</td><td>ctypes.CDLL('/usr/lib/librkllmrt.so')；模型 Qwen3.5-0.8B_w4a16_g128_rk3576.rkllm ≈1.5G；采样 temperature 0.8 / top_p 0.9 / top_k 1（贪心）/ repeat_penalty 1.1 / max_context_len 4096，可按请求覆盖；callback_impl 逐 token 累积 global_text 即天然流式</td><td>llm_server.py L15-L16（CDLL）、L213-L232（回调）、L259-L272（采样参数）、L617-L621（按请求覆盖）</td></tr>
+      <tr><td>Flask OpenAI 兼容层</td><td>GET /v1/models 返回模型清单；POST /v1/chat/completions 输出 SSE：data: {...delta.content...} → data: [DONE]；lock+isBlocking 串行化 RKLLM 推理，撞上并发即 503 server busy</td><td>llm_server.py L584-L596（/v1/models）、L598-L690（/v1/chat/completions）</td></tr>
+      <tr><td>2.1.4 滑动窗口拼接</td><td>get_last_input() 只取最后一条新增 user → LLMChat 取 [-2*max_history:] 历史拼「用户：xxx\n小飞：xxx」单条 content，前缀「以下是一段对话记录，请根据上下文自然回答最后一句，不要复述记录」；存储层 &gt;2*max_history+8 截断；reset 全清</td><td>chat.py L36-L46（拼接+指示）、L43（窗口截断）、L68-L69（存储截断）、L139-L140（reset）；llm_client.py L59-L145</td></tr>
+      <tr><td>server_manager 生命周期</td><td>pick_free_port 从 8080 起 connect_ex 探测 20 个；_port_open+_models_ok GET /v1/models 判断可复用；Popen 拉起日志隔离 runs/logs/llm_server.log；就绪轮询每 2s、超时 120s；stop() terminate→wait(5)→kill，只杀自己拉起的</td><td>server_manager.py L33-L40、L42-L53、L85-L99、L106-L110、L113-L125</td></tr>
+      <tr><td>2.1.5 VLM 复核</td><td>VisionJudge 协议 + FakeVisionJudge 恒 uncertain 兜底；RKLLMVisionJudge 懒加载 _load 10-60s；PROMPT「图中的人是否摔倒了？只回答'是'或'否'或'不确定'，然后写一句理由。」；三分类含"是"不含"否"→fall(0.8)/含"否"→not_fall(0.8)/不确定或报错→uncertain(0.5 或 0.0)；异常全捕获返 uncertain 主流程不崩；config vlm.enabled 默认 false</td><td>vision_judge.py L23-L25（PROMPT）、L34-L44（协议+Fake）、L243（懒加载）、L388-L399（异常兜底）；config/fall_config.yaml L12-L16</td></tr>
+      <tr><td>并存与优先级</td><td>告警/播报/闲聊共用 plughw:3,0 分时发声；优先级 ALERT＞ASK＞SPEAKING＞LLM 闲聊（安全设计非 bug）；monitor 三接口 on_kws / on_asr / has_ask_session 是耦合点</td><td>fall/monitor.py（三接口注册）；server_manager 端口避让 llm.server.port</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 04 -->
+<section class="blk" id="s4">
+  <h2><span class="no">04</span>实验目标</h2>
+  <ul class="check">
+    <li>能说清 RKLLM 初始化到 SSE 流式输出的<b>完整链路</b>，并解释为何逐 token 回调天然支持打字机效果</li>
+    <li>能手绘滑动窗口数据流：get_last_input 只给最后一条 → 拼 [-2×max_history] 历史 → 两层截断 → reset</li>
+    <li>能实测多轮上下文（先说"我叫张三"再问"我叫什么名字"得到正确回答）并解释失忆排查路径</li>
+    <li>能完成 vlm.enabled 切换与 vlm_demo 实测，读懂 vision/llm 耗时与三分类置信度</li>
+    <li>能解释端口避让（pick_free_port）与 503 串行策略，按优先级原则排查"抢麦"问题</li>
+  </ul>
+</section>
+
+<!-- 05 -->
+<section class="blk" id="s5">
+  <h2><span class="no">05</span>实验环境与准备</h2>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>硬件：RK3576 工控主机（建议 4G 内存及以上）；确认 NPU 驱动 <b>cat /sys/kernel/debug/rknpu/version</b></div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>确认模型文件存在：config L145 model_path 指向 Qwen3.5-0.8B_w4a16_g128_rk3576.rkllm（≈1.5G）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>读配置：<b>grep -A12 "^llm:" config/fall_config.yaml</b>（server/采样/max_history/system_prompt）与 vlm 段（默认 enabled: false）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span>预留端口 8080（或让 pick_free_port 自动避让）；用 ss -tlnp | grep 8080 确认无残留</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">5</span>留足磁盘与内存：首次加载 30-60s、日志落 runs/logs/llm_server.log；改配置前备份 yaml</div>
+  </div>
+</section>
+
+<!-- 06 -->
+<section class="blk" id="s6">
+  <h2><span class="no">06</span>动画讲解：流式链路、记忆窗口与图文复核</h2>
+  <div class="anim-box">
+    <svg viewBox="0 0 720 340" xmlns="http://www.w3.org/2000/svg">
+      <rect x="10" y="10" width="700" height="320" rx="14" fill="#111827"/>
+      <!-- 上: 流式请求链路 -->
+      <g font-family="monospace" font-size="10.5" text-anchor="middle">
+        <text x="40" y="36" fill="#6ee7b7" font-size="11">流式请求链路: client → Flask → RKLLM → SSE</text>
+        <g fill="#1f2937" stroke="#34d399">
+          <rect x="40" y="46" width="110" height="30" rx="6"/>
+          <rect x="176" y="46" width="140" height="30" rx="6"/>
+          <rect x="342" y="46" width="130" height="30" rx="6"/>
+          <rect x="498" y="46" width="92" height="30" rx="6"/>
+          <rect x="616" y="46" width="70" height="30" rx="6"/>
+        </g>
+        <g fill="#6ee7b7">
+          <text x="95" y="65">LLMClient</text>
+          <text x="246" y="65">/v1/chat/completions</text>
+          <text x="407" y="65">chat() 拼窗口</text>
+          <text x="544" y="65">librkllmrt</text>
+          <text x="651" y="65">NPU</text>
+        </g>
+        <path id="llm8" d="M8 61 L712 61" stroke="#065f46" stroke-width="8" opacity="0.5"/>
+        <circle r="5" fill="#34d399">
+          <animateMotion dur="2.6s" repeatCount="indefinite" path="M8 61 L712 61"/>
+        </circle>
+        <text x="360" y="94" fill="#9ca3af" font-size="10">回调 callback_impl 逐 token 累积 → data: {...delta.content...} → data: [DONE]；lock 串行，撞并发 → 503 server busy</text>
+      </g>
+      <!-- 中: 滑动窗口 -->
+      <g font-family="monospace" font-size="10.5" text-anchor="middle">
+        <text x="40" y="126" fill="#fbbf24" font-size="11">滑动窗口: LLMChat 取 [-2*max_history= 12 条] 拼成单条记录（max_history=6）</text>
+        <g stroke="#f59e0b" fill="#2b1d05">
+          <rect x="60" y="136" width="76" height="30" rx="5"/>
+          <rect x="144" y="136" width="76" height="30" rx="5" opacity="0.55"/>
+          <rect x="228" y="136" width="76" height="30" rx="5" opacity="0.35" stroke-dasharray="4 3"/>
+          <rect x="324" y="136" width="96" height="30" rx="5"/>
+          <rect x="428" y="136" width="96" height="30" rx="5"/>
+          <rect x="544" y="136" width="132" height="30" rx="5" stroke="#fbbf24" stroke-width="2"/>
+        </g>
+        <g fill="#fbbf24" font-size="9.5">
+          <text x="98" y="155">turn-3 记忆</text>
+          <text x="182" y="155">turn-2</text>
+          <text x="266" y="155">被截断</text>
+          <text x="372" y="155">用户：我叫张三</text>
+          <text x="476" y="155">小飞：好的张三</text>
+          <text x="610" y="155">用户：我叫什么名字→</text>
+        </g>
+        <path d="M40 176 L680 176" stroke="#4b5563" stroke-dasharray="6 5"/>
+        <text x="360" y="194" fill="#9ca3af" font-size="10">get_last_input() 只送最后一条 user；前缀指示「根据上下文自然回答最后一句，不要复述记录」；存储 &gt;12+8 截断，reset 全清</text>
+      </g>
+      <!-- 下: VLM 复核 -->
+      <g font-family="monospace" font-size="10.5" text-anchor="middle">
+        <text x="40" y="224" fill="#60a5fa" font-size="11">VLM 复核（vlm.enabled 默认 false，懒加载 10-60s）</text>
+        <rect x="40" y="234" width="96" height="52" rx="6" fill="#1e3a5f" stroke="#60a5fa"/>
+        <text x="88" y="256" fill="#93c5fd">候选帧</text>
+        <text x="88" y="272" fill="#93c5fd" font-size="9">crop+margin</text>
+        <path d="M144 260 L176 260" stroke="#60a5fa" marker-end="none"/>
+        <rect x="180" y="234" width="120" height="52" rx="6" fill="#1e3a5f" stroke="#60a5fa"/>
+        <text x="240" y="254" fill="#93c5fd">448×448 RGB</text>
+        <text x="240" y="270" fill="#93c5fd" font-size="9">→ 196×1024 嵌入</text>
+        <path d="M308 260 L340 260" stroke="#60a5fa"/>
+        <rect x="344" y="234" width="160" height="52" rx="6" fill="#14532d" stroke="#34d399"/>
+        <text x="424" y="252" fill="#6ee7b7" font-size="9">&lt;img&gt;…&lt;/img&gt; + 问句</text>
+        <text x="424" y="268" fill="#6ee7b7" font-size="9">「图中的人是否摔倒了？」</text>
+        <path d="M512 260 L544 260" stroke="#34d399"/>
+        <g fill="#3f3f46">
+          <rect x="548" y="234" width="50" height="24" rx="5" stroke="#f87171"/>
+          <rect x="604" y="234" width="56" height="24" rx="5" stroke="#fbbf24"/>
+          <rect x="548" y="264" width="112" height="22" rx="5" stroke="#9ca3af"/>
+        </g>
+        <text x="573" y="251" fill="#f87171">fall .8</text>
+        <text x="632" y="251" fill="#fbbf24">not .8</text>
+        <text x="604" y="280" fill="#d1d5db">uncertain .5（异常→兜底 Fake 也返 uncertain）</text>
+        <text x="40" y="320" fill="#9ca3af" font-size="10" text-anchor="start">优先级仲裁: ALERT &gt; ASK &gt; SPEAKING &gt; 闲聊 —— 安全事件永远压过"陪聊"（安全设计，不是 bug）</text>
+        <circle cx="690" cy="316" r="6" fill="#ef4444">
+          <animate attributeName="opacity" values="1;0.3;1" dur="1.5s" repeatCount="indefinite"/>
+        </circle>
+      </g>
+    </svg>
+    <div class="anim-cap">动画 8-1：上——一次流式问答从 LLMClient 到 NPU 再到 SSE 的五跳，绿色光点是 token 在链上跑，锁保证同时只有一个请求进 RKLLM（撞上就 503）；中——记忆便利贴：窗口只带最近 12 条、旧条目淡出被截断，"我叫张三"被拼进记录所以后面问名字能答对；下——VLM 懒加载复核：候选帧→448²→196 个 patch→多模态问句→三分类，异常永远兜底 uncertain，红灯表示这才是安全底线。</div>
+  </div>
+</section>
+
+<!-- 07 -->
+<section class="blk" id="s7">
+  <h2><span class="no">07</span>互动讲解：多轮对话与复核沙盘</h2>
+  <div class="ix-panel">
+    <div class="ix-title">🕹️ 多轮对话与复核沙盘 · LLM Bench —— 模拟记忆窗口的累积/截断，体验 VLM 与 503 节流</div>
+    <div class="ctl-row">
+      <button onclick="lSay()">🗣 说「你好」</button>
+      <button onclick="lName()">🗣 说「我叫张三」</button>
+      <button onclick="lAsk()">❓ 问「我叫什么名字」</button>
+      <button onclick="lFill()">⏩ 灌满 7 轮看截断</button>
+      <button onclick="lVlm()">📷 开 VLM 复核</button>
+      <button onclick="lBusy()">🚦 模拟并发 503</button>
+      <button onclick="lReset()">↺ reset</button>
+    </div>
+    <div class="io" id="llmIo"></div>
+  </div>
+  <div class="tip tealb"><span class="lab">🔔 试试灌满再 reset</span>L43 按 [-2×max_history] 截窗口、L68-L69 存储层 &gt;20 条再剪 —— 两层裁剪让"便利贴"永远轻薄；reset 后再问名字，小飞就不认识张三了，这正是<b>窗口即记忆</b>的直观证明。</div>
+</section>
+
+<!-- 08 -->
+<section class="blk" id="s8">
+  <h2><span class="no">08</span>实操步骤：llm_chat_test 与 vlm_demo</h2>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>grep 出 llm: 与 vlm: 两段配置，核对 model_path 与 max_history=6</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>llm_chat_test --prompt 单发：看日志拉起 → 就绪 8080 → [5.9s] 流式回复</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>进交互模式实测上下文：自我介绍 → 问名字 → reset 再问，对比窗口效果</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span>curl /v1/models、ss -tlnp 确认服务；再开"python -m http.server 8080"验证避让</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">5</span>sed 打开 vlm.enabled，跑 vlm_demo 实测三分类与复核耗时</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">6</span>并存测试（语音+LLM+推流）后 pkill -9 清理，ps 复核</div>
+  </div>
+  <div class="pre"><span class="c"># ① 配置确认（config L145 模型路径 / L151 max_history；vlm 默认 enabled: false）</span>
+cd ~/ros2_ws/src/xflz_eai_car1/app/elderly_companion
+grep -A 12 "^llm:" config/fall_config.yaml
+grep -A 6 "vlm:" config/fall_config.yaml
+
+<span class="c"># ② 单发测试（真实输出: 拉起日志 → 就绪 8080 → 流式回复）</span>
+python3 apps/llm_chat_test.py --prompt <span class="g">"你好，你是谁？"</span>
+<span class="c"># [INFO] 拉起 llm_server … [INFO] llm_server 就绪 (port 8080)</span>
+<span class="c"># [5.9s] 回复: 你好！我是 Qwen3.5，很高兴认识你！</span>
+
+<span class="c"># ③ 交互模式（输入 reset 清窗口 / exit 退出；真实会话）</span>
+python3 apps/llm_chat_test.py
+<span class="c"># 你: 我叫张三   → [1.6s] 小飞: 好的，张三！很高兴认识你。</span>
+<span class="c"># 你: 我叫什么名字 → [1.6s] 小飞: 你好，张三！   ← 滑动窗口在起作用</span>
+
+<span class="c"># ④ 服务探活与端口避让测试</span>
+curl http://127.0.0.1:8080/v1/models
+ss -tlnp | grep 8080
+<span class="c"># 另开终端: python3 -m http.server 8080 挡住 8080 → 重跑 ② 应自动避让到 8081</span>
+
+<span class="c"># ⑤ 打开 VLM 复核并实测（10-60s 懒加载，首次偏慢属正常）</span>
+sed -i <span class="g">'s/enabled: false.*# 真 VLM/enabled: true  # 真 VLM/'</span> config/fall_config.yaml
+python3 apps/vlm_demo.py --image testdata/fall_1.png
+<span class="c"># VLM: vision 0.87s, llm 3.76s, answer='是' → label=fall  confidence=0.8</span>
+
+<span class="c"># ⑥ 并存与清理</span>
+ps aux | grep llm_server
+pkill -9 -f llm_server   <span class="c"># 残留时强制清，ss -tlnp 复核 8080 已释放</span></div>
+  <div class="tip amber"><span class="lab">💡 记录要点</span>记下三种耗时：模型首次加载（30-60s）、单轮回复（[1.6s]/[5.9s]）、VLM vision+llm（0.87s+3.76s）—— 报告里用数据说明端侧 LLM "够用但不快"，以及为什么告警链路绝不能阻塞等它。</div>
+</section>
+
+<!-- 09 -->
+<section class="blk" id="s9">
+  <h2><span class="no">09</span>重点与易错点</h2>
+  <ul class="check">
+    <li><b>system_prompt 不要乱改</b>（config L149）：它定义了"小飞"的人格与回答边界</li>
+    <li><b>窗口有两层截断</b>：取用 [-2×max_history]、存储 &gt;2×max_history+8 —— 调 max_history 会同时影响两者</li>
+    <li><b>VLM 复核是"辅助第二意见"</b>：uncertain 是合法答案，主流程靠它兜底而不是被它卡死</li>
+    <li><b>优先级不可倒挂</b>：闲聊永远压不过 ALERT/ASK，否则复核/告警会被长回复堵死</li>
+  </ul>
+  <table>
+    <thead><tr><th>现象</th><th>原因</th><th>解决</th></tr></thead>
+    <tbody>
+      <tr><td>启动超过 30s 甚至卡死</td><td>model_path 错（config L145）/ NPU 驱动异常 / 模型与固件不匹配</td><td>核对路径与文件 1.5G；cat /sys/kernel/debug/rknpu/version 查驱动</td></tr>
+      <tr><td>问"我叫什么名字"答不上</td><td>没走 LLMChat 拼接（直喂 get_last_input）/ 历史超出窗口被截</td><td>确认走 chat() 全链路；检查 max_history 与是否误 reset</td></tr>
+      <tr><td>OOM / 整机卡死</td><td>LLM 1.5G + VLM 1.3G ≈ 3.0G+，2G 内存板撑不住</td><td>2G 板保持 vlm.enabled=false；4G 板开前 free -h 预算</td></tr>
+      <tr><td>报 503 server busy</td><td>RKLLM 推理串行锁，前一个请求未返回</td><td>属设计预期；客户端 chat.py L56-L59 会自动降级非流式重试</td></tr>
+      <tr><td>8080 端口腾不出来</td><td>上次 llm_server 残留 / 被无关服务占用</td><td>ss -tlnp 找 pid；pkill -9 -f llm_server；或靠 pick_free_port 避让</td></tr>
+      <tr><td>vlm_demo 一直 uncertain</td><td>图片模糊、裁剪没带全人体（crop_margin 太小）/ 模型懒加载未完成</td><td>换 testdata/fall_1.png 标准图对照；等待 _load 完成再看耗时日志</td></tr>
+      <tr><td>忘了早期对话内容</td><td>滑动窗口本性：老条目按 L43/L68 两层截断出窗</td><td>属正常行为；确需长期记忆要另做持久化（本课不涉及）</td></tr>
+      <tr><td>端口探测逻辑排错难</td><td>_port_open+_models_ok 要"既在听、又应答 /v1/models"</td><td>用 curl /v1/models 复刻探测条件，凡 200 且含模型名才判可复用</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 10 -->
+<section class="blk" id="s10">
+  <h2><span class="no">10</span>总结与思考</h2>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">✅ 完成成果</div><div class="kt">四件交付</div><p>llm_chat_test 单发+交互记录（含真实耗时）、滑动窗口时序笔记、vlm_demo 三分类输出截图、端口避让与 503 现象记录表。</p></div>
+    <div class="kcard"><div class="kd">🧠 原理收获</div><div class="kt">端侧+窗口+仲裁</div><p>RKLLM 量化模型如何在 NPU 上以 1.5G 体积跑起来；单条输入的 LLM 如何靠"拼接历史+前缀指示"获得上下文；多路发声如何靠优先级仲裁不打架。</p></div>
+    <div class="kcard"><div class="kd">🛠 技能收获</div><div class="kt">服务治理三板斧</div><p>端口探测与自动避让（connect_ex / /v1/models 探活）、日志隔离拉起与干净收尸（terminate→wait→kill）、SSE 与非流式双模客户端的用法。</p></div>
+    <div class="kcard"><div class="kd">❓ 排障思路</div><div class="kt">四问定位法</div><p>起不来？查 model_path/NPU。记不住？查窗口与 reset。摄像头复核怪？看 uncertain 条件与 crop。嘴上打架？查优先级与 plughw:3,0 分时锁。</p></div>
+  </div>
+  <div class="tip violet"><span class="lab">🟣 思考题 1</span>RKLLM 的 get_last_input() 明明只给最后一条消息，为什么 LLMChat 不直接把完整历史当 messages 数组传入，而是拼成「用户：…\n小飞：…」的单条文本 + 前缀指示（chat.py L36-L46）？这种"拼接代偿"方案牺牲了什么（提示：ChatML 结构、逐轮流式接口），又换来了什么？</div>
+  <div class="tip violet"><span class="lab">🟣 思考题 2</span>server_manager 发现 8080 已有服务且 /v1/models 应答 → <b>直接复用</b>，哪怕那是别人启动的旧模型。这在实验里方便，在生产里有什么隐患？再推一步：假如把并存路由改成"闲聊优先于 ALERT"，老人催促小飞讲笑话时恰逢真跌倒会发生什么？</div>
+</section>
+
+<nav class="expnav">
+  <a href="../exp-07-alert-evidence/index.html">← EXP-07 告警与证据链</a>
+  <a href="../exp-09-full-verification/index.html">EXP-09 全功能验证 →</a>
+</nav>
+
+</main>
+</div>
+
+<footer>
+  <div class="foot-in">
+    <span>CASE-03 · 老人跌倒监护 · EXP-08 LLM 对话与 VLM 复核</span>
+    <span>8 学时 · 综合性 · 基于 elderly_companion 实验讲义改编</span>
+  </div>
+</footer>
+
+<script>
+var lBase='沙盘就绪 — 记忆窗口为空，model Qwen3.5-0.8B（w4a16 ≈1.5G）已就绪 :8080，vlm.enabled=<b>false</b>。';
+var lIo='llmIo';
+function setL(t){document.getElementById(lIo).innerHTML=t;}
+var lHist=[], lVlmOn=false;
+function renderL(extra){
+  var win=lHist.slice(-12);
+  var s='<span class="dim">▌窗口 [-2×6=12 条] 当前 '+lHist.length+' 条：</span>'+(win.length?('「'+win.join(' / ').replace(/ ➜ /g,'➜')+'」'):'（空）')+
+    (lHist.length>12?' <span class="warn">…旧 '+ (lHist.length-12) +' 条已出窗（chat.py L43）</span>':'')+'<br>'+(extra||'');
+  setL(s);
+}
+function lSay(){lHist.push('用户：你好','小飞：你好！我是 Qwen3.5…');
+  renderL('<span class="ok">▌[5.9s] 流式回复：</span>逐 token 走 SSE data:{"delta":{"content":"你"}} … → data: [DONE]（callback 累积）');}
+function lName(){lHist.push('用户：我叫张三','小飞：好的，张三！');
+  renderL('<span class="ok">▌存储层（L68-L69）：</span>&gt; 2×6+8=20 条才剪，当前 '+lHist.length+' 条暂不剪');}
+function lAsk(){
+  var known=lHist.join(' ').indexOf('张三')>=0;
+  lHist.push('用户：我叫什么名字','小飞：'+(known?'你好，张三！':'抱歉，我不记得你说过…'));
+  renderL(known?'<span class="ok">▌get_last_input() 只送最后一条「我叫什么名字」</span>，chat() 把含"我叫张三"的历史拼进记录 → 答对！':'<span class="bad">▌窗口里已无"张三"</span>（或从未说过）→ 拼接记录里查无此名 → 失忆');</}
+function lFill(){
+  for(var i=1;i<=7;i++){lHist.push('用户：轮次'+i,'小飞：轮次'+i+' 已记录');}
+  renderL('<span class="warn">▌灌入 7 轮共 14 条：</span>取用只留末 12 条 → 最早 2 条出窗；若总数 &gt;20，存储层同步剪旧（L68-L69）');}
+function lVlm(){lVlmOn=!lVlmOn;
+  renderL(lVlmOn?'<span class="ok">▌vlm.enabled=true</span> → 首次调用懒加载 10-60s（RKLLMVisionJudge _load）→ 448²→196×1024 → PROMPT「…只回答是/否/不确定」→ 含"是"不含"否" → <b>fall conf=0.8</b>':'<span class="dim">▌vlm.enabled=false（默认）</span> → 恒用 FakeVisionJudge 返 <b>uncertain</b>，省 1.3G 内存');}
+function lBusy(){setL('<span class="bad">▌并发第二个请求撞上推理锁：</span>Flask lock+isBlocking → <b>HTTP 503 server busy</b><br><span class="dim">▌这不是崩溃：</span>RKLLM 串行是刻意为之 —— NPU 上并发推理会互相拖垮，客户端（chat.py L56-L59）自动降级为非流式重试<br><span class="dim">▌优先级仲裁仍在上层生效：</span>ALERT＞ASK＞SPEAKING＞闲聊，告警永远插队');}
+function lReset(){lHist=[];renderL('<span class="ok">▌reset（chat.py L139-L140）：</span>历史清空 → 下一轮窗口从零开始；model 与端口不动');}
+renderL('');
+</script>
+<script src="../shared/tutorial.js" defer></script>
+</body>
+</html>

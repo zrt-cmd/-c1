@@ -1,0 +1,767 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp003-ros2-application/exp-03-workspace/index.html
+TITLE: EXP-03 · 工作空间与 colcon — 机器人 ROS2 应用与开发
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+EXP-03 · 工作空间与 colcon — 机器人 ROS2 应用与开发
+🧠 具身智能课程 ·
+教程首页
+核心课程
+/
+ROS2 应用与开发
+/ EXP-03
+本页目录
+★ 课程目标
+01 问题引入：项目越来越大了怎么办
+02 演示：colcon build 构建复杂项目
+03 核心原理：四层目录结构 + colcon 编译流程
+04 实操：从零创建工作空间
+05 实操：Overlay 覆盖规则
+06 注意事项与验收清单
+07 本课总结与思考题
+CH1 · ROS2 基础
+EXP-01 ROS2 简介
+EXP-02 命令工具
+EXP-03 工作空间
+EXP-04 功能包
+EXP-03 · 第 1 章 · 验证性 · 2 学时
+工作空间与 colcon：代码放在哪、怎么编
+工作空间
+：就是源代码工程管理的顶层目录，一般以 ros 前缀、_ws 后缀命名，我们的 ROS2 工程放在家目录下，命名为
+ros2_ws
+，里面分开存放了代码（
+src
+）、构建（
+build
+）、安装（
+install
+）和运行日志（
+log
+）。
+colcon
+（全拼 collective construction，集体构建）：用于编译构建整个工程——站在工作空间根目录敲一条
+colcon build
+，src 下所有带
+package.xml
+的包就全编进 install/ 了。
+本章目标：
+掌握使用 colcon build 构建和管理 ROS2 工程
+——先看懂设备上的真实工作空间，再自己从零搭一个、把 C++ 与 Python 各编译验证一遍。第一次 build 万一报错也别担心——报错信息就是在告诉你缺什么，排查过程本身就是本章要练的。
+难度 ⭐
+2 学时
+验证性
+关键词 colcon · overlay · symlink
+目标
+本课学完，你应该能做到
+① 说清结构
+四层目录各管什么
+能阐述 src / build / install / log 四层目录各自的职责，以及 Underlay（
+/opt/ros/humble
+）与 Overlay（用户工作空间）通过
+source setup.bash
+叠加的机制。
+② 掌握流程
+建 → 编 → 载 → 验
+能正确执行
+mkdir -p ~/ros2_ws/src
+→ 放源码 →
+colcon build
+→
+source install/setup.bash
+→ 用
+ros2 pkg list
+确认包被识别。
+③ 独立搭一个
+从零建工作空间
+能独立创建新工作空间、编译示例包，并验证层级覆盖（Overlay 覆盖 Underlay）确实生效。
+④ 迁移成习惯
+新包放对地方
+后续每次新建功能包，都能正确放到
+src/
+下，并完成编译与
+source
+加载。
+本课的重点与难点
+重点
+：
+colcon build
+必须在工作空间根目录执行、编译后必须重新
+source
+——这两条是"包找不到"的两大来源。
+难点
+：理解"后 source 者胜出"的覆盖顺序，以及为什么工作空间的 setup.bash 会自动带上底层。
+和前后的关系
+本课建的
+~/ros2_ws
+是
+后续所有实验的家
+；EXP-04 就要在这个空间里建自己的包。
+01
+问题引入：项目越来越大了，怎么办
+上一章你已经能熟练使用
+ros2 run
+和
+ros2 topic echo
+了——但用的都是别人编译好的成品，就像在餐厅点菜，端上来就吃，从没进过厨房。从本章开始要自己做工程，第一个迎面撞上的问题就很现实：
+项目越做越大——源码几十上百个文件、模块之间还互相依赖，难道一直手敲编译命令硬扛？
+这个问题不新鲜，各语言生态早就撞上过，先看看人家是怎么组织的：
+语言 / 生态
+小项目怎么跑
+大了之后怎么组织
+主流构建 / 管理工具
+项目大了会出现哪些问题
+Python
+python xxx.py
+直接跑
+拆成多个模块，打包成库分发
+pip、setuptools、Poetry
+依赖版本互相冲突（"在我这能跑"）、模块路径混乱、每个人的环境都不一样
+Java
+javac
+编几个类就能跑
+多模块工程，打成 jar 交付
+Maven、Gradle
+依赖树庞大、编译慢、jar 版本冲突、改一处牵动整个模块
+C / C++
+gcc a.c -o app
+一条命令
+拆库、拆头文件，分模块编译再统一链接
+CMake 生成构建规则，Make / Ninja 执行编译
+编译命令繁杂难维护、依赖顺序（谁先编谁后编）难处理、链接报错难排查、环境差异导致跨机编译失败
+ROS2 工程
+系统装好的包，
+ros2 run
+直接用
+工作空间 src/ 里放几十上百个功能包，C++/Python 混编、包间互为依赖
+colcon（顶层调度）+ ament（包构建规范）
+包太多手动编不现实、包间依赖要排序、产物落地、环境激活——由一句
+colcon build
+统一处理；⚠️ 依赖下载不归它管，那是 rosdep 的活
+工具各不相同，但大项目要操心的其实是同四件事：
+① 编译命令怎么组织
+——文件多了，命令记不住；
+② 编译依赖怎么排序
+——谁被依赖谁先编（注意这排的是编译顺序，不是下载依赖）；
+③ 产物放哪
+——编出来的东西怎么管理、怎么找；
+④ 环境怎么激活
+——换台机器、换个终端还能跑吗。
+ROS2 给出的答案是：
+用工作空间收拢所有源码，用 colcon 统一构建
+。接下来先到真实设备上，看一套已经颇具规模的工作空间是怎么一条命令构建起来的。
+02
+演示：colcon build 构建复杂项目
+先不写一行代码。教学设备上的
+ros2_ws
+工作空间已经放了不少工程，把它打开看看长什么样：
+# ~/ros2_ws/ —— 设备上的真实工作空间（src 下的目录全部列出）
+~/ros2_ws/
+← 工作空间根目录，colcon build 就在这一层敲
+├── src/
+← 源码层：所有 ROS2 工程都住在这里（唯一手写、进 git 的层）
+│   └── xflz_eai_car1/
+← 业务顶层目录，src 下的目录全在它里面，再按用途分类
+│       ├── bringup/
+← 整车一键启动（launch/bringup.launch.py）
+│       ├── driver/
+← 驱动层
+│       │   ├── car1_base_driver/
+← 底盘驱动（/car1_base_driver/* 话题）
+│       │   └── ros_sensor/
+← 射频传感：ros_sensor + ros_sensor_interfaces 两个工程
+│       ├── navigation/
+← 导航
+│       │   └── car1_navigation/
+← 导航栈（launch / rviz / 参数）
+│       ├── arm/
+← 机械臂
+│       │   ├── car1_arm_controller/
+← 底层协议与动作控制
+│       │   └── kinematics/
+← 正 / 逆运动学解算
+│       ├── simulations/
+← 仿真三件套
+│       │   ├── car1_description/
+← URDF 模型
+│       │   ├── car1_moveit_config/
+← MoveIt 配置
+│       │   └── car1_gazebo/
+← Gazebo 仿真
+│       ├── calibration/
+← 舵机标定（servo_calib.launch.py、servo_offsets.yaml）
+│       ├── vision/
+← 视觉算法工程，编号 01～12 共 12 个
+│       │   ├── 01_industrial_defect_detection/
+← 工业缺陷检测
+│       │   ├── 02_garbage_classification/
+← 垃圾分类
+│       │   ├── 03_lab_color_recognition/
+← LAB 颜色识别
+│       │   ├── 04_qrcode/
+← 二维码识别
+│       │   ├── 05_line_following/
+← 巡线
+│       │   ├── 06_semantic_segmentation/
+← 语义分割
+│       │   ├── 07_multi_object_tracking/
+← 多目标跟踪
+│       │   ├── 08_depth_3d_detection/
+← 深度 3D 检测
+│       │   ├── 09_face_landmarks/
+← 人脸关键点
+│       │   ├── 10_pose_landmark/
+← 人体姿态关键点
+│       │   ├── 11_pose_control/
+← 姿态控制
+│       │   └── 12_hand_control/
+← 手部控制
+│       ├── interaction/
+← 语音 / 多模态交互
+│       │   ├── car1_interaction/
+← 语音交互与工具调用
+│       │   └── car1_multi_interaction/
+← 相机 + 多模态交互节点
+│       ├── app/
+← 应用类工程
+│       │   ├── object_tracking/
+← 目标跟踪应用
+│       │   ├── eai_factory/
+← 工厂场景应用
+│       │   ├── car1_app/
+← 机械臂视觉抓取
+│       │   └── elderly_companion/
+← 陪伴场景应用
+│       ├── test/
+← 测试 / 演示工具
+│       │   ├── car1_web_server/
+← Web 运动学校真
+│       │   └── camera_web_viewer/
+← 相机 Web 预览
+│       ├── examples/
+← 外部示例（camera/HP60C 相机 SDK 例程）
+│       └── ros2_demos/
+← 官方示例源码：talker / listener，本课练手用
+│           ├── demo_nodes_cpp/
+← 工程①：C++ 版
+│           ├── demo_nodes_py/
+← 工程②：Python 版
+│           └── example_interfaces/
+← 工程③：消息/服务接口，被上面两个依赖
+├── build/
+← 编译中间产物（第一次 colcon build 后出现）
+├── install/
+← 编译成品 + 环境脚本
+└── log/
+← 构建日志
+src 底下不管目录套了几层，判断"是不是一个 ROS2 工程"的标准只有一个：目录里有没有
+package.xml
+。
+上面这棵树里的目录不会个个都是工程——有的只是用来整理归类的普通文件夹，colcon 真正认的是最里层带 package.xml 的那一个；不带它，扫到这里直接跳过。先数一数当前工作空间里一共有多少个工程：
+# 列出每个工程的"身份证"
+find
+~/ros2_ws/src -name package.xml
+# 统计工程总数 —— 设备上会输出几十行，一个个 cd 进去手动编译根本不现实
+find
+~/ros2_ws/src -name package.xml | wc -l
+而把它们全部构建出来，只需要在根目录执行一条命令：
+cd
+~/ros2_ws
+colcon build
+# 一条命令构建全部工程；末尾 Summary 汇总成功/失败与耗时
+构建可以有多轻松
+src 里是 3 个包还是 300 个包，命令都是同一句
+colcon build
+——谁先编谁后编、并行开几个进程、产物装到哪，colcon 自己安排。末尾的
+Summary: N packages finished [xx s]
+就是完工凭证；有失败的包会单独标 failed，去
+log/latest_build/
+翻对应日志即可定位。
+再回头看，这次构建在根目录
+多生成了三个目录
+，它们各管一段：
+build/
+编译中间产物
+CMake 缓存、.o 目标文件，相当于"施工现场"。可以整个删掉，重编即可。
+install/
+成品与环境
+可执行文件、launch、setup.bash。
+ros2 run 只认这个目录里的东西
+。
+log/
+构建日志
+每次 colcon 运行的记录。编译失败先来这里翻日志，而不是无脑重跑十遍。
+Workspace 的定义
+工作空间就是一个
+带有 src/ 的文件夹
+：源码统一放 src/，编译产物自动落到旁边的三层目录。它和 ROS1 时代的 catkin_ws 是同一个概念，老教程里的说法可以直接套用。两句常见提醒：src 里只放工程（没有 package.xml 的目录不算包）；
+build、install、log 不要手动修改、也不要提交进 git
+，它们随时可以重新生成。各层细节第 03 节有完整讲解。
+一个容易踩的坑：刚编译完，跑的可能还是"别人家的"
+刚执行完
+colcon build
+就
+ros2 run demo_nodes_cpp talker
+，输出可能和编译前一模一样——此时环境里找到的还是 apt 安装的系统版。先执行
+source install/setup.bash
+，
+把自己工作空间的 install/ 排到系统路径前面
+，命令一个字没变，背后运行的文件才真正换成你刚编出来的这个。先记住这个现象，第 03 节讲完 Overlay 就知道为什么了。
+最后把 src 里最熟悉的一个功能包放大看，内部结构长这样：
+# ~/ros2_ws/src/xflz_eai_car1/ros2_demos/demo_nodes_cpp/
+demo_nodes_cpp/
+├── package.xml
+← 包的"身份证"，缺它 colcon 扫到这里连停都不会停
+├── CMakeLists.txt
+← 构建说明书：怎么编、装哪、命令叫什么
+├── include/demo_nodes_cpp/
+← 头文件目录，供源码 #include
+└── src/topics/
+    ├── talker.cpp
+← 发布者节点源码（你 echo 到的 Hello World 就从这几行产生）
+└── listener.cpp
+← 订阅者节点源码，一发一收对讲
+挨个文件聊一聊
+package.xml
+：每个功能包都配一份的"身份证"，写清包名、版本、依赖谁。
+文件夹里没有它，colcon 扫过去连停都不会停
+，目录长得再像包也不算数。清单上各字段怎么读、依赖分几类怎么写，是下一章 EXP-04 的正题，这里先认识它就行。
+CMakeLists.txt
+：施工图，规定拿哪些源码编出什么可执行文件、装到哪、命令叫什么。你敲
+ros2 run demo_nodes_cpp talker
+时最后那个词，就是从它的登记里来的——细读同样放到 EXP-04。
+src/topics/talker.cpp
+：真正的节点代码。一个继承
+rclcpp::Node
+的 Talker 类，创建往
+chatter
+发消息的 publisher，再挂一个每秒执行一次的定时器；旁边的
+listener.cpp
+负责订阅打印，一个发、一个收，就是你上一章看到的对讲效果。
+03
+核心原理：四层目录结构 + colcon 编译流程
+一次
+colcon build
+牵着三件事：产物落在哪（工作空间四层目录）、内部按什么顺序走（构建四阶段）、编完之后怎么被环境找到（Underlay / Overlay 叠层查找）。原理看完，最后一小节把最常用的命令收在一起——标准四步曲和高频选项，照着敲即可。
+工作空间四层目录：产物落在哪
+src/
+源码层（唯一手写层）
+所有功能包的源码、package.xml 都在这里。它是唯一需要纳入 git 版本管理的目录。
+build/
+编译中间产物
+CMake 缓存、.o 文件、构建元数据。可随时整个删除，重新编译即可。
+install/
+可执行 + 环境脚本
+编译交付物：可执行文件、库、launch、以及关键的 setup.bash 环境脚本。
+log/
+构建日志
+每次 colcon 运行的日志。编译失败时先来这里看，而不是重跑十遍。
+out-of-source 编译哲学
+说明
+源码与产物分离
+src 只有源码，build/install/log 全是生成物——
+rm -rf build install log
+永远安全。
+干净的 git
+.gitignore 常规只需排除
+build/ install/ log/
+，仓库里只有 src。
+可重建性
+任何一台装好 ROS2 的机器，
+git clone + colcon build
+即可复现环境。
+构建四阶段：内部怎么走（动画）
+① Discovery
+扫描 src 中的包
+② Topological
+按依赖排序（DAG）
+③ Build
+多进程并行编译
+④ Install
+逐包装入 install/
+依赖排序示意（② 产出的编译顺序）：
+interfaces ①先编
+driver ②
+algorithm ③
+bringup ④后编
+教学抽象的四阶段：发现包 → 拓扑排序 → 并行编译 → 安装交付；排序之后才轮得到 Build，所以
+被别人依赖的包必须先编，依赖别人的包最后编
+——就像图里 interfaces 先于 driver、bringup 收尾。对照官方说法（colcon 作者 ROSCON 2019 讲义 / developer 文档 Program flow）：colcon 先"计算依赖图、按拓扑序处理"，然后
+对每个包把 build 和 install 合成一个任务、边编边装
+，全部完成后统一生成 setup.bash 环境脚本——并不是四段完全独立的全局流水。
+还有个容易误会的点：colcon 自己不编译代码，真正干活的是 CMake 和 g++——它更像工地上的包工头，负责扫描、排序、派活、收纳。整个流程浓缩成一句话：
+src 进去，build 中转，install 出来；ros2 run 只认 install 里的东西，而 install 要 source 之后才找得到。
+这句话先记下来，后面排查问题时会经常用到。
+Underlay / Overlay：编完怎么被找到
+ROS2 用
+环境变量列表
+实现包查找：可执行文件、Python 模块、接口定义都按顺序在多层前缀里搜索，
+先匹配到的赢
+。
+1
+Underlay（底层）
+：系统安装的 ROS2（
+/opt/ros/humble
+），提供 rclpy、rviz2 等基础能力。
+2
+Overlay（上层）
+：你自己的工作空间 install/，可以
+覆盖
+底层同名包，也可以新增包。
+3
+执行
+source install/setup.bash
+把你的层
+追加到列表顶部
+——后 source 者胜出。
+4
+验证：
+echo $COLCON_PREFIX_PATH
+，你的路径应出现在系统路径
+前面
+。
+坑 1
+顺序颠倒，包"消失"
+先 source 自己的工作空间再 source /opt/ros，系统层会压在你上面，你的包找不到。
+坑 2
+setup.bash 递归
+工作空间的 setup.bash 会
+自动带着底层
+（underlay chain），日常只需要 source 它一个。
+坑 3
+新终端全忘了
+source 只对当前 shell 生效。每次开新终端都要重来，或写进 ~/.bashrc。
+常用命令：四步曲
+标准四步曲——顺序不能乱：
+# ① 确认底层已加载（装完 ROS2 的默认动作，或显式执行）
+source /opt/ros/humble/setup.bash
+# ② 在工作空间根目录（有 src/ 的那层）执行编译
+colcon build
+# ③ 激活你的工作空间（把 install/ 送进环境）
+source install/setup.bash
+# ④ 验证
+ros2 pkg prefix demo_nodes_cpp
+# 输出 ~/ros2_ws/install 即成功；还是 /opt/ros 说明 source 没做对
+# 高频选项 —— 不用背，过一遍，用到时回来查
+colcon build
+--packages-select demo_nodes_cpp
+# 只编指定的包（大工程提速关键）
+colcon build
+--packages-up-to car1_navigation
+# 编这个包，连同它依赖的所有包一起
+colcon build
+--packages-skip demo_nodes_py
+# 跳过指定的包
+colcon build
+--parallel-workers 2
+# 最多 2 个进程并行；默认占满 CPU，机器卡时调低
+colcon build
+--executor sequential
+# 逐包按顺序编，排查问题时日志更清楚
+colcon build
+--symlink-install
+# Python/launch 改动免重编，直接生效
+colcon build
+--event-handlers console_direct+
+# 实时滚动输出，失败原因一目了然
+# 成功标志：Summary: N packages finished [2.34s]
+symlink 的边界与选包的规矩
+①
+--symlink-install
+让源码改动即时生效，但改了 setup.py / package.xml / CMakeLists 后仍要重新 colcon build——链接的是内容，不是构建描述；
+②
+--packages-select
+后面写的名字必须和 package.xml 里的
+<name>
+完全一致，跟文件夹叫什么无关，拼错就是 0 个包被编。
+04
+实操：从零创建工作空间
+演示看懂了，第 03 节的流程也清楚了，现在自己从零搭一个：从只有 src 的空目录开始，把
+C++ 和 Python 两个工程各编译运行一遍、做个对比
+（自己写新包是下一章 EXP-04 的活，这里先用现成源码练流程）。
+1
+检查构建工具 colcon 是否就位（多数桌面版已自带，没有就一句 apt 装上）。
+2
+从零建目录骨架
+~/my_ws/src
+，把现成示例源码拷进来。
+3
+C++ 版
+：colcon build → source → ros2 run，再用上一章的三件套验收话题。
+4
+Python 版
+：同一条流程再走一遍，只换包名——对比两种工程的构建差异。
+5
+删产物重编，看四层目录重新长齐；用
+pkg prefix
+确认"覆盖换人"。
+# ① 检查工具链：应显示 build/test/list 等子命令
+colcon
+--help | head -1
+# command not found？ sudo apt install python3-colcon-common-extensions -y
+# ② 从零建骨架 —— 此时 ~/my_ws 底下干干净净只有 src/
+mkdir
+-p ~/my_ws/src
+cp
+-r ~/ros2_ws/src/xflz_eai_car1/ros2_demos ~/my_ws/src/
+ls
+~/my_ws/src/ros2_demos
+# 三个工程：demo_nodes_cpp / demo_nodes_py / example_interfaces
+# ③ 回根目录全量编译（不指定包，colcon 按依赖自动排序）
+cd
+~/my_ws
+colcon build
+# 预期 Summary: 3 packages finished
+source
+install/setup.bash
+# 激活自己的工作空间，每个新终端都要执行
+# 窗口 1：跑 C++ 版
+ros2 run demo_nodes_cpp talker
+# 每秒一条 Hello World: N，这窗口先留着
+# 窗口 2：拿上一章的三件套验收
+ros2 topic list | grep chatter
+# 话题在不在？
+ros2 topic echo /chatter
+# 能不能收到 "Hello World: N"？
+ros2 topic hz /chatter
+# 是不是约 1.0 Hz？
+三个都有：install/ 里有产物、命令跑得起来、话题里有数据。到这儿，"改代码、编译、运行、验证"这个日后天天要转的圈，你已经亲手完整走过一圈了。
+第一次编译遇到报错很正常
+，多数是下面这几种情况，对照排查即可：
+你可能遇到
+典型现象
+原因和解法
+命令根本不存在
+colcon: command not found
+新终端还没加载 ROS 环境，先
+source /opt/ros/humble/setup.bash
+指定了包却 0 个包被编
+Summary 显示
+0 packages finished
+包名拼错了；或者那个目录里根本没有 package.xml，压根没被扫到
+编译成功但 run 报错
+Package '…' not found
+编完忘了
+source install/setup.bash
+。注意：
+每开一个新终端都要重新 source
+，它不会替你记住
+Build 阶段 CMake 报错
+Could not find … rclcpp
+还是环境没加载全（回看上一条）；也可能是依赖没装，跑一句
+rosdep install --from-paths src -y
+改了代码，行为却是旧的
+改完跑起来一点没变
+忘了重新 build；或者你跑的根本是系统里那个同名包。
+ros2 pkg prefix demo_nodes_cpp
+应该指向
+~/my_ws/install
+编译输出滚动太快
+报错一闪而过看不清
+加
+--event-handlers console_direct+
+实时打印编译过程；完整日志在
+log/latest_build/
+目录里
+接着换 Python 版
+：C++ 能跑之后，Python 这遍就轻松多了——流程一个字没变，只是把 CMake 那套换成了 setuptools：
+# demo_nodes_py/：少了 CMakeLists.txt，多了个 setup.py 当"命令注册表"
+demo_nodes_py/
+├── package.xml
+← build_type 换成了 ament_python，工具链就切过去了
+├── setup.py
+← entry_points：'talker = demo_nodes_py.topics.talker:main'
+├── setup.cfg
+← 声明入口脚本装到 lib/demo_nodes_py/
+├── resource/demo_nodes_py
+← 一个空文件，文件名就是包名，给索引用
+└── demo_nodes_py/
+    └── topics/
+        ├── talker.py
+← 六十来行，Node 子类加个定时器
+└── listener.py
+# ④ Python 版：激活同一个工作空间，只换包名
+source
+~/my_ws/install/setup.bash
+ros2 run
+demo_nodes_py talker
+# 另一个窗口照旧 list / echo / hz
+验证结果和 C++ 版一模一样：话题在、每秒一条、约 1.0 Hz。底下走的是同一套 DDS，所以命令行工具根本分不出你跑的是哪种语言。
+把这次实操用到的两种工程放在一张表里对比：
+对比项
+C++ 工程（demo_nodes_cpp）
+Python 工程（demo_nodes_py）
+构建描述文件
+CMakeLists.txt
+setup.py + setup.cfg
+package.xml 里的 build_type
+ament_cmake
+ament_python
+是否真编译
+g++ 编译链接成可执行文件
+不编译，运行时解释执行
+build/ 里的体量
+.o 文件多、耗时明显
+基本只有元数据，秒级完成
+可执行入口怎么登记
+CMakeLists 里 add_executable
+setup.py 的 entry_points
+运行命令
+ros2 run demo_nodes_cpp talker
+ros2 run demo_nodes_py talker
+可以看到：
+两种工程只有"驱动文件"不同，激活、运行、验收的三步一个字没变，换包名就能重来一遍
+；两种 build_type 下清单各自怎么写、依赖怎么声明，属于 EXP-04 的正题。
+# ⑤ 删产物重编 + 覆盖验收（生成物删了永远安全，正好练一次 out-of-source）
+cd
+~/my_ws
+rm -rf
+build install log
+# 第 03 节说过：删了随时能重新生成
+colcon build
+source
+install/setup.bash
+ls
+~/my_ws
+# 四层齐了：build/ install/ log/ src/
+ros2 pkg prefix demo_nodes_cpp
+# 指向 ~/my_ws/install 而非 /opt/ros —— 覆盖成功 ✅
+ros2 pkg prefix demo_nodes_py
+# Python 版同理 ✅
+工程这条线到此闭环：
+建骨架 → colcon 编译 → C++/Python 双语言运行 → prefix 验收覆盖
+。
+真正从零创建一个自己的功能包、再把它改成会发话题的节点，是下一章 EXP-04 的主场
+——
+ros2 pkg create
+就在那儿等着你。
+05
+实操：动手验证 Overlay 覆盖规则
+纯终端实操，全程在设备上执行。要验证的两条铁律：
+① 谁排在前谁赢
+——加载顺序决定
+AMENT_PREFIX_PATH
+排列，Prefix 搜索命中第一个含该包的前缀；
+② 去重不挪位
+——列表里已有的路径，再 source 也不会换位置，所以顺序实验必须在
+干净终端
+里做。请严格按顺序执行并记录每步输出：
+🚦 前置检查：你的 .bashrc 是否"自启动"了 ROS？
+很多设备（含
+ros2_migration
+一类迁移工具生成的配置）会在
+~/.bashrc
+里写上
+source /opt/ros/humble/setup.bash
++
+source ~/ros2_ws/install/setup.bash
+自动加载——这样
+每个新终端一出生就带着两条前缀，且 ros2_ws 已排在 humble 前面
+；再叠加"去重不挪位"，你把 source 拆开重排一万次也全是工作空间赢，实验永远"复现不出"。做本实验前二选一：
+① 临时注释（推荐）
+：编辑
+~/.bashrc
+，给这两行
+source
+前加
+#
+，保存后
+关闭并重开终端
+再做实验，做完恢复原样；
+② 干净 shell（不动文件）
+：
+env -i HOME="$HOME" TERM="$TERM" USER="$USER" PATH=/usr/bin:/bin bash --noprofile --norc
+——进去后环境一尘不染，按下面六步执行，
+exit
+退出回原终端。
+# ① 正确顺序：系统层先，自己层后（全新终端执行）
+source /opt/ros/humble/setup.bash
+source ~/ros2_ws/install/setup.bash
+ros2 pkg prefix demo_nodes_cpp
+# → /home/<你>/ros2_ws/install/demo_nodes_cpp ✅ 晚进列表的排在前，Overlay 赢
+# ② 新开一个终端（绝不要沿用①的终端！）：先只加载系统层
+source /opt/ros/humble/setup.bash
+ros2 pkg prefix demo_nodes_cpp
+# → /opt/ros/humble/... ✅ 此刻只有系统层，它独占第一（无 Overlay 时回落系统层）
+# ③ 同一终端再补上自己的层：首次进列表 → 插到最前
+source ~/ros2_ws/install/setup.bash
+ros2 pkg prefix demo_nodes_cpp
+# → /home/<你>/ros2_ws/install/demo_nodes_cpp ✅ 后 source 者胜
+# ④ 看清真实顺序（自上而下 = 优先级从高到低）
+echo $AMENT_PREFIX_PATH | tr ':' '\n'
+echo $COLCON_PREFIX_PATH | tr ':' '\n'
+# ⑤ 反向验证：新开终端，只加载自己的层、跳过 Underlay
+source ~/ros2_ws/install/setup.bash
+ros2 --help
+# → 仍 command not found ⚠
+# 原因：Overlay 只"追加"路径，不自带 ros2 本体 —— Underlay 不能省
+# ⑥ 一键恢复：删产物重新来过（永远安全的操作）
+rm -rf build install log && colcon build
+⚠️ 为什么在同一个终端"颠倒顺序"永远复现不出回退？
+环境变量的拼接规则是
+prepend-non-duplicate：已经在列表里的路径，再 source 一次是空操作，不会把它挪到最前
+。步骤 ① 做完后，
+/opt/ros/humble
+和
+~/ros2_ws/install
+都已固化进列表——此后你在同终端里按"先自己、后系统"反复颠倒 source，顺序纹丝不动，
+ros2_ws
+照样赢（很多同学在这里以为规则反了，其实规则是"
+路径位置只在首次加入时决定，之后去重保持原位
+"）。想看系统层赢，唯一姿势就是
+新开终端只 source 它
+（步骤②）；真实排列随时用步骤④核对。
+06
+注意事项与验收清单
+四层目录齐全：src/build/install/log，且 git 仓库里只跟踪 src
+colcon build 输出出现
+Summary: N package finished
+ros2 pkg prefix demo_nodes_cpp
+指向
+~/ros2_ws/install
+（工作空间版盖住了 apt 版）
+echo $COLCON_PREFIX_PATH
+中你的工作空间排在 /opt/ros 之前
+能口头解释：为什么 build/install 可以随便删？为什么同一个终端里重复 source 不会改变前后顺序？
+完成 Overlay 实操全部六步：正序时 prefix 指向工作空间 / 新开终端只加载系统层时落回 /opt/ros / 补上自己层后又指回 ros2_ws / 跳过 Underlay 后
+ros2 --help
+仍不可用
+坑
+症状
+解法
+执行位置不对
+colcon 提示找不到 src/ 或在错误目录生成产物
+必须在工作空间
+根目录
+（src 的上一层）执行
+source 顺序颠倒
+自己的包 pkg list 里搜不到 / 运行的是旧版
+确保工作空间 setup.bash
+最后
+source
+磁盘越用越大
+build 残留几十 GB
+rm -rf build install log
+后重编，src 不受影响
+改了代码没生效
+Python/launch 改动运行还是旧行为
+加
+--symlink-install
+重编；改构建描述文件则必须重编
+07
+本课总结与思考题
+结构
+src / build / install / log
+唯一手写层是 src；三个生成层随时可删，这是 out-of-source 的全部意义。
+工具
+colcon 四阶段
+Discovery → Topological → Build → Install，依赖排序保证编译顺序正确。
+机制
+Underlay / Overlay
+环境变量列表按序查找，后 source 者胜，这就是覆盖与找回的全部原理。
+习惯
+根目录构建 + 四步曲
+build → source → 验证；symlink 让脚本类改动立等可取。
+思考题
+① 两个工作空间 a、b 各含同名包 my_pkg（版本不同），同一终端里先 source a 后 source b，运行的是哪个？想让 a 生效怎么办？
+② 团队想共享一份"公共 Underlay"（驱动+接口由维护者统一更新，成员只写自己的包），该如何设计 source 顺序？画出你的三层叠放图。
+CORE-01 · 机器人 ROS2 应用与开发 · EXP-03 工作空间与 colcon
+2 学时 · 验证性 · 基于 ros_practice 实验讲义改编

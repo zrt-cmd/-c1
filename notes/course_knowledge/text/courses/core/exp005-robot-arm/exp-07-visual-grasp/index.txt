@@ -1,0 +1,409 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp005-robot-arm/exp-07-visual-grasp/index.html
+TITLE: EXP-07 视觉动态抓取 · 机器人机械臂应用与开发
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+EXP-07 视觉动态抓取 · 机器人机械臂应用与开发
+🤖 具身智能课程 ·
+教程首页
+核心课程
+/
+机械臂应用与开发
+/ EXP-07
+本页目录
+本课程实验
+EXP-07 · 第 3 章 · 综合性 · 8 学时
+视觉动态抓取
+课程大一统：深度相机看世界、HSV 找颜色、反投影定三维、TF 换算到基座、IK 反解、状态机执行——visual_grasp.launch.py 一条命令拉起 5 节点，人机协同的 start/confirm/skip/abort 服务把"看见→确认→抓起"变成可运营的流水线。
+⭐⭐⭐ · HSV+深度+TF · 8 学时
+01
+问题引入
+EXP-06 的坐标是尺子量的——物体一挪就抓空。要让机械臂"看到"物体，需要把一帧彩色图像变成 base_link 下的 3D 坐标，再交给你已经熟悉的 IK+抓取链路。这中间横着三座桥：
+颜色桥（HSV）
+：图像成千上万像素，哪些属于目标？光照一变 RGB 全乱，HSV 才稳。
+深度桥（反投影）
+：像素 (u,v) 只有二维，加上深度图的 d 才能还原相机坐标系里的 (X,Y,Z)。
+坐标桥（TF）
+：相机装在夹爪上随臂晃动，相机系的点必须实时换到 base_link 才能抓。
+本实验 8 学时：一条 launch 拉起全栈，rqt 三栏盯着它看，四个人机服务管着节奏，最后拿红色物体（30~50mm）做成功率验收。
+02
+原理通俗讲解
+HSV 分色像用"色相环"筛豆子。
+RGB 是红绿蓝三盏灯的混合亮度，灯一暗全都变样；HSV 把"什么颜色（H）"、"多纯（S）"、"多亮（V）"拆开——只圈定 H 的范围，屋内灯稍亮稍暗都不影响筛选。
+inRange
+就是拿一个区间筛子过一遍像素，命中的涂白成掩膜。
+深度反投影像"由近及远钉钉子"。
+已知像素在画面偏右 100 像素、深度 0.5m：乘内参（fx≈614）一除，就知道它在相机右侧约 8 厘米、正前方半米——(u,v,d)→(X,Y,Z) 就是这一除。深度图单位是 uint16 的
+毫米
+，用前必须 /1000，这是最经典的翻车点。
+TF 像"随军翻译"。
+相机说"在我右前方 30cm"（camera_depth_optical_frame 系，X右/Y下/Z前，REP-103），底座听不懂；tf_buffer.transform 一换算，底座就知道"在base_link 前方多少"。相机装在手上，臂一动翻译表就更新——这就是 TF 的实时性。
+look-then-move 是"看准了再伸手"。
+观察（OBSERVE）→ 有人按确认（CONFIRM）→ 猛抓（PICK）→ 回怠速（IDLE）。光看不确认就动是鲁莽，确认了快动是果断——五态循环把二者拆开。
+形态学开闭
+先擦后补的橡皮擦
+开运算（先蚀后胀，5×5 核）擦掉小噪点；闭运算（先胀后蚀）补上掩膜窟窿，让轮廓完整。
+安全熔断
+面积 < 100 像素不抓
+轮廓太小按噪声处理，宁可 skip 也不夹空气——防误抓的第一道闸（源码实际阈值 100；想更稳可自己提到 500）。
+03
+关联知识点
+环节
+真实参数/接口
+启动
+ros2 launch car1_app visual_grasp.launch.py
+（分时启动：
+t=0 bringup
+→
+t=5s arm_controller
+→
+t=8s 深度相机
+→
+t=12s visual_grasp 节点
+→
+t=14s rqt 窗口
+）
+图像话题
+直接订相机驱动的
+原生名
+（不能 remap，驱动靠话题名里的
+rgb0
+/
+depth0
+子串来开关出流）：
+RGB
+/ascamera_hp60c/camera_publisher/rgb0/image
+· 深度
+/ascamera_hp60c/camera_publisher/depth0/image_raw
+· 内参
+/ascamera_hp60c/camera_publisher/depth0/camera_info
+HSV 阈值
+默认认红（H 环两端两段取并集）
+：主段 (0,100,80)-(15,255,255) ∪ 副段 (160,100,80)-(180,255,255)。
+实测红块 H 落在 167~178
+，所以真正起作用的是副段——只调主段会"怎么看都检测不到"。换色参考区间：yellow (20~40) · blue (100~130) · green (40~80)
+掩膜
+cv2.inRange ×2 → bitwise_or 合并 → morphologyEx
+OPEN 后 CLOSE
+（
+5×5 椭圆核
+）→ findContours(RETR_EXTERNAL) → 取最大轮廓（
+面积 < 100 直接丢弃
+）→ cv2.moments 求
+质心
+深度
+不是取质心单点
+：先把轮廓填成实心 mask，与有效深度（>0）取交集，
+至少 30 个样本
+才继续；再用
+中位数 ± 2.5×MAD
+剔除离群值，最后取中位数作 z。深度是 uint16
+毫米
+，按 dtype 判断后 ÷1000（不用
+z>100
+这种幅度猜测——近距离物体会被误判）
+反投影
+x_cam=(u−cx)·z/fx, y_cam=(v−cy)·z/fy, z_cam=z
+；
+内参从 camera_info 的 k[0]/k[4]/k[2]/k[5] 实时读取
+（不要写死 614/320/240，实测值只是它等于这些数）
+TF
+tf_buffer.lookup_transform("base_link", "camera_depth_optical_frame", …)
+→
+do_transform_point
+；链路 …→arm_link4→…→
+tcp_link→camera_depth_optical_frame
+（相机是
+眼在手上
+，装在 link4 侧，所以每一跳都随臂姿态变）；REP-103：X右/Y下/Z前
+服务
+/visual_grasp/start、/confirm、/skip、/abort 四个
+std_srvs/Trigger
+状态机
+源码是
+11 态
+枚举：IDLE→INIT→MOVE_TO_OBSERVE→WAIT_STABLE→REFRESH_JOINTS→DETECT→WAIT_CONFIRMATION→COMPUTE_TARGET→PICK→DONE/FAILED（跑完回 IDLE，节点可反复触发不用重启）
+可视化
+主要看
+/visual_grasp/visualization
+（三栏合成图，launch 会自动开 rqt_image_view）；另有
+/visual_grasp/mask
+（纯二值真相）与
+/visual_grasp/debug_image
+（RGB+轮廓）
+⚠️ 三处和讲义/直觉不一样，先纠正再动手
+① 定位方法不是
+minEnclosingCircle
+，是
+cv2.moments
+质心。
+源码注释写得很直白：质心比最小外接圆圆心更稳（对不规则团块），而且更贴近物体本体。
+② 最小面积阈值是
+100
+，不是 500。
+讲义/旧版写的 500 是更保守的建议值，但代码里实际判的是
+area < 100
+。差别很实际：30 mm 物体在 0.5 m 处大约 35×35 = 1200 px²，如果按 500 卡，稍远一点就被丢掉。
+答题写 100（以源码为准），调参时可以自己往上提到 500 减少误检。
+③ 三栏里没有
+depth_overlay
+、
+rgb_annotated
+这两个话题。
+真正的三栏是
+一张合成图
+/visual_grasp/visualization
+（RGB + Depth 伪彩 + Mask 横向拼接），用
+rqt_image_view
+订阅它一个就够；如果你按旧名字分三个窗口订阅，会一个都找不到。
+🔍 还有一个"隐藏动作"决定了定位精度
+DETECT 之前有个
+REFRESH_JOINTS
+状态：先调
+/servo_controller/refresh_positions
+让
+/joint_states
+换成
+舵机实测角度
+（平时它反映的是"指令值"，因为那样快、不抢总线），丢给 TF 之后才做 lookup。
+为什么必须这样
+：IK 有误差、舵机有回差，臂
+实际
+停的位置和你
+以为
+它停的位置差几度，TF 就会把相机算到错的地方——物体定位直接偏几厘米。
+这一步是"手眼"精度的隐形守门员。
+TF 查询失败时它
+不退回旧位姿
+，直接返回 None 让上层重试，也是同一个道理。
+基线指标
+：OBSERVE 检测 <1s；PICK <8s；单周期 <15s；HSV 检测成功率 >95%；1m 处反投影误差 ±2-3cm；TF 换算误差 <1cm；整体抓取成功率 >85%；误抓率 <5%（面积<500 剔除 + 重复抓取自动 skip）。相机按课程规格书为 HP60C（讲义环境表记 realsense2_camera 驱动，如设备不同仅影响驱动参数，五节点流水线不变）。
+04
+实验目标
+理解视觉抓取端到端原理：HSV 检测 → 深度反投影 → TF 变换 → IK → 状态机，五模块各司其职。
+独立完成一站式启动
+visual_grasp.launch.py
+并跑通"start → 观察 → confirm → 抓取"动态闭环。
+能调 HSV 阈值适配新颜色物体（hsv_tuner.py），检测成功率 >95%。
+能调 gripper_depth 适配 30~50mm 物体，并解释 look-then-move 与眼在手下压失视野问题的对策。
+掌握四服务人机节奏与重复抓取处理（目标已抓走时自动 skip，避免夹空气）。
+05
+实验环境与准备
+项
+要求
+主入口
+app/car1_app/launch/visual_grasp.launch.py
+；核心节点
+car1_app/visual_grasp.py
+；公共函数
+car1_app/common.py
+前置实验
+EXP-06（抓取链路与参数已调通）；rgb8 + aligned depth 图像话题正常
+相机
+HP60C 深度相机（课程规格）；讲义环境基于 realsense2_camera 驱动，RGB-D 双路输出
+场地
+30~50mm 红色物体置于视野中央桌面；背景与目标色区分明显（
+实测红块 HSV 的 H 落在 167~178
+，属"副段"；换绿色/蓝色物体记得连段数一起改）
+工具
+rqt_image_view（合成图 /visual_grasp/visualization）、四个 Service 终端窗口、
+dry_run:=true
+作为安全预演开关
+分阶段
+阶段1 启动与检测 120min；阶段2 状态机与服务 120min；阶段3 抓取执行与调优 120min
+启动前检查：
+机械臂零位/急停可用；bringup 与相机不冲突（visual_grasp.launch 会自管其节点）；调试默认
+wait_for_confirmation:=true
+——设 false 才会跳过人工 confirm 直连抓取，首次务必留 true。
+06
+动画讲解：观察—确认—抓取三乐章
+RGB + Depth @ 相机
+HSV mask → 质心 (u,v) → depth d → (X,Y,Z)
+TF→base_link
+源码 11 态：IDLE→INIT→OBSERVE→…→PICK→DONE
+start → 检测(绿) → 等 confirm(黄) → 抓取(红) → 回位(蓝)
+9 秒一循环：看（observe）→ 报坐标 → 等人点头（confirm）→ look-then-move 抓取 → idle
+动画 9 秒一循环：左框里绿色虚线框住红色目标并提取质心，经 TF 换算到 base_link；右上状态机光点在 OBSERVE(绿)→CONFIRM(黄)→PICK(红)→IDLE(蓝) 间移动；下方机械臂在 PICK 段伸出、合爪、带物回位——"看准了再伸手"的节奏一目了然。
+07
+互动讲解：HSV 掩膜调参台 + 反投影验算
+互动台 · 换色适配 + (u,v,d)→(X,Y,Z) 验算
+目标颜色预设
+红 red 主段 (0-15) · 默认
+黄 yellow (20-40)
+蓝 blue (100-130)
+绿 green (40-80)
+H 下限
+H 上限
+u
+v
+深度 d (mm)
+判掩膜窗口
+反投影
+默认红目标 =
+两段并集
+：主段 H∈[0,15] ∪ 副段 [160,180]（红卡在 H 环两端，
+实测红块落在 167~178，起作用的其实是副段
+），S≥100、V≥80（launch 实参 [0,100,80]）；本台窗口只模拟主段。反投影内参：
+运行时从 camera_info 读
+，实测 fx=fy=614、cx=320、cy=240；深度 uint16 单位 mm，须 /1000。
+先点"判掩膜窗口"：H 区间与预设完全一致报 ok，部分重叠报 warn（会漏检边缘色阶），完全无关报 bad。
+特别注意
+：如果你只在主段 [0,15] 里调，而手里红块的实际 H 在 167~178，那么无论怎么调都是 bad——这正是"两段并集"存在的理由。再点"反投影"：输入质心像素与深度毫米数，按
+X=(u−cx)·d/fx, Y=(v−cy)·d/fy, Z=d
+算相机系坐标——和你在 rqt Mask 栏看到的白色团块互为印证。
+08
+实操步骤
+Step 1 · 一站式启动
+拉起 5 节点，等相机出流。
+→
+Step 2 · HSV 调参
+rqt 三栏 + hsv_tuner 锁定颜色。
+→
+Step 3 · 反投影验证
+标定物对照，误差 ±2-3cm@1m。
+→
+Step 4 · TF 确认
+tf2_echo 查 optical→base_link。
+→
+Step 5 · 服务闭环
+start→观察→confirm→PICK→IDLE。
+→
+Step 6 · 换色验收
+改 HSV 抓新色块，记四指标。
+# 步骤 1 · 一站式启动（分时拉 4 组东西：bringup → arm_controller → 相机 → 节点 → rqt）
+ros2 launch car1_app visual_grasp.launch.py
+# [INFO] [visual_grasp_node]: State IDLE, waiting for /visual_grasp/start
+# 启动时序 t=0/5/8/12/14s：先串口与 TF → 控制器 → 相机出流 → 检测节点 → rqt 窗口
+# 别在 t<12s 就急着 call start：节点还没起，服务不存在
+# 步骤 2 · 三栏可视化（一个话题就够，launch 已自动开 rqt_image_view）
+ros2 run rqt_image_view rqt_image_view /visual_grasp/visualization
+# 合成图：左 RGB（绿轮廓+黄框+红十字质心）｜中 Depth 伪彩（标 mm 读数）｜右 HSV Mask 二值真相
+# 想看纯掩膜：ros2 run rqt_image_view rqt_image_view /visual_grasp/mask
+# hsv_tuner.py 是讲义提供的离线调参脚本；线上调参直接改 launch 参数里的两段 H/S/V
+# 步骤 3 · 反投影自测（内参请从 camera_info 读，别写死）
+ros2 topic echo /ascamera_hp60c/camera_publisher/depth0/camera_info --once
+# 看 k[0]=fx、k[4]=fy、k[2]=cx、k[5]=cy；实测 ≈614/614/320/240
+# 手算：u,v=320,240 → X=Y=0（正好光轴中心），Z=d/1000；偏 200px、d=0.5m → X=(200)*0.5/614≈0.163m
+# 标定物实测：1m 距离误差预期 ±2-3cm；超差先查 camera_info 是否已更新
+# 步骤 4 · TF 链与时序
+ros2 run tf2_tools view_frames
+# … → arm_link4 → … → tcp_link → camera_depth_optical_frame
+ros2 run tf2_ros tf2_echo base_link camera_depth_optical_frame
+# 步骤 5 · 人机协同四服务（Trigger 类，命令体留空）
+ros2 service call /visual_grasp/start   std_srvs/srv/Trigger "{}"
+# 日志：State IDLE -> ... -> DETECT → Contour: area=…, centroid=(u,v) → WAIT_CONFIRMATION
+ros2 service call /visual_grasp/confirm std_srvs/srv/Trigger "{}"
+# 确认后进 PICK
+ros2 service call /visual_grasp/skip    std_srvs/srv/Trigger "{}"
+# 放弃本目标
+ros2 service call /visual_grasp/abort   std_srvs/srv/Trigger "{}"
+# 中止回 IDLE
+# 步骤 6 · 换色验收（以抓 30~50mm 红色物体为例）
+# 1) 改 HSV 两段阈值：优先确保"副段 160~180"覆盖住你手里的红块（实测 H 落在 167~178）
+# 2) 桌面摆放物体，start → DETECT 出轮廓 → confirm → 看 PICK 是否 <8s 完成
+# 3) 拿走物体再 start：轮廓面积 <100 应被熔断（"Largest red contour too small"）→ 不抓空气
+# 4) 免确认直连（首次务必先过一遍带确认的）
+ros2 launch car1_app visual_grasp.launch.py wait_for_confirmation:=false
+# 安全预演：只定位不抓，机械臂只升到观察位
+ros2 launch car1_app visual_grasp.launch.py dry_run:=true
+# 验收指标：HSV 检测成功率>95% · 单周期<15s · 抓取成功率>85% · 误抓<5%
+🔍 调不出结果时，第一个该用的参数是 dry_run
+dry_run:=true
+让节点
+只检测、只打印 base_link 坐标，不发 target_pose、不调 pick
+——机械臂最多升到观察位，绝不会往物体下压。
+验证定位精度必须先用它
+：拿卷尺量一下物体实际位置，和日志里的坐标比对，差了 3 cm 以上就别急着抓，先查内参/深度/TF，否则你会在"抓偏"和"到底哪一步偏"之间反复折腾。
+09
+重点与易错点
+难点预警——眼在手下压失视野：
+相机装在腕部，机械臂 DESCEND 下压时目标会滑出视野甚至贴得太近失焦。对策即 look-then-move 的本义：
+观察阶段锁定 base_link 坐标
+，抓取段只信这份额定坐标，中途不再追着实时像素跑（需要复看就抬回观察位再 OBSERVE）。
+坑
+现象
+对策
+深度单位混淆
+反投影差 1000 倍
+HP60C 深度 uint16 单位是 mm。
+别用
+if z>100
+猜
+——源码按
+dtype
+判断（整数÷1000，浮点已是米），近距离物体会被猜错
+只调了主段 H 区间
+怎么调都检测不到红块
+实测红块 H 在 167~178
+，起作用的
+是副段
+160~180。两段都要在
+按旧名找话题
+三栏窗口一个都打不开
+不存在
+rgb_annotated
+/
+depth_overlay
+；看合成图
+/visual_grasp/visualization
+或掩膜
+/visual_grasp/mask
+深度取单点
+z 偶发跳变、定位忽准忽偏
+源码用"轮廓内多点 + 中位数 ±2.5×MAD + 样本≥30"；取质心单点遇到空洞/高光就废
+内参写死
+换分辨率后越抓越偏
+从
+camera_info
+的 k[0]/k[4]/k[2]/k[5] 读；614/320/240 只是实测值不是常量
+坐标系方向错
+抓取整体偏 90°
+optical 系 X右/Y下/Z前；用
+tf2_echo
+核对链路每一跳
+关节角用的是"指令值"
+定位偏几厘米，且每次都差不多
+REFRESH_JOINTS 状态会先调
+refresh_positions
+拿实测角；若你自写节点，必须自己补这一步
+t<12s 就 call start
+"服务不存在"
+launch 是分时启动的，等日志打出 "waiting for /visual_grasp/start" 再触发
+空抓/夹空气
+PICK 落空
+先用
+dry_run:=true
+核对坐标；面积熔断（<100）只挡"没检测到"，挡不住"坐标错了"
+⚠️ 一句必须说清的实话
+"重复抓取自动 skip"不是代码里的一行判断。
+源码
+没有
+"记住已抓过哪个物体"的逻辑——离开视野的物体本来就检测不到了；留在视野里的空位置则因为
+面积 <100 被熔断
+而不会抓。所以"误抓率 <5%"靠的是
+熔断 + 人工 confirm
+两道闸，不是自动去重。
+想要真正的去重
+，得自己记一份已抓物体的 base_link 坐标清单，在新目标与已有清单足够近时 skip——这是本实验的进阶改造题。
+交付四件套：换色检测成功率 >95%、单周期 <15s、整体成功率 >85%、误抓 <5%。
+三栏图像必须都看过才收工：rgb_annotated（框）、depth_overlay（深度着色）、mask（二值真相）。
+留档一组"失败样本"截图 + 当时 HSV/深度/TF 日志——调试能力比一次成功更值钱。
+10
+总结与思考
+三座桥
+HSV · 反投影 · TF
+颜色→掩膜→像素质心→毫米→米→base_link。
+五节点一键
+visual_grasp.launch
+相机+检测+状态机+服务同起，时序自管。
+人机四服务
+start/confirm/skip/abort
+看→点头→抓→回，重复目标自动 skip。
+验收指标
+95% / 85% / 5%
+检测率、成功率、误抓率三线齐守。
+思考题 1：
+把 S 阈值下限从 100 降到 30 会让更多像素进入掩膜——检测率会上升还是误检率会上升？结合"开运算 5×5 去噪"和"最小面积 500"设计一组你自己的调参顺序（先调谁、后调谁、每次依据什么栏判断）。
+思考题 2：
+look-then-move 在物体被人挪动的场景里会抓空。若要升级为"持续跟随"，五态循环哪里要改？把眼在手下压失视野的约束、TF 实时更新能力、以及 EXP-06 的分步移动一起纳入你的方案草案。
+CORE-05 · 机器人机械臂应用与开发 · EXP-07 视觉动态抓取
+8 学时 · 综合性 · 基于 arm_practice 实验讲义改编

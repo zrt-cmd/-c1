@@ -1,0 +1,1394 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp003-ros2-application/exp-06-topic/index.html
+TITLE: 实验 06 · ROS2 话题通讯原理（MQ5 气体传感器）
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+实验 06 · ROS2 话题通讯原理（MQ5 气体传感器）
+具身智能课程 · 教程首页
+☰ 目录
+ROS2 应用开发
+/
+实验 06 话题通讯
+本实验章节
+★ 课程目标
+01
+跑出现象：MQ5 浓度流
+02
+问题引入与原理：一份数据，为什么走话题
+03
+QoS：传输合同 + 实验台
+04
+实验步骤：框架 → 代码 → 现象
+05
+动手任务：改点新东西来验证
+06
+注意事项与验收清单
+07
+实验总结与思考题
+本课程其它实验
+▷ 05 · 节点
+▷ 07 · 服务通讯
+▷ 08 · 动作通讯
+▷ 09 · 自定义接口消息
+▷ 10 · 参数服务
+EXP-06 · 4 学时 · 难度 ⭐⭐
+ROS2 话题通讯原理（MQ5 气体传感器）
+传感器数据像河水一样持续流动，如何让"生产数据的节点"和"使用数据的节点"互不干扰地协作？本实验以真实 MQ5 可燃气体传感器为载体，讲透 ROS2
+发布/订阅
+模型、
+QoS 三要素
+与
+MQ5 对数换算
+三条原理主线，并完成"DAC 采集 → 物理量换算 → Float32 发布 → 报警判定"全链路实操。
+ROS2 Humble
+rclpy
+Publisher / Subscriber
+QoS
+MQ5 · ADC
+实验箱 B2
+目标
+本课学完，你应该能做到
+① 说清模型
+异步发布 / 订阅
+能阐述 Publisher 与 Subscriber 如何通过话题名解耦、DDS 如何自动完成发现与分发，并说明 QoS 三要素（Reliability / Durability / History Depth）如何影响通信行为。
+② 掌握链路
+从采样到回调
+掌握
+gas_sensor_node
+（发布）与
+gas_monitor
+（订阅）从参数声明、QoS 配置到消息收发回调的完整编程链路。
+③ 独立验证
+自己造出证据
+能独立运行 MQ5 收发节点，用
+topic echo/hz/info
+观察浓度、频率与类型，并用
+--ros-args -p
+动态改
+publish_period
+与报警阈值。
+④ 迁移应用
+换传感器照样套
+能把「ADC 采集 → 物理量换算 → Float32 发布」这套模型迁移到温湿度、心率血氧等其它持续数据流传感器。
+本课的重点与难点
+重点
+：QoS 的"请求 ≤ 提供"兼容规则——这是"两头都起了、数据却不来"最常见的原因。
+难点
+：把 MQ5 的电压读数经对数换算成 ppm（
+parts per million，百万分之一
+，气体浓度单位）；以及理解"发布者根本不知道有几个订阅者"。
+和前后的关系
+本课的
+gas_sensor_node
+在
+EXP-05 已从"节点结构"角度拆过
+；本课换到"话题"角度再看一遍，会发现同一份代码能讲出两层知识。
+01
+跑出现象：一步步跑出 MQ5 浓度在话题上流动
+先别急着啃原理——
+把系统跑起来，看它到底长什么样
+。下面按终端分成四段，一条命令一张卡：每条都告诉你
+为什么敲它
+，以及
+敲完屏幕上应该出现什么
+。逐条对照，现象对上了；再带着「为什么会这样」的疑问进入后面的原理与代码，会轻松很多。
+终端 A
+编译与加载环境
+（只做一次，做完可以一直用）
+1
+编译 ros_sensor 包并 source
+终端 A
+ros_sensor
+是存放传感器节点的功能包（
+gas_sensor_node
+/
+gas_monitor
+都在里面）；
+ros_sensor_interfaces
+是它依赖的接口包。
+用
+--packages-select
+点名编译这两个包
+——工作空间里包一多，全量编译既慢又容易连带报错。编译顺序由 colcon 按依赖自动排，不用你操心。
+source
+的作用是让当前终端
+知道去哪儿找这些包
+，每新开一个终端都要重新 source 一次。
+# ① 进工作空间，并先加载 ROS2 本体（underlay）
+cd ~/ros2_ws
+source /opt/ros/humble/setup.bash
+# ② 只编译本实验需要的两个包：节点包 + 它依赖的接口包
+#    用 --packages-select 点名，不碰工作空间里其它包，快且不易连带报错
+colcon build --packages-select ros_sensor ros_sensor_interfaces
+# ③ 把工作空间注册进当前终端（新终端必做，不能省）
+source install/setup.bash
+✔ 结尾出现
+Summary: N packages finished
+（N = 你工作空间里的包总数，全编了就行）；
+source
+本身没有任何输出（沉默即成功）
+终端 B
+启动发布端
+（这个终端会被一直占住，别关）
+📏
+先弄清一个单位：PPM（parts per million，百万分之一）
+等一下日志里会一直出现
+ppm=312.91
+这样的数，先说明它是什么：
+PPM 是 "parts per million" 的缩写，字面意思就是"百万分之一"
+，用来表示
+极小的比例
+。
+· 用在气体浓度上：
+一百万份空气里，混了多少份目标气体
+。312.91 ppm ≈ 每 100 万份空气里有约 313 份可燃气体。
+· 换算成百分比更直观：
+312.91 ppm ≈ 0.031%
+；本课默认报警阈值 500 ppm ≈ 0.05%——
+浓度都很低，靠鼻子闻不出来，所以必须靠传感器
+。
+· 记住两个量级参照：
+1000 ppm = 0.1%
+；
+10000 ppm = 1%
+。看到 4 位数的 ppm 就说明已经是"百分之几"了。
+· 为什么不用百分比：可燃气体在爆炸下限之前往往只有几百到几千 ppm，写成 0.03% 既不方便比大小，也不方便设阈值，所以行业统一用 ppm。
+2
+运行 MQ5 采集节点
+终端 B
+这就是数据的源头：它每秒读一次 ADC，
+把电压换算成 ppm 浓度
+（换算公式在第 4 节讲），然后把数值"喊"到
+/gas_sensor
+这个话题上。
+# 新终端必做：进目录 + 加载本工作空间（不然找不到 ros_sensor）
+cd ~/ros2_ws
+source install/setup.bash
+# 启动 MQ5 采集节点（普通用户即可，不需要 sudo）
+ros2 run ros_sensor gas_sensor_node
+$ ros2 run ros_sensor gas_sensor_node
+[INFO]
+[1728000001.123] [gas_sensor_node]: raw=1404 voltage=1.714V ppm=312.91
+[INFO]
+[1728000002.124] [gas_sensor_node]: raw=1405 voltage=1.715V ppm=313.68
+[INFO]
+[1728000003.126] [gas_sensor_node]: raw=1403 voltage=1.713V ppm=312.15
+…每秒一行，持续滚动
+✔ 每秒稳定打印一行
+raw=… voltage=…V ppm=…
+：raw 是 ADC 原始值、voltage 是换算出的电压、ppm 是最终浓度。
+光标停住不返回，正是节点在持续工作的样子
+，停止请按
+Ctrl+C
+。
+实拍｜
+MQ5 传感器板在哪
+：红框内就是气敏元件（实验箱上标着"气敏传感器模块"的那块小板）。这段代码每秒读的就是它——读不到就会出现
+读取 ADC 失败
+，先回来检查接线。
+终端 C
+启动订阅端
+（B 保持运行，别停）
+3
+运行报警监控节点
+终端 C
+它订阅同一个话题。注意：它
+完全不知道
+发布端在哪、是谁——只知道"我去
+/gas_sensor
+这个频道听"。
+# 同样的固定开场：进目录 + source（新终端必做）
+cd ~/ros2_ws
+source install/setup.bash
+# 启动订阅 / 报警节点
+ros2 run ros_sensor gas_monitor
+$ ros2 run ros_sensor gas_monitor
+[INFO]
+[gas_monitor]: 浓度正常: 312.91 ppm
+[INFO]
+[gas_monitor]: 浓度正常: 313.68 ppm
+[INFO]
+[gas_monitor]: 浓度正常: 312.15 ppm
+✔ 数值与终端 B 的
+ppm
+一一对应
+——这就是消息真的走通了。默认阈值 500 ppm，所以此刻打印的是"浓度正常"。
+实拍｜
+订阅端的真实日志
+：连续几行
+[gas_monitor]: 浓度正常: xx.xx ppm
+，数值与终端 B 的 ppm 同步跳动。一旦人为靠近气源，这里就会变成
+[报警] 气体浓度超标
+。
+终端 D
+从外部观察这条话题
+（这是排查问题最常用的一套命令）
+4
+先看系统里有哪些节点
+终端 D
+这条命令给整个系统"点名"：现在到底有哪些节点活着。
+# 新终端开场：进目录 + source（后面的命令都在这个终端里敲，不用再 source）
+cd ~/ros2_ws
+source install/setup.bash
+# 给整个系统的节点"点名"
+ros2 node list
+$ ros2 node list
+/gas_monitor
+/gas_sensor_node
+✔ 两个节点都在，说明发布与订阅程序都活着
+5
+看有哪些话题
+终端 D
+列出当前活跃的话题。除了业务话题，还会看到两个以
+/
+开头的系统话题。
+# 列出当前活跃的话题（本终端已 source 过，直接敲）
+ros2 topic list
+$ ros2 topic list
+/gas_sensor
+← 本实验的业务话题（Float32 浓度）
+/parameter_events
+← 每个节点自带的参数事件话题
+/rosout
+← 全局日志话题
+✔ 看到
+/gas_sensor
+就说明发布端已经成功登记了话题
+6
+看话题的类型与收发端数量
+终端 D
+这条命令回答两个关键问题：
+发的什么类型？谁在发、谁在收？
+加
+--verbose
+还能看到两端的 QoS（见 03 节）。
+# 看这条话题的类型 + 谁在发、谁在收
+ros2 topic info /gas_sensor
+# 再加一把 --verbose：还能看到两端的 QoS 参数
+ros2 topic info /gas_sensor --verbose
+$ ros2 topic info /gas_sensor
+Type: std_msgs/msg/Float32
+Publisher count:
+1
+Subscription count:
+1
+✔ 类型是
+std_msgs/msg/Float32
+；此时如果你在另一个终端再开
+ros2 topic echo
+，Subscription count 会变成 2 —— 这就是"一对多"的直接证据
+7
+实时"偷听"话题内容（第三方订阅者）
+终端 D
+这是话题调试最重要的命令：
+不改任何代码
+，直接把自己变成第三个订阅者。发布端完全不知道你的存在——这正是话题"位置透明"的体现。
+# 变成第三个订阅者实时"偷听"；随时 Ctrl+C 停止
+ros2 topic echo /gas_sensor
+$ ros2 topic echo /gas_sensor
+data: 312.91
+---
+data: 313.68
+---
+✔ 每秒打印一条
+data: …
+，与终端 B、C 的数值同步
+8
+测发布频率
+终端 D
+频率是判断"数据流是否健康"最直观的指标。当前
+publish_period
+默认为 1.0 秒，所以应该是 1Hz。
+# 测这条话题的发布频率；随时 Ctrl+C 停止
+ros2 topic hz /gas_sensor
+$ ros2 topic hz /gas_sensor
+average rate:
+1.000
+min: 0.999s max: 1.001s std dev: 0.00052s window: 10
+✔
+average rate: 1.000
+说明发布端严格按 1 秒一次的节奏在发
+终端 B / C
+不改代码，改运行参数
+（改完回头看现象的变化）
+9
+把发布周期改成 0.5 秒
+终端 B 重启
+发布周期做成了参数，所以不用改源码就能调快。注意参数覆盖必须用
+:=
+，用等号
+=
+不生效。
+# 在终端 B 按 Ctrl+C 停掉，再用参数重启
+ros2 run ros_sensor gas_sensor_node --ros-args -p publish_period:=
+0.5
+$ ros2 topic hz /gas_sensor
+average rate:
+2.000
+← 频率翻倍了！
+✔ 终端 B 的日志打印变快一倍，终端 C 的"浓度正常"也跟着变快——
+发布节奏变了，所有订阅者自动跟着变
+10
+把报警阈值降到 100 ppm
+终端 C 重启
+默认阈值 500 ppm，传感器在正常环境读数只有几百以内，很难触发；把阈值压低，就能立刻看到报警路径。
+# 在终端 C 按 Ctrl+C 停掉，再用参数重启
+ros2 run ros_sensor gas_monitor --ros-args -p alarm_threshold:=
+100.0
+$ ros2 run ros_sensor gas_monitor --ros-args -p alarm_threshold:=100.0
+[WARN]
+[gas_monitor]: [报警] 气体浓度超标: 312.91 ppm >= 100.0 ppm
+[WARN]
+[gas_monitor]: [报警] 气体浓度超标: 313.68 ppm >= 100.0 ppm
+✔ 日志从
+INFO 浓度正常
+变成
+WARN [报警]
+——同一个话题、同一份数据，阈值一变，行为立刻改变
+🧪
+物理验证（最能说明问题的一步）
+：用打火机（
+只按放气、绝不点火
+）对着 MQ5 传感器放一点气，终端 B 的 ppm 会明显跳升，终端 C 立即触发
+[报警]
+——这说明"采集 → 换算 → 发布 → 订阅 → 判定"整条链路同时正确。测试完请开窗通风。
+⚠️
+手上没有 B2 实验箱 / 没接 MQ5 怎么办？
+终端 B 会每秒打印
+读取 ADC 失败: …
+。这不影响理解话题机制，但看不到真实浓度。可以改用话题名与类型完全相同的手动发布来替代第 2 步：
+ros2 topic pub /gas_sensor std_msgs/msg/Float32 "{data: 320.0}" -r 1
+终端 C 与终端 D 的全部命令照常可用。
+操作
+你应该看到
+ros2 run ros_sensor gas_sensor_node
+每秒一行
+raw=1404 voltage=1.714V ppm=312.91
+ros2 run ros_sensor gas_monitor
+每秒一行
+浓度正常: 312.91 ppm
+（与发布端数值一致）
+ros2 node list
+/gas_sensor_node
+与
+/gas_monitor
+同时出现
+ros2 topic info /gas_sensor
+Type:
+std_msgs/msg/Float32
+，Publisher 1，Subscription ≥1
+ros2 topic hz /gas_sensor
+default 下
+1.000 Hz
+；
+publish_period:=0.5
+后
+2.000 Hz
+第三方
+ros2 topic echo
+可同时收到数据（一对多验证），发布端毫无感知
+alarm_threshold:=100.0
+订阅端出现
+[报警] 气体浓度超标
+的 WARN 日志
+关闭发布端（终端 B 按 Ctrl+C）
+订阅端静默等待，
+不报错
+，只是不再有新数据
+02
+问题引入与原理：一份数据，为什么要经过"话题"
+刚才那一屏数据已经跑通了。但它凭什么能跑通？先看需求——想象你在家做一个"燃气安全管家"：厨房装了
+MQ5 可燃气体传感器
+，一旦浓度超标要立刻做四件事：手机弹通知、客厅声光报警器响、云端留一份记录、物业大屏同步显示。传感器每秒读一次数据，这四个"想听的人"都要拿到
+同一份
+。
+🏠
+生活里到处都是这个结构
+：小区广播站喊一句"三号楼停水"，不需要知道谁在家；电视台播新闻，不需要知道谁在看。共同点是——
+一个人说，很多人听，而说话的人完全不必知道听众有谁
+。这正是你刚才看到的：
+gas_sensor_node
+根本不知道
+gas_monitor
+和
+ros2 topic echo
+在听。
+如果不用话题，直接让传感器程序"挨个通知"这四个人呢？这是最朴素的点对点直连，一上手就会撞到四堵墙：
+① 得先认识每一个收件人
+每个接收方都要写死 IP + 端口。手机换个 WiFi、云服务换个地址，程序就得改。
+② 加一个人就要改一次代码
+明天想再加一块"微信提醒"，传感器程序要重新改、重新编译、重新上线——加听众的成本落在说话人身上。
+③ 慢的会把快的拖死
+云端网络卡了 3 秒，传感器就得等它 3 秒。采样节奏被别人的网速绑架，这在安全监控里是致命的。
+④ 掉线重连全自己扛
+对方没开机？连接断了？排队重发还是丢弃？这些工程细节全部落到业务代码里。
+① 点对点直连：4 条专线
+gas_sensor
+发布端
+慢 → 等它
+手机通知
+要 IP + 端口
+声光报警
+要 IP + 端口
+云记录
+网络卡、阻塞发布
+物业大屏
+要 IP + 端口
+加一个听众 → 改一次发布端代码
+② 话题广播：1 条总线，听众自取
+gas_sensor
+发布端
+/gas_sensor
+手机通知
+只认话题名
+声光报警
+只认话题名
+云记录
+慢也不影响别人
+临时加入 echo
+上线就能收
+发布端一行代码都不用改
+图 6-1｜同一个"一对多"需求：左边是挨个通知，右边是把消息放到话题上让听众自取
+话题通信把这四堵墙一次性拆掉：传感器只管把消息
+放到
+/gas_sensor
+这个话题上
+，谁想用谁就自己"竖起耳朵"订阅，随时加入、随时离开，发布者永远不需要知道现在有几个听众。
+💡
+话题通信的三个承诺
+：①
+一对多
+——新订阅者随时插进来，发布端毫不知情（刚才
+ros2 topic echo
+就是这么插进去的）；②
+异步
+——发布只管把消息放到话题上就走，订阅者处理得慢也不拖累发布者；③
+位置透明
+——双方只需约定
+话题名 + 消息类型
+，谁都不需要知道对方的 IP、端口、进程号。
+那它内部到底怎么跑通的？四个环节
+"解耦"听起来抽象，其实全过程只有四步，每一步都有明确的承担者。看这张结构图——它把两个节点的
+内部
+拆开了，你会发现真正干活的并不是
+publish()
+那一行，而是它背后 DDS 的"收发管道"。
+① 注册端点
+② 发现并匹配
+③ 序列化传输
+④ 回调执行
+发布端 gas_sensor_node
+create_publisher()
+DDS Writer 发端管道
+按 QoS 排队
+发送队列 depth=10
+KEEP_LAST(10)
+timer_cb() 定时采样
+publish() 入队即返回
+DDS 全局数据空间
+/gas_sensor
+类型 std_msgs/msg/Float32
+QoS 合同 RELIABLE / 10
+消息：Float32(312.91)
+没有中心服务器，各自维护
+"同名同类型"的收发管道
+话题 = 名字 + 类型 + QoS
+订阅端 gas_monitor
+DDS Reader 收端管道
+按 QoS 收下
+接收队列
+Executor（spin 循环）
+callback(msg) 你的代码
+消息到了才被调用
+写
+读
+发现
+投递
+两端从不直接对话：各自只跟"同名同类型的话题"打交道，中间的匹配与搬运由 DDS 完成
+一个消息发出去，所有订阅者同时收到各自的副本——发布端谁都不等
+图 6-2｜话题通信内部结构：① 注册 → ② 发现匹配 → ③ 序列化传输 → ④ 回调执行
+① 注册端点
+create_publisher(Float32, '/gas_sensor', qos)
+只是向本机 DDS 登记了一个"我在这里发这种消息"的端点，此刻
+还没有任何连接
+。
+② 发现并匹配
+DDS 在后台通过
+组播
+宣告"我在找/我在发 /gas_sensor"，把
+话题名、类型、QoS
+三项都吻合的两端配对。代码里从来不需要写"连接服务器"。
+③ 序列化传输
+publish(msg)
+把对象序列化成二进制（CDR），塞进发送队列后
+立刻返回
+——它不等任何订阅者。队列按 QoS 深度决定留多少条。
+④ 回调执行
+订阅端 DDS 收到数据放进接收队列，
+Executor（由 spin 驱动）
+取出并调用你注册的
+callback(msg)
+。事件驱动，不空转轮询。
+⚠️
+最容易误解的一点
+：
+publish()
+做的事是"把消息交给话题"，全程并不关心有没有订阅者在线。所以没有订阅者时发布照样成功；订阅者处理得慢，发布的频率也不会被拖慢。这就是"异步"的全部含义。
+💡
+顺便记住分发的方式
+：消息进入话题后是
+同时
+流向所有订阅者的——话题没有"排队依次通知"的概念，每个订阅者都有自己独立的 QoS 队列。刚才
+ros2 topic echo
+能一边看、
+gas_monitor
+能一边判报警，就是各自收各自的副本。
+对比维度
+话题（本实验）
+服务（EXP-07）
+通信关系
+一对多，多对多
+一对一
+是否阻塞
+异步，发完即走
+同步，等应答
+数据方向
+持续单向流
+请求 → 应答往返
+典型场景
+传感器读数、速度指令
+查询、校准、触发一次动作
+🔍
+状态自省
+：运行时用
+ros2 topic info /gas_sensor --verbose
+可以看到类型、发布/订阅端数量，以及
+两端的 QoS 参数
+——"谁在发、谁在收、按什么规矩收"一目了然，不用读一行代码。
+03
+QoS：给话题签一份传输合同，并亲手签坏它
+同样是发数据，激光雷达"丢几帧无所谓、延迟必须低"，控制指令却"一条都不能丢"。ROS2 把这个选择权交给了 QoS（Quality of Service）：
+每个话题都附带一套传输策略
+——发布端提供一套，订阅端要求一套，DDS 逐项比对，匹配成功才建立连接。
+按下场景选档位
+场景
+Reliability
+Durability
+Depth
+为什么
+MQ5 浓度（本实验）
+RELIABLE
+VOLATILE
+10
+1Hz 的关键安全数据，丢一条就漏一次报警
+激光雷达点云 / 相机图像
+BEST_EFFORT
+VOLATILE
+1～5
+几十 Hz 且数据量大，宁可丢帧也别拖慢
+地图 / 静态配置
+RELIABLE
+TRANSIENT_LOCAL
+1
+只发一次，晚启动的节点必须能拿到
+速度指令 /cmd_vel
+RELIABLE
+VOLATILE
+1
+只要最新的一条，旧指令补发反而危险
+⚠️
+兼容规则（高频考点）
+：订阅端要求的等级必须
+不高于
+发布端提供的等级，即"请求 ≤ 提供"。
+· 发布
+BEST_EFFORT
++ 订阅
+RELIABLE
+⇒
+连不上
+（订阅者要的可靠性，发布者给不了）
+· 发布
+RELIABLE
++ 订阅
+BEST_EFFORT
+⇒
+能连
+（订阅者自降要求，发布者照给）
+动手验证：把合同"签坏"看看
+光看懂规则不够，下面这个实验台把抽象的兼容规则变成了几秒就能验证的实验：左边是发布端
+gas_sensor_node
+，右边是订阅端
+gas_monitor
+，改完档位点一下"跑 10 条消息"，模拟器就按 DDS 的规则逐条演示。建议按这张任务单操作，边做边对照上面的规则：
+#
+把两端改成
+你会观察到
+1
+发布
+BEST_EFFORT
+，订阅
+RELIABLE
+DDS 拒绝匹配，订阅端
+一条都收不到
+2
+两端都
+RELIABLE
+，发布 depth 改成
+KEEP_LAST(1)
+慢消费者场景下，中间的消息被新消息
+覆盖丢弃
+3
+勾选"订阅端晚到"：Durability 先
+VOLATILE
+再
+TRANSIENT_LOCAL
+前者错过加入前的全部数据；后者会
+补发最后一条
+🎛️ 实验台就在下面：改两端档位，点"跑 10 条消息"，按上表的三个任务依次验证。
+📤 发布端 gas_sensor_node（提供）
+Reliability
+RELIABLE（提供：可靠）
+BEST_EFFORT（提供：尽力）
+Durability
+VOLATILE（不留存量）
+TRANSIENT_LOCAL（补发存量）
+History Depth
+KEEP_LAST(10)
+KEEP_LAST(1)
+KEEP_ALL
+📥 订阅端 gas_monitor（要求）
+Reliability
+RELIABLE（要求：可靠）
+BEST_EFFORT（要求：尽力）
+Durability
+VOLATILE（不补发）
+TRANSIENT_LOCAL（要补发）
+History Depth
+KEEP_LAST(10)
+KEEP_LAST(1)
+KEEP_ALL
+模拟"订阅端晚到"：发布端已经发了 4 条，
+gas_monitor 才启动
+▶ 跑 10 条消息
+重置
+设定：发布端 0.5s 一条；订阅端是慢消费者（0.8s 才处理一条）
+✔ 兼容 —— 两端 QoS 请求 ≤ 提供，DDS 将建立连接（修改任一档位会实时重算）
+发布端发出
+订阅端收到
+已发出并送达话题
+回调已处理
+存量补发
+丢弃
+错过（当时不在线）
+点击「▶ 跑 10 条消息」开始模拟……
+互动 6-1｜改档位 → 跑消息 → 读结论。三条推荐实验见本节上方的任务单
+💡
+这个模拟在帮你建立三件事的直觉
+：
+①
+Reliability
+决定"传的过程中丢不丢"——BEST_EFFORT 会真的有消息到不了；
+②
+Depth
+决定"收端来不及处理时挤掉多少"——KEEP_LAST(1) 在慢消费者面前只剩最新一条；
+③
+Durability
+决定"我晚到了能不能补课"——TRANSIENT_LOCAL 能把加入前最后一条补给你，VOLATILE 则永远错过。
+⚠️ 注意：模拟器把"慢消费者"参数固定成 0.8s/条，是为了让 depth 的差别在几秒内可见。真实系统里这个数字来自你的回调耗时——回调写得慢，队列就容易堆积。
+04
+实验步骤：先看懂框架，再读代码，最后自己跑出结果
+这一节换个顺序：
+先看程序骨架（三份文件各管什么、谁调谁）→ 再逐段读关键代码（只讲非讲不可的几十行）→ 最后动手跑、把结果和预期对上
+。反过来"先啃代码"最容易迷路——你会记住语法，却说不清这段代码为什么长这样。
+第 1 步 · 先看骨架：三份文件，一条数据流
+刚才屏幕上的一切，来自三份代码。别急着看细节，先记住它们的
+分工
+——这份骨架看懂了，后面读代码只是填肉。
+① common.py · 数据层
+读 ADC → 换算成 ppm。只管"造数据"，不发、不收、不打印。
+↓ 被 import
+② gas_sensor_node.py · 发布端
+定时器每秒调一次 common 的采集函数 →
+publish()
+到
+/gas_sensor
+。
+↓ DDS 自动搬运（这一层你一行代码都不写）
+③ gas_monitor.py · 订阅端
+订阅
+/gas_sensor
+→ 收到就回调 → 与阈值比较 → 打印"正常 / 报警"。
+🧩
+一句话记住这个分工
+：
+common.py
+负责
+算
+，
+gas_sensor_node.py
+负责
+发
+，
+gas_monitor.py
+负责
+判
+。
+中间的"搬运"一行代码都不用你写
+——这正是 02 节讲的位置透明。想换成温度传感器？只改
+common.py
+的读取函数，发布和订阅端几乎不用动。
+📍
+三份代码在同一个模块目录里
+：
+~/ros2_ws/src/xflz_eai_car1/driver/ros_sensor/ros_sensor/ros_sensor/
+（外层
+ros_sensor/
+是包，里层同名目录才是放 .py 的），其中
+common.py
+被两个节点共用。建议边看边打开源码对照。
+第 2 步 · 再读代码：三段非讲不可的地方
+下面按数据流动的顺序看三段代码。每段只抓关键几行——其余的 import、初始化、日志格式，你打开源码一眼就懂，这里不占篇幅。
+① common.py —— ppm 是算出来的，不是读出来的
+ppm 是什么
+在 01 节已经说过（parts per million，百万分之一）。这一节补的关键点是：
+它不是传感器直接读出来的数字
+。MQ5 是半导体气敏元件，接触可燃气体时内阻下降；电路通过分压把这个电阻变化变成电压。而"电压"和"浓度"
+不是线性关系
+——它的灵敏特性曲线只有在双对数坐标下才近似直线，所以必须在对数域里插值，才能把电压反推成 ppm。
+① ADC 原始值
+raw × scale ÷ 1000
+→
+② 电压 v (V)
+分压电路输出
+→
+③ 电阻比 ratio
+rs = RL·(V_REF−v)/v
+→
+④ ppm 浓度
+10^((lg ratio−B)/M)
+🔍
+raw 和 scale 各管一半
+：
+raw
+是 ADC 数出来的"格数"，12 位的一刀把量程切成 4096 格，取值 0~4095，本身不带单位；
+scale
+是内核驱动按"满量程毫伏 ÷ 4096"提前算好、放进 sysfs 的系数，含义是 1 格等于多少毫伏（5 V 满量程约为 1.2207）。
+两者相乘得到毫伏，再 ÷1000 才是伏特
+：v = raw × scale ÷ 1000。拿日志验算一遍：1404 × 1.2207 ≈ 1714 mV，正是那行的
+voltage=1.714
+。板子上的真值可以现场读：
+cat /sys/bus/iio/devices/iio:device0/in_voltage_scale
+和
+…/in_voltage7_raw
+，各板参考电压不同，以你 cat 出来的数为准。
+🧭
+下面四步里第④步那行长公式，是这样推出来的
+：
+① 手册的灵敏度特性曲线放在双对数纸上近似一条直线，横轴 lg(ppm)、纵轴 lg(ratio)，套直线方程得
+lg(ratio) = M × lg(ppm) + B
+；
+② 把浓度反解出来：
+lg(ppm) = (lg ratio − B) ÷ M
+；
+③ 两边同时取 10 的幂：
+ppm = 10^((lg ratio − B) ÷ M)
+。
+代入拟合系数 B = 0.186、M = −0.362，就是④显示的那一行。整条链上 B、M 是查手册曲线拟合来的固定值，每次采样真正变的只有
+ratio
+。
+图 6-4｜手册原图：MQ5 灵敏度特性曲线（双对数坐标）。横轴是气体浓度，纵轴是电阻比 Rs/R0；"空气"那条水平线就是标定点，三条往下走的斜线就是能拟合成直线的曲线，B = 0.186、M = −0.362 从这类斜线上拟合而来。想对照原文可以点开
+郑州炜盛《可燃气体传感器 MQ-5 使用说明书》PDF
+（备用镜像：
+LCSC
+）
+电压 v 是怎么来的：分压电路
++5 V
+Rs
+MQ5 气敏
+浓度↑ → Rs↓
+ADC 采样
+示例 v = 1.714 V
+RL
+1 kΩ
+GND
+v = 5 × RL / (Rs + RL)：Rs 越小，v 越大
+ppm 是怎么算的：拿 1.714 V 代一遍
+① 电压 v = 1.714 V
+raw=1404 × 1.2207 ÷ 1000，毫伏换伏特
+② Rs = 1 × (5 − 1.714) / 1.714 ≈ 1.917 kΩ
+分压关系反推气敏电阻
+③ ratio = 1.917 / 10 ≈ 0.192
+与标定点 R0 = 10 kΩ 的比值
+④ ppm = 10^((lg ratio − 0.186) / −0.362)
+ratio 取未舍入值代入 = 312.91 ppm，就是日志那一行
+图 6-5｜电压与浓度的完整换算：左图是硬件，气敏电阻的变化被分压成电压；右图是代码，从 raw=1404 乘 scale 换出 1.714 V，再四步算出 312.91 ppm
+# 来源：ros_sensor/common.py L13-33
+V_REF, RL, R0 =
+5.0
+,
+1.0
+,
+10.0
+# 参考电压、负载电阻 kΩ、标定电阻 kΩ
+CURVE_B, CURVE_M =
+0.186
+,
+-0.362
+# 灵敏特性曲线截距与斜率（斜率为负！）
+def
+voltage_to_ppm(v):
+# 电压 → 浓度
+if
+v <=
+0
+or
+v >= V_REF:
+# ← 除零保护：量程外的电压不算
+return
+0.0
+rs    = RL * (V_REF - v) / v
+# ③ 由分压关系反推气敏电阻 Rs
+ratio = rs / R0
+# ③ 与标定点 R0 的比值
+return
+10
+** ((math.log10(ratio) - CURVE_B) / CURVE_M)
+# ④ 对数域线性插值
+代码
+它在做什么
+不这么写会怎样
+if v <= 0 or v >= V_REF: return 0.0
+电压落在量程外（未接线、短路）直接返回 0，并让调用方看到"这次读数无效"
+分母趋近 0 →
+ZeroDivisionError
+或天文数字
+rs = RL*(V_REF-v)/v
+分压电路：v 越低说明传感器内阻越大，反推出 Rs
+拿电压当浓度用，读数完全错误
+ratio = rs / R0
+归一化：把"当前电阻"表示成"标定电阻的几倍"，去掉元件个体差异
+换一块传感器就要重新标定整套算法
+10 ** ((lg(ratio)-B)/M)
+在双对数坐标的直线上反解浓度。直线来自手册的灵敏度特性曲线（手册只给图不给公式），B、M 是对这条曲线拟合出的截距和斜率
+线性插值会严重低估高浓度区间
+为什么 M 是负数
+M = −0.362 意味着 ppm 与 ratio
+反向变化
+：浓度越高 → 气敏电阻越小 → ratio 越小 → 代入公式后 ppm 越大。数学方向和"浓度越高内阻越低"的物理直觉是一致的。
+原始值 ≠ 电压
+ADC 是 12 位的，
+raw
+只是 0~4095 的"格数"，本身不是伏特。每格到底等于多少毫伏，内核驱动已经算好写进
+in_voltage_scale
+：格数 × 毫伏/格得到毫伏，再 ÷1000 才是伏特。换算式里不用出现 4096，因为它已经被封进 scale 里了，板上
+cat in_voltage_scale
+一眼可见。
+采集入口：read_mq5_once() 每秒钟被调用一次
+# 来源：ros_sensor/common.py L36-47
+def
+read_mq5_once():
+try
+:
+        scale = float(read_adc_attr(
+"in_voltage_scale"
+))
+# ① 量程系数：1 格 = 多少毫伏
+raw   = int(read_adc_attr(f
+"in_voltage{MQ5_CH}_raw"
+))
+# ② 原始格数（12 bit，0~4095）
+v = raw * scale /
+1000.0
+# ③ 格数×毫伏/格=毫伏，÷1000→伏特
+return
+raw, v, voltage_to_ppm(v),
+""
+# ④ 一次返回四件事
+except
+Exception
+as
+e:
+return
+None, None, None, f
+"{type(e).__name__}: {e}"
+# 失败信息交给调用方
+四个返回值
+(raw, v, ppm, err)
+就是节点日志里那一行的全部来源。
+函数不打印、不抛异常，只把结果和错误一起交出去
+——打印交给节点，这是数据层与表现层分离的好习惯。
+🔬 换算曲线：输入电压，看当前点在曲线上怎么走
+0.1
+1
+10
+100
+1k
+10k
+100k
+1M
+0
+1
+2
+3
+4
+5
+电压 v（V）
+ppm（纵轴每格 ×10，log 刻度）
+低浓度端：曲线几乎贴着走
+高浓度端：越来越陡
+电压 v =
+V
+ppm = …
+↺ 回到 1.714
+…
+互动 6-2｜拖滑杆或直接输入电压（0~5 V）：红点就是当前输入在曲线上的位置；输入 0 或 5，亲手触发代码里的量程保护
+② gas_sensor_node.py —— 发布端只做四件事
+# 来源：ros_sensor/gas_sensor_node.py L16-44
+from
+rclpy.node
+import
+Node
+from
+std_msgs.msg
+import
+Float32
+from
+rclpy.qos
+import
+QoSProfile, HistoryPolicy, ReliabilityPolicy
+from
+.common
+import
+read_mq5_once
+# 复用 ① 里的采集函数
+class
+GasSensorNode(Node):
+def
+__init__(self):
+        super().__init__(
+'gas_sensor_node'
+)
+# ① 注册节点名
+self.declare_parameter(
+'publish_period'
+,
+1.0
+)
+# ② 声明可调参数
+qos = QoSProfile(
+# ③ 传输合同
+history=HistoryPolicy.KEEP_LAST, depth=
+10
+,
+            reliability=ReliabilityPolicy.RELIABLE,
+        )
+        self.pub = self.create_publisher(Float32,
+'/gas_sensor'
+, qos)
+# ④ 创建发布端
+period = float(self.get_parameter(
+'publish_period'
+).value)
+        self.timer = self.create_timer(period, self.timer_cb)
+# ⑤ 定时器：每 period 秒叫一次
+def
+timer_cb(self):
+# ⑥ 每秒被触发一次的回调
+raw, v, ppm, err = read_mq5_once()
+#    读 + 算
+if
+err:
+            self.get_logger().error(f
+'读取 ADC 失败: {err}'
+)
+#    出错只记日志，不崩溃
+return
+msg = Float32()
+#    装消息
+msg.data = float(ppm)
+        self.pub.publish(msg)
+# ⑦ 发布：入队即返回
+self.get_logger().info(f
+'raw={raw} voltage={v:.3f}V ppm={ppm:.2f}'
+)
+def
+main():
+    rclpy.init()
+# 初始化 rclpy
+node = GasSensorNode()
+# 构造节点（此时才注册进计算图）
+try
+: rclpy.spin(node)
+# 进入事件循环：驱动定时器与回调
+except
+KeyboardInterrupt:
+pass
+finally
+: node.destroy_node(); rclpy.shutdown()
+# Ctrl+C 后干净退出
+环节
+关键行
+它在做什么
+① 注册节点
+super().__init__('gas_sensor_node')
+节点名必须全局唯一，重名时 ROS2 会自动改名为
+gas_sensor_node_1
+。这一步之后
+ros2 node list
+才能看到它。
+② 声明参数
+declare_parameter('publish_period', 1.0)
+把"发布周期"变成运行时可调项——这就是第 9 步
+-p publish_period:=0.5
+能生效的原因。
+必须先声明再读取
+。
+③ 配置 QoS
+QoSProfile(...)
+确定这份"传输合同"：可靠 + 只留最近 10 条。订阅端要能对上才连得通（见 03 节 QoS）。
+④ 创建发布端
+create_publisher(Float32, '/gas_sensor', qos)
+三要素：
+消息类型 + 话题名 + QoS
+。这一行执行后，话题才真正出现在
+ros2 topic list
+里。
+⑤ 定时器
+create_timer(period, self.timer_cb)
+周期性触发回调，相当于节点的"心跳"。1.0 秒一次的节奏就是它给的。
+⑥ 回调
+timer_cb(self)
+整个业务逻辑只有五步：读 → 判错 → 装消息 → 发布 → 记日志。
+⑦ 发布
+self.pub.publish(msg)
+把消息交给话题即返回。
+此刻有没有订阅者在听，它完全不关心
+——这就是能"一对多、随时加入"的根本原因。
+③ gas_monitor.py —— 订阅端与发布端镜面对称
+# 来源：ros_sensor/gas_monitor.py L13-36
+class
+GasMonitor(Node):
+def
+__init__(self):
+        super().__init__(
+'gas_monitor'
+)
+# ① 另一个节点名
+self.declare_parameter(
+'alarm_threshold'
+,
+500.0
+)
+# ② 报警阈值也是参数
+self.threshold = float(self.get_parameter(
+'alarm_threshold'
+).value)
+
+        qos = QoSProfile(
+# ③ QoS 必须与发布端相容
+history=HistoryPolicy.KEEP_LAST, depth=
+10
+,
+            reliability=ReliabilityPolicy.RELIABLE,
+        )
+        self.sub = self.create_subscription(
+# ④ 订阅：类型 + 话题 + 回调 + QoS
+Float32,
+'/gas_sensor'
+, self.callback, qos)
+def
+callback(self, msg):
+# ⑤ 消息到了才会被调用
+ppm = msg.data
+if
+ppm >= self.threshold:
+            self.get_logger().warn(f
+'[报警] 气体浓度超标: {ppm:.2f} ppm >= {self.threshold} ppm'
+)
+else
+:
+            self.get_logger().info(f
+'浓度正常: {ppm:.2f} ppm'
+)
+对比点
+发布端 gas_sensor_node
+订阅端 gas_monitor
+核心 API
+create_publisher()
+create_subscription()
+谁主动
+由定时器主动触发（我要发）
+被动等待（消息来了才叫我）
+业务代码在哪
+timer_cb
+：采集并发布
+callback
+：判断并报警
+必需三件套
+消息类型
+必须相同
+· 话题名
+必须相同
+· QoS
+必须相容
+（请求 ≤ 提供）
+少一个会怎样
+话题名不同 ⇒ 谁也遇不到谁；类型不同 ⇒ 发现阶段就匹配失败；QoS 不兼容 ⇒ 连不上，且
+不报错
+，只是安静地收不到
+为什么订阅端不用 while 轮询
+spin()
+内部是事件循环：消息到达 → 放入队列 → 调度
+callback
+。没有消息时线程在等待而不是空转，CPU 占用极低。
+回调里能做什么、不该做什么
+可以做判断、发日志、再转发到别的话题；
+不要做耗时操作
+（如 sleep、读写大文件），否则队列会堆积——这正是 03 节 QoS 实验台里"慢消费者被覆盖"的真实成因。
+两个节点的名字为什么重要
+节点名是它在计算图里的身份，
+ros2 node info /gas_monitor
+就是按名字查它。名字重复会导致管理命令指向不确定的对象。
+⚠️
+两个高频坑
+：① 忘了
+declare_parameter
+就
+get_parameter
+→ 运行时报"参数未声明"；② 命令行覆盖参数必须用
+:=
+（
+-p publish_period:=0.5
+），写成
+=
+无效。
+第 3 步 · 最后跑出结果：把代码和现象对上号
+代码读完了，现在回到终端，
+验证你读到的每一段在屏幕上长什么样
+。这一步不是重复 01 节，而是让"代码里的某一行"和"屏幕上的某一行"建立一一对应。
+你在代码里看到的
+终端里对应的现象
+说明
+self.timer = self.create_timer(period, self.timer_cb)
+发布端每秒滚一行日志，周期稳定
+定时器到点才调
+timer_cb
+，间隔由参数
+publish_period
+决定
+self.pub.publish(msg)
+发布端日志出现后，订阅端
+几乎同瞬间
+也打印
+publish 入队即返回，DDS 搬运和你的代码无关
+def callback(self, msg)
+订阅端打印
+浓度正常: 312.91 ppm
+回调收到的
+msg.data
+，正是发布端那一行的 ppm
+if ppm >= self.alarm_threshold
+阈值调低后日志从 INFO 变 WARN
+[报警]
+同一个回调，判断条件一变，输出就变
+declare_parameter('publish_period', 1.0)
+ros2 param get
+能查到，
+-p …:=0.5
+能改
+声明过的参数才能被外部读写（EXP-10 细讲）
+✅
+对上号的标志
+：你能指着发布端某一行的
+ppm=312.91
+，说出它是哪个函数算出来的、经哪一行发出去的、在订阅端哪一行被打印出来。
+说得出这条链路，这节就算过了
+——比记住语法重要得多。
+05
+动手任务：改点新东西，验证你真的懂了
+01 节和 04 节第 3 步都是"跟着看现象"。这一节的任务
+故意不重复那些操作
+——每个任务都要你
+改一处新东西
+（改代码、改参数、加节点），然后自己判断"结果应该是什么样"再去验证。
+能预判结果，才算真懂
+。
+📌
+先立个规矩
+：动手改之前，
+先在纸上写下你预期的现象
+（哪怕只有一个字："会变快"）。跑完再对照——预期错了，恰恰是最有价值的一次学习。
+任务 1 · 改代码：把话题名挪个位（入门）
+打开
+gas_sensor_node.py
+，把
+'/gas_sensor'
+改成
+'/gas_sensor2'
+，
+只重编发布端所在的包
+，重启发布端。
+先预判
+：订阅端还能收到吗？
+然后验证
+：
+ros2 topic list
+现在有几个话题；再把订阅端的名字也改成
+/gas_sensor2
+看是否恢复。
+要记录
+：改名前后的
+topic list
+两张截图。
+任务 2 · 改代码：加一个温度字段（进阶）
+在
+timer_cb
+里加一行日志，把
+publish_period
+的当前值打印出来（
+self.get_parameter('publish_period').value
+）。
+先预判
+：用
+-p publish_period:=0.5
+启动时，日志里的数字是 1.0 还是 0.5？
+要记录
+：加参数启动后日志里那行数字的截图。
+这题考的是"参数在 init 里读一次还是每周期读一次"的差别。
+任务 3 · 造第三个订阅者（协议层）
+不用 ros2 topic echo
+，改用
+ros2 topic pub
+反向操作：先停掉发布端，用 pub 手动发数据，看订阅端是否照常报警。
+先预判
+：手动发的消息和真实传感器数据，订阅端能分辨吗？
+要记录
+：命令与订阅端输出，并解释"为什么分不清"。
+任务 4 · 故意把 QoS 签成不兼容（排障）
+把发布端
+reliability
+改成
+BEST_EFFORT
+，订阅端保持
+RELIABLE
+。
+先预判
+：会报什么错？
+然后验证
+：
+不会报任何错
+，只是收不到。用
+ros2 topic info /gas_sensor --verbose
+找出两端的档位差，再改回来。
+要记录
+：verbose 输出里两端 QoS 不一致的那几行。
+任务 5 · 迁移设计（综合，可交报告）
+假设要接一个
+温湿度传感器
+：① 你会新建哪个包、几个节点？② 话题叫什么、用什么消息类型（提示：EXP-09 有自定义接口）？③ QoS 三要素怎么选（温湿度是慢变数据，1Hz 够了）？
+要记录
+：一张架构草图 + 三要素的选择理由，
+不用真写代码
+。
+任务 6 · 物理验证（不可替代）
+打火机
+只放气、绝不点火
+，对准 MQ5 放一点气。
+先预判
+：终端 B 的 raw / voltage / ppm 三个数，
+哪个会变、方向如何
+？
+然后验证
+：ppm 跳升时 voltage 是升还是降？回到
+common.py
+的公式
+rs = RL·(V_REF−v)/v
+解释这个方向。
+要记录
+：跳升瞬间的日志 + 你用公式写出的解释。测完开窗通风。
+🎯
+任务难度与目的
+：任务 1、3 练"协议层直觉"（名字、类型、谁在发）；任务 2、4 练"代码与配置的边界"（什么该写死在代码里、什么该留给参数和 QoS）；任务 5 练"迁移设计"；任务 6 练"从现象反推公式"。
+六个任务里，任务 2 和任务 6 最能拉开差距
+。
+证据
+来源命令/终端
+对应知识点
+发布端每秒日志（raw / voltage / ppm）
+终端 B
+ADC → 电压 → ppm 换算链路（04 节 ①）
+订阅端"浓度正常 / [报警]"日志
+终端 C
+订阅回调与阈值判断（04 节 ③）
+ros2 topic info
+输出
+终端 D
+话题类型、收发端数量、QoS 实况（03 节 QoS）
+ros2 topic hz
+改前/改后两张
+终端 D
+参数化设计：运行时不改代码调频率
+ros2 topic echo
+与 Subscription count=2
+终端 D
+一对多与位置透明（02 节三个承诺）
+打火机放气时的 ppm 跳升
+实物 + 终端 B/C
+端到端链路的物理验证
+06
+注意事项与验收清单
+⚠️ 注意项
+说明
+QoS 一致性
+发布/订阅端须同为
+Reliable + KeepLast(10)
+，否则可能收不到消息
+环境加载
+每次新开终端都要
+source install/setup.bash
+话题命名
+/gas_sensor
+以
+/
+开头为全局命名空间
+安全提示
+MQ5 通电后表面发热勿用手触；测试仅低浓度演示，
+严禁明火
+双节点运行，
+ros2 node list
+同时显示两个节点
+ros2 topic info /gas_sensor
+显示 Pub=1、Sub≥1，类型
+std_msgs/msg/Float32
+ros2 topic hz
+≈ 1.000 Hz，改
+publish_period:=0.5
+后变 ≈ 2Hz
+第三方
+ros2 topic echo
+可同时接收（一对多验证）
+调低
+alarm_threshold:=100.0
+后出现
+[报警]
+日志
+口头解释：为什么发布端不用知道订阅端 IP？MQ5 对数换算四步链路？
+07
+实验总结与思考题
+✅ 完成成果
+跑通 gas_sensor_node + gas_monitor 双节点链路；掌握 topic echo/hz/info 自省；会用
+--ros-args -p
+动态调参。
+🧠 原理收获
+发布/订阅如何用"话题名"解耦两端；QoS 三要素与"请求 ≤ 提供"兼容规则；MQ5 ADC → 电压 → ratio → ppm 对数链路。
+🛠 技能收获
+Publisher/Subscriber 标准代码模式（参数声明、QoS 配置、回调处理）；ADC → 物理量的信号处理套路，可迁移到 DHT11/MAX30102。
+❓ 常见问题
+订阅无输出 → 查话题名/QoS/DOMAIN_ID；浓度恒为 0 → 查硬件与 scale；数值跳变 → 回调里加滑动平均滤波。
+📝
+思考题 1
+：CURVE_M = −0.362 为负值，说明 ppm 与 Rs/R0 是什么单调关系？请结合物理特性解释"浓度越高、内阻越低"的原因。
+📝
+思考题 2
+：MQ5 无法区分甲烷 / 酒精蒸气。若要设计能区分"炒菜酒精"与"燃气泄漏"的厨房监控系统，请给出一个多传感器 + ROS2 话题通信的架构方案（提示：每种传感器一个话题，融合节点订阅全部）。
+CORE-01 · 机器人 ROS2 应用与开发 · 实验 06 话题通讯（MQ5）· 基于 ros_practice 实验讲义改编 · 样式：clean-tech-ui

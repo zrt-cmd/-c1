@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-05 · 垃圾分类（检测头 20 类）— 机器人视觉入门课</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<link rel="stylesheet" href="../shared/beginner.css">
+<style>:root{--theme:#2563eb;--theme-deep:#1d4ed8;--theme-bg:#dbeafe;--theme-bd:#bfdbfe}</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit">🧠 具身智能课程 · <i>机器人视觉入门</i></a>
+  <div class="crumb"><a href="../../../index.html#core">核心课程</a> / <a href="../index.html">视觉入门课</a> / EXP-05</div>
+</div>
+
+<div class="wrap">
+
+<aside class="side">
+  <h4>本页步骤</h4>
+  <a href="#s1" class="now">01 这个实验解决什么问题</a>
+  <a href="#s2">02 三分钟讲懂：认出后归到哪一类</a>
+  <a href="#s3">03 先认识 4 个词</a>
+  <a href="#s4">04 它吃什么、吐什么</a>
+  <a href="#s5">05 三步跑起来</a>
+  <a href="#s6">06 你该看到的画面</a>
+  <a href="#s7">07 改一个参数看变化</a>
+  <a href="#s8">08 踩坑速查</a>
+  <a href="#s9">09 进阶（可选）</a>
+  <a href="#s10">10 随堂小测</a>
+  <h4>本课程实验</h4>
+  <a href="../exp-01-color-hsv/index.html">EXP-01 颜色识别</a>
+  <a href="../exp-02-qrcode/index.html">EXP-02 二维码</a>
+  <a href="../exp-03-contour-polygon/index.html">EXP-03 多边形轮廓</a>
+  <a href="../exp-04-industrial-defect/index.html">EXP-04 工业缺陷检测</a>
+  <a href="../exp-05-garbage-classification/index.html" style="color:#0f766e;font-weight:700">EXP-05 垃圾分类</a>
+  <a href="../exp-06-semantic-segmentation/index.html">EXP-06 语义分割</a>
+  <a href="../exp-07-deepsort-tracking/index.html">EXP-07 多目标跟踪</a>
+  <a href="../exp-08-face-landmarks/index.html">EXP-08 人脸关键点</a>
+  <a href="../exp-09-pose-landmark/index.html">EXP-09 骨骼关键点</a>
+  <a href="../exp-10-depth-3d/index.html">EXP-10 深度 3D</a>
+  <a href="../exp-11-pose-control/index.html">EXP-11 体感控制</a>
+  <a href="../exp-12-hand-control/index.html">EXP-12 手势识别</a>
+</aside>
+
+<main class="content">
+
+<div class="exp-head">
+  <span class="code">EXP-05 · 第 2 阶段 · 目标检测与分类 · 设计性 · 4 学时</span>
+  <h1>垃圾分类：20 个小类怎么变成 4 个大桶</h1>
+  <p class="desc">上一个实验学会了"圈框"，这次要更进一步：模型认出了"矿泉水瓶"，但垃圾桶只分 4 种颜色 —— 中间这层翻译谁来做？本实验用一个 20 类的检测模型加一张映射表，把细类自动归到四大类，并在浏览器里实时看它分。</p>
+  <div class="meta">
+    <span class="tag hl">难度 ⭐⭐ · 4 学时</span>
+    <span class="tag">YOLOv5 检测头</span><span class="tag">20 → 4 类映射</span>
+    <span class="tag">多线程推理池</span>
+  </div>
+</div>
+
+<div class="pathline">
+  <span>01 颜色</span><span>02 二维码</span><span>03 轮廓</span><span>04 检测</span><span class="cur">05 分类</span><span>06 分割</span><span>07 跟踪</span><span>08 人脸</span><span>09 骨骼</span><span>10 3D</span><span>11 体感</span><span>12 手势</span>
+</div>
+
+<section class="blk" id="s1">
+  <h2><span class="no">01</span>这个实验解决什么问题</h2>
+
+  <div class="idea">
+    <span class="tag1">CORE IDEA · 一句话原理</span>
+    <p class="big">模型先认出<b>细类</b>（矿泉水瓶），再用一张<b>映射表</b>翻译成大类（可回收物）。</p>
+    <p class="analogy"><b>打个比方：</b>就像超市收银员扫码，扫出来是"XX 牌 500ml 矿泉水"，但系统记账只记"饮料类"。扫码是识别，归类是查表 —— 本实验干的就是这两件事。</p>
+  </div>
+
+  <p>真实的垃圾分类机器人面临一个尴尬：</p>
+  <ul>
+    <li>视觉模型能认出的是<b>具体物体</b> —— 矿泉水瓶、香蕉皮、废电池、纸巾……几十上百种。</li>
+    <li>但垃圾桶只有<b>四个</b>：可回收物、厨余垃圾、有害垃圾、其他垃圾。</li>
+  </ul>
+  <p>如果直接训一个"四大类"的分类器，会很难训 —— 因为"可回收"这个类别里既有瓶子又有纸箱，长得毫无共同点。<b>更聪明的做法是：让模型专心认具体物体（它擅长这个），归类交给一张表（确定性的、可维护的）。</b></p>
+
+  <table>
+    <thead><tr><th style="width:22%">大类（垃圾桶）</th><th style="width:24%">英文键</th><th>里面有哪些细类（举几例）</th></tr></thead>
+    <tbody>
+      <tr><td>可回收物</td><td><code>recyclable</code></td><td>塑料瓶、易拉罐、纸箱、玻璃瓶、旧衣服</td></tr>
+      <tr><td>厨余垃圾</td><td><code>kitchen_waste</code></td><td>果皮、菜叶、剩饭、蛋壳、茶渣</td></tr>
+      <tr><td>有害垃圾</td><td><code>hazardous_waste</code></td><td>电池、灯管、药品、油漆桶</td></tr>
+      <tr><td>其他垃圾</td><td><code>other_waste</code></td><td>纸巾、烟头、陶瓷碎片、一次性餐具</td></tr>
+    </tbody>
+  </table>
+
+  <div class="oneline"><span>本实验的核心不是"训练一个更强的模型"，而是<b>"用一层薄薄的翻译，把模型能力接到业务需求上"</b>。这是工程里最常见的做法。</span></div>
+</section>
+
+<section class="blk" id="s2">
+  <h2><span class="no">02</span>三分钟讲懂：认出垃圾后归到哪一类</h2>
+
+  <p class="lead">整条流水线四步，比上个实验多了中间那张"映射表"。</p>
+
+  <div class="anim-box">
+    <svg viewBox="0 0 760 240" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="垃圾分类流程：图像输入 缩放到640 检测头输出 得到20细类 查表映射成4大类">
+      <rect x="6" y="6" width="748" height="228" rx="12" fill="#111827" stroke="#334155"/>
+
+      <text x="86" y="32" text-anchor="middle" font-size="12" font-weight="700" fill="#93c5fd" font-family="sans-serif">① 相机画面</text>
+      <rect x="26" y="46" width="120" height="90" rx="5" fill="#1e293b" stroke="#475569"/>
+      <circle cx="72" cy="88" r="16" fill="#334155" stroke="#64748b"/>
+      <rect x="104" y="78" width="26" height="38" rx="3" fill="#334155" stroke="#64748b"/>
+      <text x="86" y="156" text-anchor="middle" font-size="9.5" fill="#64748b" font-family="sans-serif">瓶子和纸盒</text>
+
+      <path d="M156 91 L188 91" stroke="#475569" stroke-width="2" stroke-dasharray="5 4" fill="none">
+        <animate attributeName="stroke-dashoffset" values="0;-18" dur="1s" repeatCount="indefinite"/>
+      </path>
+
+      <text x="258" y="32" text-anchor="middle" font-size="12" font-weight="700" fill="#93c5fd" font-family="sans-serif">② 缩放到 640 + 检测</text>
+      <rect x="200" y="44" width="116" height="116" rx="4" fill="#374151" stroke="#3b82f6" stroke-width="1.5"/>
+      <rect x="216" y="72" width="32" height="50" rx="3" fill="none" stroke="#22d3ee" stroke-width="1.6"/>
+      <rect x="262" y="82" width="34" height="42" rx="2" fill="none" stroke="#22d3ee" stroke-width="1.6"/>
+      <text x="258" y="178" text-anchor="middle" font-size="9.5" fill="#94a3b8" font-family="sans-serif">3 个尺度 × 3 个锚框</text>
+
+      <path d="M328 102 L360 102" stroke="#475569" stroke-width="2" stroke-dasharray="5 4" fill="none">
+        <animate attributeName="stroke-dashoffset" values="0;-18" dur="1s" repeatCount="indefinite"/>
+      </path>
+
+      <text x="440" y="32" text-anchor="middle" font-size="12" font-weight="700" fill="#93c5fd" font-family="sans-serif">③ 认出细类（20 选 1）</text>
+      <rect x="372" y="44" width="136" height="92" rx="8" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+      <text x="384" y="66" font-size="9.5" fill="#e2e8f0" font-family="monospace">plastic_bottle  0.91</text>
+      <text x="384" y="84" font-size="9.5" fill="#e2e8f0" font-family="monospace">carton_box      0.84</text>
+      <text x="384" y="102" font-size="9.5" fill="#64748b" font-family="monospace">paper_towel     0.32</text>
+      <text x="384" y="120" font-size="9.5" fill="#64748b" font-family="monospace">battery         0.08</text>
+      <text x="440" y="156" text-anchor="middle" font-size="9.5" fill="#94a3b8" font-family="sans-serif">模型只输出细类名</text>
+
+      <path d="M520 91 L552 91" stroke="#475569" stroke-width="2" stroke-dasharray="5 4" fill="none">
+        <animate attributeName="stroke-dashoffset" values="0;-18" dur="1s" repeatCount="indefinite"/>
+      </path>
+
+      <text x="628" y="32" text-anchor="middle" font-size="12" font-weight="700" fill="#fbbf24" font-family="sans-serif">④ 查表 → 大类</text>
+      <rect x="560" y="44" width="140" height="92" rx="8" fill="#422006" stroke="#fbbf24" stroke-width="1.5"/>
+      <text x="572" y="62" font-size="9" fill="#fbbf24" font-family="monospace">category_map.txt</text>
+      <text x="572" y="80" font-size="9" fill="#fde68a" font-family="monospace">plastic → 1</text>
+      <text x="572" y="96" font-size="9" fill="#fde68a" font-family="monospace">carton  → 1</text>
+      <text x="572" y="112" font-size="9" fill="#fde68a" font-family="monospace">towel   → 4</text>
+      <text x="630" y="156" text-anchor="middle" font-size="9.5" fill="#94a3b8" font-family="sans-serif">1=可回收 4=其他</text>
+
+      <text x="380" y="204" text-anchor="middle" font-size="11.5" fill="#fbbf24" font-family="sans-serif">关键：模型会看错，查表不会看错 —— 把易错的部分压到最小</text>
+    </svg>
+  </div>
+  <div class="cap">图 2-1｜左边是"识别"，右边一步是"归类"。分清楚这一点，出错时就知道该查哪儿。</div>
+
+  <h3>这四步对应的技术名词</h3>
+  <table>
+    <thead><tr><th style="width:20%">步骤</th><th style="width:26%">术语</th><th>一句解释</th></tr></thead>
+    <tbody>
+      <tr><td>② 缩放</td><td><code>letterbox</code></td><td>和上个实验一样：等比缩放到 640，补灰边，别拉变形。</td></tr>
+      <tr><td>② 检测</td><td>YOLOv5 式检测头</td><td>输出 3 个尺度，每格 3 个预设框，每框 25 个数字 = 4 坐标 + 1 置信度 + 20 类分数。<b>3 × 25 = 75</b> 就是这么来的。</td></tr>
+      <tr><td>③ 解码</td><td><code>anchors</code> 解码</td><td>网络给的坐标是"相对格子中心的偏移"，要加上锚框尺寸才还原成真实框。这部分在本实验里是手写展开的，可以逐行读。</td></tr>
+      <tr><td>④ 映射</td><td>20 → 4 类查表</td><td>读 <code>category_map.txt</code>，把细类编号翻译成大类编号。一行一个映射，改起来极简单。</td></tr>
+      <tr><td>全程</td><td>推理池（RKNNPool）</td><td>板子有几个 NPU 核就开几个线程同时算，帧率比单线程高。配置里的 <code>tpes</code> 就是这个数。</td></tr>
+    </tbody>
+  </table>
+
+  <div class="oneline"><span><b>记住这句：</b>模型负责"看清是什么"，代码负责"该扔哪个桶"。<b>别把业务规则塞进模型里</b>，否则垃圾分类标准一改，你就得重训模型。</span></div>
+</section>
+
+<section class="blk" id="s3">
+  <h2><span class="no">03</span>先认识 4 个词</h2>
+  <div class="terms">
+    <div class="term"><div class="w">锚框 <em>anchor</em></div><p class="m">事先摆好的几个"标准大小的框"。网络只需说"在这个框基础上宽一点、高一点"。<b>YOLOv8 取消了它，YOLOv5 还留着。</b></p></div>
+    <div class="term"><div class="w">检测头 <em>head</em></div><p class="m">网络最后那几层，专门输出框和类别。3 个尺度 = 3 个检测头，分管大中小目标。</p></div>
+    <div class="term"><div class="w">映射表</div><p class="m">一张纯文本对照表，<code>细类编号 → 大类编号</code>。改它不用改代码，不用重训。</p></div>
+    <div class="term"><div class="w">推理池 <em>pool</em></div><p class="m">同时开几个线程一起推理。板上有几个 NPU 核，就开几个线程刚好。</p></div>
+  </div>
+
+  <details class="deep">
+    <summary>为什么用 3 个尺度？<em>选读 40 秒</em></summary>
+    <div class="deep-body">
+      <p>因为物体大小差别很大。把 640 的图分成 <b>80×80</b> 的细格子，适合找小东西（一个电池）；分成 <b>20×20</b> 的粗格子，适合找大东西（一个纸箱）；中间 <b>40×40</b> 管不大不小的。</p>
+      <p>三个尺度同时预测，最后合在一起做 NMS 去重。这就是为什么网络有 9 个输出张量（3 尺度 × 3 张量）。</p>
+    </div>
+  </details>
+</section>
+
+<section class="blk" id="s4">
+  <h2><span class="no">04</span>它吃什么、吐什么</h2>
+
+  <div class="io2">
+    <div class="cellbox in">
+      <span class="lb">INPUT · 喂进去</span>
+      <div class="v">一张有垃圾的图 / 相机画面</div>
+      <p class="d">640×640 的 RGB 图。实验自带测试图在 <code>images/</code>。</p>
+    </div>
+    <div class="arw">→</div>
+    <div class="cellbox out">
+      <span class="lb">OUTPUT · 吐出来</span>
+      <div class="v">双重标注：大类 + 细类 + 分数</div>
+      <p class="d">例如 <code>recyclable plastic_bottle 0.91</code> ——<b>第一个词给你看（扔哪），后面是模型原文（认出啥）</b>。</p>
+    </div>
+  </div>
+
+  <p style="font-size:14px;color:#64748b">四个大类名在配置里写死，方便对照：</p>
+  <pre><span class="b">model:</span>
+  category_names:
+    "1": <span class="y">recyclable</span>        <span class="c"># 可回收物</span>
+    "2": <span class="y">kitchen_waste</span>     <span class="c"># 厨余垃圾</span>
+    "3": <span class="y">hazardous_waste</span>   <span class="c"># 有害垃圾</span>
+    "4": <span class="y">other_waste</span>       <span class="c"># 其他垃圾</span></pre>
+</section>
+
+<section class="blk" id="s5">
+  <h2><span class="no">05</span>三步跑起来</h2>
+
+  <ol class="steps3">
+    <li>
+      <span class="st">进目录，认识三个文本文件<em>约 2 分钟</em></span>
+      <p>这个实验比上个多几张"配置纸"，先看一眼，后面调试心里有数。</p>
+      <pre><span class="g">cd</span> ~/ros2_ws/src/xflz_eai_car1/vision/02_garbage_classification
+<span class="g">ls</span> models/ config/ images/
+<span class="g">head</span> config/labels.txt
+<span class="g">head</span> config/category_map.txt</pre>
+      <div class="expect">models/:  garbage_yolov5_20cls.rknn   <i>← 约 9MB</i>
+
+config/:  anchors.txt  category_map.txt
+          garbage_config.yaml  labels.txt
+
+<i>labels.txt        ← 20 个细类名，一行一个</i>
+<i>category_map.txt  ← 细类 → 大类 编号对照</i></div>
+      <p><b>要看懂的就这两个文件：模型吐出 labels 里的第几行，category_map 把它翻成几号桶。</b></p>
+    </li>
+
+    <li>
+      <span class="st">单图推理：确认模型能认出东西<em>约 20 秒</em></span>
+      <pre><span class="g">python</span> src/app.py --image images/1.jpg --save out.jpg</pre>
+      <div class="expect">recyclable  plastic_bottle  0.91  [212,148,318,402]
+recyclable  carton_box      0.84  [96,210,188,352]
+...
+saved -&gt; out.jpg</div>
+      <p>每行三段：<b>大类 · 细类 · 分数</b>。如果大类全是 <code>other_waste</code>，要么映射表没读到，要么模型认错了 —— 看第 08 节。</p>
+    </li>
+
+    <li>
+      <span class="st">实时 + 多线程：看帧率怎么涨<em>约 3 分钟</em></span>
+      <p>先起相机（和上个实验一样，两个终端都要 source + DOMAIN_ID=2）：</p>
+      <pre><span class="c"># 终端 1</span>
+<span class="g">source</span> /opt/ros/humble/setup.bash &amp;&amp; <span class="g">source</span> ~/ros2_ws/install/setup.bash
+<span class="g">export</span> ROS_DOMAIN_ID=2
+<span class="g">ros2</span> launch ascamera hp60c.launch.py</pre>
+      <pre><span class="c"># 终端 2：先单线程跑一遍</span>
+<span class="g">cd</span> ~/ros2_ws/src/xflz_eai_car1/vision/02_garbage_classification
+<span class="g">python</span> src/app.py --ros --tpes 1</pre>
+      <div class="expect">avg_fps ≈ 6~8   <i>← 单线程，只用 1 个 NPU 核</i>
+http://&lt;板子IP&gt;:8080/garbage_cam.mjpg</div>
+      <p>按 Ctrl+C 停掉，再开 3 线程：</p>
+      <pre><span class="g">python</span> src/app.py --ros --tpes 3</pre>
+      <div class="expect">avg_fps ≈ 15~18  <i>← 3 线程，多个 NPU 核一起用</i></div>
+      <p>浏览器打开 <code>http://&lt;板子IP&gt;:8080/garbage_cam.mjpg</code>，把瓶子、纸盒举到镜头前看它分。</p>
+    </li>
+  </ol>
+
+  <div class="oneline"><span><code>--tpes</code> 就是"开几个线程推理"。<b>把它从 1 改到 3 看帧率变化</b>，你就亲手验证了"多核并行"—— 这比看任何原理图都直观。</span></div>
+</section>
+
+<section class="blk" id="s6">
+  <h2><span class="no">06</span>你该看到的画面</h2>
+
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">画面 A · 正常</div><div class="kt">标签里有两层信息</div><p>每个物体一个框，框上方写着 <b>大类 细类 分数</b> 三个信息。这是本实验刻意做的"双层标注"。</p></div>
+    <div class="kcard"><div class="kd">画面 B · 分数不高</div><div class="kt">0.3~0.5 之间摇摆</div><p>物体太小、太远、或侧着放时会这样。把物体拿近一点，分数通常上到 0.7 以上。</p></div>
+    <div class="kcard"><div class="kd">画面 C · 大类全不对</div><div class="kt">翻译错了</div><p>细类看着对，但大类全是"其他"。多半是映射表路径没读对 —— 看第 08 节第 1 条。</p></div>
+  </div>
+
+  <div class="tip tealb"><span class="lab">🔍 这个模型只认 20 种垃圾</span>不是 20 个大类，是 20 个具体物体类别。你拿一支笔、一个水杯给它看，它会给出"最接近的"答案 —— 通常错。这不是 bug，是它的能力边界。</div>
+</section>
+
+<section class="blk" id="s7">
+  <h2><span class="no">07</span>改一个参数看变化</h2>
+  <p class="lead">本实验最值得动手改的是"线程数"和"分数阈值"。前者改帧率，后者改准确度。</p>
+
+  <pre><span class="g">nano</span> config/garbage_config.yaml</pre>
+  <pre><span class="b">infer:</span>
+  <span class="y">score_thr: 0.25</span>    <span class="c">← 改这个：0.10 更容易报，0.55 更保守</span>
+  nms_thr: 0.45
+
+<span class="b">pool:</span>
+  <span class="y">tpes: 2</span>             <span class="c">← 改这个：1 / 2 / 3，看帧率差多少</span>
+  core_mask: auto     <span class="c">← 别动！这块板子上改成 round_robin 会卡死</span></pre>
+
+  <div class="lab2">
+    <div class="lh">⚡ 参数实验台 · 线程数与帧率的关系</div>
+    <div class="lr">
+      <label>tpes（线程数）</label>
+      <input id="tp" type="range" min="1" max="4" step="1" value="1">
+      <output id="tp_o">1</output>
+    </div>
+    <div class="vis">
+      <svg viewBox="0 0 420 130" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="线程数从1到4时帧率变化柱状图">
+        <rect x="0" y="0" width="420" height="130" rx="8" fill="#0b1220"/>
+        <g id="bars">
+          <rect data-n="1" x="50" y="96" width="46" height="0" fill="#3b82f6" rx="3"/>
+          <rect data-n="2" x="150" y="96" width="46" height="0" fill="#60a5fa" rx="3"/>
+          <rect data-n="3" x="250" y="96" width="46" height="0" fill="#93c5fd" rx="3"/>
+          <rect data-n="4" x="350" y="96" width="46" height="0" fill="#cbd5e1" rx="3"/>
+        </g>
+        <g font-size="10" fill="#64748b" font-family="monospace" text-anchor="middle">
+          <text x="73" y="114">1 线程</text><text x="173" y="114">2 线程</text>
+          <text x="273" y="114">3 线程</text><text x="373" y="114">4 线程</text>
+        </g>
+        <line x1="30" y1="96" x2="410" y2="96" stroke="#334155"/>
+        <text x="20" y="30" font-size="9.5" fill="#475569" font-family="monospace">fps</text>
+      </svg>
+    </div>
+    <div class="say" id="say"></div>
+  </div>
+
+  <h3>为什么线程不是越多越好</h3>
+  <p>因为 NPU 核数是固定的。开超过核数的线程，多余线程在抢核，上下文切换的开销反而拖慢整体 —— 和 4 个工人抢 3 台机器是一个意思。</p>
+
+  <div class="oneline"><span><b>调参的判断标准：</b>线程数看帧率上限（不超过核数），分数阈值看你要偏"别漏"还是偏"别错"。</span></div>
+</section>
+
+<section class="blk" id="s8">
+  <h2><span class="no">08</span>踩坑速查</h2>
+
+  <table class="pit2">
+    <thead><tr><th>现象</th><th>原因</th><th>怎么办</th></tr></thead>
+    <tbody>
+      <tr><td>大类全是 <code>other_waste</code></td><td>映射表没读到，或细类编号和表对不上</td><td>核对 <code>config/category_map.txt</code> 路径，行数应 = 20</td></tr>
+      <tr><td>模型文件找不到</td><td>配置里的模型路径是相对<b>配置文件所在目录</b>的</td><td>路径写 <code>../models/xxx.rknn</code>，不是 <code>models/xxx.rknn</code></td></tr>
+      <tr><td>板上跑起来卡死 / 不动</td><td><code>core_mask</code> 改成了 <code>round_robin</code></td><td>保持 <code>auto</code>。这块板子上轮转会撞核</td></tr>
+      <tr><td>帧率没随线程数提升</td><td>线程数超过核数，或有别的实验在抢 NPU</td><td>先把 <code>tpes</code> 设 3；确认其他实验已退出</td></tr>
+      <tr><td>同一个瓶子被圈两个框</td><td>NMS 阈值太高，重叠框没去掉</td><td>把 <code>nms_thr</code> 从 0.45 降到 0.35 试</td></tr>
+      <tr><td>终端刷满 rknnlite 警告</td><td>版本提示，不影响功能</td><td>忽略。真正报 ERROR 才是问题</td></tr>
+    </tbody>
+  </table>
+
+  <div class="tip amber"><span class="lab">💡 排查口诀</span><b>先查"细类对不对"，再查"大类对不对"。</b>细类就错了 → 模型/图片/阈值的问题；细类对但大类错 → 一定是映射表的问题。分开查，一次就中。</div>
+</section>
+
+<section class="blk" id="s9">
+  <h2><span class="no">09</span>进阶（可选）</h2>
+
+  <details class="deep">
+    <summary>进阶 1 · 亲手改映射表，换个归类<em>约 15 分钟</em></summary>
+    <div class="deep-body">
+      <p>打开 <code>config/category_map.txt</code>，找到某个细类的编号，把它的目标大类改成另一个数字，重跑单图推理，看输出里大类名字变了没有。</p>
+      <p>练习很小，但它演示了一件重要的事：<b>业务规则的改动，可以完全不碰模型和代码。</b>这就是"配置与代码分离"。</p>
+    </div>
+  </details>
+
+  <details class="deep">
+    <summary>进阶 2 · 接入机械臂做分拣联动<em>约 1 小时</em></summary>
+    <div class="deep-body">
+      <p>真实产线上，分类结果要变成动作。思路：检测到某个大类的框后，把框中心坐标换算成机械臂抓取位置，调用机械臂接口。</p>
+      <p>本实验只做到"识别 + 显示"。要做联动，需在主循环里加一段"结果 → 指令"的分支。注意设<b>冷却时间</b>，否则同一个物体每帧都触发一次抓取。</p>
+    </div>
+  </details>
+
+  <details class="deep">
+    <summary>进阶 3 · 试试直接训 4 类，看看为什么不推荐<em>约 2 小时</em></summary>
+    <div class="deep-body">
+      <p>你可以试试直接训"可回收 / 厨余 / 有害 / 其他"四类，对比效果。大概率会发现准确率明显低于"20 类 + 映射"方案。</p>
+      <p><b>原因：</b>同一个大类内部物体外观差异太大（塑料瓶和纸箱都是可回收，却毫无共性），模型很难归纳出"可回收"这个抽象概念。</p>
+      <p>这是本实验最重要的一课：<b>有些问题不该交给模型</b>。能用一个 if 或一张表说清的事，就别动用神经网络。</p>
+    </div>
+  </details>
+</section>
+
+<section class="blk" id="s10">
+  <h2><span class="no">10</span>随堂小测</h2>
+
+  <div class="quiz2">
+    <div class="qq"><span class="qn">Q1</span>模型认出了 <code>plastic_bottle</code>，但画面标成 <code>other_waste</code>。最该先查什么？</div>
+    <div class="opt" data-right="0">重新训练模型</div>
+    <div class="opt" data-right="1">category_map.txt 里这个细类映射到几号</div>
+    <div class="opt" data-right="0">换一个更好的相机</div>
+    <div class="fb"><b>对。</b>细类认对了说明模型没问题，问题在"翻译"。查映射表里 <code>plastic_bottle</code> 对应编号是不是 1（可回收）。</div>
+  </div>
+
+  <div class="quiz2">
+    <div class="qq"><span class="qn">Q2</span>为什么不干脆训一个四分类模型，省掉映射表？</div>
+    <div class="opt" data-right="0">因为四分类模型跑得慢</div>
+    <div class="opt" data-right="1">因为同一大类内部物体外观差异太大，模型很难学</div>
+    <div class="opt" data-right="0">因为四分类模型不能用 NPU</div>
+    <div class="fb"><b>对。</b>"可回收"里有瓶子和纸箱，没有共同外观特征。模型擅长区分"看起来像什么"，不擅长理解"按规则归类"。确定性规则交给代码更可靠、更好维护。</div>
+  </div>
+
+  <div class="quiz2">
+    <div class="qq"><span class="qn">Q3</span>线程数从 1 加到 3 帧率涨了，加到 4 反而降。为什么？</div>
+    <div class="opt" data-right="0">代码有 bug</div>
+    <div class="opt" data-right="1">线程数超过 NPU 核数，多余线程在抢核</div>
+    <div class="opt" data-right="0">模型太大装不下</div>
+    <div class="fb"><b>对。</b>并行度不能超过物理单元数。核数配满刚好，多出来的线程要等核空闲，切换开销让整体更慢。</div>
+  </div>
+</section>
+
+<nav class="expnav">
+  <a href="../exp-04-industrial-defect/index.html"><span class="lb">← 上一个</span>EXP-04 工业缺陷检测</a>
+  <a class="next" href="../exp-06-semantic-segmentation/index.html"><span class="lb">下一个实验 →</span>EXP-06 语义分割</a>
+</nav>
+
+<footer>
+  <span>机器人视觉入门 · EXP-05 垃圾分类</span>
+  <span>4 学时 · 基于 vision/02_garbage_classification 源码</span>
+</footer>
+
+</main>
+</div>
+
+<script src="../shared/tutorial.js" defer></script>
+<script src="../shared/beginner.js" defer></script>
+<script>
+(function(){
+  var tp=document.getElementById('tp'); if(!tp) return;
+  var bars=document.querySelectorAll('#bars rect');
+  var say=document.getElementById('say');
+  var FPS={1:7,2:13,3:18,4:15};
+  function upd(){
+    var n=parseInt(tp.value,10);
+    document.getElementById('tp_o').textContent=n;
+    for(var i=0;i<bars.length;i++){
+      var k=parseInt(bars[i].getAttribute('data-n'),10);
+      var h=Math.round(FPS[k]*3.2);
+      bars[i].setAttribute('height',h);
+      bars[i].setAttribute('y',96-h);
+      bars[i].setAttribute('opacity',k===n?1:0.4);
+    }
+    var m='';
+    if(n===1) m='<b>1 个线程</b>：只用了 1 个 NPU 核，其余在闲着。帧率约 7 FPS，画面明显有卡顿。';
+    else if(n===2) m='<b>2 个线程</b>：两个核并行，帧率约 13 FPS —— 接近翻倍。';
+    else if(n===3) m='<b>3 个线程</b>：帧率约 18 FPS，接近这块板子的上限。';
+    else m='<b>4 个线程</b>：帧率反而掉到约 15 FPS。线程数超过核数，多余线程抢核，开销吃掉了收益。';
+    say.innerHTML=m;
+  }
+  tp.addEventListener('input',upd); upd();
+})();
+</script>
+</body>
+</html>

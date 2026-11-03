@@ -1,0 +1,289 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/cases/exp006-smart-factory/exp-05-visual-loading/index.html
+TITLE: EXP-05 · 视觉自适应装货 — 智慧工厂装货分拣码垛综合项目
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+EXP-05 · 视觉自适应装货 — 智慧工厂装货分拣码垛综合项目
+🧠 具身智能课程 ·
+教程首页
+综合项目
+/
+智慧工厂装货分拣码垛
+/ EXP-05
+本页目录
+01 问题引入
+02 原理通俗讲解
+03 关联知识点
+04 实验目标
+05 实验环境与准备
+06 动画讲解
+07 互动讲解
+08 实操步骤
+09 重点与易错点
+10 总结与思考
+CASE-01 · 智慧工厂
+EXP-01 需求分析
+EXP-02 五节点架构
+EXP-03 接口设计
+EXP-04 语音交互集成
+EXP-05 视觉自适应装货
+EXP-06 智能分拣
+EXP-07 自主码垛
+EXP-08 危险检测与急停
+EXP-09 全功能快速验证
+EXP-05 · 第 2 章 · 综合性 · 8 学时
+视觉自适应装货：AprilTag tag36h11 + PnP 位姿纠偏
+箱子每次摆放位置都不一样，固定抓取点必然落空。本实验让机械臂"看一眼再抓"：
+    vision_node 用 AprilTag（tag36h11，tag_id=3，tag_size=0.025）检测码放区域，solvePnP（IPPE_SQUARE）解出位姿，
+    经 TF 变换到 base_link，再叠加 pick_offset 补偿完成自适应抓取（对应需求 R4 装货任务）。
+🏷️ AprilTag tag36h11
+solvePnP · IPPE_SQUARE
+TF 坐标变换
+pick_offset 三轴补偿
+debug / production 双模式
+01
+问题引入：为什么固定抓取点会失手？
+需求 R4 要求"装货：把箱子从取货位抓到放货位"。最省事的写法是抄一套固定关节角度（fixed grasp），
+    但现实里箱子每次停放的位置有几毫米到几厘米的偏差，夹爪一合——抓空，或者把箱子碰歪。
+    源讲义给装货任务配了
+vision: true
+：抓之前先让相机"看一眼"。
+于是问题变成三个连续追问：
+看到的是什么
+（AprilTag 编码标志）、
+怎么从图像算出空间位置
+（PnP 求解）、
+算出来的坐标怎么给机械臂用
+（TF 变换 + 三轴偏移补偿）。这正是本实验的三段主线。
+02
+原理通俗讲解：贴条码、伸两指、对地图
+用三个生活动作讲透视觉自适应：
+贴条码 · AprilTag
+在箱子区贴一张黑白方块码
+AprilTag 相当于工业版"条形码"：黑白方格自带唯一 ID，抗光照、抗遮挡。系统用
+OpenCV 4.11 的 ArucoDetector
+（venv 内 cv2，系统自带 4.5.4 不可靠）检测
+vocDICT_APRILTAG_36h11
+族，识别 tag_id=3、物理边长 2.5cm（tag_size=0.025）的标签。
+        就像快递员扫条码知道是哪件货——扫到码，就知道"抓取区在哪"。
+伸两指 · PnP
+已知方块多大，看它多"小"
+标签的四个角在图像里的坐标已知（2D），标签的真实尺寸已知（3D）——已知 3D-2D 对应点，
+        解相机到标签的位姿就是
+PnP 问题
+。本项目用
+SOLVEPNP_IPPE_SQUARE
+（L217-219，针对平面正方形的迭代法），再经 Rodrigues 转换 + 修正（L222-223）得到旋转矩阵与平移向量。
+        投影原理一行写完：
+s·[u,v,1]ᵀ = K·[R|t]·[X,Y,Z,1]ᵀ
+，其中 K 是相机内参
+        （fx=592.9, fy=593.1, cx=335.4, cy=237.7）。
+对地图 · TF
+从"相机眼"换算到"机器身"
+PnP 解出的位姿在相机光学系（camera_depth_optical_frame）里，机械臂听不懂。vision_node 的
+_to_base_link
+（L308-327）查 TF 树拿
+lookup_transform(base_link, camera_depth_optical_frame)
+，
+        把点变换到 base_link——相当于把"我眼前的坐标"换算成"以身体为原点的坐标"，机械臂才能按图索骥。
+差一点 · pick_offset
+眼到、手还差一点
+标签贴的位置不等于理想抓取点，所以加三轴固定补偿：
+x=+0.015、y=-0.010、z=+0.023（米）
+。
+        单轴可在线整定：
+ros2 param set /eai_factory_grasp grasp.pick_offset_y -0.015
+。
+        z 方向还要与夹爪下探深度自洽——两处叠加容易过冲，是易错点。
+观察距离
+检测框出现在
+15~25cm
+的相机—标签距离内最稳；太近出视野、太远角点精度掉，
+      对应 yaml 里的 observe 观察位姿（load: [0.16, 0.0, 0.27, 2.5307]）就是为这个距离设计的。
+03
+关联知识点
+三个话题
+detected / target / debug_image
+/eai_factory/vision/detected
+检测标志，
+/target
+（PoseStamped，z≈0.19）目标位姿，
+/debug_image
+画绿色检测框＋红色角点，肉眼核对首选。
+双模式
+debug 等确认 / production 直通
+yaml
+mode: debug
+下抓取前停在 awaiting_confirm，等 confirm 服务放行（L295-306）；
+production
+直接执行。抓取八步流程两种模式共用。
+抓取八步
+观察 → 停顿 → 检测 → TF → 补偿 → 抓 → 放 → 回位
+observe 到位后先停
+move_delay=3.0
+秒等画面稳定再检测，抓放完成后 go_work 复位（R4.1）。
+串行保护
+_start_cb 忙碌拒绝
+grasp_node
+_start_cb
+（L210-213）在上一单没做完时直接拒绝新 start，后进 FIFO 的
+        set_task/start 需先 abort 复位（报错表已列该坑）。
+04
+实验目标
+在 venv OpenCV 4.11 环境下稳定检出 tag_id=3 的 tag36h11 标签，debug_image 出绿框红角点。
+读懂 PnP 解算输出与内参矩阵，说明 IPPE_SQUARE 为何适合平面方形标签。
+完成 TF 变换验证，解释 target 的 z≈0.19 与 observe 距离 15~25cm 的关系。
+在 debug 与 production 两种模式下各完成一次完整装货，理解 awaiting_confirm 的作用。
+动态调参整定 pick_offset 单轴，记录抓取落点变化；完成 TV1~TV3、TG1~TG5 测试。
+05
+实验环境与准备
+机械臂上安装相机并完成标定（内参 fx/fy/cx/cy 写入系统）；TF 树含 camera_depth_optical_frame → base_link。
+取货区贴好 tag36h11 标签：tag_id=3，实际边长 2.5cm（
+tag_size 必须与实物一致，填错了会怎样？
+平移向量按比例错，抓手整体偏移）。
+必须使用 venv 内的 OpenCV 4.11
+，系统级 4.5.4 的 Aruco 检测不可靠。
+关闭语音避免干扰：有语音时用
+start_voice:=false
+启动
+ros2 launch eai_factory eai_factory.launch.py start_voice:=false
+，本实验专注视觉链路。
+核对 yaml：
+vision: {tag_id: 3, tag_size: 0.025, tag_family: tag36h11}
+与
+grasp.tasks.load
+的 observe / place 位姿。
+06
+动画讲解：四角 → 位姿 → 纠偏抓取
+AprilTag 检测 → PnP 解算（相机视角）
+/eai_factory/vision/debug_image
+tag_id=3 · 0.025m · tag36h11
+四角像素 (u,v) 已知 + 内参 K + 物理边长 3D → IPPE_SQUARE 解 [R|t]
+s·[u,v,1]ᵀ = K · [R|t] · [X,Y,Z,1]ᵀ　　平移 t → Rodrigues → base_link（TF）
+自适应抓取轨迹（侧视）
+箱子+标签
+pick_offset x+0.015
+observe(15~25cm 检测) → 停 3.0s → 纠偏下抓 → 放 → go_work
+模式分支：
+debug → awaiting_confirm(等 confirm 服务) ｜ production → 直接执行
+光点走完 = 一次视觉自适应装货：先把"看"变成"位姿"，再把"位姿"变成"跟随的抓取点"。
+图 5-1　左：debug_image 中绿框红角的 tag 检测与 PnP 解算式；右：解算位姿经 TF+pick_offset 后，抓取轨迹随箱子位置自适应平移，光点演示观察→纠偏→抓取时序。
+07
+互动讲解：pick_offset 整定台
+点击按钮模拟调整 pick_offset 单轴参数，观察系统提示与抓取落点偏差（数值仅为整定方法演示，实际以试抓为准）：
+🎛️ pick_offset 单轴整定台
+默认 y=-0.010
+偏左 y→-0.015
+偏右 y→-0.005
+z 补偿冲突
+复位
+选择一个场景，观察调参命令与诊断输出……
+方法
+一次只动一个轴、小步逼近（0.5cm 一档），每档试抓 2~3 次记录命中率；
+      z 轴要连同夹爪下探深度一起看，因为
+两处补偿是叠加关系
+。
+08
+实操步骤
+1
+确认相机与标签
+：擦净镜头，将 tag_id=3 标签平贴于取货位，距离相机 15~25cm 内肉眼可见。
+2
+关语音启动
+ros2 launch eai_factory eai_factory.launch.py start_voice:=false
+# 观察启动日志：vision_node 加载 venv cv2、tag 参数与内参
+3
+看检测输出
+ros2 topic hz /eai_factory/vision/detected
+ros2 topic echo /eai_factory/vision/target --once
+position: z ≈ 0.19（PoseStamped 在 base_link 下）
+打开 /debug_image 截图：绿框应完整套住标签，四红角落在角点上。
+4
+debug 模式首跑
+：yaml
+mode: debug
+下触发装货
+      （语音或
+ros2 service call /eai_factory/start_load std_srvs/srv/Trigger
+），
+      抓取停在 awaiting_confirm——人工核对目标位姿后调 confirm 服务放行（L295-306）。
+5
+切 production 直通
+：改 yaml
+mode: production
+重启，观察完整八步：
+      observe → move_delay 3.0s 稳像 → detect → TF → 补偿 → 抓 → 放 → go_work。
+6
+单轴整定 pick_offset
+ros2 param set /eai_factory_grasp grasp.pick_offset_y -0.015
+# 每改一档试抓 2~3 次；调完写回 yaml 固化
+7
+复位与串行验证
+：连续快速触发两次 start_load，第二次应被
+_start_cb
+（L210-213）拒绝；
+      先调 abort 服务复位再重试（对应 TG 系列测试用例）。
+8
+记录 TV1~TV3 / TG1~TG5
+：检测成功率、纠偏前后抓取落点、异常复位是否干净，整理入报告。
+09
+重点与易错点
+诊断
+视觉链路坏了按段查：
+没绿框
+→标签/距离/cv2 版本；
+有框没 target
+→TF 树；
+target 对但抓偏
+→pick_offset / tag_size / 内参。
+现象
+根因
+处理
+检测框时有时无
+系统 cv2 4.5.4 的 Aruco 不可靠，或距离超出 15~25cm
+确认运行在 venv OpenCV 4.11；调整 observe 位姿
+抓取整体偏固定距离
+tag_size 与实物不符（应 0.025m）
+量实物重填 yaml，平移按比例缩放
+x/y 对但 z 扎太深
+pick_offset z(+0.023) 与夹爪下探深度双重叠加
+二选一为主，调一档试抓一次
+target 坐标系不对
+未做 TF（camera_depth_optical_frame → base_link）
+查
+_to_base_link
+L308-327，
+ros2 run tf2_tools view_frames
+核对
+第二次 start 无反应
+忙碌串行保护
+先
+/eai_factory/grasp/abort
+复位，勿重复狂按
+debug 模式卡在确认
+awaiting_confirm 在等 confirm 服务，属设计行为
+核对无误后调 confirm；正式跑切 production
+评分自测（源讲义 15/20/30/20/15）：检测链路 15、PnP/TF 理解 20、抓取实现与整定 30、双模式切换 20、记录报告 15。
+报告附 debug_image 截图（绿框红角）＋调参前后落点对比数据。
+observe 观察位姿与 pick_offset 职责不同：前者选"看的位置"，后者修"抓的落点"，别混调。
+10
+总结与思考
+看
+AprilTag tag36h11
+标签给机器一个不怕乱放的"空间锚点"，tag_id=3 / 0.025m。
+算
+IPPE_SQUARE PnP
+四角像素＋内参＋物理尺寸 → [R|t]，平面方形的最优场景。
+换
+TF → base_link
+相机语言翻译成机械臂语言，p_base = T · p_camera。
+补
+pick_offset 三轴
+x+0.015 / y-0.010 / z+0.023，小步逼近在线整定。
+思考 1
+tag_size 从 0.025 错填成 0.05，解出的位姿会放大还是缩小几倍？为什么"整体偏移"和"越远偏越多"
+      能分别指向 tag_size 和内参两类不同错误？
+思考 2
+既然有 observe 观察位姿可以"多看一眼"，为什么还要 pick_offset 这种静态补偿？
+      两者在调试顺序上谁先谁后？
+CASE-01 · 智慧工厂装货分拣码垛 · EXP-05 视觉自适应装货
+8 学时 · 综合性 · 基于 llm_practice 实验讲义改编

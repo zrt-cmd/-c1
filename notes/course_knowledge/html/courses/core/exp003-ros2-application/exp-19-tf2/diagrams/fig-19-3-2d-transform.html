@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>图 19-3 · TF 二维坐标变换：子坐标系 base_link → 父坐标系 map</title>
+<style>
+  :root{
+    --bg-card:#ffffff;
+    --bg-soft:#f8fafc;
+    --bg-tint:#eef4ff;
+    --border:#e2e8f0;
+    --accent-blue:#2563eb;
+    --accent-amber:#d97706;
+    --text-primary:#0f172a;
+    --text-body:#334155;
+    --text-secondary:#64748b;
+    --text-muted:#94a3b8;
+    --font-sans:"PingFang SC","Noto Sans CJK SC","Microsoft YaHei","Segoe UI",system-ui,sans-serif;
+    --font-mono:"Cascadia Mono","JetBrains Mono",Consolas,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:#ffffff;color:var(--text-body);font-family:var(--font-sans)}
+  body{padding:24px;font-size:16px;line-height:1.65}
+
+  .layout{
+    max-width:1500px;margin:0 auto;
+    display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);
+    gap:24px;align-items:start;
+  }
+
+  .card{
+    background:var(--bg-card);border:1px solid var(--border);
+    border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,.04);
+    overflow:hidden;
+  }
+  .card-hd{
+    padding:12px 18px;border-bottom:1px solid var(--border);
+    display:flex;align-items:center;gap:10px;
+  }
+  .card-hd .dot{width:9px;height:9px;border-radius:50%;background:var(--accent-blue)}
+  .card-hd h2{font-size:16px;font-weight:700;color:var(--text-primary)}
+  .card-hd .hint{margin-left:auto;font-size:13px;color:var(--text-muted)}
+
+  /* ===== 左栏 SVG ===== */
+  .viz-wrap{padding:8px 8px 4px}
+  svg#scene{width:100%;height:auto;display:block;user-select:none}
+  #scene text{font-family:var(--font-sans)}
+  .b{font-weight:700}
+  .mono{font-family:var(--font-mono)}
+  /* 裸标签加白描边：坐标轴/弧线从字上穿过时，字浮在最上层不被"划字" */
+  #aText,#bText,#tLabel,#thetaLabel,#pLabel{
+    paint-order:stroke fill;
+    stroke:#ffffff;
+    stroke-width:3.5px;
+    stroke-linejoin:round;
+    stroke-linecap:round;
+  }
+
+  /* ===== 左栏参数滑杆 ===== */
+  .controls{
+    border-top:1px solid var(--border);
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:10px 20px;padding:14px 18px 16px;background:var(--bg-soft);
+  }
+  .ctl{display:flex;align-items:center;gap:10px}
+  .ctl label{
+    font-size:14px;font-weight:700;color:var(--text-primary);
+    min-width:92px;font-family:var(--font-mono);
+  }
+  .ctl input[type=range]{flex:1;min-width:70px;accent-color:var(--accent-blue);height:22px}
+  .ctl .val{
+    font-family:var(--font-mono);font-size:13px;color:var(--accent-blue);
+    background:var(--bg-tint);border:1px solid #dbeafe;border-radius:6px;
+    padding:1px 8px;min-width:58px;text-align:center;
+  }
+  .ctl.theta label{color:var(--accent-amber)}
+  .ctl.theta .val{color:var(--accent-amber);background:#fffbeb;border-color:#fde68a}
+  .ctl.pointm label{color:var(--accent-blue)}
+
+  /* ===== 右栏 ===== */
+  .right{display:flex;flex-direction:column;gap:20px}
+  .right h1{
+    font-size:24px;font-weight:800;color:var(--text-primary);
+    letter-spacing:.5px;
+  }
+  .right h1 .sub{display:block;font-size:14px;font-weight:500;color:var(--text-secondary);margin-top:4px;letter-spacing:0}
+
+  .formula{
+    background:var(--bg-soft);border:1px solid var(--border);border-radius:12px;
+    padding:22px 16px;text-align:center;font-family:var(--font-mono);
+    font-size:21px;line-height:2.1;color:var(--text-primary);
+  }
+  .formula .live{color:var(--accent-blue);font-weight:700}
+  .formula .tx{color:#b45309;font-weight:700}
+  .formula-note{text-align:center;font-size:13px;color:var(--text-muted);margin-top:8px}
+
+  .checklist{list-style:none;display:flex;flex-direction:column;gap:14px}
+  .checklist li{
+    background:#fff;border:1px solid var(--border);border-radius:10px;
+    padding:13px 16px;font-size:15.5px;
+  }
+  .checklist .ok{color:var(--accent-blue);font-weight:800;margin-right:6px}
+  .checklist strong{color:var(--text-primary)}
+  .warn{
+    margin-top:8px;padding:8px 12px;border-left:3px solid var(--accent-amber);
+    background:rgba(217,119,6,.05);border-radius:0 8px 8px 0;
+    font-size:14.5px;color:#92400e;
+  }
+  .param-grid{
+    margin-top:10px;display:grid;grid-template-columns:118px 1fr;
+    gap:8px 12px;font-size:15px;
+  }
+  .param-grid .k{
+    font-family:var(--font-mono);font-weight:700;color:var(--text-primary);
+    background:var(--bg-tint);border-radius:6px;padding:2px 8px;
+    justify-self:start;font-size:14px;
+  }
+  .analogy{
+    background:var(--bg-tint);border:1px solid #dbeafe;border-radius:10px;
+    padding:12px 16px;font-size:15px;color:var(--text-body);
+  }
+  .analogy strong{color:var(--accent-blue)}
+
+  .legend{display:flex;flex-wrap:wrap;gap:18px;padding:14px 18px;font-size:15px}
+  .legend span{display:flex;align-items:center;gap:8px;color:var(--text-body)}
+  .swatch{width:26px;height:5px;border-radius:3px;display:inline-block}
+  .swatch.k{background:#111827}
+  .swatch.m{background:#dc2626}
+  .swatch.p{width:15px;height:15px;border-radius:50%;background:#2563eb}
+
+  @media (max-width:1080px){
+    .layout{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- ================= 左栏：交互式矢量示意图 ================= -->
+  <section class="card">
+    <div class="card-hd">
+      <span class="dot"></span>
+      <h2>交互示意图：拖动下方参数，图实时联动</h2>
+      <span class="hint">X 向右 ↑ Y 向上</span>
+    </div>
+
+    <div class="viz-wrap">
+      <svg id="scene" viewBox="0 0 860 660" role="img"
+           aria-label="父坐标系map与子坐标系base_link的二维平移旋转变换示意图">
+        <defs>
+          <marker id="arrowK" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+            <path d="M0,0 L7,3 L0,6 z" fill="#111827"/>
+          </marker>
+          <marker id="arrowM" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+            <path d="M0,0 L7,3 L0,6 z" fill="#dc2626"/>
+          </marker>
+          <marker id="arrowB" markerWidth="8" markerHeight="8" refX="6" refY="2.5" orient="auto">
+            <path d="M0,0 L6,2.5 L0,5 z" fill="#64748b"/>
+          </marker>
+          <marker id="arrowRot" markerWidth="8" markerHeight="8" refX="6" refY="2.5" orient="auto">
+            <path d="M0,0 L6,2.5 L0,5 z" fill="#d97706"/>
+          </marker>
+          <marker id="arrowGray" markerWidth="8" markerHeight="8" refX="6" refY="2.5" orient="auto">
+            <path d="M0,0 L6,2.5 L0,5 z" fill="#94a3b8"/>
+          </marker>
+        </defs>
+
+        <!-- ③ 平移箭头：map原点O → base_link原点O′（灰） -->
+        <line id="transArrow" x1="0" y1="0" x2="0" y2="0"
+              stroke="#64748b" stroke-width="2.5" stroke-dasharray="7 5"
+              marker-end="url(#arrowB)"/>
+
+        <!-- ② 旋转示意：读数向量(橙色空心点) 绕O转θ → 橙色空心点 -->
+        <circle id="ghostG" r="5" fill="#ffffff" stroke="#94a3b8" stroke-width="2"/>
+        <path id="step2Line" d="" fill="none"
+              stroke="#d97706" stroke-width="2.5" stroke-dasharray="6 5"
+              marker-end="url(#arrowRot)"/>
+        <circle id="ghostQ" r="5" fill="#ffffff" stroke="#d97706" stroke-width="2"/>
+
+        <!-- ③ 平移示意：旋转后的点 → 叠加(tx,ty) 到达最终P（灰） -->
+        <polyline id="step3Poly" points=""
+              fill="none" stroke="#94a3b8" stroke-width="2"
+              stroke-dasharray="4 5" marker-end="url(#arrowGray)"/>
+
+        <!-- ========== 父坐标系 map（黑） ========== -->
+        <g>
+          <line x1="170" y1="470" x2="740" y2="470" stroke="#111827" stroke-width="2.5" marker-end="url(#arrowK)"/>
+          <line x1="430" y1="640" x2="430" y2="60"  stroke="#111827" stroke-width="2.5" marker-end="url(#arrowK)"/>
+          <text x="748" y="476" font-size="20" font-weight="700" fill="#111827">X<tspan font-size="13" dy="4">map</tspan></text>
+          <text x="430" y="52" font-size="20" font-weight="700" fill="#111827" text-anchor="middle">Y<tspan font-size="13" dy="4">map</tspan></text>
+          <circle cx="430" cy="470" r="4.5" fill="#111827"/>
+          <text id="aText" x="414" y="494" font-size="19" font-weight="700" fill="#111827">O（map 原点）</text>
+        </g>
+
+        <!-- θ 角弧线（在O′处，map的X方向 → base_link的X方向） -->
+        <path id="thetaArc" d="" fill="none" stroke="#d97706" stroke-width="2.5" marker-end="url(#arrowRot)"/>
+        <text id="thetaLabel" font-size="17" font-weight="700" fill="#d97706">θ</text>
+
+        <!-- ========== 子坐标系 base_link（红），整体绕O′旋转 ========== -->
+        <g id="frameM">
+          <line x1="-170" y1="0" x2="290" y2="0" stroke="#dc2626" stroke-width="2.5" marker-end="url(#arrowM)"/>
+          <line x1="0" y1="170" x2="0" y2="-270" stroke="#dc2626" stroke-width="2.5" marker-end="url(#arrowM)"/>
+          <text x="300" y="6" font-size="19" font-weight="700" fill="#dc2626">X<tspan font-size="12" dy="4">bl</tspan></text>
+          <text x="0" y="-282" font-size="19" font-weight="700" fill="#dc2626" text-anchor="middle">Y<tspan font-size="12" dy="4">bl</tspan></text>
+        </g>
+
+        <!-- 平移量 (tx,ty) 标注（JS 定位跟随 O→O′ 中点） -->
+        <text id="tLabel" font-size="16" font-weight="700" fill="#64748b" class="mono"></text>
+
+        <!-- base_link 原点 O′ -->
+        <g id="originB">
+          <circle id="bDot" r="5.5" fill="#dc2626"/>
+          <text id="bText" font-size="18" font-weight="700" fill="#dc2626">O′</text>
+        </g>
+
+        <!-- 测试点 P（蓝），带分步引线 -->
+        <g id="pointP">
+          <circle id="pDot" r="8" fill="#2563eb"/>
+          <circle id="pDotHalo" r="8" fill="none" stroke="#2563eb" stroke-width="2" opacity=".35"/>
+        </g>
+
+        <!-- P 的读数标签 -->
+        <text id="pLabel" font-size="17" font-weight="700" fill="#2563eb" text-anchor="middle">P</text>
+
+        <!-- 引线注解（分步） -->
+        <g id="anno1">
+          <polyline id="anno1Line" points="" fill="none" stroke="#94a3b8" stroke-width="1.5"/>
+          <g id="anno1Box">
+            <rect rx="7" fill="#eef4ff" stroke="#bfdbfe"/>
+            <text font-size="14.5" fill="#1e3a8a" font-weight="600">
+              <tspan x="0" dy="0">① 原始读数：P 在 base_link 上</tspan>
+              <tspan x="0" dy="21" class="mono" id="anno1Val"></tspan>
+            </text>
+          </g>
+        </g>
+
+        <g id="anno4">
+          <polyline id="anno4Line" points="" fill="none" stroke="#94a3b8" stroke-width="1.5"/>
+          <g id="anno4Box">
+            <rect rx="7" fill="#ecfdf5" stroke="#a7f3d0"/>
+            <text font-size="14.5" fill="#065f46" font-weight="600">
+              <tspan x="0" dy="0">④ 最终：换算到 map 上</tspan>
+              <tspan x="0" dy="21" class="mono" id="anno4Val"></tspan>
+            </text>
+          </g>
+        </g>
+
+        <!-- 固定步骤说明（左上角流程图，不随参数移动） -->
+        <g id="flow">
+          <rect x="24" y="18" width="276" height="164" rx="10" fill="#f8fafc" stroke="#e2e8f0"/>
+          <text x="40" y="44" font-size="14.5" font-weight="700" fill="#0f172a">变换流程（先旋转，后平移）</text>
+          <text x="40" y="72" font-size="14" fill="#2563eb">① 读数：P 在 base_link (x<tspan font-size="11" dy="3">bl</tspan><tspan dy="-3">, y</tspan><tspan font-size="11" dy="3">bl</tspan><tspan dy="-3">)</tspan></text>
+          <text x="40" y="99" font-size="14" fill="#d97706">② 旋转：对齐 map 的轴方向（θ）</text>
+          <text x="40" y="126" font-size="14" fill="#64748b">③ 平移：加上 O′ 的偏移 (t<tspan font-size="11" dy="3">x</tspan><tspan dy="-3">, t</tspan><tspan font-size="11" dy="3">y</tspan><tspan dy="-3">)</tspan></text>
+          <text x="40" y="153" font-size="14" fill="#059669">④ 得到 P 在 map 上 (x<tspan font-size="11" dy="3">map</tspan><tspan dy="-3">, y</tspan><tspan font-size="11" dy="3">map</tspan><tspan dy="-3">)</tspan></text>
+          <line x1="44" y1="78" x2="44" y2="94" stroke="#cbd5e1" stroke-width="1.5" marker-end="url(#arrowGray)"/>
+          <line x1="44" y1="105" x2="44" y2="121" stroke="#cbd5e1" stroke-width="1.5" marker-end="url(#arrowGray)"/>
+          <line x1="44" y1="132" x2="44" y2="148" stroke="#cbd5e1" stroke-width="1.5" marker-end="url(#arrowGray)"/>
+        </g>
+      </svg>
+    </div>
+
+    <!-- 参数控制区 -->
+    <div class="controls">
+      <div class="ctl">
+        <label for="tx">t<sub>x</sub></label>
+        <input id="tx" type="range" min="-150" max="150" step="1" value="150">
+        <span class="val" id="txVal">150</span>
+      </div>
+      <div class="ctl">
+        <label for="ty">t<sub>y</sub></label>
+        <input id="ty" type="range" min="-80" max="80" step="1" value="80">
+        <span class="val" id="tyVal">80</span>
+      </div>
+      <div class="ctl theta">
+        <label for="theta">θ (°)</label>
+        <input id="theta" type="range" min="-180" max="180" step="1" value="39">
+        <span class="val" id="thetaVal">39</span>
+      </div>
+      <div class="ctl pointm">
+        <label for="xM">x<sub>bl</sub></label>
+        <input id="xM" type="range" min="-70" max="70" step="1" value="70">
+        <span class="val" id="xMVal">70</span>
+      </div>
+      <div class="ctl pointm">
+        <label for="yM">y<sub>bl</sub></label>
+        <input id="yM" type="range" min="-70" max="70" step="1" value="36">
+        <span class="val" id="yMVal">36</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 右栏：公式 + 讲解 ================= -->
+  <aside class="right">
+    <section class="card">
+      <div class="card-hd"><span class="dot"></span><h2>二维 TF 变换：子坐标系 base_link → 父坐标系 map</h2></div>
+      <div style="padding:20px">
+        <div class="formula">
+          <div>x<sub>map</sub> = <span class="live">x<sub>bl</sub> cosθ − y<sub>bl</sub> sinθ</span> + <span class="tx">t<sub>x</sub></span></div>
+          <div>y<sub>map</sub> = <span class="live">x<sub>bl</sub> sinθ + y<sub>bl</sub> cosθ</span> + <span class="tx">t<sub>y</sub></span></div>
+        </div>
+        <div class="formula-note">左图实时计算结果：<span class="mono" style="color:var(--accent-blue);font-weight:700" id="calcOut"></span></div>
+
+        <div class="analogy" style="margin-top:16px">
+          一句话理解：点 P 没有动，只是<strong>从一把尺子（子 base_link）上的读数，换算到另一把尺子（父 map）上</strong>。
+        </div>
+
+        <ul class="checklist" style="margin-top:16px">
+          <li>
+            <span class="ok">✅</span><strong>变换顺序：先旋转，后平移</strong>（ROS TF 固定顺序）
+            <div class="warn">⚠️ 顺序不能颠倒！必须先把 P 的方向转正对齐 K，再叠加原点偏移。</div>
+          </li>
+          <li>
+            <span class="ok">✅</span><strong>参数含义</strong>
+            <div class="param-grid">
+              <span class="k">t<sub>x</sub>, t<sub>y</sub></span><span>子坐标系 base_link 的原点 <strong>O′</strong>，在父坐标系 map 中的位置</span>
+              <span class="k">θ</span><span>base_link 相对于 map <strong>逆时针旋转</strong>的角度</span>
+              <span class="k">x<sub>bl</sub>, y<sub>bl</sub></span><span>点 P 在子坐标系 base_link 里的<strong>读数</strong></span>
+              <span class="k">x<sub>map</sub>, y<sub>map</sub></span><span>同一个点 P，换算到父坐标系 map 里的读数</span>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-hd"><span class="dot"></span><h2>图例</h2></div>
+      <div class="legend">
+        <span><i class="swatch k"></i>黑色：父坐标系 map</span>
+        <span><i class="swatch m"></i>红色：子坐标系 base_link</span>
+        <span><i class="swatch p"></i>蓝色圆点：测试点 P</span>
+        <span style="color:var(--text-muted)">橙色圆弧：②绕O旋转θ · 灰色空心点：①读数原位 · 橙色空心点：②旋转后 · 灰虚线：③平移(tx,ty)</span>
+      </div>
+    </section>
+  </aside>
+</div>
+
+<script>
+(function(){
+  // map 原点 O 在 SVG 画布中的像素位置；1 单位参数 = 1 像素
+  const AX = 430, AY = 470;
+
+  const $ = id => document.getElementById(id);
+  const params = { tx:$('tx'), ty:$('ty'), theta:$('theta'), xM:$('xM'), yM:$('yM') };
+  const deg2rad = d => d * Math.PI / 180;
+
+  // 坐标 → 画布像素（Y 轴翻转）
+  const px = x => AX + x;
+  const py = y => AY - y;
+
+  function fmt(v){ return (Math.round(v*10)/10).toString(); }
+
+  function update(){
+    const tx  = +params.tx.value,
+          ty  = +params.ty.value,
+          th  = deg2rad(+params.theta.value),
+          xM  = +params.xM.value,
+          yM  = +params.yM.value;
+
+    // 展示数值
+    $('txVal').textContent = tx;
+    $('tyVal').textContent = ty;
+    $('thetaVal').textContent = params.theta.value;
+    $('xMVal').textContent = xM;
+    $('yMVal').textContent = yM;
+
+    const cos = Math.cos(th), sin = Math.sin(th);
+
+    // ===== 公式计算：先旋转，后平移 =====
+    const xR = xM*cos - yM*sin;   // 旋转后（相对map原点）
+    const yR = xM*sin + yM*cos;
+    const xK = xR + tx;           // 再平移
+    const yK = yR + ty;
+
+    // ===== pLabel 预填避免零宽测量 =====
+    if (!($('pLabel').textContent || '').trim()) $('pLabel').textContent = 'P';
+
+    // ===== 分解：G = ①读数原位(仅xM,yM)，Q = ②旋转后，P = ④最终 =====
+    const Bx = px(tx), By = py(ty);                 // base_link 原点 O′
+    const Gx = px(xM), Gy = py(yM);                 // ① 读数原位
+    const Qx = px(xR), Qy = py(yR);                 // ② 旋转后
+    const Px = px(xK), Py = py(yK);                 // ④ 最终 P
+    const rr = Math.hypot(xM, yM);
+    const hasGhost = rr > 14;
+    const a0 = Math.atan2(yM, xM) * 180 / Math.PI;
+    const thDeg = +params.theta.value;
+
+    // ===== base_link 坐标系绕 O′ 旋转（先平移到O′，再旋转；SVG旋转角=-θ，画布Y向下）=====
+    $('frameM').setAttribute('transform', `translate(${Bx} ${By}) rotate(${-thDeg})`);
+
+    // ===== O′ 点标注 =====
+    $('bDot').setAttribute('cx', Bx); $('bDot').setAttribute('cy', By);
+    $('bText').textContent = 'O′ (' + tx + ', ' + ty + ')';
+
+    // ===== 平移箭头 O→O′ =====
+    $('transArrow').setAttribute('x1', AX); $('transArrow').setAttribute('y1', AY);
+    $('transArrow').setAttribute('x2', Bx); $('transArrow').setAttribute('y2', By);
+    $('tLabel').textContent = `(tx=${tx}, ty=${ty})`;
+
+    // ===== θ 弧线（在O′处，map的X正方向 逆时针转到 base_link的X方向）=====
+    $('thetaArc').setAttribute('d', describeArc(Bx, By, 42, 0, thDeg));
+
+    // ===== P 点 =====
+    $('pDot').setAttribute('cx', Px); $('pDot').setAttribute('cy', Py);
+    $('pDotHalo').setAttribute('cx', Px); $('pDotHalo').setAttribute('cy', Py);
+    // ===== pLabel：只写 "P"（坐标值交给④注解框，避免与引线框抢位） =====
+    $('pLabel').textContent = 'P';
+
+    // ===== ② 旋转示意：绕O逆时针转θ =====
+    $('ghostG').setAttribute('cx', Gx); $('ghostG').setAttribute('cy', Gy);
+    $('ghostG').setAttribute('opacity', hasGhost && Math.abs(thDeg) > 2 ? 1 : 0);
+    $('ghostQ').setAttribute('cx', Qx); $('ghostQ').setAttribute('cy', Qy);
+    $('ghostQ').setAttribute('opacity', hasGhost ? 1 : 0);
+    $('step2Line').setAttribute('d', (hasGhost && Math.abs(thDeg) > 2)
+      ? describeArc(AX, AY, rr, a0, a0 + thDeg) : '');
+    $('step2Line').setAttribute('opacity', hasGhost && Math.abs(thDeg) > 2 ? 1 : 0);
+
+    // ===== ③ 平移示意：Q → 最终P =====
+    $('step3Poly').setAttribute('points', hasGhost ? `${Qx},${Qy} ${Px},${Py}` : '');
+    $('step3Poly').setAttribute('opacity', hasGhost ? 1 : 0);
+
+    $('calcOut').textContent =
+      `(${fmt(xM)}, ${fmt(yM)}) → (${fmt(xK)}, ${fmt(yK)})`;
+
+    $('anno1Val').textContent = `(x_bl, y_bl) = (${xM}, ${yM})`;
+    $('anno4Val').textContent = `(x_map, y_map) = (${fmt(xK)}, ${fmt(yK)})`;
+
+    layoutAll({ Px, Py, Bx, By, Gx, Gy, thDeg });
+  }
+
+  // ===== 固定标注（O/O′/P/θ/tx）锚点排布：候选位选不重叠的 =====
+  function placeLabels(Bx, By){
+    const VH = 660, VW = 860;
+
+    // 测量尺寸（归零后取 bbox）
+    function sz(el){
+      el.setAttribute('x', 0); el.setAttribute('y', 0);
+      el.setAttribute('text-anchor', 'start');
+      const b = el.getBBox();
+      return { w: b.width, h: b.height, y0: b.y };
+    }
+    // 放置：目标左上角 (lx,ly) + 对齐方式（写 SVG 属性）
+    function move(el, size, lx, ly, anchor){
+      el.setAttribute('text-anchor', anchor);
+      let X = lx;
+      if (anchor === 'middle') X = lx + size.w / 2;
+      else if (anchor === 'end') X = lx + size.w;
+      el.setAttribute('x', X);
+      el.setAttribute('y', ly - size.y0);
+      return { x: lx, y: ly, w: size.w, h: size.h };
+    }
+    function overlap(a, b){
+      return !(a.x + a.w < b.x || b.x + b.w < a.x || a.y + a.h < b.y || b.y + b.h < a.y);
+    }
+    const inCanvas = b => b.x >= 0 && b.y >= 0 && b.x + b.w <= VW && b.y + b.h <= VH;
+    // 障碍物：流程图 + 两个注解框 + θ 直标 + O′标注（θ 座位由 layoutAll.seatTheta 提前定好；
+    // O′ 标签沿用上一轮座位——O′到原点的移动是连续的，瞬移风险极低）
+    const obstacles = [boxOf('#flow'), boxOf('#anno1 rect'), boxOf('#anno4 rect'),
+                       boxOf('#thetaLabel'), boxOf('#bText')];
+
+    // 候选位打分：出界=∞，否则取重叠面积和（0 最佳）
+    function pick(el, size, cands, extras){
+      const obs = obstacles.concat(extras || []);
+      let best = null, bestScore = Infinity, bestC = null;
+      for (const c of cands){
+        const b = move(el, size, c.lx, c.ly, c.anchor);
+        const score = inCanvas(b) ? obs.reduce((s, o) => s + overlapArea(b, o), 0)
+                                  : 1e18 + overlapArea({x:0,y:0,w:VW,h:VH}, b);
+        if (score < bestScore){ bestScore = score; best = b; bestC = c; }
+        if (score === 0) return b;            // 元素已停在该候选位
+      }
+      // 关键：把元素挪回打分最优的候选位（防止渲染位置与返回的障碍框不一致）
+      if (bestC) move(el, size, bestC.lx, bestC.ly, bestC.anchor);
+      return best;
+    }
+
+    const boxes = [];
+    // O 标注：左下（静态位置）
+    const bA = move($('aText'), sz($('aText')), AX - 14, AY + 10, 'end');
+    boxes.push(bA);
+    // O′ 标注：座位已由 layoutAll.seatOLabel 定妥，此处仅返回其占位框
+    // θ 标注：座位已由 layoutAll.seatTheta 定妥（含离 O′≥28px 几何保底），此处仅作为障碍参与其他标签排布
+    // tx 标注：<O,O′> 中点多向候选（内圈手选 + 外圈兜底，逃不开 aText 等障碍时换圈）
+    const mx = (AX + Bx) / 2, my = (AY + By) / 2;
+    const tSize = sz($('tLabel'));
+    const tCands = [
+      { lx: mx - 10, ly: my - 18, anchor: 'end'    },
+      { lx: mx + 10, ly: my - 18, anchor: 'start'  },
+      { lx: mx - 10, ly: my + 16, anchor: 'end'    },
+      { lx: mx + 10, ly: my + 16, anchor: 'start'  },
+      { lx: mx - 67, ly: my - 40, anchor: 'middle' },
+      { lx: mx - 67, ly: my + 34, anchor: 'middle' },
+      { lx: mx + 67, ly: my - 40, anchor: 'middle' },
+      { lx: mx + 67, ly: my + 34, anchor: 'middle' },
+      { lx: mx - 67, ly: my - 64, anchor: 'middle' },
+      { lx: mx + 67, ly: my - 64, anchor: 'middle' }
+    ];
+    [64, 96, 134].forEach(function(r){
+      [30, 70, 110, 150, 210, 250, 290, 330].forEach(function(a){
+        const p = polar(mx, my, r, a);
+        tCands.push({ lx: p.x - tSize.w / 2, ly: p.y - 8, anchor: 'middle' });
+      });
+    });
+    const bTx = pick($('tLabel'), tSize, tCands, boxes);
+    boxes.push(bTx);
+
+    // P 标签："P" 短标签，绕 P 多圈八向候选（避开固定标注 + 流程图 + 注解框）
+    const Pcx = +$('pDot').getAttribute('cx'), Pcy = +$('pDot').getAttribute('cy');
+    const candsP = [];
+    [[16, 44], [40, 70], [80, 110]].forEach(function(d){
+      candsP.push({ lx: Pcx,          ly: Pcy - d[0], anchor: 'middle' });
+      candsP.push({ lx: Pcx + d[0],   ly: Pcy - 6,    anchor: 'start'  });
+      candsP.push({ lx: Pcx - d[0],   ly: Pcy - 6,    anchor: 'end'    });
+      candsP.push({ lx: Pcx,          ly: Pcy + d[0], anchor: 'middle' });
+      candsP.push({ lx: Pcx + d[0],   ly: Pcy + 12,   anchor: 'start'  });
+      candsP.push({ lx: Pcx - d[0],   ly: Pcy + 12,   anchor: 'end'    });
+      candsP.push({ lx: Pcx - d[1]/2, ly: Pcy - d[1], anchor: 'middle' });
+      candsP.push({ lx: Pcx + d[1]/2, ly: Pcy + d[1], anchor: 'middle' });
+    });
+    boxes.push(pick($('pLabel'), sz($('pLabel')), candsP, boxes));
+    return boxes;
+  }
+
+  // ===== 统一排布：④①注解框 → 固定标签订位（两轮迭代收敛，防重叠） =====
+  function layoutAll(pos){
+    const VW = 860, VH = 660, PAD = 10;
+    const flow = boxOf('#flow');
+
+    // 按注解文字实际尺寸撑开边框
+    function measureAnno(boxId){
+      const el = document.querySelector('#' + boxId + ' text');
+      el.setAttribute('x', 0); el.setAttribute('y', 24);
+      el.querySelectorAll('tspan').forEach(t => t.setAttribute('x', 0));
+      const b = el.getBBox();
+      return { w: Math.ceil(b.width + 28), h: Math.ceil(24 - b.y + b.height + 6) };
+    }
+    // 锚点周围八向候选打分：两圈距离，出界裁剪后取重叠面积和最小
+    function pickBox(w, h, ax, ay, obs){
+      const dirs = [[1,-1],[-1,-1],[1,1],[-1,1],[0,-1],[0,1],[-1,0],[1,0]];
+      const all = obs.concat([{ x: ax - 7, y: ay - 7, w: 14, h: 14 }]); // 别盖住锚点
+      let best = null, bs = Infinity;
+      for (const D of [36, 96, 156]){
+        for (const o of dirs){
+          const ox = o[0], oy = o[1];
+          let x = ox === 1 ? ax + D : ox === -1 ? ax - D - w : ax - w / 2;
+          let y = oy === 1 ? ay + D : oy === -1 ? ay - D - h : ay - h / 2;
+          x = Math.min(Math.max(x, PAD), VW - w - PAD);
+          y = Math.min(Math.max(y, PAD), VH - h - PAD);
+          const b = { x, y, w, h };
+          const s = all.reduce((t, ob) => t + overlapArea(b, ob), 0);
+          if (s < bs){ bs = s; best = b; }
+          if (s === 0) return best;
+        }
+      }
+      return best;
+    }
+
+    const m1 = measureAnno('anno1'), m4 = measureAnno('anno4');
+    let b1 = null, b4 = layoutAll._b4 || null;
+    let labels = layoutAll._labels || [];
+
+    for (let pass = 0; pass < 3; pass++){
+      // 每轮用当前①④框位置重定 θ / O′ 座位（否则 O′ 座会撞上挪过来的注解框）
+      seatTheta(pos.Bx, pos.By, pos.thDeg);
+      seatOLabel(pos.Bx, pos.By);
+      const thetaBox = boxOf('#thetaLabel');
+      const aTxt = boxOf('#aText');
+      const bTxt = boxOf('#bText');
+      b1 = pickBox(m1.w, m1.h, pos.Gx, pos.Gy,
+                   [flow, aTxt, bTxt, thetaBox].concat(b4 ? [b4] : []).concat(labels));
+      placeAnno('anno1', 'anno1Line', '', pos.Gx, pos.Gy, b1.x, b1.y, m1.w, m1.h);
+      // O′ 座位再校一次（避开刚就位的①框）
+      seatOLabel(pos.Bx, pos.By);
+      b4 = pickBox(m4.w, m4.h, pos.Px, pos.Py,
+                   [flow, aTxt, bTxt, boxOf('#thetaLabel'), b1, boxOf('#bText')].concat(labels));
+      b4 = moveBBox(b4, pos.Px, pos.Py);   // ④框与 P 几何保底 ≥28px
+      placeAnno('anno4', 'anno4Line', '', pos.Px, pos.Py, b4.x, b4.y, m4.w, m4.h);
+      labels = placeLabels(pos.Bx, pos.By);
+    }
+    // 收尾：①④框全部就位后，θ / O′ 标签贴回 O′ 邻域（此时障碍最全，座位不再飘远）
+    seatTheta(pos.Bx, pos.By, pos.thDeg);
+    seatOLabel(pos.Bx, pos.By);
+    layoutAll._b1 = b1; layoutAll._b4 = b4; layoutAll._labels = labels;
+
+    // ---- θ 直标座位：候选打分 + 离 O′ 距离硬约束 ----
+    function seatTheta(Bx, By, thDeg){
+      placeRing($('thetaLabel'), Bx, By,
+        [56, 78, 104].flatMap(r =>
+          [-56, -36, -18, 18, 36, 56].map(off => mid => [polar(Bx, By, r, mid + off)])),
+        thDeg / 2, false);
+    }
+
+    // ---- O′ 直标座位：八向两圈候选 + 离 O′ 硬约束（θ 为 0 时刻意贴 O′ 轴向）----
+    function seatOLabel(Bx, By){
+      const el = $('bText');
+      const last = seatOLabel._last || { x: Bx + 14, y: By + 18 };
+      const cands = [{ x: last.x, y: last.y }];
+      [30, 64, 100].forEach(r => {
+        [[1,1],[1,-1],[-1,1],[-1,-1],[1,0],[-1,0],[0,1],[0,-1]].forEach(d =>
+          cands.push(polar(Bx, By, r, Math.atan2(-d[1], d[0]) * 180 / Math.PI)));
+      });
+      const seat = placeRing(el, Bx, By, [() => cands], 0, true, cands);
+      // 记忆"中心点"（cands 里的坐标都是中心），下次以它为首候选，防逐帧漂移
+      seatOLabel._last = { x: seat.x + (seat.w || 0) / 2,
+                           y: seat.y + (seat.h || 0) / 2 };
+    }
+
+    // ---- 环形候选 + 离锚点硬约束 + 重叠打分的通用定座 ----
+    // gen(rings) 返回 半径→(mid+off) 采样点集；hardDist 为真时"离锚点<28px"废票
+    function placeRing(el, ax, ay, rings, midGen, hardDist, flat){
+      el.setAttribute('text-anchor', 'start');
+      el.setAttribute('x', 0); el.setAttribute('y', 0);
+      const b = el.getBBox(), w = b.width, h = b.height, y0 = b.y;
+      let cands = flat || [];
+      if (!flat){
+        const mid = (typeof midGen === 'function') ? 0 : midGen;
+        rings.forEach(gen => gen(mid).forEach(p => cands.push(p)));
+      }
+      // 障碍表：把"自己"那一条剔除（按元素引用比较）；裸标签也要参与，防止收尾定座撞上
+      const obs = [['#flow', null], ['#aText', null], ['#anno1 rect', null], ['#anno4 rect', null],
+                   ['#tLabel', $('tLabel')], ['#pLabel', $('pLabel')],
+                   ['#thetaLabel', $('thetaLabel')], ['#bText', $('bText')]]
+                  .filter(pair => pair[1] !== el)
+                  .map(pair => boxOf(pair[0]));
+      let best = null, bs = Infinity;
+      for (const c of cands){
+        let x = Math.min(Math.max(c.x - w / 2, 10), 860 - w - 10);
+        let y = Math.min(Math.max(c.y - h / 2, 10), 660 - h - 10);
+        const rect = { x, y, w, h };
+        if (hardDist){
+          const ox = Math.min(Math.max(ax, x), x + w), oy = Math.min(Math.max(ay, y), y + h);
+          if (Math.hypot(ax - ox, ay - oy) < 28) continue;
+        }
+        const s = obs.reduce((t, o) => t + overlapArea(rect, o), 0);
+        if (s < bs){ bs = s; best = rect; }
+        if (s === 0) break;
+      }
+      if (!best){
+        const p = flat ? flat[0] : polar(ax, ay, 78, midGen || 0);
+        best = { x: Math.min(Math.max(p.x - w / 2, 10), 860 - w - 10),
+                 y: Math.min(Math.max(p.y - h / 2, 10), 660 - h - 10), w, h };
+      }
+      // 渲染位置必须与打分用的占位框一致：best.x/y 是左上角
+      el.setAttribute('x', best.x);
+      el.setAttribute('y', best.y - y0);
+      return best;
+    }
+
+    // ---- ④框几何保底：任意情形下与 P 点保持 ≥28px ----
+    function moveBBox(b, ax, ay){
+      if (!b) return b;
+      for (let i = 0; i < 30; i++){
+        const ox = Math.min(Math.max(ax, b.x), b.x + b.w);
+        const oy = Math.min(Math.max(ay, b.y), b.y + b.h);
+        if (Math.hypot(ax - ox, ay - oy) >= 28) break;
+        const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
+        let ux = cx - ax, uy = cy - ay, ud = Math.hypot(ux, uy);
+        if (ud < 1e-6){ ux = 1; uy = 0; ud = 1; }
+        const R = 28 + Math.hypot(b.w, b.h) / 2;
+        const nx = ax + ux / ud * R, ny = ay + uy / ud * R;
+        b = { x: Math.min(Math.max(nx - b.w / 2, 10), 860 - b.w - 10),
+              y: Math.min(Math.max(ny - b.h / 2, 10), 660 - b.h - 10), w: b.w, h: b.h };
+      }
+      // P 靠画布边缘时，对推可能被边界挡死 → 换四个"贴边侧放"候选兜底
+      const pDist = (r, px, py) => {
+        const ox = Math.min(Math.max(px, r.x), r.x + r.w);
+        const oy = Math.min(Math.max(py, r.y), r.y + r.h);
+        return Math.hypot(px - ox, py - oy);
+      };
+      if (pDist(b, ax, ay) < 28){
+        const cands = [
+          { x: ax - 28 - b.w,     y: ay - b.h / 2 },
+          { x: ax + 28,           y: ay - b.h / 2 },
+          { x: ax - b.w / 2,      y: ay - 28 - b.h },
+          { x: ax - b.w / 2,      y: ay + 28 }
+        ].map(c => ({
+          x: Math.min(Math.max(c.x, 10), 860 - b.w - 10),
+          y: Math.min(Math.max(c.y, 10), 660 - b.h - 10),
+          w: b.w, h: b.h
+        }));
+        let fb = null, fd = -1;
+        for (const c of cands){
+          const d = pDist(c, ax, ay);
+          if (d > fd){ fd = d; fb = c; }
+        }
+        if (fb && fd >= 28) b = fb;
+      }
+      return b;
+    }
+  }
+
+  // ===== 通用：矩形重叠面积（0 = 不重叠） =====
+  function overlapArea(a, b){
+    const w = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
+    const h = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+    return (w > 0 && h > 0) ? w * h : 0;
+  }
+  function boxOf(sel){
+    const b = document.querySelector(sel).getBBox();
+    return { x: b.x, y: b.y, w: b.width, h: b.height };
+  }
+
+  // 放置标注框 + 直线引线（clamp 防止出界/覆盖流程图）
+  function placeAnno(boxId, lineId, rectId, px1, py1, wantX, wantY, w, h){
+    const VBW = 860, VBH = 660, PAD = 10;
+    let bx = Math.min(Math.max(wantX, PAD), VBW - w - PAD);
+    let by = Math.min(Math.max(wantY, PAD), VBH - h - PAD);
+    // 框中心
+    const cx = bx + w/2, cy = by + h/2;
+    const rect = document.querySelector('#' + boxId + ' rect');
+    rect.setAttribute('x', bx); rect.setAttribute('y', by);
+    rect.setAttribute('width', w); rect.setAttribute('height', h);
+    const txt = document.querySelector('#' + boxId + ' text');
+    txt.setAttribute('x', bx + 14); txt.setAttribute('y', by + 24);
+    txt.querySelectorAll('tspan').forEach(t => t.setAttribute('x', bx + 14));
+    // 引线：从 P 点到框的边缘中点（留 4px 间隙）
+    const dx = cx - px1, dy = cy - py1, len = Math.hypot(dx, dy) || 1;
+    const ex = px1 + dx/len*13, ey = py1 + dy/len*13;      // 靠近 P 的一端
+    const sx = cx - (dx/len)*(w/2) , sy = cy - (dy/len)*(h/2); // 框边一端
+    const gap = 4;
+    const fx = sx - (dx/len)*gap, fy = sy - (dy/len)*gap;
+    $(lineId).setAttribute('points', `${ex},${ey} ${fx},${fy}`);
+  }
+
+  // 角度弧线：SVG 坐标系中（Y 向下），角度 a 映射为 -a
+  function polar(cx, cy, r, aDeg){
+    const a = deg2rad(aDeg);
+    return { x: cx + r*Math.cos(a), y: cy - r*Math.sin(a) };
+  }
+  function describeArc(cx, cy, r, a0, a1){
+    const sweep = Math.abs(a1 - a0) < 0.5 ? 0.5 : a1 - a0;
+    const start = polar(cx, cy, r, a0);
+    let endA = a0 + sweep;
+    if (sweep > 0 && endA > 180) endA = 180;
+    if (sweep < 0 && endA < -180) endA = -180;
+    const end = polar(cx, cy, r, endA);
+    const largeArc = Math.abs(endA - a0) > 180 ? 1 : 0;
+    // 画布Y向下：逻辑上的逆时针(角度增大)在屏幕上是逆时针 → sweep-flag = 0
+    const sweepFlag = sweep > 0 ? 0 : 1;
+    return `M ${start.x} ${start.y} A ${r} ${r} 0 ${largeArc} ${sweepFlag} ${end.x} ${end.y}`;
+  }
+
+  Object.values(params).forEach(el => el.addEventListener('input', update));
+  update();
+})();
+</script>
+<script>
+(function(){if(window===parent)return;function send(){try{parent.postMessage({type:'figh',h:document.body.scrollHeight},'*')}catch(e){}}window.addEventListener('load',send);window.addEventListener('resize',function(){clearTimeout(window.__fighT);window.__fighT=setTimeout(send,120)});send();})();
+</script>
+</body>
+</html>

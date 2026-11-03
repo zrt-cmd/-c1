@@ -1,0 +1,33 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp003-ros2-application/exp-19-tf2/diagrams/fig-19-2-tf-tree.html
+TITLE: 图 19-2 · TF2 变换树
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+图 19-2 · TF2 变换树
+图 19-2 · TF2 变换树：一个 child 只能有一个 parent
+本图回答的问题：机器人身上的坐标系怎么组织，为什么必须是一棵树？
+map
+世界原点 · SLAM 维护
+odom
+里程计原点 · 会漂移
+base_link
+车体中心 · 挂载点
+laser_frame
+雷达测量原点
+camera_link
+相机测量原点
+arm_base
+机械臂基座
+/tf 动态 · 10~100Hz
+/tf 动态 · 里程计
+静态 /tf_static
+静态 /tf_static
+静态 /tf_static
+static_transform_publisher
+免代码发一条静态边
+补一条边
+✗ 互为父子 = 成环
+任意两个坐标系之间只有一条唯一路径 → 查变换永远有解且可终止
+✅ 结论：单父、无环、路径唯一，查询必有解
+⚠️ 风险：两个节点抢同一 child 配不同 parent → TF2 报冲突
+🔍 验证：02 节步骤 ② 生成的 frames.pdf 树形核对 · 04 节第 4 步检查要点
+EXP-19 · TF2 坐标系变换

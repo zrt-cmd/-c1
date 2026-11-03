@@ -1,0 +1,40 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp003-ros2-application/exp-17-launch/diagrams/fig-17-1-lifecycle.html
+TITLE: 图 17-1 · Launch 解析执行与 SIGINT 级联
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+图 17-1 · Launch 解析执行与 SIGINT 级联
+图 17-1 · 解析 → Runner → 子进程 → SIGINT 级联
+本图回答的问题：ros2 launch 读完 .launch.py 之后做了什么？一次 Ctrl+C 如何停干净全部节点？
+剧本层
+编排层
+进程层
+my.launch.py
+Node(A)          → Action1
+Node(B)          → Action2
+If(mode) Node(C) → Action3
+OnExit(A) → cleanup
+入口：generate_launch_description()
+解析
+Launch Runner
+① 按序执行 Action
+② 评估 condition
+③ 拉起子进程并监管
+[talker-1] pid 4242
+output='screen' 汇入同一终端
+[listener-2] pid 4243
+日志前缀 = 谁在说话
+[debug-3] 条件节点
+condition 成立才创建进程
+评估通过才 spawn
+Ctrl+C → Runner 向全部子进程广播 SIGINT
+talker-1 finished cleanly · listener-2 finished cleanly · 无僵尸残留
+不要直接 kill Launch 父进程——绕过级联会留下孤儿节点
+退出信号由 Runner 统一下发
+退出同一机制的另一面：事件编排
+OnProcessExit(A) → 自动执行 on_exit 里的 Action（恢复/清理/接续）
+监管日志是身份证明
+process has died / finished cleanly
+✅ 一次 Ctrl+C 全停 = Runner 广播 SIGINT 的级联清理
+⚠️ 直接 kill 父进程 → 绕过级联留孤儿 · condition False 的 name 也占号
+🔍 04 节第 1 步：两行 process has finished cleanly
+EXP-17 · Launch 启动系统

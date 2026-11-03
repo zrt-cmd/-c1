@@ -1,0 +1,22 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/cases/exp007-intelligent-factory/exp-03-voice-llm/index.html
+TITLE: EXP-03 语音交互与大模型 · 建设中 · EXP007
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+EXP-03 语音交互与大模型 · 建设中 · EXP007
+具身智能课程 · 科普教程
+EXP007
+/
+实验 03 语音交互与大模型
+EXPERIMENT · EXP-03
+🎙️
+语音交互与大模型
+⏳ 本实验正在建设中
+规划建设内容
+离线语音唤醒与 ASR 识别流程
+大模型意图解析："去 A 点取方块"如何变成结构化指令
+自然语言 → 机器人任务的实操演示
+内容就绪度
+45%
+先看：实验 01 建图与导航 →
+返回课程首页
+EXP007 · 实验 03 语音交互与大模型 · 输出于 training/output

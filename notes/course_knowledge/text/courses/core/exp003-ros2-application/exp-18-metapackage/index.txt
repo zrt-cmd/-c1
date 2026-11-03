@@ -1,0 +1,361 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp003-ros2-application/exp-18-metapackage/index.html
+TITLE: EXP-18 · 元功能包 — 机器人 ROS2 应用与开发
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+EXP-18 · 元功能包 — 机器人 ROS2 应用与开发
+🧠 具身智能课程 ·
+教程首页
+核心课程
+/
+ROS2 应用与开发
+/ EXP-18
+本页目录
+★ 课程目标
+01 是什么
+02 和普通包有什么区别
+03 什么时候用、什么时候不用
+04 怎么用
+05 小结与自测
+CH4 · 工具链
+EXP-14 rqt 调试工具
+EXP-15 rviz2 可视化
+EXP-16 rosbag 数据录制
+EXP-17 Launch 启动文件
+EXP-18 元功能包
+EXP-18 · 第 4 章 · 验证性 · 2 学时
+元功能包：是什么、和普通包什么区别、什么时候用、怎么用
+有一种包永远不包含代码，却能让一条 apt 命令装齐整套依赖——这就是元功能包（metapackage）。本课按四问展开：是什么、和普通包什么区别、什么时候该用（以及什么时候不该用）、怎么用——从场景自建到打成 apt 可装的 .deb。
+难度 ⭐
+2 学时
+验证性
+关键词 元功能包 · 普通包区别 · apt 打包 · bringup
+目标
+本课学完，你应该能做到
+① 是什么
+元功能包的定义
+能用自己的话说出定义：不含代码的空壳包，用一串
+exec_depend
+把一套功能聚合成一个名字。
+② 什么区别
+对比普通功能包
+能从源代码、依赖声明、构建产物三方面，说清元包和普通功能包的差别。
+③ 什么时候用
+该用还是不该用
+拿到真实需求，能判断该建元包、该用 bringup 包，还是 launch 文件就够了。
+④ 怎么用
+创建、验证并发布
+能按"交付 car1"的场景建出
+car1_meta
+、一条命令回读验证，并说清怎么打成 apt 能装的 .deb。
+一句话记住
+元功能包 =
+购物清单式的包
+：自己什么也不干，只负责"装我等于装全家桶"。
+01
+是什么
+定义
+元功能包（metapackage）
+是一种"空壳"包：自己不包含任何节点、代码或配置，只在 package.xml 里用
+<exec_depend>
+声明对一组包的依赖。它的作用是把一整套相关功能
+"打包成一个名字"
+，方便安装和整体启动。
+特征一
+零内容
+没有 src/、没有节点、没有配置文件。（ROS 1 硬性规定不能有代码；ROS 2 放宽了，但惯例仍是"纯聚合"。）
+特征二
+只写运行时依赖
+package.xml 里只用
+exec_depend
+声明"运行时我需要谁"，不用 build_depend 链接代码。
+特征三
+export 打标记
+package 格式 3，在
+<export>
+里写
+<metapackage/>
+，构建类型仍是 ament_cmake。
+典型例子
+ros-humble-desktop
+——装一个就带上整套工具；
+navigation2
+——一条 apt 命令装齐 20 余个子包（完整拆解见 02 节）；
+car1_bringup
+——本仓库最接近的思路包（它带 launch 内容，属于聚合包而非纯元包，对照见 03 节）。
+图 18-1 · 聚合生效原理｜本图回答：元包没有代码，
+apt install
+它之后为什么整棵子包树都在了？
+✅ 结论：元包只提供清单，展开由包管理器递归完成
+⚠️ 风险：绕过元包手敲子包名，漏一个就运行期报错
+🔍 验证：04 节步骤 ④ 的回读输出
+02
+和普通包有什么区别
+一句话区别
+普通包"干活"，元包"点单"
+：普通功能包有代码、编译出节点或库，负责实现功能；元功能包零代码，只有一张依赖清单，负责"装我时带上谁"。
+维度
+普通功能包
+元功能包
+源代码
+有 src/ 或 Python 模块
+完全没有
+可执行文件
+有节点 / 库
+无
+build 类型
+ament_cmake / ament_python
+仅 ament_cmake
+CMakeLists
+完整构建逻辑
+仅 ament_package() 一行有效指令
+依赖声明
+build_depend + exec_depend 按需
+只写 exec_depend（聚合用）
+colcon build
+编译本包
+空操作，约 0.5 秒仅注册关系
+典型用途
+实现功能
+一键安装 / 版本锁定一套子包
+拆开一对真实样本对照——nav2 家族里正好一个元包 + 一个普通包：
+# 元包 navigation2：本体没有代码，清单里全是运行时依赖
+$ ros2 pkg xml navigation2 | grep exec_depend
+  <exec_depend>nav2_amcl</exec_depend>
+  <exec_depend>nav2_planner</exec_depend>
+  <exec_depend>nav2_controller</exec_depend>
+# ……一口气 20 余行：这就是它"聚合"的全部内容
+# 普通包 nav2_planner：有代码要编译，所以多了 build_depend
+$ ros2 pkg xml nav2_planner | grep -E
+"depend"
+<build_depend>nav2_core</build_depend>
+  <depend>nav2_msgs</depend>
+  <exec_depend>nav2_costmap_2d</exec_depend>
+# 它还有 src/ 与编译目标——这正是两类包的分界线
+观察结论
+元包的行行都是 exec_depend（只要运行）；普通包出现 build_depend（编译要用头文件），且自身有实现代码。
+看清单里有没有"干活的部分"，一眼分清两类包。
+03
+什么时候用、什么时候不用
+场景一
+对外交付：一条 apt 装齐
+项目以安装包形式发布给别人：
+sudo apt install ros-humble-car1
+装一个 = 装齐整套驱动。官方 desktop、nav2 正是这么做的。
+场景二
+多仓库协作：总入口
+底盘组、导航组各发各的仓库，用一个元包声明"完整系统 = 这三者的某个版本组合"，不必搬别人的源码。
+场景三
+聚合构建：一键带编
+colcon build --packages-up-to car1_meta
+：靠元包的依赖关系，把所有兄弟包一次编出来。
+这些情况不需要元包
+① 包里有 launch、配置、脚本
+→ 这是 bringup 包（如 car1_bringup：ament_python 包，带 launch/bringup.launch.py，export 里只有 ament_python、没有 metapackage 标记）。
+② 只想一次启动多个节点
+→ launch 文件就够了（EXP-17）。
+③ 单人/小团队直接源码 colcon build
+→ 依赖自动解析，元包没有实际收益。
+维度
+纯元包
+bringup 包（如 car1_bringup）
+内容
+纯依赖清单，零内容
+launch 文件 + 实际代码结构
+export 标记
+ament_cmake + metapackage
+ament_python / ament_cmake，无 metapackage
+职责
+安装入口："装我 = 装全家"
+启动入口："一条 launch 拉起整机"
+常见度
+apt 发布的官方包常用
+ROS 2 日常开发里更常见
+结论
+对"源码编译 + 单仓库"的开发方式（如本工程），现有 bringup 包模式就是最合适的选择，
+不需要引入元包
+；只有走到 apt 发布、或多仓库给不同团队集成时，才值得加一个纯元包当安装入口。
+04
+怎么用
+先定场景，再照四步做——2 分钟从零到一个可回读的元包。
+实战场景（就用本课程仓库 ros2_ws/src/xflz_eai_car1）
+假设你要走 03 节"对外交付"路线：把 car1 打成 deb 包给客户，一条
+sudo apt install
+装齐能跑的最小集合——
+car1_base_driver
+（底盘驱动）、
+controller
+（控制）、
+car1_description
+（模型）、
+car1_navigation
+（导航）。现在给这四个包造一个安装入口：
+car1_meta
+。
+先看别人怎么用
+拿到现成元包只需一条命令：
+sudo apt install ros-humble-<元包名>
+（官方 desktop、nav2 都提供这种入口）。自己造，跟下面四步走：
+1
+创建
+：
+ros2 pkg create car1_meta --build-type ament_cmake
+（选 ament_python 会去找 setup.py 直接失败）
+2
+改 package.xml
+：删掉自动生成的 build_depend/test 块，把场景里的四个包写成
+<exec_depend>
+；export 段写上
+<metapackage/>
+3
+改 CMakeLists.txt
+：只留四行，project 换成 car1_meta
+4
+编译并回读验证
+：
+colcon build
+→
+source install/setup.bash
+→
+ros2 pkg xml car1_meta | grep exec_depend
+看到四行清单即成功
+图 18-4 · 自建元包四步流程｜本图回答：从零建一个元包，每一步动什么文件、用什么命令、看什么输出？
+✅ 结论：四步即可得到可安装、可回读的元包
+⚠️ 风险：build-type 选错或混入 build_depend
+🔍 验证：下方步骤 ④ 的回读输出
+# ① 进工作空间创建（必须 ament_cmake；选 ament_python 会去找 setup.py 直接失败）
+$
+cd ros2_ws/src/xflz_eai_car1
+$
+ros2 pkg create car1_meta --build-type ament_cmake
+# ② package.xml：换成场景四个包，export 段打上元包标记
+<package format="3">
+  ...
+<exec_depend>car1_base_driver</exec_depend>
+<exec_depend>controller</exec_depend>
+<exec_depend>car1_description</exec_depend>
+<exec_depend>car1_navigation</exec_depend>
+<export>
+    <build_type>ament_cmake</build_type>
+<metapackage/>
+</export>
+</package>
+# ③ CMakeLists.txt 只留四行（project 换成 car1_meta）
+cmake_minimum_required(VERSION 3.8)
+project(car1_meta)
+find_package(ament_cmake REQUIRED)
+ament_package()
+# ④ 编译（约 0.5 秒，没代码可编，属正常）→ source → 回读验证
+$
+colcon build --packages-select car1_meta
+$
+source install/setup.bash
+$
+ros2 pkg xml car1_meta | grep exec_depend
+  <exec_depend>car1_base_driver</exec_depend>
+  <exec_depend>controller</exec_depend>
+  <exec_depend>car1_description</exec_depend>
+  <exec_depend>car1_navigation</exec_depend>
+# 四行齐 = 成功，这就是 car1_meta 的全部"内容"
+造好之后怎么用
+给别人安装
+：
+sudo apt install ros-humble-car1-meta
+一键装齐（这个 .deb 从哪来，见下方进阶）；
+自己仓库内
+：
+colcon build --packages-up-to car1_meta
+顺带把所有依赖的兄弟包一起编出来。
+进阶：打成 apt 能装的 .deb，发布出去
+承接场景
+上面四步只让
+car1_meta
+在
+你自己的工作空间
+里可用。要让客户执行
+sudo apt install ros-humble-car1-meta
+，还得把源码打成 Debian 安装包（.deb）：自建交付源用
+bloom
+本地打包（四条命令见下）；进 ROS 官方 apt 源则走 bloom-release → rosdistro → buildfarm，打包逻辑相同、只是托管平台不同。
+# ① 装打包工具（一台机器装一次即可）
+$
+sudo apt install python3-bloom build-essential
+# ② 进入元包目录：补构建依赖 → 生成 Debian 打包骨架
+$
+cd ros2_ws/src/xflz_eai_car1/car1_meta
+$
+rosdep install --from-paths . --ignore-src -y
+$
+bloom-generate rosdebian --ros-distro humble
+# ③ 真正产出 .deb（产物落在包目录的上一级）
+$
+fakeroot debian/rules binary
+# → ../ros-humble-car1-meta_0.1.0-1jammy..._amd64.deb
+# ④ 本机试装，并查看它到底会拉起哪些子包
+$
+sudo dpkg -i ../ros-humble-car1-meta_*.deb
+$
+apt show ros-humble-car1-meta | grep Depends
+  Depends: ros-humble-car1-base-driver, ros-humble-controller,
+           ros-humble-car1-description, ros-humble-car1-navigation, ...
+# 这串 Depends 就是"装我=装全家"在 apt 里的真身
+发布关键坑：壳能装 ≠ 全家桶到位
+ros-humble-car1-meta
+这个 .deb 本体几乎为空，全家桶全靠 Depends 字段拉起——所以
+四个子包也要各自用 bloom 打出 .deb
+（ros-humble-car1-base-driver 等），和元包一起放进
+同一个 apt 源
+（reprepro / aptly 自建内网源即可）。少任何一个，客户安装时直接报
+unmet dependencies
+。
+常见坑（只记两条）
+① 回读命令没输出 → 当前终端没 source，先执行
+source install/setup.bash
+。
+② 元包里混入
+build_depend
+→ 安装时不会拉起该依赖，聚合失效。
+05
+小结与自测
+是什么
+空壳购物清单
+不含代码，只用
+exec_depend
+聚合依赖——装我等于装全家桶。
+什么区别
+干活 vs 点单
+普通包有代码实现功能；元包零代码，只有一张依赖清单。
+什么时候用
+apt 发布 / 多仓库
+源码小团队用 bringup 包即可；对外交付、多仓库集成才上元包。
+怎么用
+四步创建 + 打包发布
+create → 改 package.xml → 四行 CMakeLists → 回读验证；对外交付再用 bloom 打成 .deb 放进 apt 源。
+自测（3 题 · 先自己作答，再展开核对）
+1（考场景）
+你的项目要以 apt 包发布，用户一条命令装齐 5 个驱动包——该建元包还是 bringup 包？如果用户还要求"一条 launch 拉起整机"呢？
+参考答案与得分点
+得分点：①只要安装入口 → 建纯元包 ②还要整机启动 → 元包管安装 + bringup/launch 包管启动，或直接用带 launch 的 bringup 包一步到位（ROS 2 里更常见）③能说出"装我=装全家"与"一条 launch 拉起"是两个职责。（①②各 40%，③ 20%）
+2（改标签）
+把元包 package.xml 里一行
+<exec_depend>sensor_msgs</exec_depend>
+改成
+<build_depend>sensor_msgs</build_depend>
+。
+colcon build
+照样秒过，但用户
+sudo apt install
+你的元包后运行时会怎样？
+参考答案与得分点
+得分点：①build_depend 只是构建依赖，安装时不会把 sensor_msgs 作为运行时依赖拉起 ②运行期缺包，节点起不来/报缺依赖 ③元包必须只用 exec_depend，聚合才成立。（①②各 40%，③ 20%）
+3（改创建参数）
+把创建命令换成
+ros2 pkg create home_robot_meta --build-type ament_python
+后直接
+colcon build
+，会发生什么？正确写法是什么？
+参考答案与得分点
+得分点：①ament_python 靠 setup.py 打包，colcon 找不到 setup.py，构建失败或跳过该包 ②正确写法：
+--build-type ament_cmake
+③元包没有可打包的模块，不适合 ament_python。（①②各 40%，③ 20%）
+CORE-01 · 机器人 ROS2 应用与开发 · EXP-18 元功能包
+2 学时 · 验证性 · 基于 ros_practice 实验讲义改编

@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-03 · fall_config.yaml 配置详解 — 老人跌倒监护综合项目</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+:root{--theme:#059669;--theme-deep:#047857;--theme-bg:#d1fae5;--theme-bd:#a7f3d0}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit" title="返回课程首页">🧠 具身智能课程 · <i>教程首页</i></a>
+  <div class="crumb"><a href="../../../index.html#case">综合项目</a> / <a href="../index.html">老人跌倒监护</a> / EXP-03</div>
+</div>
+
+<div class="wrap">
+
+<aside class="side">
+  <h4>本页目录</h4>
+  <a href="#s1" class="now">01 问题引入：改一个阈值为什么要惊动全系统</a>
+  <a href="#s2">02 原理通俗讲解：配置是"全屋总闸"</a>
+  <a href="#s3">03 关联知识点：十四段配置与模块对号入座</a>
+  <a href="#s4">04 实验目标</a>
+  <a href="#s5">05 实验环境与准备</a>
+  <a href="#s6">06 动画讲解：十四段配置与三层覆盖优先级</a>
+  <a href="#s7">07 互动讲解：配置项开关与阈值对比台</a>
+  <a href="#s8">08 实操步骤：env_check 自检与 CLI 覆盖</a>
+  <a href="#s9">09 重点与易错点</a>
+  <a href="#s10">10 总结与思考</a>
+  <h4>CH1 · 需求与配置</h4>
+  <a href="../exp-01-requirements/index.html">EXP-01 需求分析</a>
+  <a href="../exp-02-architecture/index.html">EXP-02 分层架构</a>
+  <a href="../exp-03-config/index.html">EXP-03 配置详解</a>
+  <h4>CH2 · 感知与交互</h4>
+  <a href="../exp-04-voice/index.html">EXP-04 语音交互</a>
+  <a href="../exp-05-pose-detection/index.html">EXP-05 检测与姿态</a>
+  <a href="../exp-06-fall-judgment/index.html">EXP-06 跌倒状态机</a>
+  <h4>CH3 · 告警与验证</h4>
+  <a href="../exp-07-alert-evidence/index.html">EXP-07 告警证据链</a>
+  <a href="../exp-08-llm-vlm/index.html">EXP-08 LLM·VLM</a>
+  <a href="../exp-09-full-verification/index.html">EXP-09 全功能验证</a>
+</aside>
+
+<main class="content">
+
+<div class="exp-head">
+  <span class="code">EXP-03 · 第 1 章 · 设计性 · 4 学时</span>
+  <h1>fall_config.yaml 配置详解：系统唯一的"总闸"</h1>
+  <p class="desc">整个 elderly_companion 只认一份 YAML：<b>config/fall_config.yaml</b>，共十四段，管着从模型路径、检测阈值、状态机时间参数到串口设备、LLM 服务端口的一切。本实验吃透 <b>config_schema 必填/可缺省双轨</b>、<b>CLI &gt; yaml &gt; 代码默认</b>三层覆盖优先级，学会用 <b>env_check</b> 一键体检七个依赖库、模型文件与串口设备，做到"改参数不动代码、动代码必过自检"。</p>
+  <div class="meta">
+    <span class="tag hl">难度 ⭐⭐ · 4 学时</span>
+    <span class="tag">十四段 YAML</span><span class="tag">config_schema</span>
+    <span class="tag">覆盖优先级</span><span class="tag">env_check</span>
+  </div>
+</div>
+
+<!-- 01 -->
+<section class="blk" id="s1">
+  <h2><span class="no">01</span>问题引入：改一个阈值为什么要惊动全系统</h2>
+  <p>课堂上最常见的事故：同学把"躯干角 50°"直接写进状态机源码里测试 —— 结果代码里 50、YAML 里 50、注释里 45，三处不一致，谁也说不清线上到底用的哪个。工程化的答案是：<b>所有可调量只住在配置文件里</b>。</p>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>阈值散落源码 → 改一次要全文搜索，漏一处就是隐性 bug</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>集中到 fall_config.yaml → 调参 = 改一行，重启即生效，还可 git diff 审查</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>再加 config_schema 校验 → 键名拼错、必填缺失在启动时立刻报错，不带病运行</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span>最后由 env_check 把关 → 依赖库、模型文件、串口设备逐一探测，EXIT 0 才准开工</div>
+  </div>
+  <div class="tip amber"><span class="lab">💡 一个类比</span>配置文件像家里的<b>配电总闸 + 分路标签</b>：哪里该通电、多少安培（阈值）都写在面板上。总闸不清晰，谁都不敢动线路。</div>
+</section>
+
+<!-- 02 -->
+<section class="blk" id="s2">
+  <h2><span class="no">02</span>原理通俗讲解：参数的三层来源与"双轨制"</h2>
+  <p>同一个参数可能来自三个地方，<b>优先级从高到低</b>：</p>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">第 1 优先</div><div class="kt">命令行 CLI 参数</div><p>如 <code>--score-thr 0.4 --log-level DEBUG</code>：一次性实验覆盖，不落盘、不污染文件，跑完即失效。适合"今天临时试一个值"。</p></div>
+    <div class="kcard"><div class="kd">第 2 优先</div><div class="kt">fall_config.yaml</div><p>持久化的正式值：团队共享、随版本走。适合"这个项目的正式参数"。CLI 没给的键，全部以这里为准。</p></div>
+    <div class="kcard"><div class="kd">第 3 优先</div><div class="kt">代码内默认值</div><p>config_schema 的兜底：yaml 没写、CLI 也没给的<b>可缺省键</b>，自动填默认值，保证程序永远拿得到值。</p></div>
+  </div>
+  <p>而 config_schema 本身是<b>双轨制</b>：</p>
+  <table>
+    <thead><tr><th>轨道</th><th>schema 写法</th><th>缺失时的行为</th><th>例子</th></tr></thead>
+    <tbody>
+      <tr><td><b>纯 type（必填）</b></td><td><code>type: str</code>（无 default）</td><td>yaml 里没写 → 启动直接 <code>config error: missing key</code></td><td>detect.model_path 等路径类键</td></tr>
+      <tr><td><b>(type, default)（可缺省）</b></td><td>带默认值</td><td>yaml 没写 → 自动填默认，程序照常跑</td><td>detect.score_thr、state.angle_thr</td></tr>
+    </tbody>
+  </table>
+  <div class="tip tealb"><span class="lab">🔔 隐患坑：schema 有默认不等于 YAML 是活键</span>典型如 <b>session.wake_words</b>：schema 给了默认值（可缺省轨道），于是 yaml 里没写时也会"正常启动"—— 但你以为在改唤醒词、实际生效的是 schema 默认。<b>要改的键必须显式写进 yaml</b>，别依赖兜底。</div>
+</section>
+
+<!-- 03 -->
+<section class="blk" id="s3">
+  <h2><span class="no">03</span>关联知识点：十四段配置与模块对号入座</h2>
+  <p>十四段各管一个"辖区"，与 EXP-02 六层一一咬合：</p>
+  <table>
+    <thead><tr><th>段名</th><th>管什么</th><th>消费模块</th></tr></thead>
+    <tbody>
+      <tr><td>paths</td><td>模型/数据/输出目录</td><td>全部加载方</td></tr>
+      <tr><td>model</td><td>模型选型，含 <code>vlm.enabled</code>（config L16，默认 false，约 1.5G 懒加载）与 pose_type（schema L11 默认 blazepose，yaml L9 为 rtmpose）</td><td>检测/姿态/VLM</td></tr>
+      <tr><td>detect</td><td>score_thr（L27 默认 0.25）、<code>crop_margin: 1.5</code>（L33，改 1.0 躺姿容易裁丢）</td><td>YOLOv8 检测</td></tr>
+      <tr><td>source</td><td>video / image / camera 模式与深度相机话题 /ascamera_hp60c</td><td>fall_app --mode</td></tr>
+      <tr><td>session</td><td>唤醒词、会话合并（wake_words 注意第 02 节隐患坑）</td><td>voice_loop</td></tr>
+      <tr><td>speech</td><td>六麦硬件唤醒开关（L39 true）、串口 /dev/ttyACM0（L41）、ASR/TTS 参数</td><td>KWS / ASR / TTS</td></tr>
+      <tr><td>state</td><td>angle_thr 50（L57）、aspect_thr 0.5、falling_window 1.5、lying_time 3.0、ask_timeout 12（L62）、cooldown 60</td><td>六状态机</td></tr>
+      <tr><td>interaction</td><td>confirm/cancel 词表、播报节奏</td><td>询问流</td></tr>
+      <tr><td>alert</td><td>告警串口 <b>/dev/ttyUSB0（L115）</b>、帧参数（USB1 是毫米波雷达，别插错）</td><td>alert 硬件驱动</td></tr>
+      <tr><td>evidence</td><td>FrameRing pre/post 秒数、三件套目录、events.jsonl 上限</td><td>证据落盘</td></tr>
+      <tr><td>monitor</td><td>IoU 关联（iou_thr 0.3、max_age 3.0s）等监控参数</td><td>monitor.py</td></tr>
+      <tr><td>arm_reaction</td><td>下位机联动动作（LED/蜂鸣/OLED）</td><td>告警执行</td></tr>
+      <tr><td>server · display · save · log</td><td>LLM 服务端口 <b>8080（L170/L173）</b>、MJPEG 预览 8088、保存与日志级别</td><td>Flask / 预览 / 日志</td></tr>
+      <tr><td>llm</td><td>Qwen3.5 rkllm 模型路径、采样参数、max_history 等</td><td>RKLLM</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 04 -->
+<section class="blk" id="s4">
+  <h2><span class="no">04</span>实验目标</h2>
+  <ul class="check">
+    <li>能按用途默写<span class="ok">十四段配置</span>的分段清单，并说出 state / detect / alert / llm 四段的关键键与默认值</li>
+    <li>能解释<span class="ok">CLI &gt; yaml &gt; 代码默认</span>三层优先级，并现场演示一次 CLI 覆盖</li>
+    <li>能区分 config_schema 的<span class="ok">必填（纯 type）与可缺省（带 default）</span>双轨行为</li>
+    <li>能独立运行 env_check，读懂 <span class="ok">[env] OK / MISSING / 自检通过</span>三种输出与退出码含义</li>
+    <li>牢记三个端口/设备易混点：<span class="ok">TTYACM0（六麦）vs TTYUSB0（告警）vs TTYUSB1（雷达）；8080（LLM）vs 8088（MJPEG）</span></li>
+  </ul>
+</section>
+
+<!-- 05 -->
+<section class="blk" id="s5">
+  <h2><span class="no">05</span>实验环境与准备</h2>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>硬件到位：工控主机 + 摄像头 + XFM 六麦，串口已枚举（<code>ls /dev/ttyUSB* /dev/ttyACM*</code>）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>进入工程：<code>~/ros2_ws/src/xflz_eai_car1/app/elderly_companion</code>，确认 config/ 就位</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>预读两份文件：<b>config/fall_config.yaml</b>（正式值）与 <b>common/config_schema</b>（双轨规则）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span>工具准备：编辑器 + 终端两个窗口（一个改 yaml、一个跑自检）</div>
+  </div>
+</section>
+
+<!-- 06 -->
+<section class="blk" id="s6">
+  <h2><span class="no">06</span>动画讲解：十四段配置与三层覆盖优先级</h2>
+  <p class="lead">左边十四段配置轮番点亮，右侧演示一个参数从 CLI 覆盖不到时逐层回退到 yaml、再到 schema 默认的下行动画：</p>
+  <div class="anim-box">
+    <svg viewBox="0 0 720 330" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="十四段配置与三层覆盖优先级动画">
+      <rect x="8" y="8" width="400" height="314" rx="12" fill="#111827" stroke="#334155"/>
+      <text x="208" y="32" text-anchor="middle" font-size="13.5" font-weight="700" fill="#6ee7b7">fall_config.yaml · 十四段</text>
+      <g font-size="11" font-family="sans-serif" text-anchor="middle" fill="#cbd5e1">
+        <g fill="#1e293b" stroke="#059669">
+          <rect x="26" y="46" width="84" height="28" rx="7"><animate attributeName="stroke" values="#059669;#6ee7b7;#059669" dur="4.9s" begin="0s" repeatCount="indefinite"/></rect>
+          <rect x="118" y="46" width="84" height="28" rx="7"><animate attributeName="stroke" values="#059669;#6ee7b7;#059669" dur="4.9s" begin="0.35s" repeatCount="indefinite"/></rect>
+          <rect x="210" y="46" width="84" height="28" rx="7"><animate attributeName="stroke" values="#059669;#6ee7b7;#059669" dur="4.9s" begin="0.7s" repeatCount="indefinite"/></rect>
+          <rect x="302" y="46" width="84" height="28" rx="7"><animate attributeName="stroke" values="#059669;#6ee7b7;#059669" dur="4.9s" begin="1.05s" repeatCount="indefinite"/></rect>
+          <rect x="26" y="82" width="84" height="28" rx="7"><animate attributeName="stroke" values="#059669;#6ee7b7;#059669" dur="4.9s" begin="1.4s" repeatCount="indefinite"/></rect>
+          <rect x="118" y="82" width="84" height="28" rx="7"><animate attributeName="stroke" values="#059669;#6ee7b7;#059669" dur="4.9s" begin="1.75s" repeatCount="indefinite"/></rect>
+          <rect x="210" y="82" width="84" height="28" rx="7"><animate attributeName="stroke" values="#059669;#6ee7b7;#059669" dur="4.9s" begin="2.1s" repeatCount="indefinite"/></rect>
+          <rect x="302" y="82" width="84" height="28" rx="7"><animate attributeName="stroke" values="#059669;#6ee7b7;#059669" dur="4.9s" begin="2.45s" repeatCount="indefinite"/></rect>
+          <rect x="26" y="118" width="84" height="28" rx="7"><animate attributeName="stroke" values="#059669;#6ee7b7;#059669" dur="4.9s" begin="2.8s" repeatCount="indefinite"/></rect>
+          <rect x="118" y="118" width="84" height="28" rx="7"><animate attributeName="stroke" values="#059669;#6ee7b7;#059669" dur="4.9s" begin="3.15s" repeatCount="indefinite"/></rect>
+          <rect x="210" y="118" width="84" height="28" rx="7"><animate attributeName="stroke" values="#059669;#6ee7b7;#059669" dur="4.9s" begin="3.5s" repeatCount="indefinite"/></rect>
+          <rect x="302" y="118" width="84" height="28" rx="7"><animate attributeName="stroke" values="#059669;#6ee7b7;#059669" dur="4.9s" begin="3.85s" repeatCount="indefinite"/></rect>
+          <rect x="72" y="154" width="84" height="28" rx="7"><animate attributeName="stroke" values="#059669;#6ee7b7;#059669" dur="4.9s" begin="4.2s" repeatCount="indefinite"/></rect>
+          <rect x="164" y="154" width="84" height="28" rx="7"><animate attributeName="stroke" values="#059669;#6ee7b7;#059669" dur="4.9s" begin="4.55s" repeatCount="indefinite"/></rect>
+        </g>
+        <g font-size="10.5">
+          <text x="68" y="65">paths</text><text x="160" y="65">model</text><text x="252" y="65">detect</text><text x="344" y="65">source</text>
+          <text x="68" y="101">session</text><text x="160" y="101">speech</text><text x="252" y="101">state</text><text x="344" y="101">interaction</text>
+          <text x="68" y="137">alert</text><text x="160" y="137">evidence</text><text x="252" y="137">monitor</text><text x="344" y="137">arm_reaction</text>
+          <text x="114" y="173">server·display</text><text x="206" y="173">llm 等</text>
+        </g>
+      </g>
+      <line x1="26" y1="198" x2="386" y2="198" stroke="#334155"/>
+      <text x="208" y="222" text-anchor="middle" font-size="11.5" fill="#94a3b8">config_schema · 双轨校验</text>
+      <g font-size="11" font-family="sans-serif" text-anchor="middle">
+        <rect x="46" y="234" width="156" height="64" rx="9" fill="#1e293b" stroke="#f87171" stroke-width="1.6"/>
+        <text x="124" y="256" fill="#fca5a5" font-weight="700">纯 type · 必填</text>
+        <text x="124" y="274" fill="#94a3b8" font-size="10.5">缺 → config error: missing key</text>
+        <text x="124" y="290" fill="#64748b" font-size="10">例：detect.model_path</text>
+        <rect x="214" y="234" width="156" height="64" rx="9" fill="#1e293b" stroke="#4ade80" stroke-width="1.6"/>
+        <text x="292" y="256" fill="#86efac" font-weight="700">type+default · 可缺省</text>
+        <text x="292" y="274" fill="#94a3b8" font-size="10.5">缺 → 自动填默认值</text>
+        <text x="292" y="290" fill="#64748b" font-size="10">例：state.angle_thr = 50.0</text>
+      </g>
+
+      <rect x="424" y="8" width="288" height="314" rx="12" fill="#111827" stroke="#334155"/>
+      <text x="568" y="32" text-anchor="middle" font-size="13.5" font-weight="700" fill="#93c5fd">覆盖优先级 · CLI &gt; yaml &gt; 默认</text>
+      <g font-size="11" font-family="sans-serif" text-anchor="middle">
+        <rect x="464" y="52" width="208" height="48" rx="9" fill="#1e293b" stroke="#f59e0b" stroke-width="2"/>
+        <text x="568" y="72" fill="#fde68a" font-weight="700">① 命令行 CLI</text>
+        <text x="568" y="90" fill="#94a3b8" font-size="10.5">--score-thr 0.4（临时生效，不落盘）</text>
+        <line x1="568" y1="100" x2="568" y2="130" stroke="#64748b" stroke-width="2" stroke-dasharray="6 5"><animate attributeName="stroke-dashoffset" values="0;-22" dur="1.2s" repeatCount="indefinite"/></line>
+        <text x="568" y="122" fill="#64748b" font-size="10">给了 → 用它；没给 ↓</text>
+        <rect x="464" y="130" width="208" height="48" rx="9" fill="#1e293b" stroke="#059669" stroke-width="2"/>
+        <text x="568" y="150" fill="#6ee7b7" font-weight="700">② fall_config.yaml</text>
+        <text x="568" y="168" fill="#94a3b8" font-size="10.5">score_thr: 0.25（正式值，随版本走）</text>
+        <line x1="568" y1="178" x2="568" y2="208" stroke="#64748b" stroke-width="2" stroke-dasharray="6 5"><animate attributeName="stroke-dashoffset" values="0;-22" dur="1.2s" begin=".6s" repeatCount="indefinite"/></line>
+        <text x="568" y="200" fill="#64748b" font-size="10">写了 → 用它；没写 ↓</text>
+        <rect x="464" y="208" width="208" height="48" rx="9" fill="#1e293b" stroke="#7c3aed" stroke-width="2"/>
+        <text x="568" y="228" fill="#c4b5fd" font-weight="700">③ config_schema 默认</text>
+        <text x="568" y="246" fill="#94a3b8" font-size="10.5">可缺省键兜底（必填键则报错）</text>
+        <g opacity="0">
+          <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.35;.8;1" dur="5s" repeatCount="indefinite"/>
+          <rect x="464" y="266" width="208" height="34" rx="8" fill="#052e2b" stroke="#4ade80"/>
+          <text x="568" y="287" fill="#86efac" font-size="11">env_check 体检通过 → EXIT 0 开工</text>
+        </g>
+      </g>
+    </svg>
+  </div>
+  <div class="anim-cap">动画 3-1｜左：十四段按序点亮、下方双轨校验分流；右：一个参数层层回退的取值路线，最终由 env_check 放行</div>
+</section>
+
+<!-- 07 -->
+<section class="blk" id="s7">
+  <h2><span class="no">07</span>互动讲解：配置项开关与阈值对比台</h2>
+  <p class="lead">切换开关与阈值预设，观察"谁生效、行为怎么变"：</p>
+  <div class="ix-panel">
+    <div class="ix-title">配置对比台 · Config Bench</div>
+    <div class="ctl-row">
+      <button class="btn" onclick="cfgDefault()">📄 只用 yaml 默认</button>
+      <button class="btn ghost" onclick="cfgCli()">⚡ CLI --score-thr 0.4</button>
+      <button class="btn ghost" onclick="cfgVlm()">👁 vlm.enabled: true</button>
+      <button class="btn ghost" onclick="cfgMissing()">❌ 必填键缺失</button>
+      <button class="btn ghost" onclick="cfgReset()">↺ 复位</button>
+    </div>
+    <div class="io" id="cfgIo"><span class="dim">// 四种典型配置场景，观察参数来源与系统行为的差异</span>
+<span class="ok">当前：yaml 默认 → detect.score_thr=0.25，vlm.enabled=false，必填键齐全</span>
+<span class="ok">env_check：[env] 自检通过（EXIT 0）</span></div>
+  </div>
+  <div class="tip violet"><span class="lab">🙋 调参伦理</span>把 score_thr 调高"少误报"，代价是远处/遮挡的老人被漏检；调低则误报增长。调参不是刷指标，是<b>在"漏救"与"骚扰"之间找平衡</b> —— 每次改动都记录理由。</div>
+</section>
+
+<!-- 08 -->
+<section class="blk" id="s8">
+  <h2><span class="no">08</span>实操步骤：env_check 自检与 CLI 覆盖实验</h2>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>进入工程目录，先跑官方自检 —— 七库、模型文件、/dev/ttyUSB0 逐一探测</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>故意制造 schema 键名拼错（detect.model_path → detect.model_pth），观察启动报错</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>改回后做一次 CLI 覆盖：--score-thr 0.4 --log-level DEBUG，确认临时值生效且 yaml 未被改动</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span>逐条核对 state 段六个时间/角度参数与 EXP-01 三条时序的对应关系</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">5</span>口述三个设备/端口分工（六麦 ACM0、告警 USB0、雷达 USB1；LLM 8080、MJPEG 8088）并复验</div>
+  </div>
+  <pre><span class="c"># ① 进入工程并运行环境自检（只读探测，不会自动安装任何东西）</span>
+<span class="g">cd</span> ~/ros2_ws/src/xflz_eai_car1/app/elderly_companion
+<span class="g">python3</span> common/env_check.py --config config/fall_config.yaml
+<span class="c"># 预期逐条输出：[env] OK numpy 1.24.3 ... 直到 [env] 自检通过（EXIT 0）</span>
+<span class="c"># 探测 7 库：numpy / cv2 / scipy / rknnlite / sherpa_onnx / serial / yaml</span>
+<span class="c"># 同时探测模型文件与串口设备；缺项输出 [env] MISSING /dev/ttyUSB0（EXIT 2）</span>
+
+<span class="c"># ② schema 报错演示：把 detect.model_path 拼成 detect.model_pth 后启动</span>
+<span class="g">python3</span> apps/fall_video_demo.py --video testdata/fall_slow_x264.mp4 --text
+<span class="c"># 预期：config error: missing key  → 立刻改回（必填轨道，绝不带病启动）</span>
+
+<span class="c"># ③ CLI 覆盖实验：临时值生效，yaml 保持原样</span>
+<span class="g">python3</span> apps/fall_video_demo.py --video testdata/fall_slow_x264.mp4 --text --score-thr 0.4 --log-level DEBUG
+<span class="c"># 优先级：--score-thr 0.4 &gt; yaml 的 score_thr: 0.25 &gt; schema 默认</span></pre>
+  <div class="tip tealb"><span class="lab">🔍 端口备忘</span><b>/dev/ttyACM0</b> = XFM 六麦硬件唤醒（speech 段）；<b>/dev/ttyUSB0</b> = 告警串口（alert 段 L115）；<b>/dev/ttyUSB1</b> = 毫米波雷达，告警不走它。硬件插拔后枚举号可能漂移，报错先 <code>ls /dev/tty*</code> 核对。</div>
+</section>
+
+<!-- 09 -->
+<section class="blk" id="s9">
+  <h2><span class="no">09</span>重点与易错点</h2>
+  <ul class="check">
+    <li>三层覆盖优先级：<span class="ok">CLI &gt; yaml &gt; 代码默认</span>，临时试值用 CLI、正式值进 yaml</li>
+    <li>双轨制：<span class="ok">纯 type 必填缺了报 config error；带 default 可缺省自动兜底</span></li>
+    <li>env_check 是<span class="ok">只读自检</span>：不自动装依赖，缺啥报啥，EXIT 0 才开工</li>
+    <li>重点键位：vlm.enabled 默认 <span class="ok">false</span>（L16）、angle_thr <span class="ok">50</span>（L57）、ask_timeout <span class="ok">12</span>（L62）、alert.port <span class="ok">USB0</span>（L115）、llm 端口 <span class="ok">8080</span>（L170/173）</li>
+  </ul>
+  <table>
+    <thead><tr><th>⚠️ 常见坑</th><th>现象 → 解法</th></tr></thead>
+    <tbody>
+      <tr><td>键名拼错</td><td>启动 <code>config error: missing key</code> → 核对 schema：改 yaml 键名而不是改 schema</td></tr>
+      <tr><td>误把"可缺省"当"没生效"</td><td>改了概念却没改 yaml（session.wake_words 典型）→ 要改的键显式写进 yaml</td></tr>
+      <tr><td>CLI 参数顺序/拼写错</td><td>--sore-thr 静默或报错 → 每次跑完看日志里的实际生效值</td></tr>
+      <tr><td>串口张冠李戴</td><td>告警没反应，插的是 USB1（雷达）→ alert.port 对准 USB0</td></tr>
+      <tr><td>端口混用</td><td>curl 8088 找 LLM / MJPEG 8088 找 llm → LLM 在 <b>8080</b>（/v1/models），预览流在 8088</td></tr>
+      <tr><td>体检当安装器</td><td>MISSING 后等它自动修 → env_check 只读，依赖需按讲义自行安装</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 10 -->
+<section class="blk" id="s10">
+  <h2><span class="no">10</span>总结与思考</h2>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">✅ 完成成果</div><div class="kt">十四段配置地图</div><p>分段清单 + 关键键值表（state/detect/alert/llm 四段随口能报默认值）。</p></div>
+    <div class="kcard"><div class="kd">🧠 原理收获</div><div class="kt">三层优先级 + 双轨校验</div><p>参数取值路线与必填/可缺省的分裂行为，理解"schema 默认不等于 yaml 是活键"。</p></div>
+    <div class="kcard"><div class="kd">🛠 技能收获</div><div class="kt">env_check 工作流</div><p>自检 → EXIT 0 → 开工；看懂 OK / MISSING / 退出码三类信号。</p></div>
+    <div class="kcard"><div class="kd">❓ 排障思路</div><div class="kt">先问参数从哪来</div><p>行为诡异时先打印/核对实际生效值：CLI？yaml？还是 schema 兜底？</p></div>
+  </div>
+  <div class="tip violet"><span class="lab">📝 思考题 1</span>实验课上你临时要试 score_thr=0.4，正式项目值是 0.25。用哪种方式覆盖最稳妥？如果下一位同学接手，如何保证他不会"误以为"项目值已改成 0.4？写出你的操作与沟通清单。</div>
+  <div class="tip violet"><span class="lab">📝 思考题 2</span>config_schema 给 session.wake_words 提供了默认值，但讲义仍强调"要改就必须显式写进 yaml"。请推演一次事故：同学 A 只在心里把唤醒词改成"小飞小飞"，现场系统却毫无反应 —— 用"双轨制 + 三层优先级"解释这个现象的完整链条。</div>
+</section>
+
+<nav class="expnav">
+  <a href="../exp-02-architecture/index.html"><span class="lb">← 上一个实验</span>EXP-02 分层系统架构</a>
+  <a class="next" href="../exp-04-voice/index.html"><span class="lb">下一个实验 →</span>EXP-04 语音交互子系统</a>
+</nav>
+
+<footer>
+  <span>CASE-03 · 老人跌倒监护 · EXP-03 fall_config.yaml 配置详解</span>
+  <span>4 学时 · 设计性 · 基于 elderly_companion 实验讲义改编</span>
+</footer>
+
+</main>
+</div>
+
+<script>
+// 配置对比台
+var cBase='<span class="dim">// 四种典型配置场景，观察参数来源与系统行为的差异</span>\n'+
+'<span class="ok">当前：yaml 默认 → detect.score_thr=0.25，vlm.enabled=false，必填键齐全</span>\n'+
+'<span class="ok">env_check：[env] 自检通过（EXIT 0）</span>';
+function setC(t){document.getElementById('cfgIo').innerHTML=t;}
+function cfgDefault(){
+  setC('<span class="dim">// 场景一：只用 yaml 默认值</span>\n'+
+'<span class="ok">取值路线：CLI 未给 → 读 yaml → detect.score_thr = 0.25</span>\n'+
+'<span class="ok">model.vlm.enabled = false（L16）→ VLM 不加载，省约 1.5G 内存</span>\n'+
+'<span class="ok">行为：较远/较小的人框可能低于 0.25 被滤掉 —— 稳妥的默认平衡点</span>');
+}
+function cfgCli(){
+  setC('<span class="dim">// 场景二：命令行临时覆盖</span>\n'+
+'<span class="warn">运行：python3 ... --score-thr 0.4 --log-level DEBUG</span>\n'+
+'<span class="ok">生效值：0.4（CLI 第一优先级），yaml 中 0.25 原样保留未被改写</span>\n'+
+'<span class="warn">影响：门槛变高 → 误报减少，但遮挡/远处的人漏检风险上升</span>\n'+
+'<span class="dim">退出进程即失效 —— 正式改动仍需回写 yaml 并记录理由</span>');
+}
+function cfgVlm(){
+  setC('<span class="dim">// 场景三：打开 VLM 复核开关</span>\n'+
+'<span class="warn">yaml：model.vlm.enabled: true（默认 false，config L16）</span>\n'+
+'<span class="warn">行为：跌倒截图送 VLM 三分类 fall / not_fall / uncertain 辅助复核</span>\n'+
+'<span class="warn">代价：懒加载首次 10–60s + 约 1.5G 内存增量 → 总占用可能破 3.8G（EXP-09 重点盯）</span>\n'+
+'<span class="dim">内存紧张时宁可关掉 VLM，也不能拖垮主链路（EXP-08 细讲）</span>');
+}
+function cfgMissing(){
+  setC('<span class="dim">// 场景四：必填键缺失（拼错键名）</span>\n'+
+'<span class="bad">yaml：detect.model_pth: ...（正确键名是 model_path）</span>\n'+
+'<span class="bad">启动即失败：config error: missing key —— 纯 type 必填轨道，绝不兜底</span>\n'+
+'<span class="ok">对比：state.angle_thr 属可缺省轨道，删掉也只是回落 50.0 默认值，不会报错</span>\n'+
+'<span class="dim">教训：报错指哪改哪 —— 改 yaml 键名，不要去改 schema</span>');
+}
+function cfgReset(){setC(cBase);}
+</script>
+<script src="../shared/tutorial.js" defer></script>
+</body>
+</html>

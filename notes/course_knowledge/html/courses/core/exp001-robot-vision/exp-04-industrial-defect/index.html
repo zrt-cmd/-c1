@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-04 工业表面缺陷检测 — 机器人视觉应用与开发</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<link rel="stylesheet" href="../shared/beginner.css">
+<style>
+:root{--theme:#0d9488;--theme-deep:#0f766e;--theme-bg:#ccfbf1;--theme-bd:#99f6e4}
+/* 一句话原理条 */
+.idea-bar{display:flex;gap:14px;align-items:flex-start;background:linear-gradient(135deg,#f0fdfa,#eff6ff);border:1.5px solid #99f6e4;border-radius:14px;padding:16px 20px;margin:4px 0 20px}
+.idea-bar .ic{font-size:22px;flex:none;line-height:1.4}
+.idea-bar .tx{flex:1;min-width:0}
+.idea-bar .tx b{display:block;font-size:.74rem;letter-spacing:.18em;color:#0d9488;font-weight:700;margin-bottom:5px}
+.idea-bar .tx p{margin:0;font-size:15.5px;color:#134e4a;line-height:1.8}
+.idea-bar .tx p b{display:inline;font-size:inherit;letter-spacing:0;color:#0f766e;background:linear-gradient(180deg,transparent 62%,#ccfbf1 62%);padding:0 2px}
+/* 观察任务 */
+.obs{background:#eff6ff;border:1px solid #bfdbfe;border-left:4px solid #2563eb;border-radius:10px;padding:14px 18px;margin:14px 0;font-size:14.5px;line-height:1.85;color:#1e3a8a}
+.obs b{color:#1d4ed8}
+.obs ol{margin:6px 0 0;padding-left:22px}
+.obs li{margin-bottom:4px}
+/* 预期输出 */
+.expect{background:#0b1220;border:1px solid #1e293b;border-left:4px solid #4ade80;border-radius:12px;padding:14px 18px;margin:12px 0;font-family:var(--font-mono);font-size:13px;line-height:1.85;color:#cbd5e1;white-space:pre-wrap;overflow-x:auto}
+.expect::before{content:'跑完大概是这个样子';display:block;font-size:11px;letter-spacing:.14em;color:#4ade80;font-weight:700;margin-bottom:8px}
+/* 步骤块 */
+.steps{counter-reset:st;list-style:none;padding:0;margin:16px 0}
+.steps>li{counter-increment:st;position:relative;background:#fff;border:1.5px solid var(--border);border-radius:14px;padding:16px 18px 16px 58px;margin-bottom:12px}
+.steps>li::before{content:counter(st);position:absolute;left:15px;top:15px;width:29px;height:29px;border-radius:50%;background:var(--theme);color:#fff;font-family:var(--font-mono);font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center}
+.steps>li>.st{font-size:15.5px;font-weight:700;color:var(--head);margin-bottom:6px;display:block}
+.steps>li>.st em{font-style:normal;font-size:12px;font-weight:600;color:#0f766e;background:#ccfbf1;border-radius:6px;padding:1px 7px;margin-left:8px}
+/* 折叠进阶 */
+details.deep{border:1px solid var(--border);border-radius:12px;background:#f8fafc;margin:14px 0;overflow:hidden}
+details.deep>summary{cursor:pointer;list-style:none;padding:12px 16px;font-size:14px;font-weight:700;color:#475569;display:flex;align-items:center;gap:8px}
+details.deep>summary::-webkit-details-marker{display:none}
+details.deep>summary::before{content:'▸';color:var(--theme);transition:transform .2s}
+details.deep[open]>summary::before{transform:rotate(90deg)}
+details.deep[open]>summary{border-bottom:1px solid var(--border);color:var(--head)}
+details.deep>.deep-body{padding:14px 18px;font-size:14px;line-height:1.8;color:#475569}
+/* 小测 */
+.quiz2{background:#fff;border:1.5px solid var(--border);border-radius:14px;padding:18px 20px;margin:14px 0}
+.quiz2 .qq{font-size:14.5px;font-weight:700;color:var(--head);margin-bottom:12px;line-height:1.7}
+.quiz2 .qq .qn{display:inline-block;font-family:var(--font-mono);font-size:11.5px;font-weight:700;background:var(--theme);color:#fff;border-radius:6px;padding:1px 8px;margin-right:8px}
+.quiz2 .opt{display:block;background:#f8fafc;border:1.5px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:8px;cursor:pointer;font-size:14px;color:#334155;transition:.18s}
+.quiz2 .opt:hover{border-color:var(--theme);background:#f0fdfa}
+.quiz2 .opt.ok{border-color:#34d399;background:#f0fdf4;color:#047857;font-weight:600}
+.quiz2 .opt.ok::after{content:'  ✓ 对了';font-size:12.5px;color:#059669}
+.quiz2 .opt.no{border-color:#fca5a5;background:#fef2f2;color:#991b1b}
+.quiz2 .opt.no::after{content:'  ✗ 再想想';font-size:12.5px;color:#dc2626}
+.quiz2 .fb{font-size:13.5px;line-height:1.8;color:#475569;padding:12px 14px;border-radius:10px;background:#f1f5f9;margin-top:6px;display:none}
+.quiz2 .fb.on{display:block}
+.quiz2 .fb b{color:#0f766e}
+/* 互动台 */
+.lab2{background:#0f172a;border-radius:14px;padding:18px 20px;margin:16px 0;color:#e2e8f0}
+.lab2 .lh{font-size:13.5px;font-weight:700;color:#fbbf24;margin-bottom:14px}
+.lab2 .lr{display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+.lab2 .lr label{font-size:13px;color:#cbd5e1;min-width:120px}
+.lab2 .lr input[type=range]{flex:1;min-width:140px;accent-color:#14b8a6;height:24px}
+.lab2 .lr output{font-family:var(--font-mono);font-size:13px;color:#5eead4;min-width:56px;text-align:right}
+.lab2 .vis{background:#020617;border:1px solid #1e293b;border-radius:10px;padding:12px;margin-top:10px}
+.lab2 .vis svg{display:block;width:100%;height:auto}
+.lab2 .say{font-size:13px;line-height:1.75;color:#94a3b8;margin-top:10px;min-height:48px}
+.lab2 .say b{color:#5eead4}
+/* 坑表 */
+table.pit2{width:100%;border-collapse:collapse;font-size:13.5px;margin:12px 0}
+table.pit2 th{background:#fef2f2;color:#991b1b;text-align:left;padding:9px 12px;border:1px solid #fecaca;font-weight:600;font-size:12.5px}
+table.pit2 td{padding:9px 12px;border:1px solid var(--border);vertical-align:top;line-height:1.7}
+table.pit2 td:first-child{color:#991b1b;font-weight:600;width:30%}
+table.pit2 td:last-child{color:#047857;width:32%}
+/* 收集卡 */
+.take{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin:14px 0}
+.take div{background:#fff;border:1px solid var(--border);border-left:4px solid var(--theme);border-radius:10px;padding:12px 14px}
+.take div b{display:block;font-size:14px;color:#0f172a;margin-bottom:4px}
+.take div span{font-size:13px;color:#64748b;line-height:1.7}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit" title="返回课程首页">🎓 具身智能课程 · <i>教程首页</i></a>
+  <div class="crumb"><a href="../../../index.html#core">核心课程</a> / <a href="../index.html">视觉应用与开发</a> / EXP-04</div>
+</div>
+
+<div class="wrap">
+<aside class="side">
+  <h4>本页目录</h4>
+  <a href="#s1" class="now">01 问题引入：钢板上的六种缺陷</a>
+  <a href="#s2">02 检测器是怎么"看图圈框"的</a>
+  <a href="#s3">03 模型吃什么、吐什么</a>
+  <a href="#s4">04 认识四个词</a>
+  <a href="#s5">05 实操：三条命令跑起来</a>
+  <a href="#s6">06 你该看到的画面</a>
+  <a href="#s7">07 调一调 score_thr</a>
+  <a href="#s8">08 重点与易错点</a>
+  <a href="#s9">09 进阶与深读</a>
+  <a href="#s10">10 验收与总结</a>
+  <h4>本课程实验</h4>
+  <a href="../exp-01-color-hsv/index.html">EXP-01 颜色识别</a>
+  <a href="../exp-02-qrcode/index.html">EXP-02 二维码</a>
+  <a href="../exp-03-contour-polygon/index.html">EXP-03 多边形轮廓</a>
+  <a href="../exp-04-industrial-defect/index.html" style="color:#0f766e;font-weight:700">EXP-04 工业缺陷检测</a>
+  <a href="../exp-05-garbage-classification/index.html">EXP-05 垃圾分类</a>
+  <a href="../exp-06-semantic-segmentation/index.html">EXP-06 语义分割</a>
+  <a href="../exp-07-deepsort-tracking/index.html">EXP-07 多目标跟踪</a>
+  <a href="../exp-08-face-landmarks/index.html">EXP-08 人脸关键点</a>
+  <a href="../exp-09-pose-landmark/index.html">EXP-09 骨骼关键点</a>
+  <a href="../exp-10-depth-3d/index.html">EXP-10 深度 3D</a>
+  <a href="../exp-11-pose-control/index.html">EXP-11 体感控制</a>
+  <a href="../exp-12-hand-control/index.html">EXP-12 手势识别</a>
+</aside>
+
+<main class="content">
+
+<div class="exp-head">
+  <span class="code">EXP-04 · 第 2 阶段 · 目标检测与分类 · 综合性 · 4 学时</span>
+  <h1>工业表面缺陷检测</h1>
+  <p class="desc">这一章我们要让机器学会一件事：<b>看着一张钢板的照片，把上面的裂纹、划痕圈出来，并说出它是哪一种</b>。听起来简单，但你要处理的是"训练好的模型怎么装进一块小板子里还能跑到 13 帧"这类问题。做完这一章，后面 11 个实验都是同一套路。</p>
+  <div class="meta">
+    <span class="tag hl">难度 ⭐⭐ · 4 学时 · 综合性</span>
+    <span class="tag">YOLOv8</span>
+    <span class="tag">RKNN int8</span>
+    <span class="tag">NMS</span>
+    <span class="tag">板端 13 FPS</span>
+  </div>
+</div>
+
+<div class="pathline">
+  <span>01 颜色</span><span>02 二维码</span><span>03 轮廓</span><span class="cur">04 检测</span><span>05 分类</span><span>06 分割</span><span>07 跟踪</span><span>08 人脸</span><span>09 骨骼</span><span>10 3D</span><span>11 体感</span><span>12 手势</span>
+</div>
+
+<div class="idea-bar">
+  <span class="ic">💡</span>
+  <div class="tx">
+    <b>这一章其实就干一件事</b>
+    <p><b>让电脑在照片上画框，并说清框里是什么。</b>你拿红笔在照片上圈出"这里有裂纹、这里有划痕"，干的是一模一样的事——区别只是它一秒能圈 13 张，还不会眼花。</p>
+  </div>
+</div>
+
+<!-- 01 -->
+<section class="blk" id="s1">
+  <h2><span class="no">01</span>问题引入：钢板上的六种缺陷</h2>
+  <p>钢铁厂的质检线上，冷轧钢板以每秒数米的速度通过。质检员要做的事，是在差不多 <b>0.1 秒</b>里看清这块板子上有没有下面六种毛病：</p>
+  <table>
+    <thead><tr><th style="width:26%">模型里叫</th><th style="width:22%">中文</th><th>长什么样</th></tr></thead>
+    <tbody>
+      <tr><td><code>crazing</code></td><td>裂纹</td><td>细密的网状浅裂，像干涸的泥地</td></tr>
+      <tr><td><code>inclusion</code></td><td>夹杂</td><td>嵌进去的黑色异物块</td></tr>
+      <tr><td><code>patches</code></td><td>斑块</td><td>一大片颜色不均匀</td></tr>
+      <tr><td><code>pitted_surface</code></td><td>麻点</td><td>密密麻麻的小坑</td></tr>
+      <tr><td><code>rolled-in_scale</code></td><td>氧化皮压入</td><td>压进去的暗色氧化层</td></tr>
+      <tr><td><code>scratches</code></td><td>划痕</td><td>一条一条的直线划伤</td></tr>
+    </tbody>
+  </table>
+  <p>盯两个小时，人眼就开始漏了。而漏掉一块有缺陷的钢板，让它流进冲压车间，可能就是一整批汽车零件报废。所以得让机器来盯。</p>
+  <p>机器要盯住这件事，光"看清楚"不够，它得同时回答两个问题：<b>东西在哪</b>、<b>是什么</b>。前面那个问题给出一个方框的四个坐标，后面那个问题给出一个类别和一个"有多确定"的分数。这两件事合起来，就是<b>目标检测</b>。</p>
+  <p><b>这是全课第一个真正用神经网络的实验。</b>前面三个（颜色、二维码、轮廓）靠的都是人写好的规则，你能一行行读懂它为什么这么判。从这一章起，判断权交给了一个训练出来的模型——它更准、更通用，但你也说不清它内部到底怎么想的。这个转变是整门课最重要的一道分水岭。</p>
+
+  <div class="tip tealb"><span class="lab">🔍 为什么把检测排在第 4 个</span>检测一上来就是"缩放进 640 → NPU 推理 → 解码 → NMS → 缩回来"五件事，还要处理 int8 量化和模型文件。如果放在最前面，你会在还没搞清"像素和坐标是什么关系"的时候，先被部署细节劝退。<b>前三章建立的"阈值思维"（多少分算通过）在这里直接迁移成了置信度阈值</b>——你会发现 <code>score_thr</code> 和 HSV 的色彩范围，本质是同一件事。</div>
+
+  <p><b>这一章你要拿到的六样东西：</b></p>
+  <ul class="check">
+    <li>能说清一帧图从"进模型"到"画出框"走了哪四步，每步在干什么</li>
+    <li>跑通单图推理，看到终端打印出类别、置信度和坐标</li>
+    <li>开起来实时检测，在浏览器里看到 <b>13 FPS</b> 的滚动画面</li>
+    <li>知道 <code>score_thr</code> 和 <code>iou_thr</code> 分别管什么，改一个就能看到结果变化</li>
+    <li>能解释"框的位置整体偏移"和"框的形状也不对"分别该查哪儿</li>
+    <li>（可选）用 <code>eval_map.py</code> 给 onnx 和 rknn 各评一次分，看量化掉了多少</li>
+  </ul>
+</section>
+
+<!-- 02 -->
+<section class="blk" id="s2">
+  <h2><span class="no">02</span>检测器是怎么"看图圈框"的</h2>
+  <p>先说结论：一帧图要走四步，四步之外全是细节。这四步走明白了，这一章的原理就通了。</p>
+
+  <div class="anim-box">
+    <svg viewBox="0 0 760 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="缺陷检测四步流程：原图 缩放到640 神经网络盖框 去重后输出">
+      <rect x="6" y="6" width="748" height="238" rx="12" fill="#111827" stroke="#334155"/>
+
+      <text x="104" y="34" text-anchor="middle" font-size="12.5" font-weight="700" fill="#5eead4" font-family="sans-serif">① 原图 1600×200</text>
+      <rect x="30" y="48" width="148" height="46" rx="5" fill="#1e293b" stroke="#475569"/>
+      <rect x="62" y="60" width="30" height="10" rx="2" fill="#f87171"/>
+      <rect x="120" y="74" width="26" height="9" rx="2" fill="#f87171"/>
+      <text x="104" y="114" text-anchor="middle" font-size="10" fill="#64748b" font-family="sans-serif">一张长条形的钢板照片</text>
+
+      <path d="M188 71 L226 71" stroke="#475569" stroke-width="2" stroke-dasharray="5 4" fill="none">
+        <animate attributeName="stroke-dashoffset" values="0;-18" dur="1s" repeatCount="indefinite"/>
+      </path>
+
+      <text x="300" y="34" text-anchor="middle" font-size="12.5" font-weight="700" fill="#5eead4" font-family="sans-serif">② 缩放进 640 方框</text>
+      <rect x="236" y="46" width="128" height="128" rx="4" fill="#374151" stroke="#22d3ee" stroke-width="1.5"/>
+      <rect x="236" y="94" width="128" height="30" fill="#6b7280" opacity=".6"/>
+      <rect x="262" y="102" width="25" height="9" rx="2" fill="#f87171"/>
+      <rect x="312" y="110" width="22" height="8" rx="2" fill="#f87171"/>
+      <text x="300" y="190" text-anchor="middle" font-size="10" fill="#94a3b8" font-family="sans-serif">上下补灰边，别把图拉变形</text>
+
+      <path d="M372 110 L410 110" stroke="#475569" stroke-width="2" stroke-dasharray="5 4" fill="none">
+        <animate attributeName="stroke-dashoffset" values="0;-18" dur="1s" repeatCount="indefinite"/>
+      </path>
+
+      <text x="504" y="34" text-anchor="middle" font-size="12.5" font-weight="700" fill="#5eead4" font-family="sans-serif">③ 网络盖了一堆框</text>
+      <rect x="424" y="46" width="160" height="106" rx="8" fill="#1e293b" stroke="#22d3ee" stroke-width="1.5"/>
+      <g stroke="#f472b6" fill="none" stroke-width="1.2" opacity=".85">
+        <rect x="446" y="66" width="42" height="26"/><rect x="452" y="70" width="44" height="24"/>
+        <rect x="500" y="88" width="40" height="26"/><rect x="506" y="92" width="38" height="24"/>
+        <rect x="466" y="106" width="52" height="30"/>
+      </g>
+      <text x="504" y="166" text-anchor="middle" font-size="10" fill="#94a3b8" font-family="sans-serif">同一处缺陷被圈了好几次</text>
+
+      <path d="M592 110 L630 110" stroke="#475569" stroke-width="2" stroke-dasharray="5 4" fill="none">
+        <animate attributeName="stroke-dashoffset" values="0;-18" dur="1s" repeatCount="indefinite"/>
+      </path>
+
+      <text x="688" y="34" text-anchor="middle" font-size="12.5" font-weight="700" fill="#5eead4" font-family="sans-serif">④ 只留最好的</text>
+      <rect x="642" y="52" width="94" height="90" rx="5" fill="#1e293b" stroke="#94a3b8"/>
+      <rect x="664" y="74" width="38" height="15" fill="none" stroke="#4ade80" stroke-width="2"/>
+      <text x="683" y="102" text-anchor="middle" font-size="9" fill="#4ade80" font-family="monospace">scratches .87</text>
+      <rect x="680" y="112" width="30" height="13" fill="none" stroke="#4ade80" stroke-width="2"/>
+      <text x="689" y="166" text-anchor="middle" font-size="10" fill="#94a3b8" font-family="sans-serif">每处缺陷只剩一个框</text>
+
+      <text x="380" y="228" text-anchor="middle" font-size="11.5" fill="#5eead4" font-family="sans-serif">关键：框是在 640 图上画的，最后要按原比例"缩回去"，才对准原图</text>
+    </svg>
+  </div>
+  <div class="embed-cap" style="text-align:center;font-size:13px;color:#94a3b8;margin-top:10px">图 1-1｜一帧钢板照片在检测器里的完整旅程。这四步就是这一章的全部原理。</div>
+
+  <p>为什么非要先缩到 640？因为模型只认这个尺寸——训练的时候就是拿 640 的图喂的，它学到的所有特征都是在这个尺度上长出来的。你给它一张 1600×200 的图，它不知道该怎么看。</p>
+  <p>为什么不能直接拉成 640×640 的方图？因为钢板上的一道划痕本来是细长的，你一拉，它就被横向压扁了。<b>网络学的是"这个形状像划痕"，形状一变它就不认识了</b>。所以做法是等比缩放——按两条边里更"挤"的那条算比例，缩完之后上下补上灰边，凑满 640 的方框。补边这件事叫 <code>letterbox</code>。</p>
+  <p>那为什么第③步会盖出一堆框？网络在整张 640 的图上同时猜了几千个位置，每个位置都给出"这里可能有东西、框大概多大"的答案。信心足的自然圈得准，信心不足的就在旁边乱蒙蒙——所以同一道划痕会被圈十几次。第④步的 <code>NMS</code> 就是来收拾这个场面的：按分数排队，最高的留下，跟它重叠太多的同类框全删掉。</p>
+
+  <div class="obs">
+    <b>观察任务（看图 1-1 就行，不用动手）：</b>
+    <ol>
+      <li>注意第②步那块灰色区域。它上下两块灰边的高度是<b>可以算出来的</b>——后面对应"框整体偏移"那个坑，就是这个灰边算错了。</li>
+      <li>注意第③步那些粉色框，它们是<b>在 640 的图上画的</b>，不是在原图上。所以第④步必须缩回去。</li>
+      <li>把"缩进去 → 算一遍 → 挑最像的 → 缩回来"这八个字记住。整门课 12 个 AI 实验，走的都是这个节奏。</li>
+    </ol>
+  </div>
+
+  <p>下面这段是完全不懂的话可以先跳过：网络内部怎么实现这三个尺度、DFL 是什么、解耦头是什么。这些不影响你跑通、也不影响你调参，等你哪天要自己训模型了再回来看。</p>
+  <details class="deep">
+    <summary>YOLOv8 这个名字是什么意思？<em>选读 30 秒</em></summary>
+    <div class="deep-body">
+      <p><b>YOLO</b> 是 "You Only Look Once"，只看一眼。早期做检测要在同一张图上扫很多遍，YOLO 只看一遍就能同时给出所有框——所以它快，能做到实时。</p>
+      <p><b>v8</b> 是第八代，<b>n</b> 是 nano，最小号。这次用的 <code>yolov8n</code> 只有三百多万参数，模型文件 6MB。同系列的 s/m/l/x 越大越准也越慢，之所以选 n，就是因为要在板子上跑到 13 帧。</p>
+    </div>
+  </details>
+  <details class="deep">
+    <summary>为什么是 9 个输出张量？<em>选读 40 秒，不影响跑通</em></summary>
+    <div class="deep-body">
+      <p>因为网络在三个不同的"粗细"上同时猜。640 的图切成 80×80 的细格子，适合抓小目标（麻点）；切成 40×40 中等；切成 20×20 粗格子，适合抓大目标（大片斑块）。三个尺度各输出三样东西，合起来就是 3 × 3 = 9 个。</p>
+      <p>三样分别是：<b>框的原始分布</b>（box）、<b>每类的分数</b>（cls）、<b>分数之和</b>（cls_sum，可忽略）。yolov8n 有 3 个检测层，所以是 9 个。这个数字在"进阶"里会用到，跑推理时你不需要管它。</p>
+    </div>
+  </details>
+</section>
+
+<!-- 03 -->
+<section class="blk" id="s3">
+  <h2><span class="no">03</span>模型吃什么、吐什么</h2>
+  <p>认清这两头，出了错你才知道往哪查。</p>
+
+  <table>
+    <thead><tr><th style="width:16%"></th><th>具体是什么</th><th style="width:34%">说明</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>吃进</b></td>
+        <td>一张钢板照片</td>
+        <td>可以是图片文件（<code>images/1.jpg</code>）、视频、USB 相机，或者板载 HP60C 相机的实时画面。<b>送进去之前必须先变成 640×640 的 RGB 图</b>——这一步是代码干的，你不用管，但要知道它发生了。</td>
+      </tr>
+      <tr>
+        <td><b>吐出</b></td>
+        <td>若干条检测结果</td>
+        <td>每条 = <b>类别 + 置信度 + 框的四个坐标</b>。比如 <code>scratches 0.87 [120,64,338,102]</code>。注意吐出来的只是文字和数字，<b>画成红框是我们后面代码干的</b>。</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p>吐出来的东西有三种看法，实验里都会用到：</p>
+  <table>
+    <thead><tr><th style="width:26%">怎么看</th><th style="width:34%">命令里加什么</th><th>你得到什么</th></tr></thead>
+    <tbody>
+      <tr><td>存成图片</td><td><code>--save out.jpg</code></td><td>一张带红框的图，可以直接贴进实验报告</td></tr>
+      <tr><td>浏览器看实时</td><td><code>--ros</code></td><td>网页上滚动的视频流（MJPEG），手机连同一个 WiFi 也能看</td></tr>
+      <tr><td>只看终端</td><td>任何模式都有</td><td>文字列表，能看到分数和坐标，最适合核对数值</td></tr>
+    </tbody>
+  </table>
+
+  <p>这里有个容易误会的点：<b>检测器不负责画图</b>。所以画面上看起来"框错了"，可能是它真的算错了，也可能是我们画的时候坐标搞反了。分清楚这两件事，排查会快很多。</p>
+</section>
+
+<!-- 04 -->
+<section class="blk" id="s4">
+  <h2><span class="no">04</span>认识四个词</h2>
+  <p>这四个词后面每一步都会出现，花一分钟认全，之后就不用反复查了。</p>
+  <table>
+    <thead><tr><th style="width:20%">词</th><th style="width:18%">英文</th><th>什么意思</th></tr></thead>
+    <tbody>
+      <tr><td><b>置信度</b></td><td><code>score</code></td><td>模型有多确定"这里是划痕"。0.87 表示它挺有把握。<b>低于 0.25 的框默认会直接丢掉</b>。</td></tr>
+      <tr><td><b>IoU</b></td><td>重叠率</td><td>两个框重叠了多少。完全重合是 1，完全不沾是 0。用来判断两个框是不是在说同一个东西。</td></tr>
+      <tr><td><b>NMS</b></td><td>非极大值抑制</td><td>一串操作：按分数排序，留下最高的，把跟它 IoU 超过 0.45 的同类框全删。结果是一处缺陷一个框。</td></tr>
+      <tr><td><b>mAP50</b></td><td>平均精度均值</td><td>整个模型考多少分。这次的模型考了 <b>0.732</b>（满分 1.0）。这个数字是模型的成绩单。</td></tr>
+    </tbody>
+  </table>
+  <p>这里只要求你认识，不要求会算。真要用的时候，<b>mAP 在"进阶"里会实际跑一次</b>，那时候再理解它怎么算更有意义。</p>
+</section>
+
+<!-- 05 -->
+<section class="blk" id="s5">
+  <h2><span class="no">05</span>实操：三条命令跑起来</h2>
+  <p>全部在板子上执行。三个步骤从简单到复杂，<b>复制、粘贴、回车</b>就行。</p>
+
+  <ol class="steps">
+    <li>
+      <span class="st">进目录，先确认模型在<em>约 1 分钟</em></span>
+      <p>所有实验的代码都在同一个地方，先确认你站对了位置。</p>
+      <pre><span class="g">cd</span> ~/ros2_ws/src/xflz_eai_car1/vision/01_industrial_defect_detection
+<span class="g">ls</span> models/
+<span class="g">ls</span> images/</pre>
+      <div class="expect">defect_yolov8n_int8.rknn      <i>← 模型，约 6MB</i>
+defect_yolov8n_int8_calib.txt
+
+1.jpg  2.jpg  3.jpg  4.jpg    <i>← 四张测试用的缺陷图</i></div>
+      <p><b>看不到这两样东西？</b>说明目录不对，或者文件没拷全。回上一步检查路径，别急着往下走。</p>
+    </li>
+
+    <li>
+      <span class="st">单图推理，先看到结果<em>约 10 秒</em></span>
+      <p>拿一张图跑一遍，把结果存成 <code>out.jpg</code>。这是验证"模型到底能不能用"最快的办法。</p>
+      <pre><span class="g">python</span> src/app.py --model models/defect_yolov8n_int8.rknn \
+       --image images/1.jpg --save out.jpg</pre>
+      <div class="expect">fps=10.0
+  inclusion 0.826 (181,0,279,302)
+  inclusion 0.763 (96,430,214,641)
+saved -&gt; out.jpg</div>
+      <p>终端每一行就是一处缺陷：<b>类别 + 分数 + 左上右下坐标</b>。看到这类输出，模型就跑通了。打开 <code>out.jpg</code> 看红框和缺陷对不对得上。</p>
+      <p style="color:#b45309"><b>一定要带 <code>--save</code>。</b>不带的话程序会弹窗等你按 q，用 SSH 远程连过去就卡在那儿了——这是新手最常遇到的第一次"假死"。</p>
+    </li>
+
+    <li>
+      <span class="st">打开实时检测，让相机对着东西动起来<em>约 2 分钟</em></span>
+      <p>这一步要开<b>两个终端</b>。第一个终端起相机，起好之后别关：</p>
+      <pre><span class="c"># 终端 1：相机驱动</span>
+<span class="g">source</span> /opt/ros/humble/setup.bash
+<span class="g">source</span> ~/ros2_ws/install/setup.bash
+<span class="g">export</span> ROS_DOMAIN_ID=2
+<span class="g">ros2</span> launch ascamera hp60c.launch.py</pre>
+      <p>第二个终端跑检测。<b>source 两行和 DOMAIN_ID 都要重来一遍</b>——这是新手最容易漏的地方，漏了就是两边互相看不见：</p>
+      <pre><span class="c"># 终端 2：实时检测</span>
+<span class="g">source</span> /opt/ros/humble/setup.bash
+<span class="g">source</span> ~/ros2_ws/install/setup.bash
+<span class="g">export</span> ROS_DOMAIN_ID=2
+<span class="g">cd</span> ~/ros2_ws/src/xflz_eai_car1/vision/01_industrial_defect_detection
+<span class="g">python</span> src/app.py --model models/defect_yolov8n_int8.rknn --ros</pre>
+      <p>然后在同一局域网的浏览器打开下面这个地址，把 <code>&lt;板子IP&gt;</code> 换成板子真正的局域网地址：</p>
+      <pre>http://&lt;板子IP&gt;:8080/defect.mjpg</pre>
+      <div class="expect">frame 30  avg_fps=13.2
+frame 60  avg_fps=13.0</div>
+      <p>浏览器里应该出现滚动的画面，上面叠着红色方框。<b>13 FPS 是这块板子的真实水平</b>——6MB 的小模型，在 6TOPS 的 NPU 上跑到这个数，已经能实时用了。</p>
+    </li>
+  </ol>
+
+  <p><b>你刚才证明了：</b>一个在 PC 上用几十万张图训出来的模型，被压到 6MB，塞进一块巴掌大的板子里，还能一秒看 13 帧。这中间发生了什么，是这章剩下的部分要讲的事——但你现在已经能看到结果了。</p>
+</section>
+
+<!-- 06 -->
+<section class="blk" id="s6">
+  <h2><span class="no">06</span>你该看到的画面</h2>
+  <p>知道"正常"长什么样，才知道"异常"是哪里出的问题。</p>
+
+  <p><b>单图模式（<code>--image</code>）：</b>红框应该贴着缺陷的外沿，框旁边标着类别名和分数。如果框整体往一个方向偏出去，但形状还是对的，直接跳到第 08 节第一条。</p>
+  <p><b>实时模式（<code>--ros</code>）：</b>拿一块带缺陷的样板在镜头前慢慢移动，框应该跟着一起动。<b>框稳定、不闪</b>就是正常的；如果框疯狂跳，多半是画面太暗或者太糊。</p>
+  <p><b>对着桌面也会乱圈——这是正常的。</b>这个模型只认识钢板上的六类缺陷。你拿它拍桌面、拍手，它仍然会努力"找一个最像缺陷的区域"，于是圈出一堆莫名其妙的东西。这不是 bug，是它没学过这些东西。</p>
+
+  <div class="tip tealb"><span class="lab">🔍 这个现象有名字，叫域偏移</span>模型的能力边界就是它的训练数据。训练时只给它看过钢板缺陷图，遇到没见过的画面，它只能硬套。<b>想让它在别的场景好用，得用那个场景的数据重新训练。</b>记住这句话，后面每个实验都会遇到类似的"它怎么认不出来"。</div>
+</section>
+
+<!-- 07 -->
+<section class="blk" id="s7">
+  <h2><span class="no">07</span>调一调 score_thr</h2>
+  <p>不改代码，只改一个数字，你就能亲手感受"漏检"和"误检"是怎么互相拉扯的。这是目标检测里最重要的手感。</p>
+
+  <pre><span class="g">nano</span> config/defect_config.yaml
+<span class="c"># 找到 infer 这一段</span></pre>
+  <pre><span class="b">infer:</span>
+  imgsz: 640
+  <span class="y">score_thr: 0.25</span>   <span class="c">← 改这个，试试 0.05 和 0.60</span>
+  iou_thr: 0.45      <span class="c">← 或者改这个，试试 0.30 和 0.70</span></pre>
+
+  <div class="lab2">
+    <div class="lh">⚡ 拖一下，看框怎么变</div>
+    <div class="lr">
+      <label>score_thr</label>
+      <input id="sc" type="range" min="5" max="90" step="5" value="25">
+      <output id="sc_o">0.25</output>
+    </div>
+    <div class="vis">
+      <svg viewBox="0 0 420 150" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="调整 score 阈值时保留下来的检测框数量变化">
+        <rect x="0" y="0" width="420" height="150" rx="8" fill="#0b1220"/>
+        <text x="210" y="18" text-anchor="middle" font-size="10.5" fill="#475569" font-family="sans-serif">模拟一帧画面：4 处真缺陷 + 3 个低分假框</text>
+        <g id="bx">
+          <g data-s="0.87"><rect x="34" y="36" width="60" height="26" fill="none" stroke="#4ade80" stroke-width="2"/><text x="34" y="32" font-size="8.5" fill="#4ade80" font-family="monospace">scra .87</text></g>
+          <g data-s="0.71"><rect x="128" y="36" width="54" height="24" fill="none" stroke="#4ade80" stroke-width="2"/><text x="128" y="32" font-size="8.5" fill="#4ade80" font-family="monospace">patc .71</text></g>
+          <g data-s="0.44"><rect x="218" y="36" width="58" height="26" fill="none" stroke="#4ade80" stroke-width="2"/><text x="218" y="32" font-size="8.5" fill="#4ade80" font-family="monospace">incl .44</text></g>
+          <g data-s="0.19"><rect x="316" y="36" width="52" height="24" fill="none" stroke="#4ade80" stroke-width="2"/><text x="316" y="32" font-size="8.5" fill="#4ade80" font-family="monospace">pitt .19</text></g>
+          <g data-s="0.13" data-fake="1"><rect x="56" y="96" width="56" height="24" fill="none" stroke="#fbbf24" stroke-width="1.6" stroke-dasharray="4 3"/><text x="56" y="92" font-size="8.5" fill="#fbbf24" font-family="monospace">假 .13</text></g>
+          <g data-s="0.09" data-fake="1"><rect x="178" y="96" width="50" height="22" fill="none" stroke="#fbbf24" stroke-width="1.6" stroke-dasharray="4 3"/><text x="178" y="92" font-size="8.5" fill="#fbbf24" font-family="monospace">假 .09</text></g>
+          <g data-s="0.06" data-fake="1"><rect x="290" y="96" width="52" height="22" fill="none" stroke="#fbbf24" stroke-width="1.6" stroke-dasharray="4 3"/><text x="290" y="92" font-size="8.5" fill="#fbbf24" font-family="monospace">假 .06</text></g>
+        </g>
+        <text x="210" y="142" text-anchor="middle" font-size="10" fill="#64748b" font-family="sans-serif" id="txt">阈值 0.25 → 保留 3 个框</text>
+      </svg>
+    </div>
+    <div class="say" id="say"></div>
+  </div>
+
+  <p>两种改法，后果正好相反：</p>
+  <table>
+    <thead><tr><th style="width:22%">改成什么</th><th style="width:34%">你会看到</th><th>什么时候该这么改</th></tr></thead>
+    <tbody>
+      <tr><td><code>score_thr: 0.05</code><br>往低调</td><td>框变多。漏掉的弱小缺陷被抓回来了，但同时冒出一堆假框</td><td>质检要求"一条都不能漏"的时候。宁可多报，让人工复核。</td></tr>
+      <tr><td><code>score_thr: 0.60</code><br>往高调</td><td>框变少。留下的都很确定，但细小的划痕消失了</td><td>误报太多、产线老是误停线的时候。宁可少报，也得报得准。</td></tr>
+      <tr><td><code>iou_thr: 0.30</code></td><td>去重更狠，挨得近的缺陷可能被合成一个</td><td>一般不用动。0.45 是工程上试出来的默认值。</td></tr>
+    </tbody>
+  </table>
+
+  <p><b>你刚才发现的：</b>调低阈值和调高阈值，代价是反着来的。一个让漏检变少但误检变多，另一个反过来。这两个东西天生互相对抗——这叫<b>召回和精确的权衡</b>，任何检测器都躲不开。</p>
+  <p>所以在产线上真正要问的不是"哪个参数最好"，而是：<b>漏掉一个缺陷和误报一个缺陷，哪个代价更大？</b>想清楚这个，参数就定了。</p>
+</section>
+
+<!-- 08 -->
+<section class="blk" id="s8">
+  <h2><span class="no">08</span>重点与易错点</h2>
+  <p>按"我看到的症状"找对应行。左边是你遇到的，右边是该做的。</p>
+
+  <table class="pit2">
+    <thead><tr><th>你看到的</th><th>多半是什么原因</th><th>怎么办</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>框的位置整体偏移，但形状是对的</td>
+        <td>缩放时的补边量 <code>pad</code> 前后没对上，反缩放时少减了</td>
+        <td>"形对位漂"就查 padding。这是本实验第一大坑，图 1-1 第②步那块灰边就是它。</td>
+      </tr>
+      <tr>
+        <td>框的位置对，但类别全错、分数都很低</td>
+        <td>颜色通道顺序搞反了，BGR 送给了要 RGB 的模型</td>
+        <td>"形都不对"就查 RGB / BGR 顺序</td>
+      </tr>
+      <tr>
+        <td>报 <code>need 4dims input</code></td>
+        <td>模型要 4 维输入 <code>[1,H,W,3]</code>，你给了 3 维</td>
+        <td>用 <code>np.newaxis</code> 补一维。自己写推理代码时才会遇到，跑 <code>app.py</code> 不会。</td>
+      </tr>
+      <tr>
+        <td>报 <code>core mode not supported</code></td>
+        <td>NPU 核心参数传了空值</td>
+        <td>显式写 <code>core_mask=0</code>（自动选核）。这个坑在处理多个实验并行时会遇到。</td>
+      </tr>
+      <tr>
+        <td>浏览器打不开 <code>:8080/defect.mjpg</code></td>
+        <td>端口被别的实验占了，或者 IP 填成了 localhost</td>
+        <td>先关掉占用 8080 的进程；IP 要用板子的局域网地址，不是 127.0.0.1</td>
+      </tr>
+      <tr>
+        <td><code>--ros</code> 跑起来一直黑屏</td>
+        <td>相机没起，或者两个终端的 <code>ROS_DOMAIN_ID</code> 不一样</td>
+        <td>先起相机；两个终端都写 <code>export ROS_DOMAIN_ID=2</code></td>
+      </tr>
+      <tr>
+        <td>程序直接弹窗不动，SSH 里像死机了</td>
+        <td><code>--image</code> 模式没加 <code>--save</code>，程序在等你按 q</td>
+        <td>带 <code>--save out.jpg</code>；已经卡住的按 Ctrl+C 退出</td>
+      </tr>
+      <tr>
+        <td>画面上出现一堆问号方块</td>
+        <td>OpenCV 画字不支持中文</td>
+        <td>窗口里的文字统一用英文，这不是乱码 bug</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="tip amber"><span class="lab">💡 排查口诀</span><b>先看模型，再看输入，最后看输出。</b>① 模型文件在不在、多大；② 送进去的图是不是 640×640 的 RGB；③ 出来的框坐标在不在画面范围内。三步走完，九成的坑都能定位。</div>
+</section>
+
+<!-- 09 -->
+<section class="blk" id="s9">
+  <h2><span class="no">09</span>进阶与深读</h2>
+  <p>基础三步跑通之后再看这里。做不完不影响成绩，做了有加分。</p>
+
+  <details class="deep">
+    <summary>进阶 1 · 用 onnx 和 rknn 各评一次分，看差多少<em>约 30 分钟</em></summary>
+    <div class="deep-body">
+      <p>同一个模型有两种格式：<code>.onnx</code> 是原始浮点版，准但慢；<code>.rknn</code> 是压缩后的 int8 版，快但会掉一点精度。跑两次评测就能量化"为了快牺牲了多少准"。</p>
+      <pre><span class="g">python</span> src/eval_map.py --backend onnx   <span class="c"># 浮点基准</span>
+<span class="g">python</span> src/eval_map.py --backend rknn   <span class="c"># int8 实测</span></pre>
+      <p><b>验收线是两者 mAP50 的差 ≤ 3%。</b>超过 3% 说明量化做得不好，常见原因是校准图不够或者校准图跟真实数据差太远。</p>
+      <p>注意这两个分数只能在<b>同一份权重</b>下互相比较，用来衡量量化损失。不能拿它去跟别人的模型比谁强——不同数据集、不同评测代码算出来的 mAP 没有可比性。</p>
+    </div>
+  </details>
+
+  <details class="deep">
+    <summary>进阶 2 · 把检测结果变成质检报表<em>约 40 分钟</em></summary>
+    <div class="deep-body">
+      <p>在 <code>src/app.py</code> 的主循环里，把每帧的检测结果按类别累加起来，每 100 帧打印一次统计：</p>
+      <pre>scratches: 12 处
+inclusion: 3 处
+patches: 1 处</pre>
+      <p>这就是"缺陷统计加质检报告生成"，产线上真正在用的形态。思路是找到返回 detections 列表的那一行，在它后面加累加逻辑，别动别的地方。</p>
+    </div>
+  </details>
+
+  <details class="deep">
+    <summary>进阶 3 · 想自己训练一个模型<em>约 3 小时，需要 PC 加显卡</em></summary>
+    <div class="deep-body">
+      <p>完整链路是：准备数据集 → PC 上训练 → 导出 ONNX → 转成 RKNN → 拷到板子上跑。四个脚本都在 <code>scripts/</code> 目录里写好了。</p>
+      <p><b>三个硬性前提，缺一不可：</b></p>
+      <ul>
+        <li>必须用仓库里那个<b>改过的 ultralytics</b>（RKNN 优化 fork）。用官方版导出的 ONNX 不是 9 个输出，转到 RKNN 就解不出来。</li>
+        <li>标注必须是 YOLO 归一化格式（<code>类别 cx cy w h</code>，全是 0 到 1 之间的小数）。写错了训练"能跑完"，但 mAP 趋近 0——这种失败最难查，因为它不报错。</li>
+        <li>量化校准图要贴近真实产线画面。用错场景的图去校准，等于拿错尺子量。</li>
+      </ul>
+      <p>这次的模型已经交付在 <code>models/</code> 里，<b>不重训也能完成全部实验内容</b>。</p>
+    </div>
+  </details>
+</section>
+
+<!-- 10 -->
+<section class="blk" id="s10">
+  <h2><span class="no">10</span>验收与总结</h2>
+
+  <p><b>验收清单。</b>下面这几条都能做到，这一章就算过了：</p>
+  <ul class="check">
+    <li>能不看笔记地说出检测四步，以及每一步为什么必须做</li>
+    <li>单图、实时流两条链路都跑通，终端能看到 <code>fps</code> 和检测结果</li>
+    <li>能解释"框形对但位置漂"和"框形都不对"分别该查什么</li>
+    <li>亲手把 <code>score_thr</code> 改成 0.6 看过漏检效果，再改回 0.25</li>
+    <li>能回答：为什么部署推理要用 <code>pad</code> 而训练时用 114，这两者必须一致吗</li>
+  </ul>
+
+  <p><b>三道小测。</b>点选项就会告诉你对不对，答错不用慌，说明该回去看哪一节。</p>
+
+  <div class="quiz2">
+    <div class="qq"><span class="qn">Q1</span>你把 score_thr 从 0.25 调到 0.70，最可能发生什么？</div>
+    <div class="opt" data-right="0">检测框变多，能抓到更多小缺陷</div>
+    <div class="opt" data-right="1">检测框变少，细小划痕容易漏掉</div>
+    <div class="opt" data-right="0">框的位置会整体偏移</div>
+    <div class="fb"><b>对。</b>score_thr 是"及格线"，调高等于要求模型更有把握才报。代价是信心不足的弱小缺陷被过滤掉，漏检增加。框位置偏移跟这个参数无关，那是缩放和 padding 的事。</div>
+  </div>
+
+  <div class="quiz2">
+    <div class="qq"><span class="qn">Q2</span>检测框形状是对的，但整体往右下偏了几十像素。最该怀疑哪一步？</div>
+    <div class="opt" data-right="0">相机没对焦</div>
+    <div class="opt" data-right="0">模型训练不够</div>
+    <div class="opt" data-right="1">缩放的补边量对不上，或者反缩放时忘了减</div>
+    <div class="fb"><b>对。</b>"形对位漂"就是缩放链路的问题。模型输出的是 640 图上的坐标，要通过 <code>(坐标 − pad) / scale</code> 换算回原图。pad 算错或者忘了减，就会整体系统性偏移。回看图 1-1 第②步那块灰边。</div>
+  </div>
+
+  <div class="quiz2">
+    <div class="qq"><span class="qn">Q3</span>你把相机对着自己的手，画面上出现了一堆乱框。这说明什么？</div>
+    <div class="opt" data-right="0">模型坏了，要重新训练</div>
+    <div class="opt" data-right="1">模型只学过钢板缺陷，没见过手，属正常现象</div>
+    <div class="opt" data-right="0">相机驱动有问题</div>
+    <div class="fb"><b>对。</b>这叫域偏移。模型的能力边界就是它的训练数据——只见过六类钢板缺陷，遇到别的画面就会硬套。想让它在你的场景好用，要用那个场景的数据重训。</div>
+  </div>
+
+  <p><b>总结。</b>这一章你做的事，说穿了就是让机器"看图圈框并说清是什么"。中间跨过的最大一道坎，是模型本来只能吃 640 的方图，而真实照片是任意尺寸——所以要先缩进去、算完之后再缩回来。这个"进和出必须互逆"的思路，会在后面很多实验里反复出现。</p>
+  <p>下一章换个角度：如果模型认出的东西太细（矿泉水瓶、香蕉皮、废电池），而垃圾桶只分四类，中间这层翻译谁来做？</p>
+</section>
+
+<nav class="expnav">
+  <a href="../exp-03-contour-polygon/index.html"><span class="lb">← 上一个</span>EXP-03 多边形轮廓</a>
+  <a class="next" href="../exp-05-garbage-classification/index.html"><span class="lb">下一个实验 →</span>EXP-05 垃圾分类</a>
+</nav>
+
+<footer>
+  <span>具身智能课程 · CORE-02 · EXP-04 工业表面缺陷检测</span>
+  <span>4 学时 · 综合性 · 板端实测 13 FPS</span>
+</footer>
+
+</main>
+</div>
+
+<script src="../shared/tutorial.js" defer></script>
+<script>
+(function(){
+  var sc=document.getElementById('sc');
+  if(!sc) return;
+  var groups=document.querySelectorAll('#bx g');
+  var say=document.getElementById('say');
+  var txt=document.getElementById('txt');
+  function upd(){
+    var t=parseInt(sc.value,10)/100;
+    document.getElementById('sc_o').textContent=t.toFixed(2);
+    var keep=0,fake=0;
+    for(var i=0;i<groups.length;i++){
+      var g=groups[i], s=parseFloat(g.getAttribute('data-s'));
+      var show=s>=t;
+      g.style.opacity=show?1:0.12;
+      if(show){ if(g.getAttribute('data-fake')) fake++; else keep++; }
+    }
+    txt.textContent='阈值 '+t.toFixed(2)+' → 保留 '+(keep+fake)+' 个框（真缺陷 '+keep+' / 假框 '+fake+'）';
+    var m='';
+    if(t<=0.10) m='<b>阈值很低</b>：4 处真缺陷全在，但 3 个低分假框也全冒出来了，误检风险最高。适合"宁可错杀"的场合。';
+    else if(t<=0.25) m='<b>默认区间</b>：抓住 3 处明显缺陷，放掉最弱的麻点（0.19），假框全部滤掉。这是工程上常用的甜点位。';
+    else if(t<=0.50) m='<b>阈值偏高</b>：只剩 2 个最有把握的框，夹杂（0.44）也被滤掉了，开始出现漏检。';
+    else m='<b>阈值太高</b>：只留最强的那一个，4 处里有 3 处漏掉。产线上这样设会出事。';
+    say.innerHTML=m;
+  }
+  sc.addEventListener('input',upd); upd();
+})();
+/* 小测 */
+(function(){
+  var qs=document.querySelectorAll('.quiz2');
+  for(var i=0;i<qs.length;i++){
+    (function(q){
+      var opts=q.querySelectorAll('.opt');
+      for(var k=0;k<opts.length;k++){
+        opts[k].addEventListener('click',function(){
+          if(q.getAttribute('data-done')==='1') return;
+          var right=this.getAttribute('data-right')==='1';
+          this.classList.add(right?'ok':'no');
+          if(right){
+            var fb=q.querySelector('.fb');
+            if(fb) fb.classList.add('on');
+            q.setAttribute('data-done','1');
+          }
+        });
+      }
+    })(qs[i]);
+  }
+})();
+</script>
+</body>
+</html>

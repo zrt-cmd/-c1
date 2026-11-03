@@ -1,0 +1,1502 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>实验 06 · ROS2 话题通讯原理（MQ5 气体传感器）</title>
+<style>
+:root{
+  --bg-base:#f8fafc;--bg-card:#fff;--bg-soft:#f1f5f9;--bg-tint:#eef4ff;
+  --border:#e2e8f0;--border-hover:#94a3b8;
+  --accent-blue:#2563eb;--accent-cyan:#0891b2;--accent-teal:#0d9488;
+  --accent-amber:#d97706;--accent-rose:#e11d48;--accent-violet:#7c3aed;
+  --text-primary:#0f172a;--text-body:#334155;--text-secondary:#64748b;--text-muted:#94a3b8;
+  --shadow-md:0 4px 12px rgba(0,0,0,.05),0 2px 4px rgba(0,0,0,.03);
+  --font-mono:'Cascadia Code','JetBrains Mono',Consolas,monospace;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:82px}
+body{margin:0;background:var(--bg-base);color:var(--text-body);
+  font-family:"Noto Sans CJK SC","PingFang SC","Microsoft YaHei","Segoe UI",system-ui,sans-serif;
+  background-image:
+    radial-gradient(ellipse 60% 40% at 50% -5%,rgba(37,99,235,.05),transparent),
+    radial-gradient(ellipse 50% 35% at 100% 5%,rgba(13,148,136,.04),transparent);}
+.topbar{position:sticky;top:0;z-index:60;height:60px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 32px;background:rgba(255,255,255,.88);backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;color:var(--text-primary);font-size:14.5px;text-decoration:none}
+.logo .dot{width:9px;height:9px;border-radius:50%;background:var(--accent-teal);animation:pulse 2.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.crumb{font-size:13px;color:var(--text-muted)}
+.crumb a{color:var(--accent-blue);text-decoration:none}
+.crumb b{color:var(--text-secondary);font-weight:500}
+.menu-btn{display:none;border:1px solid var(--border);background:#fff;border-radius:8px;padding:6px 12px;font-size:13px;cursor:pointer}
+.layout{display:flex;max-width:1340px;margin:0 auto;gap:32px;padding:32px}
+.sidebar{width:252px;flex:none;align-self:flex-start;position:sticky;top:78px;
+  background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:18px 14px;box-shadow:var(--shadow-md);max-height:calc(100vh - 96px);overflow:auto}
+.sidebar .st{font-size:12px;letter-spacing:.1em;color:var(--text-muted);font-family:var(--font-mono);padding:0 8px 8px}
+.sidebar a{display:flex;gap:10px;align-items:center;padding:9px 10px;margin-bottom:3px;border-radius:8px;
+  font-size:13.5px;color:var(--text-body);text-decoration:none;transition:.28s cubic-bezier(.4,0,.2,1);border:1px solid transparent}
+.sidebar a .n{font-family:var(--font-mono);font-size:11px;color:var(--text-muted);flex:none}
+.sidebar a:hover{background:var(--bg-soft)}
+.sidebar a.active{background:var(--bg-tint);border-color:#dbeafe;color:var(--accent-blue);font-weight:600}
+.sidebar a.active .n{color:var(--accent-blue)}
+.sidebar hr{border:none;border-top:1px solid var(--border);margin:12px 4px}
+.sidebar .other{font-size:12px;color:var(--text-muted);padding:2px 8px 8px}
+.sidebar .other a{display:block;padding:5px 10px;font-size:12.5px;color:var(--text-secondary)}
+.sidebar .other a:hover{color:var(--accent-blue)}
+.main{flex:1;min-width:0;max-width:920px}
+.exp-head{background:var(--bg-card);border:1px solid var(--border);border-radius:16px;padding:30px 34px;box-shadow:var(--shadow-md)}
+.exp-head .code{font-family:var(--font-mono);font-size:12px;font-weight:600;color:var(--accent-teal);
+  background:#f0fdfa;border:1px solid #ccfbf1;border-radius:6px;padding:3px 9px}
+.exp-head h1{margin:16px 0 10px;font-size:27px;color:var(--text-primary);line-height:1.35}
+.exp-head .desc{font-size:15px;line-height:1.85;color:var(--text-secondary);margin:0}
+.meta-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+.tag{font-size:12px;padding:4px 11px;border-radius:100px;background:var(--bg-soft);border:1px solid var(--border);color:var(--text-secondary)}
+.tag.teal{color:var(--accent-teal);border-color:#ccfbf1;background:#f0fdfa}
+.tag.violet{color:var(--accent-violet);border-color:#ede9fe;background:#f5f3ff}
+section.blk{margin-top:34px;scroll-margin-top:82px}
+section.blk>h2{font-size:21px;color:var(--text-primary);margin:0 0 6px;display:flex;align-items:center;gap:10px}
+section.blk>h2 .sn{font-family:var(--font-mono);font-size:13px;font-weight:700;color:#fff;background:var(--accent-blue);
+  border-radius:7px;padding:3px 9px}
+section.blk>h2 .sn.teal{background:var(--accent-teal)}
+section.blk>h2 .sn.violet{background:var(--accent-violet)}
+section.blk>p{font-size:15px;line-height:1.9;margin:10px 0}
+.lead{color:var(--text-secondary)}
+.tip{border-left:3px solid var(--accent-blue);background:rgba(37,99,235,.05);border-radius:0 10px 10px 0;
+  padding:14px 18px;margin:18px 0;font-size:14px;line-height:1.8;color:var(--text-body)}
+.tip b{color:var(--accent-blue)}
+.tip.amber{border-left-color:var(--accent-amber);background:rgba(217,119,6,.05)}
+.tip.amber b{color:var(--accent-amber)}
+.tip.tealb{border-left-color:var(--accent-teal);background:rgba(13,148,136,.05)}
+.tip.tealb b{color:var(--accent-teal)}
+pre{background:#0f172a;color:#e2e8f0;font-family:var(--font-mono);font-size:13px;line-height:1.7;
+  border-radius:12px;padding:18px 20px;overflow-x:auto;margin:16px 0}
+pre code{background:transparent;border:none;border-radius:0;padding:0;font-size:inherit;color:inherit;font-family:inherit}
+pre .c{color:#94a3b8}pre .g{color:#4ade80}pre .b{color:#7dd3fc}pre .y{color:#fbbf24}
+code.inline{font-family:var(--font-mono);font-size:13px;color:var(--accent-blue);background:var(--bg-tint);
+  border-radius:5px;padding:2px 7px}
+.flow{display:flex;align-items:stretch;gap:0;flex-wrap:wrap;margin:20px 0}
+.flow .step{flex:1;min-width:140px;background:var(--bg-soft);border:1px solid var(--border);border-radius:11px;
+  padding:14px 12px;text-align:center;transition:.28s}
+.flow .step:hover{border-color:var(--accent-teal);box-shadow:0 6px 18px rgba(13,148,136,.12);transform:translateY(-3px)}
+.flow .step .t{font-size:14px;font-weight:700;color:var(--text-primary)}
+.flow .step .d{font-size:12px;color:var(--text-muted);margin-top:5px;font-family:var(--font-mono)}
+.flow .ar{align-self:center;color:var(--border-hover);padding:0 8px;font-size:18px;flex:none}
+.kgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin:18px 0}
+.kcard{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:16px;transition:.28s}
+.kcard:hover{transform:translateY(-3px);box-shadow:var(--shadow-md);border-color:var(--border-hover)}
+.kcard .kt{font-size:14px;font-weight:700;color:var(--text-primary);margin-bottom:6px}
+.kcard .kd{font-size:12.8px;line-height:1.7;color:var(--text-secondary)}
+table{width:100%;border-collapse:collapse;margin:16px 0;font-size:13.5px;background:var(--bg-card);
+  border:1px solid var(--border);border-radius:12px;overflow:hidden}
+th{background:var(--bg-soft);color:var(--text-primary);font-size:13px;padding:11px 14px;text-align:left;border-bottom:1px solid var(--border)}
+td{padding:10px 14px;border-bottom:1px solid var(--border);color:var(--text-body)}
+tr:last-child td{border-bottom:none}
+td code{font-family:var(--font-mono);font-size:12.5px;color:var(--accent-teal)}
+.check{list-style:none;padding:0;margin:16px 0}
+.check li{position:relative;padding:11px 14px 11px 42px;background:var(--bg-card);border:1px solid var(--border);
+  border-radius:10px;margin-bottom:9px;font-size:14px;transition:.28s}
+.check li:hover{border-color:var(--accent-teal)}
+.check li::before{content:"✓";position:absolute;left:14px;top:11px;width:20px;height:20px;border-radius:6px;
+  background:#f0fdfa;border:1px solid #99f6e4;color:var(--accent-teal);font-size:12px;font-weight:700;
+  display:flex;align-items:center;justify-content:center}
+.check li b{color:var(--text-primary)}
+.check .out{font-family:var(--font-mono);font-size:12.5px;color:var(--accent-blue)}
+figure{margin:0}
+.img-block,.anim2d-block{margin:26px 0;text-align:center}
+.img-block img,.anim2d-block .anim2d{max-width:100%;height:auto;border:1px solid var(--border);border-radius:12px;background:#fff;box-shadow:0 4px 18px rgba(15,23,42,.07)}
+.img-block figcaption,.anim2d-block figcaption{margin-top:10px;font-size:13.5px;color:var(--text-secondary)}
+.anim2d-block .anim2d{width:100%;max-width:680px}
+.ix-block{margin:26px 0;text-align:center}
+.ix-panel{background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:20px;box-shadow:var(--shadow-md);text-align:left}
+.ix-caption{margin-top:10px;font-size:13.5px;color:var(--text-secondary);text-align:center}
+/* 互动控件 */
+.qos-row{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+.qos-box{flex:1;min-width:240px;border:1px solid var(--border);border-radius:10px;padding:12px 14px;background:var(--bg-base)}
+.qos-box h5{margin:0 0 8px;font-size:13.5px;color:var(--text-primary)}
+.qos-box label{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--text-secondary);margin:6px 0}
+.qos-box select{font-family:var(--font-mono);font-size:12.5px;padding:4px 8px;border:1px solid var(--border);border-radius:7px;background:#fff;color:var(--text-body)}
+#qosResult{margin-top:6px;padding:12px 14px;border-radius:10px;font-size:14px;font-weight:700;text-align:center;transition:.3s}
+#qosResult.ok{background:#f0fdfa;border:1px solid #99f6e4;color:var(--accent-teal)}
+#qosResult.bad{background:#fef2f2;border:1px solid #fecaca;color:var(--accent-rose)}
+.btn{display:inline-block;border:none;background:var(--accent-teal);color:#fff;font-size:13.5px;font-weight:600;
+  padding:9px 20px;border-radius:9px;cursor:pointer;transition:.25s;font-family:inherit}
+.btn:hover{background:#0f766e;transform:translateY(-1px)}
+.mq5-calc{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.mq5-calc input{font-family:var(--font-mono);font-size:14px;padding:7px 11px;border:1px solid var(--border);border-radius:8px;width:140px}
+.mq5-out{font-family:var(--font-mono);font-size:14px;color:var(--accent-teal);font-weight:700}
+.mq5-chart{margin-top:12px;background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.mq5-chart svg{display:block;width:100%}
+.mq5-range{flex:1;min-width:180px;accent-color:#0891b2}
+.mq5-btn{font:inherit;font-size:13px;font-weight:600;color:var(--accent-teal);background:#f0fdfa;border:1px solid #ccfbf1;border-radius:8px;padding:7px 14px;cursor:pointer;transition:.15s}
+.mq5-btn:hover{background:#ccfbf1}
+.mq5-reads{margin-top:10px;font-family:var(--font-mono);font-size:13px;color:var(--text-body);background:var(--bg-soft);border:1px solid var(--border);border-radius:8px;padding:8px 12px}
+.mq5-verdict{margin-top:10px;font-size:13.5px;line-height:1.75;color:var(--text-body);border-left:3px solid var(--accent-teal);background:rgba(13,148,136,.06);border-radius:0 8px 8px 0;padding:9px 13px}
+.expnav{display:flex;justify-content:space-between;gap:14px;margin-top:44px;padding-top:22px;border-top:1px solid var(--border)}
+.expnav a{flex:1;text-decoration:none;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;
+  padding:15px 18px;transition:.28s}
+.expnav a:hover{border-color:var(--accent-teal);box-shadow:var(--shadow-md);transform:translateY(-2px)}
+.expnav .dir{font-size:11.5px;color:var(--text-muted);font-family:var(--font-mono)}
+.expnav .t{font-size:14.5px;color:var(--text-primary);font-weight:600;margin-top:4px}
+.expnav .r{text-align:right}
+footer{max-width:1340px;margin:20px auto 0;padding:24px 32px 44px;border-top:1px solid var(--border);
+  text-align:center;font-size:12.5px;color:var(--text-muted)}
+.reveal{opacity:0;transform:translateY(16px);transition:opacity .5s,transform .5s}
+.reveal.visible{opacity:1;transform:none}
+@media (max-width:1000px){
+  .sidebar{position:fixed;left:0;top:60px;bottom:0;z-index:55;border-radius:0;transform:translateX(-110%);transition:transform .3s;overflow:auto;max-height:none}
+  .sidebar.open{transform:none}
+  .menu-btn{display:block}
+  .layout{padding:20px;gap:0}
+  .exp-head{padding:22px}
+}
+@media (prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}}
+
+/* 指导书实操截图图廊 */
+.figs-guide{margin:1rem 0 .4rem;padding:.9rem 1rem;background:#f8fafc;border:1px dashed #94a3b8;border-radius:12px}
+.figs-guide h4{font-size:.88rem;margin:0 0 .7rem;color:#334155;display:flex;gap:.4rem;align-items:center}
+.figgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:.8rem}
+.fg{margin:0;background:#fff;border:1px solid var(--border,#e2e8f0);border-radius:10px;padding:.5rem;cursor:zoom-in;transition:.2s}
+.fg:hover{box-shadow:0 6px 18px rgba(13,148,136,.15);transform:translateY(-2px)}
+.fg img{width:100%;display:block;border-radius:6px;background:#fff}
+.fg figcaption{font-size:.74rem;color:#64748b;line-height:1.55;padding-top:.45rem}
+#lightbox{position:fixed;inset:0;background:rgba(15,23,42,.92);display:none;align-items:center;justify-content:center;z-index:99;cursor:zoom-out;padding:2vh 2vw}
+#lightbox.on{display:flex}
+#lightbox img{max-width:96vw;max-height:92vh;border-radius:8px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+
+/* ===== 命令分步卡（与 EXP-05 同款，供 06 节运行演示使用） ===== */
+.termbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:22px 0 10px}
+.termbar .tl{background:#0f172a;color:#fff;border-radius:999px;padding:3px 13px;font-family:var(--font-mono);font-size:11.5px;letter-spacing:.04em}
+.termbar b{font-size:14.5px;color:var(--text-primary)}
+.termbar .note{font-size:12.5px;color:var(--text-muted)}
+.cmdstep{--theme:var(--accent-teal);--theme-bg:#f0fdfa;--theme-bd:#ccfbf1;--theme-deep:#0f766e;
+  background:var(--bg-soft);border:1px solid var(--border);border-left:3px solid var(--theme);border-radius:12px;padding:13px 17px;margin:11px 0}
+.cmdstep .cs-hd{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.cmdstep .cs-no{font-family:var(--font-mono);font-size:12px;font-weight:700;background:var(--theme);color:#fff;border-radius:999px;min-width:22px;height:22px;text-align:center;line-height:22px;padding:0 5px;flex:none}
+.cmdstep .cs-hd b{font-size:14.5px;color:var(--text-primary)}
+.cmdstep .cs-where{margin-left:auto;font-family:var(--font-mono);font-size:11px;background:var(--theme-bg);color:var(--theme-deep);border:1px solid var(--theme-bd);border-radius:999px;padding:3px 11px;white-space:nowrap}
+.cmdstep .cs-why{font-size:13.5px;color:#475569;margin:7px 0 0;line-height:1.8}
+.cmdstep pre{margin:9px 0 0;font-size:13px;padding:13px 16px}
+.cmdstep table{margin:10px 0 0;font-size:13.5px}
+.cmdstep .cs-see{font-size:12.5px;color:#0f766e;margin:8px 0 0;line-height:1.75}
+.cmdstep .io{margin:9px 0 0;font-size:12.5px;color:#cbd5e1;background:#0f172a;border-radius:10px;padding:13px 16px;line-height:1.8;font-family:var(--font-mono);white-space:pre-wrap;overflow-x:auto}
+.cmdstep .io .dim{color:#64748b}
+.cmdstep .io .g{color:#4ade80}
+.cmdstep .io .w{color:#fbbf24}
+.cmdstep .io .y{color:#fbbf24}
+
+/* ===== 生活类比 / 标签行 ===== */
+.cmp-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:18px 0}
+@media(max-width:720px){.cmp-grid{grid-template-columns:1fr}}
+.cmp-box{border:1px solid var(--border);border-radius:12px;padding:14px 16px;background:var(--bg-card)}
+.cmp-box.bad{border-color:#fecaca;background:#fff7f7}
+.cmp-box.good{border-color:#99f6e4;background:#f6fffd}
+.cmp-box h5{margin:0 0 8px;font-size:14px;color:var(--text-primary);display:flex;align-items:center;gap:8px}
+.cmp-box ul{margin:0;padding-left:18px;font-size:13px;line-height:1.85;color:var(--text-secondary)}
+.cmp-box li b{color:var(--text-primary)}
+
+/* ===== QoS 模拟实验台 ===== */
+.sim-line{display:flex;align-items:center;gap:10px;margin:9px 0}
+.sim-lb{width:88px;flex:none;font-size:12px;color:var(--text-secondary);font-family:var(--font-mono)}
+.sim-cells{display:flex;gap:6px;flex-wrap:wrap}
+.sim-cells .cell{width:27px;height:27px;border-radius:7px;background:#e2e8f0;border:1px solid var(--border);
+  display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:11px;color:#94a3b8;transition:.35s}
+.sim-cells .cell.sent{background:#ccfbf1;border-color:#5eead4;color:#0f766e}
+.sim-cells .cell.recv{background:#dcfce7;border-color:#86efac;color:#15803d}
+.sim-cells .cell.hold{background:#fef3c7;border-color:#fcd34d;color:#b45309}
+.sim-cells .cell.lost{background:#fee2e2;border-color:#fecaca;color:#b91c1c}
+.sim-cells .cell.miss{background:#f1f5f9;border-color:#e2e8f0;color:#cbd5e1;text-decoration:line-through}
+.sim-legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--text-secondary);margin:10px 0 0}
+.sim-legend i{display:inline-block;width:12px;height:12px;border-radius:4px;margin-right:5px;vertical-align:-1px}
+.sim-log{margin-top:12px;background:#0f172a;color:#cbd5e1;border-radius:10px;padding:13px 16px;
+  font-family:var(--font-mono);font-size:12.5px;line-height:1.85;white-space:pre-wrap;min-height:76px}
+.sim-log .g{color:#4ade80}.sim-log .r{color:#fca5a5}.sim-log .y{color:#fbbf24}.sim-log .d{color:#64748b}
+.sim-verdict{margin-top:10px;padding:11px 14px;border-radius:10px;font-size:13.5px;font-weight:700;text-align:center}
+.sim-verdict.ok{background:#f0fdfa;border:1px solid #99f6e4;color:var(--accent-teal)}
+.sim-verdict.bad{background:#fef2f2;border:1px solid #fecaca;color:var(--accent-rose)}
+.sim-verdict.warn{background:#fffbeb;border:1px solid #fde68a;color:#b45309}
+.qos-task{margin:16px 0 0}
+.qos-task table{font-size:13px}
+.switch-row{display:flex;align-items:center;gap:8px;margin:12px 0 2px;font-size:13px;color:var(--text-secondary)}
+.switch-row input{width:16px;height:16px;accent-color:var(--accent-teal)}
+.btn-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:12px}
+.btn.ghost{background:#fff;color:var(--accent-teal);border:1px solid #99f6e4}
+.btn.ghost:hover{background:#f0fdfa;color:#0f766e}
+/* goal supplement */
+section.blk>h2 .no{font-family:var(--font-mono);font-size:13px;font-weight:700;color:#fff;background:#1e293b;border-radius:8px;padding:2px 9px;letter-spacing:.05em;flex:none}
+.kcard p{font-size:13.5px;line-height:1.75;color:#475569;margin:6px 0 0}
+.tip .lab{display:inline-block;font-size:12px;font-weight:700;color:var(--accent-blue);background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.25);border-radius:999px;padding:1px 10px;margin:0 8px 2px 0;vertical-align:1px}
+code{font-family:var(--font-mono);font-size:.92em;background:var(--bg-soft);border:1px solid var(--border);border-radius:5px;padding:1px 6px}
+pre code{background:transparent;border:none;padding:0;font-size:inherit;color:inherit}
+code.inline{font-family:var(--font-mono);font-size:13px;color:var(--accent-blue);background:var(--bg-tint);border-radius:5px;padding:2px 7px}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="logo" href="../index.html"><span class="dot"></span>具身智能课程 · 教程首页</a>
+  <button class="menu-btn" onclick="document.querySelector('.sidebar').classList.toggle('open')">☰ 目录</button>
+  <div class="crumb"><a href="../index.html">ROS2 应用开发</a> / <b>实验 06 话题通讯</b></div>
+</div>
+
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="st">本实验章节</div>
+    <a href="#goal">★ 课程目标</a>
+    <a href="#s6" class="active"><span class="n">01</span>跑出现象：MQ5 浓度流</a>
+    <a href="#s1"><span class="n">02</span>问题引入与原理：一份数据，为什么走话题</a>
+    <a href="#s4"><span class="n">03</span>QoS：传输合同 + 实验台</a>
+    <a href="#s7"><span class="n">04</span>实验步骤：框架 → 代码 → 现象</a>
+    <a href="#s8"><span class="n">05</span>动手任务：改点新东西来验证</a>
+    <a href="#s9"><span class="n">06</span>注意事项与验收清单</a>
+    <a href="#s10"><span class="n">07</span>实验总结与思考题</a>
+    <hr>
+    <div class="other">本课程其它实验</div>
+    <div class="other">
+      <a href="../exp-05-node/index.html">▷ 05 · 节点</a>
+      <a href="../exp-07-service/index.html">▷ 07 · 服务通讯</a>
+      <a href="../exp-08-action/index.html">▷ 08 · 动作通讯</a>
+      <a href="../exp-09-custom-msg/index.html">▷ 09 · 自定义接口消息</a>
+      <a href="../exp-10-parameter/index.html">▷ 10 · 参数服务</a>
+    </div>
+  </aside>
+
+  <main class="main">
+
+    <div class="exp-head reveal">
+      <span class="code">EXP-06 · 4 学时 · 难度 ⭐⭐</span>
+      <h1>ROS2 话题通讯原理（MQ5 气体传感器）</h1>
+      <p class="desc">传感器数据像河水一样持续流动，如何让"生产数据的节点"和"使用数据的节点"互不干扰地协作？本实验以真实 MQ5 可燃气体传感器为载体，讲透 ROS2 <b>发布/订阅</b>模型、<b>QoS 三要素</b>与 <b>MQ5 对数换算</b>三条原理主线，并完成"DAC 采集 → 物理量换算 → Float32 发布 → 报警判定"全链路实操。</p>
+      <div class="meta-row">
+        <span class="tag teal">ROS2 Humble</span><span class="tag teal">rclpy</span>
+        <span class="tag">Publisher / Subscriber</span><span class="tag">QoS</span><span class="tag violet">MQ5 · ADC</span>
+        <span class="tag">实验箱 B2</span>
+      </div>
+    </div>
+
+        <!-- 00 课程目标 -->
+    <section class="blk reveal" id="goal">
+<h2><span class="no">目标</span>本课学完，你应该能做到</h2>
+<div class="kgrid">
+  <div class="kcard"><div class="kd">① 说清模型</div><div class="kt">异步发布 / 订阅</div><p>能阐述 Publisher 与 Subscriber 如何通过话题名解耦、DDS 如何自动完成发现与分发，并说明 QoS 三要素（Reliability / Durability / History Depth）如何影响通信行为。</p></div>
+  <div class="kcard"><div class="kd">② 掌握链路</div><div class="kt">从采样到回调</div><p>掌握 <code>gas_sensor_node</code>（发布）与 <code>gas_monitor</code>（订阅）从参数声明、QoS 配置到消息收发回调的完整编程链路。</p></div>
+  <div class="kcard"><div class="kd">③ 独立验证</div><div class="kt">自己造出证据</div><p>能独立运行 MQ5 收发节点，用 <code>topic echo/hz/info</code> 观察浓度、频率与类型，并用 <code>--ros-args -p</code> 动态改 <code>publish_period</code> 与报警阈值。</p></div>
+  <div class="kcard"><div class="kd">④ 迁移应用</div><div class="kt">换传感器照样套</div><p>能把「ADC 采集 → 物理量换算 → Float32 发布」这套模型迁移到温湿度、心率血氧等其它持续数据流传感器。</p></div>
+</div>
+<div class="tip tealb"><span class="lab">本课的重点与难点</span>
+<b>重点</b>：QoS 的"请求 ≤ 提供"兼容规则——这是"两头都起了、数据却不来"最常见的原因。<br>
+<b>难点</b>：把 MQ5 的电压读数经对数换算成 ppm（<b>parts per million，百万分之一</b>，气体浓度单位）；以及理解"发布者根本不知道有几个订阅者"。</div>
+<div class="tip amber"><span class="lab">和前后的关系</span>
+本课的 <code>gas_sensor_node</code> 在 <b>EXP-05 已从"节点结构"角度拆过</b>；本课换到"话题"角度再看一遍，会发现同一份代码能讲出两层知识。</div>
+</section>
+
+    <section class="blk reveal" id="s6">
+      <h2><span class="sn">01</span>跑出现象：一步步跑出 MQ5 浓度在话题上流动</h2>
+      <p class="lead">先别急着啃原理——<b>把系统跑起来，看它到底长什么样</b>。下面按终端分成四段，一条命令一张卡：每条都告诉你<b>为什么敲它</b>，以及<b>敲完屏幕上应该出现什么</b>。逐条对照，现象对上了；再带着「为什么会这样」的疑问进入后面的原理与代码，会轻松很多。</p>
+
+      <div class="termbar"><span class="tl">终端 A</span><b>编译与加载环境</b><span class="note">（只做一次，做完可以一直用）</span></div>
+
+      <div class="cmdstep">
+        <div class="cs-hd"><span class="cs-no">1</span><b>编译 ros_sensor 包并 source</b><span class="cs-where">终端 A</span></div>
+        <p class="cs-why"><code>ros_sensor</code> 是存放传感器节点的功能包（<code>gas_sensor_node</code> / <code>gas_monitor</code> 都在里面）；<code>ros_sensor_interfaces</code> 是它依赖的接口包。<b>用 <code class="inline">--packages-select</code> 点名编译这两个包</b>——工作空间里包一多，全量编译既慢又容易连带报错。编译顺序由 colcon 按依赖自动排，不用你操心。<code>source</code> 的作用是让当前终端<b>知道去哪儿找这些包</b>，每新开一个终端都要重新 source 一次。</p>
+        <pre data-copy="cmd"><span class="c"># ① 进工作空间，并先加载 ROS2 本体（underlay）</span>
+cd ~/ros2_ws
+source /opt/ros/humble/setup.bash
+<span class="c"># ② 只编译本实验需要的两个包：节点包 + 它依赖的接口包</span>
+<span class="c">#    用 --packages-select 点名，不碰工作空间里其它包，快且不易连带报错</span>
+colcon build --packages-select ros_sensor ros_sensor_interfaces
+<span class="c"># ③ 把工作空间注册进当前终端（新终端必做，不能省）</span>
+source install/setup.bash</pre>
+        <p class="cs-see">✔ 结尾出现 <code>Summary: N packages finished</code>（N = 你工作空间里的包总数，全编了就行）；<code>source</code> 本身没有任何输出（沉默即成功）</p>
+      </div>
+
+      <div class="termbar"><span class="tl">终端 B</span><b>启动发布端</b><span class="note">（这个终端会被一直占住，别关）</span></div>
+
+      <div class="tip tealb" style="margin:14px 0 0">
+      📏 <b>先弄清一个单位：PPM（parts per million，百万分之一）</b><br>
+      等一下日志里会一直出现 <code>ppm=312.91</code> 这样的数，先说明它是什么：<b>PPM 是 "parts per million" 的缩写，字面意思就是"百万分之一"</b>，用来表示<b>极小的比例</b>。<br>
+      · 用在气体浓度上：<b>一百万份空气里，混了多少份目标气体</b>。312.91 ppm ≈ 每 100 万份空气里有约 313 份可燃气体。<br>
+      · 换算成百分比更直观：<b>312.91 ppm ≈ 0.031%</b>；本课默认报警阈值 500 ppm ≈ 0.05%——<b>浓度都很低，靠鼻子闻不出来，所以必须靠传感器</b>。<br>
+      · 记住两个量级参照：<b>1000 ppm = 0.1%</b>；<b>10000 ppm = 1%</b>。看到 4 位数的 ppm 就说明已经是"百分之几"了。<br>
+      · 为什么不用百分比：可燃气体在爆炸下限之前往往只有几百到几千 ppm，写成 0.03% 既不方便比大小，也不方便设阈值，所以行业统一用 ppm。</div>
+
+      <div class="cmdstep">
+        <div class="cs-hd"><span class="cs-no">2</span><b>运行 MQ5 采集节点</b><span class="cs-where">终端 B</span></div>
+        <p class="cs-why">这就是数据的源头：它每秒读一次 ADC，<b>把电压换算成 ppm 浓度</b>（换算公式在第 4 节讲），然后把数值"喊"到 <code>/gas_sensor</code> 这个话题上。</p>
+        <pre data-copy="cmd"><span class="c"># 新终端必做：进目录 + 加载本工作空间（不然找不到 ros_sensor）</span>
+cd ~/ros2_ws
+source install/setup.bash
+<span class="c"># 启动 MQ5 采集节点（普通用户即可，不需要 sudo）</span>
+ros2 run ros_sensor gas_sensor_node</pre>
+        <div class="io"><span class="dim">$ ros2 run ros_sensor gas_sensor_node</span>
+<span class="g">[INFO]</span> [1728000001.123] [gas_sensor_node]: raw=1404 voltage=1.714V ppm=312.91
+<span class="g">[INFO]</span> [1728000002.124] [gas_sensor_node]: raw=1405 voltage=1.715V ppm=313.68
+<span class="g">[INFO]</span> [1728000003.126] [gas_sensor_node]: raw=1403 voltage=1.713V ppm=312.15
+<span class="dim">…每秒一行，持续滚动</span></div>
+        <p class="cs-see">✔ 每秒稳定打印一行 <code>raw=… voltage=…V ppm=…</code>：raw 是 ADC 原始值、voltage 是换算出的电压、ppm 是最终浓度。<b>光标停住不返回，正是节点在持续工作的样子</b>，停止请按 <code>Ctrl+C</code>。</p>
+        <figure class="img-block" onclick="lbShow(this)" style="cursor:zoom-in;margin:12px 0 0">
+          <img src="../assets/image-20260821183128226.png" alt="指导书原图：B2 实验箱上的 MQ5 气敏传感器模块位置（红框标注）" loading="lazy">
+          <figcaption>实拍｜<b>MQ5 传感器板在哪</b>：红框内就是气敏元件（实验箱上标着"气敏传感器模块"的那块小板）。这段代码每秒读的就是它——读不到就会出现 <code>读取 ADC 失败</code>，先回来检查接线。</figcaption>
+        </figure>
+      </div>
+
+      <div class="termbar"><span class="tl">终端 C</span><b>启动订阅端</b><span class="note">（B 保持运行，别停）</span></div>
+
+      <div class="cmdstep">
+        <div class="cs-hd"><span class="cs-no">3</span><b>运行报警监控节点</b><span class="cs-where">终端 C</span></div>
+        <p class="cs-why">它订阅同一个话题。注意：它<b>完全不知道</b>发布端在哪、是谁——只知道"我去 <code>/gas_sensor</code> 这个频道听"。</p>
+        <pre data-copy="cmd"><span class="c"># 同样的固定开场：进目录 + source（新终端必做）</span>
+cd ~/ros2_ws
+source install/setup.bash
+<span class="c"># 启动订阅 / 报警节点</span>
+ros2 run ros_sensor gas_monitor</pre>
+        <div class="io"><span class="dim">$ ros2 run ros_sensor gas_monitor</span>
+<span class="g">[INFO]</span> [gas_monitor]: 浓度正常: 312.91 ppm
+<span class="g">[INFO]</span> [gas_monitor]: 浓度正常: 313.68 ppm
+<span class="g">[INFO]</span> [gas_monitor]: 浓度正常: 312.15 ppm</div>
+        <p class="cs-see">✔ 数值与终端 B 的 <code>ppm</code> <b>一一对应</b>——这就是消息真的走通了。默认阈值 500 ppm，所以此刻打印的是"浓度正常"。</p>
+        <figure class="img-block" onclick="lbShow(this)" style="cursor:zoom-in;margin:12px 0 0">
+          <img src="../assets/image-20260821182700575.png" alt="指导书原图：gas_monitor 订阅节点运行现象，每秒打印浓度正常" loading="lazy">
+          <figcaption>实拍｜<b>订阅端的真实日志</b>：连续几行 <code>[gas_monitor]: 浓度正常: xx.xx ppm</code>，数值与终端 B 的 ppm 同步跳动。一旦人为靠近气源，这里就会变成 <code>[报警] 气体浓度超标</code>。</figcaption>
+        </figure>
+      </div>
+
+      <div class="termbar"><span class="tl">终端 D</span><b>从外部观察这条话题</b><span class="note">（这是排查问题最常用的一套命令）</span></div>
+
+      <div class="cmdstep">
+        <div class="cs-hd"><span class="cs-no">4</span><b>先看系统里有哪些节点</b><span class="cs-where">终端 D</span></div>
+        <p class="cs-why">这条命令给整个系统"点名"：现在到底有哪些节点活着。</p>
+        <pre data-copy="cmd"><span class="c"># 新终端开场：进目录 + source（后面的命令都在这个终端里敲，不用再 source）</span>
+cd ~/ros2_ws
+source install/setup.bash
+<span class="c"># 给整个系统的节点"点名"</span>
+ros2 node list</pre>
+        <div class="io"><span class="dim">$ ros2 node list</span>
+/gas_monitor
+/gas_sensor_node</div>
+        <p class="cs-see">✔ 两个节点都在，说明发布与订阅程序都活着</p>
+      </div>
+
+      <div class="cmdstep">
+        <div class="cs-hd"><span class="cs-no">5</span><b>看有哪些话题</b><span class="cs-where">终端 D</span></div>
+        <p class="cs-why">列出当前活跃的话题。除了业务话题，还会看到两个以 <code>/</code> 开头的系统话题。</p>
+        <pre data-copy="cmd"><span class="c"># 列出当前活跃的话题（本终端已 source 过，直接敲）</span>
+ros2 topic list</pre>
+        <div class="io"><span class="dim">$ ros2 topic list</span>
+/gas_sensor           <span class="w">← 本实验的业务话题（Float32 浓度）</span>
+/parameter_events     <span class="w">← 每个节点自带的参数事件话题</span>
+/rosout               <span class="w">← 全局日志话题</span></div>
+        <p class="cs-see">✔ 看到 <code>/gas_sensor</code> 就说明发布端已经成功登记了话题</p>
+      </div>
+
+      <div class="cmdstep">
+        <div class="cs-hd"><span class="cs-no">6</span><b>看话题的类型与收发端数量</b><span class="cs-where">终端 D</span></div>
+        <p class="cs-why">这条命令回答两个关键问题：<b>发的什么类型？谁在发、谁在收？</b>加 <code>--verbose</code> 还能看到两端的 QoS（见 03 节）。</p>
+        <pre data-copy="cmd"><span class="c"># 看这条话题的类型 + 谁在发、谁在收</span>
+ros2 topic info /gas_sensor
+<span class="c"># 再加一把 --verbose：还能看到两端的 QoS 参数</span>
+ros2 topic info /gas_sensor --verbose</pre>
+        <div class="io"><span class="dim">$ ros2 topic info /gas_sensor</span>
+Type: std_msgs/msg/Float32
+Publisher count: <span class="w">1</span>
+Subscription count: <span class="w">1</span></div>
+        <p class="cs-see">✔ 类型是 <code>std_msgs/msg/Float32</code>；此时如果你在另一个终端再开 <code>ros2 topic echo</code>，Subscription count 会变成 2 —— 这就是"一对多"的直接证据</p>
+      </div>
+
+      <div class="cmdstep">
+        <div class="cs-hd"><span class="cs-no">7</span><b>实时"偷听"话题内容（第三方订阅者）</b><span class="cs-where">终端 D</span></div>
+        <p class="cs-why">这是话题调试最重要的命令：<b>不改任何代码</b>，直接把自己变成第三个订阅者。发布端完全不知道你的存在——这正是话题"位置透明"的体现。</p>
+        <pre data-copy="cmd"><span class="c"># 变成第三个订阅者实时"偷听"；随时 Ctrl+C 停止</span>
+ros2 topic echo /gas_sensor</pre>
+        <div class="io"><span class="dim">$ ros2 topic echo /gas_sensor</span>
+data: 312.91
+---
+data: 313.68
+---</div>
+        <p class="cs-see">✔ 每秒打印一条 <code>data: …</code>，与终端 B、C 的数值同步</p>
+      </div>
+
+      <div class="cmdstep">
+        <div class="cs-hd"><span class="cs-no">8</span><b>测发布频率</b><span class="cs-where">终端 D</span></div>
+        <p class="cs-why">频率是判断"数据流是否健康"最直观的指标。当前 <code>publish_period</code> 默认为 1.0 秒，所以应该是 1Hz。</p>
+        <pre data-copy="cmd"><span class="c"># 测这条话题的发布频率；随时 Ctrl+C 停止</span>
+ros2 topic hz /gas_sensor</pre>
+        <div class="io"><span class="dim">$ ros2 topic hz /gas_sensor</span>
+average rate: <span class="w">1.000</span>
+  min: 0.999s max: 1.001s std dev: 0.00052s window: 10</div>
+        <p class="cs-see">✔ <code>average rate: 1.000</code> 说明发布端严格按 1 秒一次的节奏在发</p>
+      </div>
+
+      <div class="termbar"><span class="tl">终端 B / C</span><b>不改代码，改运行参数</b><span class="note">（改完回头看现象的变化）</span></div>
+
+      <div class="cmdstep">
+        <div class="cs-hd"><span class="cs-no">9</span><b>把发布周期改成 0.5 秒</b><span class="cs-where">终端 B 重启</span></div>
+        <p class="cs-why">发布周期做成了参数，所以不用改源码就能调快。注意参数覆盖必须用 <code>:=</code>，用等号 <code>=</code> 不生效。</p>
+        <pre data-copy="cmd"><span class="c"># 在终端 B 按 Ctrl+C 停掉，再用参数重启</span>
+ros2 run ros_sensor gas_sensor_node --ros-args -p publish_period:=<span class="b">0.5</span></pre>
+        <div class="io"><span class="dim">$ ros2 topic hz /gas_sensor</span>
+average rate: <span class="w">2.000</span>          <span class="w">← 频率翻倍了！</span></div>
+        <p class="cs-see">✔ 终端 B 的日志打印变快一倍，终端 C 的"浓度正常"也跟着变快——<b>发布节奏变了，所有订阅者自动跟着变</b></p>
+      </div>
+
+      <div class="cmdstep">
+        <div class="cs-hd"><span class="cs-no">10</span><b>把报警阈值降到 100 ppm</b><span class="cs-where">终端 C 重启</span></div>
+        <p class="cs-why">默认阈值 500 ppm，传感器在正常环境读数只有几百以内，很难触发；把阈值压低，就能立刻看到报警路径。</p>
+        <pre data-copy="cmd"><span class="c"># 在终端 C 按 Ctrl+C 停掉，再用参数重启</span>
+ros2 run ros_sensor gas_monitor --ros-args -p alarm_threshold:=<span class="b">100.0</span></pre>
+        <div class="io"><span class="dim">$ ros2 run ros_sensor gas_monitor --ros-args -p alarm_threshold:=100.0</span>
+<span class="w">[WARN]</span> [gas_monitor]: [报警] 气体浓度超标: 312.91 ppm >= 100.0 ppm
+<span class="w">[WARN]</span> [gas_monitor]: [报警] 气体浓度超标: 313.68 ppm >= 100.0 ppm</div>
+        <p class="cs-see">✔ 日志从 <code>INFO 浓度正常</code> 变成 <code>WARN [报警]</code>——同一个话题、同一份数据，阈值一变，行为立刻改变</p>
+      </div>
+
+      <div class="tip tealb">🧪 <b>物理验证（最能说明问题的一步）</b>：用打火机（<b>只按放气、绝不点火</b>）对着 MQ5 传感器放一点气，终端 B 的 ppm 会明显跳升，终端 C 立即触发 <code>[报警]</code>——这说明"采集 → 换算 → 发布 → 订阅 → 判定"整条链路同时正确。测试完请开窗通风。</div>
+      <div class="tip amber">⚠️ <b>手上没有 B2 实验箱 / 没接 MQ5 怎么办？</b>终端 B 会每秒打印 <code>读取 ADC 失败: …</code>。这不影响理解话题机制，但看不到真实浓度。可以改用话题名与类型完全相同的手动发布来替代第 2 步：<br><code class="inline">ros2 topic pub /gas_sensor std_msgs/msg/Float32 "{data: 320.0}" -r 1</code><br>终端 C 与终端 D 的全部命令照常可用。</div>
+
+      <table>
+        <thead><tr><th>操作</th><th>你应该看到</th></tr></thead>
+        <tbody>
+          <tr><td><code>ros2 run ros_sensor gas_sensor_node</code></td><td>每秒一行 <code>raw=1404 voltage=1.714V ppm=312.91</code></td></tr>
+          <tr><td><code>ros2 run ros_sensor gas_monitor</code></td><td>每秒一行 <code>浓度正常: 312.91 ppm</code>（与发布端数值一致）</td></tr>
+          <tr><td><code>ros2 node list</code></td><td><code>/gas_sensor_node</code> 与 <code>/gas_monitor</code> 同时出现</td></tr>
+          <tr><td><code>ros2 topic info /gas_sensor</code></td><td>Type: <code>std_msgs/msg/Float32</code>，Publisher 1，Subscription ≥1</td></tr>
+          <tr><td><code>ros2 topic hz /gas_sensor</code></td><td>default 下 <code>1.000 Hz</code>；<code>publish_period:=0.5</code> 后 <code>2.000 Hz</code></td></tr>
+          <tr><td>第三方 <code>ros2 topic echo</code></td><td>可同时收到数据（一对多验证），发布端毫无感知</td></tr>
+          <tr><td><code>alarm_threshold:=100.0</code></td><td>订阅端出现 <code>[报警] 气体浓度超标</code> 的 WARN 日志</td></tr>
+          <tr><td>关闭发布端（终端 B 按 Ctrl+C）</td><td>订阅端静默等待，<b>不报错</b>，只是不再有新数据</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+<section class="blk reveal" id="s1">
+      <h2><span class="sn">02</span>问题引入与原理：一份数据，为什么要经过"话题"</h2>
+      <p class="lead">刚才那一屏数据已经跑通了。但它凭什么能跑通？先看需求——想象你在家做一个"燃气安全管家"：厨房装了 <b>MQ5 可燃气体传感器</b>，一旦浓度超标要立刻做四件事：手机弹通知、客厅声光报警器响、云端留一份记录、物业大屏同步显示。传感器每秒读一次数据，这四个"想听的人"都要拿到<b>同一份</b>。</p>
+
+      <div class="tip">🏠 <b>生活里到处都是这个结构</b>：小区广播站喊一句"三号楼停水"，不需要知道谁在家；电视台播新闻，不需要知道谁在看。共同点是——<b>一个人说，很多人听，而说话的人完全不必知道听众有谁</b>。这正是你刚才看到的：<code class="inline">gas_sensor_node</code> 根本不知道 <code class="inline">gas_monitor</code> 和 <code class="inline">ros2 topic echo</code> 在听。</div>
+
+      <p>如果不用话题，直接让传感器程序"挨个通知"这四个人呢？这是最朴素的点对点直连，一上手就会撞到四堵墙：</p>
+      <div class="kgrid">
+        <div class="kcard"><div class="kt">① 得先认识每一个收件人</div><div class="kd">每个接收方都要写死 IP + 端口。手机换个 WiFi、云服务换个地址，程序就得改。</div></div>
+        <div class="kcard"><div class="kt">② 加一个人就要改一次代码</div><div class="kd">明天想再加一块"微信提醒"，传感器程序要重新改、重新编译、重新上线——加听众的成本落在说话人身上。</div></div>
+        <div class="kcard"><div class="kt">③ 慢的会把快的拖死</div><div class="kd">云端网络卡了 3 秒，传感器就得等它 3 秒。采样节奏被别人的网速绑架，这在安全监控里是致命的。</div></div>
+        <div class="kcard"><div class="kt">④ 掉线重连全自己扛</div><div class="kd">对方没开机？连接断了？排队重发还是丢弃？这些工程细节全部落到业务代码里。</div></div>
+      </div>
+
+      <figure class="anim2d-block">
+        <svg class="anim2d" viewBox="0 0 680 340" xmlns="http://www.w3.org/2000/svg" role="img"
+             aria-label="点对点直连与话题广播的对比示意图">
+          <defs>
+            <marker id="a6" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+              <path d="M0,0 L6,3 L0,6 z" fill="#94a3b8"/>
+            </marker>
+            <marker id="a6r" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+              <path d="M0,0 L6,3 L0,6 z" fill="#e11d48"/>
+            </marker>
+            <marker id="a6t" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+              <path d="M0,0 L6,3 L0,6 z" fill="#0d9488"/>
+            </marker>
+          </defs>
+          <rect x="0" y="0" width="680" height="340" rx="12" fill="#f8fafc"/>
+
+          <text x="30" y="30" font-size="13.5" font-weight="700" fill="#b91c1c">① 点对点直连：4 条专线</text>
+          <rect x="30" y="42" width="300" height="250" rx="10" fill="#fff7f7" stroke="#fecaca"/>
+          <rect x="42" y="128" width="104" height="62" rx="10" fill="#fff" stroke="#e11d48" stroke-width="1.8"/>
+          <text x="94" y="154" text-anchor="middle" font-size="12.5" font-weight="700" fill="#9f1239">gas_sensor</text>
+          <text x="94" y="172" text-anchor="middle" font-size="10.5" fill="#94a3b8">发布端</text>
+          <line x1="150" y1="159" x2="206" y2="72" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#a6)"/>
+          <line x1="150" y1="159" x2="206" y2="127" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#a6)"/>
+          <line x1="150" y1="159" x2="206" y2="182" stroke="#e11d48" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#a6r)"/>
+          <line x1="150" y1="159" x2="206" y2="237" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#a6)"/>
+          <text x="152" y="205" font-size="10" fill="#e11d48">慢 → 等它</text>
+          <rect x="210" y="50" width="108" height="44" rx="8" fill="#fff" stroke="#e2e8f0"/>
+          <rect x="210" y="105" width="108" height="44" rx="8" fill="#fff" stroke="#e2e8f0"/>
+          <rect x="210" y="160" width="108" height="44" rx="8" fill="#fff" stroke="#fecaca"/>
+          <rect x="210" y="215" width="108" height="44" rx="8" fill="#fff" stroke="#e2e8f0"/>
+          <text x="264" y="70" text-anchor="middle" font-size="11" fill="#334155">手机通知</text>
+          <text x="264" y="85" text-anchor="middle" font-size="9.5" fill="#94a3b8">要 IP + 端口</text>
+          <text x="264" y="125" text-anchor="middle" font-size="11" fill="#334155">声光报警</text>
+          <text x="264" y="140" text-anchor="middle" font-size="9.5" fill="#94a3b8">要 IP + 端口</text>
+          <text x="264" y="180" text-anchor="middle" font-size="11" fill="#9f1239">云记录</text>
+          <text x="264" y="195" text-anchor="middle" font-size="9.5" fill="#f87171">网络卡、阻塞发布</text>
+          <text x="264" y="235" text-anchor="middle" font-size="11" fill="#334155">物业大屏</text>
+          <text x="264" y="250" text-anchor="middle" font-size="9.5" fill="#94a3b8">要 IP + 端口</text>
+          <text x="42" y="283" font-size="10.5" fill="#b91c1c">加一个听众 → 改一次发布端代码</text>
+
+          <text x="360" y="30" font-size="13.5" font-weight="700" fill="#0f766e">② 话题广播：1 条总线，听众自取</text>
+          <rect x="350" y="42" width="310" height="250" rx="10" fill="#f6fffd" stroke="#99f6e4"/>
+          <rect x="362" y="128" width="96" height="62" rx="10" fill="#fff" stroke="#0d9488" stroke-width="1.8"/>
+          <text x="410" y="154" text-anchor="middle" font-size="12.5" font-weight="700" fill="#0f766e">gas_sensor</text>
+          <text x="410" y="172" text-anchor="middle" font-size="10.5" fill="#94a3b8">发布端</text>
+          <line x1="462" y1="159" x2="512" y2="159" stroke="#0d9488" stroke-width="2.4" marker-end="url(#a6t)"/>
+          <line x1="516" y1="70" x2="516" y2="250" stroke="#0d9488" stroke-width="4" opacity=".28"/>
+          <text x="523" y="286" font-size="10.5" font-weight="700" fill="#0f766e">/gas_sensor</text>
+          <line x1="516" y1="72" x2="556" y2="72" stroke="#0d9488" stroke-width="1.6" marker-end="url(#a6t)"/>
+          <line x1="516" y1="127" x2="556" y2="127" stroke="#0d9488" stroke-width="1.6" marker-end="url(#a6t)"/>
+          <line x1="516" y1="182" x2="556" y2="182" stroke="#0d9488" stroke-width="1.6" marker-end="url(#a6t)"/>
+          <line x1="516" y1="237" x2="556" y2="237" stroke="#0d9488" stroke-width="1.6" stroke-dasharray="4 4" marker-end="url(#a6t)"/>
+          <rect x="560" y="50" width="94" height="44" rx="8" fill="#fff" stroke="#99f6e4"/>
+          <rect x="560" y="105" width="94" height="44" rx="8" fill="#fff" stroke="#99f6e4"/>
+          <rect x="560" y="160" width="94" height="44" rx="8" fill="#fff" stroke="#99f6e4"/>
+          <rect x="560" y="215" width="94" height="44" rx="8" fill="#fff" stroke="#e2e8f0" stroke-dasharray="4 3"/>
+          <text x="607" y="70" text-anchor="middle" font-size="11" fill="#334155">手机通知</text>
+          <text x="607" y="85" text-anchor="middle" font-size="9.5" fill="#94a3b8">只认话题名</text>
+          <text x="607" y="125" text-anchor="middle" font-size="11" fill="#334155">声光报警</text>
+          <text x="607" y="140" text-anchor="middle" font-size="9.5" fill="#94a3b8">只认话题名</text>
+          <text x="607" y="180" text-anchor="middle" font-size="11" fill="#334155">云记录</text>
+          <text x="607" y="195" text-anchor="middle" font-size="9.5" fill="#94a3b8">慢也不影响别人</text>
+          <text x="607" y="235" text-anchor="middle" font-size="11" fill="#64748b">临时加入 echo</text>
+          <text x="607" y="250" text-anchor="middle" font-size="9.5" fill="#94a3b8">上线就能收</text>
+          <text x="362" y="283" font-size="10.5" fill="#0f766e">发布端一行代码都不用改</text>
+        </svg>
+        <figcaption>图 6-1｜同一个"一对多"需求：左边是挨个通知，右边是把消息放到话题上让听众自取</figcaption>
+      </figure>
+
+      <p>话题通信把这四堵墙一次性拆掉：传感器只管把消息<b>放到 <code class="inline">/gas_sensor</code> 这个话题上</b>，谁想用谁就自己"竖起耳朵"订阅，随时加入、随时离开，发布者永远不需要知道现在有几个听众。</p>
+
+      <div class="tip tealb">💡 <b>话题通信的三个承诺</b>：① <b>一对多</b>——新订阅者随时插进来，发布端毫不知情（刚才 <code class="inline">ros2 topic echo</code> 就是这么插进去的）；② <b>异步</b>——发布只管把消息放到话题上就走，订阅者处理得慢也不拖累发布者；③ <b>位置透明</b>——双方只需约定<b>话题名 + 消息类型</b>，谁都不需要知道对方的 IP、端口、进程号。</div>
+
+      <h3 style="font-size:16px;color:var(--text-primary);margin:26px 0 0">那它内部到底怎么跑通的？四个环节</h3>
+      <p>"解耦"听起来抽象，其实全过程只有四步，每一步都有明确的承担者。看这张结构图——它把两个节点的<b>内部</b>拆开了，你会发现真正干活的并不是 <code class="inline">publish()</code> 那一行，而是它背后 DDS 的"收发管道"。</p>
+
+      <figure class="anim2d-block">
+        <svg class="anim2d" viewBox="0 0 680 372" xmlns="http://www.w3.org/2000/svg" role="img"
+             aria-label="话题通信内部结构图：发布端、DDS 数据空间、订阅端与四个环节">
+          <defs>
+            <marker id="a2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+              <path d="M0,0 L6,3 L0,6 z" fill="#2563eb"/>
+            </marker>
+            <marker id="a2t" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+              <path d="M0,0 L6,3 L0,6 z" fill="#0d9488"/>
+            </marker>
+          </defs>
+          <rect x="0" y="0" width="680" height="372" rx="12" fill="#f8fafc"/>
+
+          <rect x="24" y="16" width="150" height="34" rx="9" fill="#e0f2fe" stroke="#7dd3fc"/>
+          <text x="99" y="38" text-anchor="middle" font-size="12" font-weight="700" fill="#0369a1">① 注册端点</text>
+          <rect x="188" y="16" width="150" height="34" rx="9" fill="#e0f2fe" stroke="#7dd3fc"/>
+          <text x="263" y="38" text-anchor="middle" font-size="12" font-weight="700" fill="#0369a1">② 发现并匹配</text>
+          <rect x="352" y="16" width="150" height="34" rx="9" fill="#e0f2fe" stroke="#7dd3fc"/>
+          <text x="427" y="38" text-anchor="middle" font-size="12" font-weight="700" fill="#0369a1">③ 序列化传输</text>
+          <rect x="516" y="16" width="140" height="34" rx="9" fill="#e0f2fe" stroke="#7dd3fc"/>
+          <text x="586" y="38" text-anchor="middle" font-size="12" font-weight="700" fill="#0369a1">④ 回调执行</text>
+
+          <rect x="24" y="80" width="180" height="222" rx="12" fill="#fff" stroke="#0d9488" stroke-width="1.8"/>
+          <text x="114" y="103" text-anchor="middle" font-size="12.5" font-weight="700" fill="#0f766e">发布端 gas_sensor_node</text>
+          <rect x="36" y="116" width="156" height="34" rx="7" fill="#f0fdfa" stroke="#99f6e4"/>
+          <text x="114" y="138" text-anchor="middle" font-size="10.5" fill="#0f766e">create_publisher()</text>
+          <rect x="36" y="158" width="156" height="34" rx="7" fill="#f0fdfa" stroke="#99f6e4"/>
+          <text x="114" y="173" text-anchor="middle" font-size="10.5" fill="#0f766e">DDS Writer 发端管道</text>
+          <text x="114" y="186" text-anchor="middle" font-size="9.5" fill="#94a3b8">按 QoS 排队</text>
+          <rect x="36" y="200" width="156" height="34" rx="7" fill="#f0fdfa" stroke="#99f6e4"/>
+          <text x="114" y="215" text-anchor="middle" font-size="10.5" fill="#0f766e">发送队列 depth=10</text>
+          <text x="114" y="228" text-anchor="middle" font-size="9.5" fill="#94a3b8">KEEP_LAST(10)</text>
+          <rect x="36" y="242" width="156" height="42" rx="7" fill="#fff" stroke="#e2e8f0"/>
+          <text x="114" y="259" text-anchor="middle" font-size="10.5" fill="#334155">timer_cb() 定时采样</text>
+          <text x="114" y="274" text-anchor="middle" font-size="9.5" fill="#94a3b8">publish() 入队即返回</text>
+
+          <rect x="238" y="80" width="204" height="222" rx="12" fill="#eef4ff" stroke="#93c5fd" stroke-width="1.8"/>
+          <text x="340" y="103" text-anchor="middle" font-size="12.5" font-weight="700" fill="#1e40af">DDS 全局数据空间</text>
+          <text x="340" y="126" text-anchor="middle" font-size="11.5" font-family="monospace" fill="#2563eb">/gas_sensor</text>
+          <rect x="254" y="136" width="172" height="30" rx="7" fill="#fff" stroke="#bfdbfe"/>
+          <text x="340" y="155" text-anchor="middle" font-size="10.5" fill="#334155">类型 std_msgs/msg/Float32</text>
+          <rect x="254" y="172" width="172" height="30" rx="7" fill="#fff" stroke="#bfdbfe"/>
+          <text x="340" y="191" text-anchor="middle" font-size="10.5" fill="#334155">QoS 合同 RELIABLE / 10</text>
+          <rect x="254" y="208" width="172" height="30" rx="7" fill="#fff" stroke="#bfdbfe"/>
+          <text x="340" y="227" text-anchor="middle" font-size="10.5" fill="#334155">消息：Float32(312.91)</text>
+          <text x="340" y="262" text-anchor="middle" font-size="10" fill="#64748b">没有中心服务器，各自维护</text>
+          <text x="340" y="278" text-anchor="middle" font-size="10" fill="#64748b">"同名同类型"的收发管道</text>
+          <text x="340" y="294" text-anchor="middle" font-size="9.5" fill="#94a3b8">话题 = 名字 + 类型 + QoS</text>
+
+          <rect x="476" y="80" width="180" height="222" rx="12" fill="#fff" stroke="#2563eb" stroke-width="1.8"/>
+          <text x="566" y="103" text-anchor="middle" font-size="12.5" font-weight="700" fill="#1e40af">订阅端 gas_monitor</text>
+          <rect x="488" y="116" width="156" height="34" rx="7" fill="#eff6ff" stroke="#bfdbfe"/>
+          <text x="566" y="131" text-anchor="middle" font-size="10.5" fill="#1e40af">DDS Reader 收端管道</text>
+          <text x="566" y="144" text-anchor="middle" font-size="9.5" fill="#94a3b8">按 QoS 收下</text>
+          <rect x="488" y="158" width="156" height="34" rx="7" fill="#eff6ff" stroke="#bfdbfe"/>
+          <text x="566" y="179" text-anchor="middle" font-size="10.5" fill="#1e40af">接收队列</text>
+          <rect x="488" y="200" width="156" height="34" rx="7" fill="#eff6ff" stroke="#bfdbfe"/>
+          <text x="566" y="221" text-anchor="middle" font-size="10.5" fill="#1e40af">Executor（spin 循环）</text>
+          <rect x="488" y="242" width="156" height="42" rx="7" fill="#fff" stroke="#e2e8f0"/>
+          <text x="566" y="259" text-anchor="middle" font-size="10.5" fill="#334155">callback(msg) 你的代码</text>
+          <text x="566" y="274" text-anchor="middle" font-size="9.5" fill="#94a3b8">消息到了才被调用</text>
+
+          <line x1="208" y1="140" x2="234" y2="140" stroke="#0d9488" stroke-width="2" marker-end="url(#a2t)"/>
+          <line x1="446" y1="140" x2="472" y2="140" stroke="#2563eb" stroke-width="2" marker-end="url(#a2)"/>
+          <line x1="208" y1="250" x2="234" y2="250" stroke="#0d9488" stroke-width="2" marker-end="url(#a2t)"/>
+          <line x1="446" y1="250" x2="472" y2="250" stroke="#2563eb" stroke-width="2" marker-end="url(#a2)"/>
+          <text x="221" y="132" text-anchor="middle" font-size="9" fill="#0d9488">写</text>
+          <text x="459" y="132" text-anchor="middle" font-size="9" fill="#2563eb">读</text>
+          <text x="221" y="242" text-anchor="middle" font-size="9" fill="#0d9488">发现</text>
+          <text x="459" y="242" text-anchor="middle" font-size="9" fill="#2563eb">投递</text>
+          <text x="340" y="330" text-anchor="middle" font-size="11" fill="#94a3b8">两端从不直接对话：各自只跟"同名同类型的话题"打交道，中间的匹配与搬运由 DDS 完成</text>
+          <text x="340" y="352" text-anchor="middle" font-size="11" fill="#0d9488">一个消息发出去，所有订阅者同时收到各自的副本——发布端谁都不等</text>
+        </svg>
+        <figcaption>图 6-2｜话题通信内部结构：① 注册 → ② 发现匹配 → ③ 序列化传输 → ④ 回调执行</figcaption>
+      </figure>
+
+      <div class="kgrid">
+        <div class="kcard"><div class="kt">① 注册端点</div><div class="kd"><code class="inline">create_publisher(Float32, '/gas_sensor', qos)</code> 只是向本机 DDS 登记了一个"我在这里发这种消息"的端点，此刻<b>还没有任何连接</b>。</div></div>
+        <div class="kcard"><div class="kt">② 发现并匹配</div><div class="kd">DDS 在后台通过<b>组播</b>宣告"我在找/我在发 /gas_sensor"，把<b>话题名、类型、QoS</b> 三项都吻合的两端配对。代码里从来不需要写"连接服务器"。</div></div>
+        <div class="kcard"><div class="kt">③ 序列化传输</div><div class="kd"><code class="inline">publish(msg)</code> 把对象序列化成二进制（CDR），塞进发送队列后<b>立刻返回</b>——它不等任何订阅者。队列按 QoS 深度决定留多少条。</div></div>
+        <div class="kcard"><div class="kt">④ 回调执行</div><div class="kd">订阅端 DDS 收到数据放进接收队列，<b>Executor（由 spin 驱动）</b>取出并调用你注册的 <code class="inline">callback(msg)</code>。事件驱动，不空转轮询。</div></div>
+      </div>
+
+      <div class="tip amber">⚠️ <b>最容易误解的一点</b>：<code class="inline">publish()</code> 做的事是"把消息交给话题"，全程并不关心有没有订阅者在线。所以没有订阅者时发布照样成功；订阅者处理得慢，发布的频率也不会被拖慢。这就是"异步"的全部含义。</div>
+      <div class="tip">💡 <b>顺便记住分发的方式</b>：消息进入话题后是<b>同时</b>流向所有订阅者的——话题没有"排队依次通知"的概念，每个订阅者都有自己独立的 QoS 队列。刚才 <code class="inline">ros2 topic echo</code> 能一边看、<code class="inline">gas_monitor</code> 能一边判报警，就是各自收各自的副本。</div>
+
+      <table>
+        <thead><tr><th>对比维度</th><th>话题（本实验）</th><th>服务（EXP-07）</th></tr></thead>
+        <tbody>
+          <tr><td>通信关系</td><td>一对多，多对多</td><td>一对一</td></tr>
+          <tr><td>是否阻塞</td><td>异步，发完即走</td><td>同步，等应答</td></tr>
+          <tr><td>数据方向</td><td>持续单向流</td><td>请求 → 应答往返</td></tr>
+          <tr><td>典型场景</td><td>传感器读数、速度指令</td><td>查询、校准、触发一次动作</td></tr>
+        </tbody>
+      </table>
+      <div class="tip tealb">🔍 <b>状态自省</b>：运行时用 <code class="inline">ros2 topic info /gas_sensor --verbose</code> 可以看到类型、发布/订阅端数量，以及<b>两端的 QoS 参数</b>——"谁在发、谁在收、按什么规矩收"一目了然，不用读一行代码。</div>
+    </section>
+
+        <!-- 04 QoS -->
+    <section class="blk reveal" id="s4">
+      <h2><span class="sn violet">03</span>QoS：给话题签一份传输合同，并亲手签坏它</h2>
+      <p class="lead">同样是发数据，激光雷达"丢几帧无所谓、延迟必须低"，控制指令却"一条都不能丢"。ROS2 把这个选择权交给了 QoS（Quality of Service）：<b>每个话题都附带一套传输策略</b>——发布端提供一套，订阅端要求一套，DDS 逐项比对，匹配成功才建立连接。</p>
+
+      <h3 style="font-size:16px;color:var(--text-primary);margin:26px 0 0">按下场景选档位</h3>
+      <table>
+        <thead><tr><th>场景</th><th>Reliability</th><th>Durability</th><th>Depth</th><th>为什么</th></tr></thead>
+        <tbody>
+          <tr><td>MQ5 浓度（本实验）</td><td><code>RELIABLE</code></td><td><code>VOLATILE</code></td><td>10</td><td>1Hz 的关键安全数据，丢一条就漏一次报警</td></tr>
+          <tr><td>激光雷达点云 / 相机图像</td><td><code>BEST_EFFORT</code></td><td><code>VOLATILE</code></td><td>1～5</td><td>几十 Hz 且数据量大，宁可丢帧也别拖慢</td></tr>
+          <tr><td>地图 / 静态配置</td><td><code>RELIABLE</code></td><td><code>TRANSIENT_LOCAL</code></td><td>1</td><td>只发一次，晚启动的节点必须能拿到</td></tr>
+          <tr><td>速度指令 /cmd_vel</td><td><code>RELIABLE</code></td><td><code>VOLATILE</code></td><td>1</td><td>只要最新的一条，旧指令补发反而危险</td></tr>
+        </tbody>
+      </table>
+
+      <div class="tip amber">⚠️ <b>兼容规则（高频考点）</b>：订阅端要求的等级必须<b>不高于</b>发布端提供的等级，即"请求 ≤ 提供"。<br>
+      · 发布 <code class="inline">BEST_EFFORT</code> + 订阅 <code class="inline">RELIABLE</code> ⇒ <b>连不上</b>（订阅者要的可靠性，发布者给不了）<br>
+      · 发布 <code class="inline">RELIABLE</code> + 订阅 <code class="inline">BEST_EFFORT</code> ⇒ <b>能连</b>（订阅者自降要求，发布者照给）</div>
+
+      <h3 style="font-size:16px;color:var(--text-primary);margin:26px 0 0">动手验证：把合同"签坏"看看</h3>
+      <p>光看懂规则不够，下面这个实验台把抽象的兼容规则变成了几秒就能验证的实验：左边是发布端 <code class="inline">gas_sensor_node</code>，右边是订阅端 <code class="inline">gas_monitor</code>，改完档位点一下"跑 10 条消息"，模拟器就按 DDS 的规则逐条演示。建议按这张任务单操作，边做边对照上面的规则：</p>
+      <div class="qos-task">
+        <table>
+          <thead><tr><th>#</th><th>把两端改成</th><th>你会观察到</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>发布 <code>BEST_EFFORT</code>，订阅 <code>RELIABLE</code></td><td>DDS 拒绝匹配，订阅端<b>一条都收不到</b></td></tr>
+            <tr><td>2</td><td>两端都 <code>RELIABLE</code>，发布 depth 改成 <code>KEEP_LAST(1)</code></td><td>慢消费者场景下，中间的消息被新消息<b>覆盖丢弃</b></td></tr>
+            <tr><td>3</td><td>勾选"订阅端晚到"：Durability 先 <code>VOLATILE</code> 再 <code>TRANSIENT_LOCAL</code></td><td>前者错过加入前的全部数据；后者会<b>补发最后一条</b></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p style="margin-top:14px;font-size:13.5px;color:#475569">🎛️ 实验台就在下面：改两端档位，点"跑 10 条消息"，按上表的三个任务依次验证。</p>
+
+      <div class="ix-block">
+        <div class="ix-panel">
+          <div class="qos-row">
+            <div class="qos-box">
+              <h5>📤 发布端 gas_sensor_node（提供）</h5>
+              <label>Reliability <select id="pubRel">
+                <option value="R">RELIABLE（提供：可靠）</option>
+                <option value="B">BEST_EFFORT（提供：尽力）</option>
+              </select></label>
+              <label>Durability <select id="pubDur">
+                <option value="V">VOLATILE（不留存量）</option>
+                <option value="T">TRANSIENT_LOCAL（补发存量）</option>
+              </select></label>
+              <label>History Depth <select id="pubDep">
+                <option value="10">KEEP_LAST(10)</option>
+                <option value="1">KEEP_LAST(1)</option>
+                <option value="0">KEEP_ALL</option>
+              </select></label>
+            </div>
+            <div class="qos-box">
+              <h5>📥 订阅端 gas_monitor（要求）</h5>
+              <label>Reliability <select id="subRel">
+                <option value="R">RELIABLE（要求：可靠）</option>
+                <option value="B">BEST_EFFORT（要求：尽力）</option>
+              </select></label>
+              <label>Durability <select id="subDur">
+                <option value="V">VOLATILE（不补发）</option>
+                <option value="T">TRANSIENT_LOCAL（要补发）</option>
+              </select></label>
+              <label>History Depth <select id="subDep">
+                <option value="10">KEEP_LAST(10)</option>
+                <option value="1">KEEP_LAST(1)</option>
+                <option value="0">KEEP_ALL</option>
+              </select></label>
+            </div>
+          </div>
+
+          <div class="switch-row">
+            <input type="checkbox" id="subLate">
+            <label for="subLate">模拟"订阅端晚到"：发布端已经发了 4 条，<b>gas_monitor 才启动</b></label>
+          </div>
+
+          <div class="btn-row">
+            <button class="btn" onclick="simulateQos()">▶ 跑 10 条消息</button>
+            <button class="btn ghost" onclick="resetSim()">重置</button>
+            <span style="font-size:12.5px;color:var(--text-muted)">设定：发布端 0.5s 一条；订阅端是慢消费者（0.8s 才处理一条）</span>
+          </div>
+
+          <div id="qosResult" class="ok" style="margin-top:14px">✔ 兼容 —— 两端 QoS 请求 ≤ 提供，DDS 将建立连接（修改任一档位会实时重算）</div>
+
+          <div style="margin-top:16px">
+            <div class="sim-line"><span class="sim-lb">发布端发出</span><div class="sim-cells" id="simPub"></div></div>
+            <div class="sim-line"><span class="sim-lb">订阅端收到</span><div class="sim-cells" id="simSub"></div></div>
+            <div class="sim-legend">
+              <span><i style="background:#ccfbf1;border:1px solid #5eead4"></i>已发出并送达话题</span>
+              <span><i style="background:#dcfce7;border:1px solid #86efac"></i>回调已处理</span>
+              <span><i style="background:#fef3c7;border:1px solid #fcd34d"></i>存量补发</span>
+              <span><i style="background:#fee2e2;border:1px solid #fecaca"></i>丢弃</span>
+              <span><i style="background:#f1f5f9;border:1px solid #e2e8f0"></i>错过（当时不在线）</span>
+            </div>
+            <div class="sim-log" id="simLog">点击「▶ 跑 10 条消息」开始模拟……</div>
+            <div class="sim-verdict" id="simVerdict" style="display:none"></div>
+          </div>
+        </div>
+        <p class="ix-caption">互动 6-1｜改档位 → 跑消息 → 读结论。三条推荐实验见本节上方的任务单</p>
+      </div>
+
+      <div class="tip">💡 <b>这个模拟在帮你建立三件事的直觉</b>：<br>
+      ① <b>Reliability</b> 决定"传的过程中丢不丢"——BEST_EFFORT 会真的有消息到不了；<br>
+      ② <b>Depth</b> 决定"收端来不及处理时挤掉多少"——KEEP_LAST(1) 在慢消费者面前只剩最新一条；<br>
+      ③ <b>Durability</b> 决定"我晚到了能不能补课"——TRANSIENT_LOCAL 能把加入前最后一条补给你，VOLATILE 则永远错过。</div>
+      <div class="tip amber">⚠️ 注意：模拟器把"慢消费者"参数固定成 0.8s/条，是为了让 depth 的差别在几秒内可见。真实系统里这个数字来自你的回调耗时——回调写得慢，队列就容易堆积。</div>
+    </section>
+
+        <!-- 07 实验步骤 -->
+    <section class="blk reveal" id="s7">
+      <h2><span class="sn">04</span>实验步骤：先看懂框架，再读代码，最后自己跑出结果</h2>
+      <p class="lead">这一节换个顺序：<b>先看程序骨架（三份文件各管什么、谁调谁）→ 再逐段读关键代码（只讲非讲不可的几十行）→ 最后动手跑、把结果和预期对上</b>。反过来"先啃代码"最容易迷路——你会记住语法，却说不清这段代码为什么长这样。</p>
+
+      <h3 style="font-size:17px;color:var(--text-primary);margin:28px 0 0">第 1 步 · 先看骨架：三份文件，一条数据流</h3>
+      <p>刚才屏幕上的一切，来自三份代码。别急着看细节，先记住它们的<b>分工</b>——这份骨架看懂了，后面读代码只是填肉。</p>
+
+      <div class="flow" style="flex-direction:column;align-items:stretch">
+        <div class="step" style="flex:none"><div class="t">① common.py · 数据层</div><div class="d" style="font-family:inherit;font-size:13px">读 ADC → 换算成 ppm。只管"造数据"，不发、不收、不打印。</div></div>
+        <div class="ar" style="align-self:center;padding:4px 0">↓ 被 import</div>
+        <div class="step" style="flex:none"><div class="t">② gas_sensor_node.py · 发布端</div><div class="d" style="font-family:inherit;font-size:13px">定时器每秒调一次 common 的采集函数 → <code class="inline">publish()</code> 到 <code class="inline">/gas_sensor</code>。</div></div>
+        <div class="ar" style="align-self:center;padding:4px 0">↓ DDS 自动搬运（这一层你一行代码都不写）</div>
+        <div class="step" style="flex:none"><div class="t">③ gas_monitor.py · 订阅端</div><div class="d" style="font-family:inherit;font-size:13px">订阅 <code class="inline">/gas_sensor</code> → 收到就回调 → 与阈值比较 → 打印"正常 / 报警"。</div></div>
+      </div>
+
+      <div class="tip tealb">🧩 <b>一句话记住这个分工</b>：<code class="inline">common.py</code> 负责<b>算</b>，<code class="inline">gas_sensor_node.py</code> 负责<b>发</b>，<code class="inline">gas_monitor.py</code> 负责<b>判</b>。<b>中间的"搬运"一行代码都不用你写</b>——这正是 02 节讲的位置透明。想换成温度传感器？只改 <code class="inline">common.py</code> 的读取函数，发布和订阅端几乎不用动。</div>
+
+      <div class="tip">📍 <b>三份代码在同一个模块目录里</b>：<code class="inline">~/ros2_ws/src/xflz_eai_car1/driver/ros_sensor/ros_sensor/ros_sensor/</code>（外层 <code class="inline">ros_sensor/</code> 是包，里层同名目录才是放 .py 的），其中 <code class="inline">common.py</code> 被两个节点共用。建议边看边打开源码对照。</div>
+
+      <h3 style="font-size:17px;color:var(--text-primary);margin:28px 0 0">第 2 步 · 再读代码：三段非讲不可的地方</h3>
+      <p>下面按数据流动的顺序看三段代码。每段只抓关键几行——其余的 import、初始化、日志格式，你打开源码一眼就懂，这里不占篇幅。</p>
+
+      <h4 style="font-size:15.5px;color:var(--theme-deep);margin:24px 0 0">① common.py —— ppm 是算出来的，不是读出来的</h4>
+      <p><b>ppm 是什么</b>在 01 节已经说过（parts per million，百万分之一）。这一节补的关键点是：<b>它不是传感器直接读出来的数字</b>。MQ5 是半导体气敏元件，接触可燃气体时内阻下降；电路通过分压把这个电阻变化变成电压。而"电压"和"浓度"<b>不是线性关系</b>——它的灵敏特性曲线只有在双对数坐标下才近似直线，所以必须在对数域里插值，才能把电压反推成 ppm。</p>
+      <div class="flow">
+        <div class="step"><div class="t">① ADC 原始值</div><div class="d">raw × scale ÷ 1000</div></div>
+        <div class="ar">→</div>
+        <div class="step"><div class="t">② 电压 v (V)</div><div class="d">分压电路输出</div></div>
+        <div class="ar">→</div>
+        <div class="step"><div class="t">③ 电阻比 ratio</div><div class="d">rs = RL·(V_REF−v)/v</div></div>
+        <div class="ar">→</div>
+        <div class="step"><div class="t">④ ppm 浓度</div><div class="d">10^((lg ratio−B)/M)</div></div>
+      </div>
+
+      <div class="tip tealb">🔍 <b>raw 和 scale 各管一半</b>：<code class="inline">raw</code> 是 ADC 数出来的"格数"，12 位的一刀把量程切成 4096 格，取值 0~4095，本身不带单位；<code class="inline">scale</code> 是内核驱动按"满量程毫伏 ÷ 4096"提前算好、放进 sysfs 的系数，含义是 1 格等于多少毫伏（5 V 满量程约为 1.2207）。<b>两者相乘得到毫伏，再 ÷1000 才是伏特</b>：v = raw × scale ÷ 1000。拿日志验算一遍：1404 × 1.2207 ≈ 1714 mV，正是那行的 <code class="inline">voltage=1.714</code>。板子上的真值可以现场读：<code class="inline">cat /sys/bus/iio/devices/iio:device0/in_voltage_scale</code> 和 <code class="inline">…/in_voltage7_raw</code>，各板参考电压不同，以你 cat 出来的数为准。</div>
+
+      <div class="tip">🧭 <b>下面四步里第④步那行长公式，是这样推出来的</b>：<br>
+        ① 手册的灵敏度特性曲线放在双对数纸上近似一条直线，横轴 lg(ppm)、纵轴 lg(ratio)，套直线方程得 <code class="inline">lg(ratio) = M × lg(ppm) + B</code>；<br>
+        ② 把浓度反解出来：<code class="inline">lg(ppm) = (lg ratio − B) ÷ M</code>；<br>
+        ③ 两边同时取 10 的幂：<code class="inline">ppm = 10^((lg ratio − B) ÷ M)</code>。<br>
+        代入拟合系数 B = 0.186、M = −0.362，就是④显示的那一行。整条链上 B、M 是查手册曲线拟合来的固定值，每次采样真正变的只有 <code class="inline">ratio</code>。</div>
+
+      <figure class="img-block" onclick="lbShow(this)" style="cursor:zoom-in">
+        <img src="../assets/mq5-sensitivity-curve.png" alt="MQ-5 灵敏度特性曲线（双对数坐标）：横轴气体浓度 100~10000 ppm，纵轴 Rs/R0，含丙烷、空气、甲烷、乙醇四条线" loading="lazy">
+        <figcaption>图 6-4｜手册原图：MQ5 灵敏度特性曲线（双对数坐标）。横轴是气体浓度，纵轴是电阻比 Rs/R0；"空气"那条水平线就是标定点，三条往下走的斜线就是能拟合成直线的曲线，B = 0.186、M = −0.362 从这类斜线上拟合而来。想对照原文可以点开 <a href="https://datasheet.sisoog.com/MQ-5/file/7a657573/datasheet/79701185ea1f27506c945c417b151c44449520e2.pdf" target="_blank" rel="noopener">郑州炜盛《可燃气体传感器 MQ-5 使用说明书》PDF</a>（备用镜像：<a href="https://www.lcsc.com/datasheet/C99297.pdf" target="_blank" rel="noopener">LCSC</a>）</figcaption>
+      </figure>
+
+      <figure class="anim2d-block">
+        <svg viewBox="0 0 760 356" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="MQ5 分压电路与 ppm 四步换算图解">
+          <rect width="760" height="356" fill="#ffffff"/>
+          <text x="24" y="32" font-size="14" font-weight="700" fill="#0f172a">电压 v 是怎么来的：分压电路</text>
+          <line x1="70" y1="64" x2="300" y2="64" stroke="#334155" stroke-width="2"/>
+          <text x="70" y="54" font-size="12" font-weight="700" fill="#e11d48" text-anchor="middle">+5 V</text>
+          <line x1="170" y1="64" x2="170" y2="96" stroke="#334155" stroke-width="2"/>
+          <rect x="144" y="96" width="52" height="64" rx="8" fill="#fffbeb" stroke="#d97706" stroke-width="1.5"/>
+          <text x="170" y="120" font-size="14" font-weight="700" fill="#b45309" text-anchor="middle">Rs</text>
+          <text x="170" y="140" font-size="10.5" fill="#b45309" text-anchor="middle">MQ5 气敏</text>
+          <text x="206" y="126" font-size="11" fill="#94a3b8">浓度↑ → Rs↓</text>
+          <line x1="170" y1="160" x2="170" y2="194" stroke="#334155" stroke-width="2"/>
+          <circle cx="170" cy="196" r="5" fill="#2563eb"/>
+          <line x1="170" y1="196" x2="248" y2="196" stroke="#2563eb" stroke-width="2"/>
+          <rect x="248" y="170" width="94" height="52" rx="8" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
+          <text x="295" y="191" font-size="12" font-weight="700" fill="#1d4ed8" text-anchor="middle">ADC 采样</text>
+          <text x="295" y="209" font-size="11" fill="#1d4ed8" text-anchor="middle">示例 v = 1.714 V</text>
+          <line x1="170" y1="198" x2="170" y2="222" stroke="#334155" stroke-width="2"/>
+          <rect x="144" y="222" width="52" height="56" rx="8" fill="#f1f5f9" stroke="#475569" stroke-width="1.5"/>
+          <text x="170" y="244" font-size="13" font-weight="700" fill="#334155" text-anchor="middle">RL</text>
+          <text x="170" y="262" font-size="10.5" fill="#64748b" text-anchor="middle">1 kΩ</text>
+          <line x1="170" y1="278" x2="170" y2="294" stroke="#334155" stroke-width="2"/>
+          <g stroke="#334155" stroke-width="2">
+            <line x1="154" y1="294" x2="186" y2="294"/>
+            <line x1="159" y1="300" x2="181" y2="300"/>
+            <line x1="164" y1="306" x2="176" y2="306"/>
+          </g>
+          <text x="70" y="300" font-size="12" font-weight="700" fill="#94a3b8">GND</text>
+          <text x="170" y="338" font-size="12" fill="#475569" text-anchor="middle">v = 5 × RL / (Rs + RL)：Rs 越小，v 越大</text>
+          <line x1="360" y1="44" x2="360" y2="330" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="6 5"/>
+          <text x="384" y="32" font-size="14" font-weight="700" fill="#0f172a">ppm 是怎么算的：拿 1.714 V 代一遍</text>
+          <rect x="384" y="50" width="352" height="58" rx="10" fill="#ecfeff" stroke="#0891b2" stroke-width="1.5"/>
+          <text x="400" y="76" font-size="13" font-weight="700" fill="#0e7490">① 电压 v = 1.714 V</text>
+          <text x="400" y="96" font-size="11" fill="#64748b">raw=1404 × 1.2207 ÷ 1000，毫伏换伏特</text>
+          <polygon points="556,114 564,114 560,126" fill="#94a3b8"/>
+          <rect x="384" y="130" width="352" height="58" rx="10" fill="#fffbeb" stroke="#d97706" stroke-width="1.5"/>
+          <text x="400" y="156" font-size="13" font-weight="700" fill="#b45309">② Rs = 1 × (5 − 1.714) / 1.714 ≈ 1.917 kΩ</text>
+          <text x="400" y="176" font-size="11" fill="#64748b">分压关系反推气敏电阻</text>
+          <polygon points="556,194 564,194 560,206" fill="#94a3b8"/>
+          <rect x="384" y="210" width="352" height="58" rx="10" fill="#f5f3ff" stroke="#7c3aed" stroke-width="1.5"/>
+          <text x="400" y="236" font-size="13" font-weight="700" fill="#6d28d9">③ ratio = 1.917 / 10 ≈ 0.192</text>
+          <text x="400" y="256" font-size="11" fill="#64748b">与标定点 R0 = 10 kΩ 的比值</text>
+          <polygon points="556,274 564,274 560,286" fill="#94a3b8"/>
+          <rect x="384" y="290" width="352" height="58" rx="10" fill="#f0fdfa" stroke="#0d9488" stroke-width="1.5"/>
+          <text x="400" y="316" font-size="13" font-weight="700" fill="#0f766e">④ ppm = 10^((lg ratio − 0.186) / −0.362)</text>
+          <text x="400" y="336" font-size="11" fill="#64748b">ratio 取未舍入值代入 = 312.91 ppm，就是日志那一行</text>
+        </svg>
+        <figcaption>图 6-5｜电压与浓度的完整换算：左图是硬件，气敏电阻的变化被分压成电压；右图是代码，从 raw=1404 乘 scale 换出 1.714 V，再四步算出 312.91 ppm</figcaption>
+      </figure>
+
+      <pre><span class="c"># 来源：ros_sensor/common.py L13-33</span>
+V_REF, RL, R0 = <span class="b">5.0</span>, <span class="b">1.0</span>, <span class="b">10.0</span>      <span class="c"># 参考电压、负载电阻 kΩ、标定电阻 kΩ</span>
+CURVE_B, CURVE_M = <span class="b">0.186</span>, <span class="b">-0.362</span>  <span class="c"># 灵敏特性曲线截距与斜率（斜率为负！）</span>
+
+<span class="g">def</span> voltage_to_ppm(v):                        <span class="c"># 电压 → 浓度</span>
+    <span class="g">if</span> v &lt;= <span class="b">0</span> <span class="g">or</span> v &gt;= V_REF:                 <span class="c"># ← 除零保护：量程外的电压不算</span>
+        <span class="g">return</span> <span class="b">0.0</span>
+    rs    = RL * (V_REF - v) / v               <span class="c"># ③ 由分压关系反推气敏电阻 Rs</span>
+    ratio = rs / R0                            <span class="c"># ③ 与标定点 R0 的比值</span>
+    <span class="g">return</span> <span class="b">10</span> ** ((math.log10(ratio) - CURVE_B) / CURVE_M)   <span class="c"># ④ 对数域线性插值</span></pre>
+
+      <table>
+        <thead><tr><th>代码</th><th>它在做什么</th><th>不这么写会怎样</th></tr></thead>
+        <tbody>
+          <tr><td><code>if v &lt;= 0 or v &gt;= V_REF: return 0.0</code></td><td>电压落在量程外（未接线、短路）直接返回 0，并让调用方看到"这次读数无效"</td><td>分母趋近 0 → <code>ZeroDivisionError</code> 或天文数字</td></tr>
+          <tr><td><code>rs = RL*(V_REF-v)/v</code></td><td>分压电路：v 越低说明传感器内阻越大，反推出 Rs</td><td>拿电压当浓度用，读数完全错误</td></tr>
+          <tr><td><code>ratio = rs / R0</code></td><td>归一化：把"当前电阻"表示成"标定电阻的几倍"，去掉元件个体差异</td><td>换一块传感器就要重新标定整套算法</td></tr>
+          <tr><td><code>10 ** ((lg(ratio)-B)/M)</code></td><td>在双对数坐标的直线上反解浓度。直线来自手册的灵敏度特性曲线（手册只给图不给公式），B、M 是对这条曲线拟合出的截距和斜率</td><td>线性插值会严重低估高浓度区间</td></tr>
+        </tbody>
+      </table>
+
+      <div class="kgrid">
+        <div class="kcard"><div class="kt">为什么 M 是负数</div><div class="kd">M = −0.362 意味着 ppm 与 ratio <b>反向变化</b>：浓度越高 → 气敏电阻越小 → ratio 越小 → 代入公式后 ppm 越大。数学方向和"浓度越高内阻越低"的物理直觉是一致的。</div></div>
+        <div class="kcard"><div class="kt">原始值 ≠ 电压</div><div class="kd">ADC 是 12 位的，<code class="inline">raw</code> 只是 0~4095 的"格数"，本身不是伏特。每格到底等于多少毫伏，内核驱动已经算好写进 <code class="inline">in_voltage_scale</code>：格数 × 毫伏/格得到毫伏，再 ÷1000 才是伏特。换算式里不用出现 4096，因为它已经被封进 scale 里了，板上 <code class="inline">cat in_voltage_scale</code> 一眼可见。</div></div>
+      </div>
+
+      <h3 style="font-size:17px;color:var(--text-primary);margin:26px 0 0">采集入口：read_mq5_once() 每秒钟被调用一次</h3>
+      <pre><span class="c"># 来源：ros_sensor/common.py L36-47</span>
+<span class="g">def</span> read_mq5_once():
+    <span class="g">try</span>:
+        scale = float(read_adc_attr(<span class="y">"in_voltage_scale"</span>))      <span class="c"># ① 量程系数：1 格 = 多少毫伏</span>
+        raw   = int(read_adc_attr(f<span class="y">"in_voltage{MQ5_CH}_raw"</span>))   <span class="c"># ② 原始格数（12 bit，0~4095）</span>
+        v = raw * scale / <span class="b">1000.0</span>                          <span class="c"># ③ 格数×毫伏/格=毫伏，÷1000→伏特</span>
+        <span class="g">return</span> raw, v, voltage_to_ppm(v), <span class="y">""</span>            <span class="c"># ④ 一次返回四件事</span>
+    <span class="g">except</span> Exception <span class="g">as</span> e:
+        <span class="g">return</span> None, None, None, f<span class="y">"{type(e).__name__}: {e}"</span>   <span class="c"># 失败信息交给调用方</span></pre>
+      <p class="ix-caption" style="text-align:left">四个返回值 <code class="inline">(raw, v, ppm, err)</code> 就是节点日志里那一行的全部来源。<b>函数不打印、不抛异常，只把结果和错误一起交出去</b>——打印交给节点，这是数据层与表现层分离的好习惯。</p>
+
+      <div class="ix-block">
+        <div class="ix-panel">
+          <b style="font-size:14px">🔬 换算曲线：输入电压，看当前点在曲线上怎么走</b>
+          <div class="mq5-chart">
+            <svg id="mq5svg" viewBox="0 0 640 336" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="MQ5 电压到 ppm 的换算曲线，红点为当前输入对应的点">
+              <rect width="640" height="336" fill="#ffffff"/>
+              <g stroke="#e2e8f0" stroke-width="1">
+                <line x1="60" y1="286" x2="618" y2="286"/>
+                <line x1="60" y1="249" x2="618" y2="249"/>
+                <line x1="60" y1="212" x2="618" y2="212"/>
+                <line x1="60" y1="175" x2="618" y2="175"/>
+                <line x1="60" y1="137" x2="618" y2="137"/>
+                <line x1="60" y1="100" x2="618" y2="100"/>
+                <line x1="60" y1="63" x2="618" y2="63"/>
+                <line x1="60" y1="26" x2="618" y2="26"/>
+              </g>
+              <line x1="60" y1="26" x2="60" y2="286" stroke="#94a3b8" stroke-width="1.5"/>
+              <line x1="60" y1="286" x2="618" y2="286" stroke="#94a3b8" stroke-width="1.5"/>
+              <g font-size="11" fill="#94a3b8" text-anchor="end">
+                <text x="54" y="290">0.1</text>
+                <text x="54" y="253">1</text>
+                <text x="54" y="216">10</text>
+                <text x="54" y="179">100</text>
+                <text x="54" y="141">1k</text>
+                <text x="54" y="104">10k</text>
+                <text x="54" y="67">100k</text>
+                <text x="54" y="30">1M</text>
+              </g>
+              <g font-size="11" fill="#94a3b8" text-anchor="middle">
+                <text x="60" y="304">0</text>
+                <text x="172" y="304">1</text>
+                <text x="283" y="304">2</text>
+                <text x="395" y="304">3</text>
+                <text x="506" y="304">4</text>
+                <text x="618" y="304">5</text>
+              </g>
+              <text x="339" y="326" font-size="12" fill="#64748b" text-anchor="middle">电压 v（V）</text>
+              <text x="60" y="16" font-size="12" fill="#64748b">ppm（纵轴每格 ×10，log 刻度）</text>
+              <text x="118" y="264" font-size="11.5" fill="#94a3b8">低浓度端：曲线几乎贴着走</text>
+              <text x="452" y="46" font-size="11.5" fill="#94a3b8">高浓度端：越来越陡</text>
+              <path id="mq5path" fill="none" stroke="#0891b2" stroke-width="2.5"/>
+              <line id="mq5lx" stroke="#e11d48" stroke-width="1" stroke-dasharray="4 3" y2="286" opacity="0"/>
+              <line id="mq5ly" stroke="#e11d48" stroke-width="1" stroke-dasharray="4 3" x1="60" opacity="0"/>
+              <circle id="mq5dot" r="6" fill="#e11d48" stroke="#fff" stroke-width="2" opacity="0"/>
+              <text id="mq5tip" font-size="12" font-weight="700" fill="#e11d48" opacity="0"></text>
+            </svg>
+          </div>
+          <div class="mq5-calc">
+            <span style="font-size:13.5px;color:#64748b">电压 v =</span>
+            <input id="mv" type="number" step="0.001" min="0" max="5" value="1.714">
+            <input id="mslider" type="range" min="0" max="5" step="0.001" value="1.714" class="mq5-range" aria-label="电压滑杆">
+            <span style="font-size:13.5px;color:#64748b">V</span>
+            <span class="mq5-out" id="mppm">ppm = …</span>
+            <button class="mq5-btn" id="mreset" type="button">↺ 回到 1.714</button>
+          </div>
+          <div class="mq5-reads" id="mreads">…</div>
+          <div class="mq5-verdict" id="mverdict"></div>
+        </div>
+        <p class="ix-caption">互动 6-2｜拖滑杆或直接输入电压（0~5 V）：红点就是当前输入在曲线上的位置；输入 0 或 5，亲手触发代码里的量程保护</p>
+      </div>
+
+      <h4 style="font-size:15.5px;color:var(--theme-deep);margin:24px 0 0">② gas_sensor_node.py —— 发布端只做四件事</h4>
+      <pre><span class="c"># 来源：ros_sensor/gas_sensor_node.py L16-44</span>
+<span class="g">from</span> rclpy.node <span class="g">import</span> Node
+<span class="g">from</span> std_msgs.msg <span class="g">import</span> Float32
+<span class="g">from</span> rclpy.qos <span class="g">import</span> QoSProfile, HistoryPolicy, ReliabilityPolicy
+<span class="g">from</span> .common <span class="g">import</span> read_mq5_once                <span class="c"># 复用 ① 里的采集函数</span>
+
+<span class="g">class</span> GasSensorNode(Node):
+    <span class="g">def</span> __init__(self):
+        super().__init__(<span class="y">'gas_sensor_node'</span>)                       <span class="c"># ① 注册节点名</span>
+        self.declare_parameter(<span class="y">'publish_period'</span>, <span class="b">1.0</span>)         <span class="c"># ② 声明可调参数</span>
+
+        qos = QoSProfile(                                          <span class="c"># ③ 传输合同</span>
+            history=HistoryPolicy.KEEP_LAST, depth=<span class="b">10</span>,
+            reliability=ReliabilityPolicy.RELIABLE,
+        )
+        self.pub = self.create_publisher(Float32, <span class="y">'/gas_sensor'</span>, qos)   <span class="c"># ④ 创建发布端</span>
+
+        period = float(self.get_parameter(<span class="y">'publish_period'</span>).value)
+        self.timer = self.create_timer(period, self.timer_cb)      <span class="c"># ⑤ 定时器：每 period 秒叫一次</span>
+
+    <span class="g">def</span> timer_cb(self):                                            <span class="c"># ⑥ 每秒被触发一次的回调</span>
+        raw, v, ppm, err = read_mq5_once()                          <span class="c">#    读 + 算</span>
+        <span class="g">if</span> err:
+            self.get_logger().error(f<span class="y">'读取 ADC 失败: {err}'</span>)       <span class="c">#    出错只记日志，不崩溃</span>
+            <span class="g">return</span>
+        msg = Float32()                                             <span class="c">#    装消息</span>
+        msg.data = float(ppm)
+        self.pub.publish(msg)                                       <span class="c"># ⑦ 发布：入队即返回</span>
+        self.get_logger().info(f<span class="y">'raw={raw} voltage={v:.3f}V ppm={ppm:.2f}'</span>)
+
+<span class="g">def</span> main():
+    rclpy.init()                    <span class="c"># 初始化 rclpy</span>
+    node = GasSensorNode()          <span class="c"># 构造节点（此时才注册进计算图）</span>
+    <span class="g">try</span>: rclpy.spin(node)         <span class="c"># 进入事件循环：驱动定时器与回调</span>
+    <span class="g">except</span> KeyboardInterrupt: <span class="g">pass</span>
+    <span class="g">finally</span>: node.destroy_node(); rclpy.shutdown()   <span class="c"># Ctrl+C 后干净退出</span></pre>
+
+      <table>
+        <thead><tr><th>环节</th><th>关键行</th><th>它在做什么</th></tr></thead>
+        <tbody>
+          <tr><td>① 注册节点</td><td><code>super().__init__('gas_sensor_node')</code></td><td>节点名必须全局唯一，重名时 ROS2 会自动改名为 <code>gas_sensor_node_1</code>。这一步之后 <code>ros2 node list</code> 才能看到它。</td></tr>
+          <tr><td>② 声明参数</td><td><code>declare_parameter('publish_period', 1.0)</code></td><td>把"发布周期"变成运行时可调项——这就是第 9 步 <code>-p publish_period:=0.5</code> 能生效的原因。<b>必须先声明再读取</b>。</td></tr>
+          <tr><td>③ 配置 QoS</td><td><code>QoSProfile(...)</code></td><td>确定这份"传输合同"：可靠 + 只留最近 10 条。订阅端要能对上才连得通（见 03 节 QoS）。</td></tr>
+          <tr><td>④ 创建发布端</td><td><code>create_publisher(Float32, '/gas_sensor', qos)</code></td><td>三要素：<b>消息类型 + 话题名 + QoS</b>。这一行执行后，话题才真正出现在 <code>ros2 topic list</code> 里。</td></tr>
+          <tr><td>⑤ 定时器</td><td><code>create_timer(period, self.timer_cb)</code></td><td>周期性触发回调，相当于节点的"心跳"。1.0 秒一次的节奏就是它给的。</td></tr>
+          <tr><td>⑥ 回调</td><td><code>timer_cb(self)</code></td><td>整个业务逻辑只有五步：读 → 判错 → 装消息 → 发布 → 记日志。</td></tr>
+          <tr><td>⑦ 发布</td><td><code>self.pub.publish(msg)</code></td><td>把消息交给话题即返回。<b>此刻有没有订阅者在听，它完全不关心</b>——这就是能"一对多、随时加入"的根本原因。</td></tr>
+        </tbody>
+      </table>
+
+      <h4 style="font-size:15.5px;color:var(--theme-deep);margin:24px 0 0">③ gas_monitor.py —— 订阅端与发布端镜面对称</h4>
+      <pre><span class="c"># 来源：ros_sensor/gas_monitor.py L13-36</span>
+<span class="g">class</span> GasMonitor(Node):
+    <span class="g">def</span> __init__(self):
+        super().__init__(<span class="y">'gas_monitor'</span>)                        <span class="c"># ① 另一个节点名</span>
+        self.declare_parameter(<span class="y">'alarm_threshold'</span>, <span class="b">500.0</span>)    <span class="c"># ② 报警阈值也是参数</span>
+        self.threshold = float(self.get_parameter(<span class="y">'alarm_threshold'</span>).value)
+
+        qos = QoSProfile(                                       <span class="c"># ③ QoS 必须与发布端相容</span>
+            history=HistoryPolicy.KEEP_LAST, depth=<span class="b">10</span>,
+            reliability=ReliabilityPolicy.RELIABLE,
+        )
+        self.sub = self.create_subscription(                    <span class="c"># ④ 订阅：类型 + 话题 + 回调 + QoS</span>
+            Float32, <span class="y">'/gas_sensor'</span>, self.callback, qos)
+
+    <span class="g">def</span> callback(self, msg):                                    <span class="c"># ⑤ 消息到了才会被调用</span>
+        ppm = msg.data
+        <span class="g">if</span> ppm &gt;= self.threshold:
+            self.get_logger().warn(f<span class="y">'[报警] 气体浓度超标: {ppm:.2f} ppm &gt;= {self.threshold} ppm'</span>)
+        <span class="g">else</span>:
+            self.get_logger().info(f<span class="y">'浓度正常: {ppm:.2f} ppm'</span>)</pre>
+
+      <table>
+        <thead><tr><th>对比点</th><th>发布端 gas_sensor_node</th><th>订阅端 gas_monitor</th></tr></thead>
+        <tbody>
+          <tr><td>核心 API</td><td><code>create_publisher()</code></td><td><code>create_subscription()</code></td></tr>
+          <tr><td>谁主动</td><td>由定时器主动触发（我要发）</td><td>被动等待（消息来了才叫我）</td></tr>
+          <tr><td>业务代码在哪</td><td><code>timer_cb</code>：采集并发布</td><td><code>callback</code>：判断并报警</td></tr>
+          <tr><td>必需三件套</td><td colspan="2" style="text-align:center">消息类型 <b>必须相同</b> · 话题名 <b>必须相同</b> · QoS <b>必须相容</b>（请求 ≤ 提供）</td></tr>
+          <tr><td>少一个会怎样</td><td colspan="2" style="text-align:center">话题名不同 ⇒ 谁也遇不到谁；类型不同 ⇒ 发现阶段就匹配失败；QoS 不兼容 ⇒ 连不上，且<b>不报错</b>，只是安静地收不到</td></tr>
+        </tbody>
+      </table>
+
+      <div class="kgrid">
+        <div class="kcard"><div class="kt">为什么订阅端不用 while 轮询</div><div class="kd"><code class="inline">spin()</code> 内部是事件循环：消息到达 → 放入队列 → 调度 <code class="inline">callback</code>。没有消息时线程在等待而不是空转，CPU 占用极低。</div></div>
+        <div class="kcard"><div class="kt">回调里能做什么、不该做什么</div><div class="kd">可以做判断、发日志、再转发到别的话题；<b>不要做耗时操作</b>（如 sleep、读写大文件），否则队列会堆积——这正是 03 节 QoS 实验台里"慢消费者被覆盖"的真实成因。</div></div>
+        <div class="kcard"><div class="kt">两个节点的名字为什么重要</div><div class="kd">节点名是它在计算图里的身份，<code class="inline">ros2 node info /gas_monitor</code> 就是按名字查它。名字重复会导致管理命令指向不确定的对象。</div></div>
+      </div>
+
+      <div class="tip amber">⚠️ <b>两个高频坑</b>：① 忘了 <code class="inline">declare_parameter</code> 就 <code class="inline">get_parameter</code> → 运行时报"参数未声明"；② 命令行覆盖参数必须用 <code class="inline">:=</code>（<code class="inline">-p publish_period:=0.5</code>），写成 <code class="inline">=</code> 无效。</div>
+
+      <h3 style="font-size:17px;color:var(--text-primary);margin:30px 0 0">第 3 步 · 最后跑出结果：把代码和现象对上号</h3>
+      <p>代码读完了，现在回到终端，<b>验证你读到的每一段在屏幕上长什么样</b>。这一步不是重复 01 节，而是让"代码里的某一行"和"屏幕上的某一行"建立一一对应。</p>
+
+      <table>
+        <thead><tr><th>你在代码里看到的</th><th>终端里对应的现象</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td><code>self.timer = self.create_timer(period, self.timer_cb)</code></td><td>发布端每秒滚一行日志，周期稳定</td><td>定时器到点才调 <code>timer_cb</code>，间隔由参数 <code>publish_period</code> 决定</td></tr>
+          <tr><td><code>self.pub.publish(msg)</code></td><td>发布端日志出现后，订阅端<b>几乎同瞬间</b>也打印</td><td>publish 入队即返回，DDS 搬运和你的代码无关</td></tr>
+          <tr><td><code>def callback(self, msg)</code></td><td>订阅端打印 <code>浓度正常: 312.91 ppm</code></td><td>回调收到的 <code>msg.data</code>，正是发布端那一行的 ppm</td></tr>
+          <tr><td><code>if ppm >= self.alarm_threshold</code></td><td>阈值调低后日志从 INFO 变 WARN <code>[报警]</code></td><td>同一个回调，判断条件一变，输出就变</td></tr>
+          <tr><td><code>declare_parameter('publish_period', 1.0)</code></td><td><code>ros2 param get</code> 能查到，<code>-p …:=0.5</code> 能改</td><td>声明过的参数才能被外部读写（EXP-10 细讲）</td></tr>
+        </tbody>
+      </table>
+
+      <div class="tip tealb">✅ <b>对上号的标志</b>：你能指着发布端某一行的 <code class="inline">ppm=312.91</code>，说出它是哪个函数算出来的、经哪一行发出去的、在订阅端哪一行被打印出来。<b>说得出这条链路，这节就算过了</b>——比记住语法重要得多。</div>
+    </section>
+
+        <!-- 08 动手任务 -->
+    <section class="blk reveal" id="s8">
+      <h2><span class="sn">05</span>动手任务：改点新东西，验证你真的懂了</h2>
+      <p class="lead">01 节和 04 节第 3 步都是"跟着看现象"。这一节的任务<b>故意不重复那些操作</b>——每个任务都要你<b>改一处新东西</b>（改代码、改参数、加节点），然后自己判断"结果应该是什么样"再去验证。<b>能预判结果，才算真懂</b>。</p>
+
+      <div class="tip amber">📌 <b>先立个规矩</b>：动手改之前，<b>先在纸上写下你预期的现象</b>（哪怕只有一个字："会变快"）。跑完再对照——预期错了，恰恰是最有价值的一次学习。</div>
+
+      <div class="kgrid">
+        <div class="kcard"><div class="kt">任务 1 · 改代码：把话题名挪个位（入门）</div><div class="kd">打开 <code class="inline">gas_sensor_node.py</code>，把 <code class="inline">'/gas_sensor'</code> 改成 <code class="inline">'/gas_sensor2'</code>，<b>只重编发布端所在的包</b>，重启发布端。<br><b>先预判</b>：订阅端还能收到吗？<br><b>然后验证</b>：<code class="inline">ros2 topic list</code> 现在有几个话题；再把订阅端的名字也改成 <code class="inline">/gas_sensor2</code> 看是否恢复。<br><b>要记录</b>：改名前后的 <code class="inline">topic list</code> 两张截图。</div></div>
+
+        <div class="kcard"><div class="kt">任务 2 · 改代码：加一个温度字段（进阶）</div><div class="kd">在 <code class="inline">timer_cb</code> 里加一行日志，把 <code class="inline">publish_period</code> 的当前值打印出来（<code class="inline">self.get_parameter('publish_period').value</code>）。<br><b>先预判</b>：用 <code class="inline">-p publish_period:=0.5</code> 启动时，日志里的数字是 1.0 还是 0.5？<br><b>要记录</b>：加参数启动后日志里那行数字的截图。<br><i>这题考的是"参数在 init 里读一次还是每周期读一次"的差别。</i></div></div>
+
+        <div class="kcard"><div class="kt">任务 3 · 造第三个订阅者（协议层）</div><div class="kd"><b>不用 ros2 topic echo</b>，改用 <code class="inline">ros2 topic pub</code> 反向操作：先停掉发布端，用 pub 手动发数据，看订阅端是否照常报警。<br><b>先预判</b>：手动发的消息和真实传感器数据，订阅端能分辨吗？<br><b>要记录</b>：命令与订阅端输出，并解释"为什么分不清"。</div></div>
+
+        <div class="kcard"><div class="kt">任务 4 · 故意把 QoS 签成不兼容（排障）</div><div class="kd">把发布端 <code class="inline">reliability</code> 改成 <code class="inline">BEST_EFFORT</code>，订阅端保持 <code class="inline">RELIABLE</code>。<br><b>先预判</b>：会报什么错？<br><b>然后验证</b>：<b>不会报任何错</b>，只是收不到。用 <code class="inline">ros2 topic info /gas_sensor --verbose</code> 找出两端的档位差，再改回来。<br><b>要记录</b>：verbose 输出里两端 QoS 不一致的那几行。</div></div>
+
+        <div class="kcard"><div class="kt">任务 5 · 迁移设计（综合，可交报告）</div><div class="kd">假设要接一个<b>温湿度传感器</b>：① 你会新建哪个包、几个节点？② 话题叫什么、用什么消息类型（提示：EXP-09 有自定义接口）？③ QoS 三要素怎么选（温湿度是慢变数据，1Hz 够了）？<br><b>要记录</b>：一张架构草图 + 三要素的选择理由，<b>不用真写代码</b>。</div></div>
+
+        <div class="kcard"><div class="kt">任务 6 · 物理验证（不可替代）</div><div class="kd">打火机<b>只放气、绝不点火</b>，对准 MQ5 放一点气。<br><b>先预判</b>：终端 B 的 raw / voltage / ppm 三个数，<b>哪个会变、方向如何</b>？<br><b>然后验证</b>：ppm 跳升时 voltage 是升还是降？回到 <code class="inline">common.py</code> 的公式 <code class="inline">rs = RL·(V_REF−v)/v</code> 解释这个方向。<br><b>要记录</b>：跳升瞬间的日志 + 你用公式写出的解释。测完开窗通风。</div></div>
+      </div>
+
+      <div class="tip tealb">🎯 <b>任务难度与目的</b>：任务 1、3 练"协议层直觉"（名字、类型、谁在发）；任务 2、4 练"代码与配置的边界"（什么该写死在代码里、什么该留给参数和 QoS）；任务 5 练"迁移设计"；任务 6 练"从现象反推公式"。<b>六个任务里，任务 2 和任务 6 最能拉开差距</b>。</div>
+
+      <table>
+        <thead><tr><th>证据</th><th>来源命令/终端</th><th>对应知识点</th></tr></thead>
+        <tbody>
+          <tr><td>发布端每秒日志（raw / voltage / ppm）</td><td>终端 B</td><td>ADC → 电压 → ppm 换算链路（04 节 ①）</td></tr>
+          <tr><td>订阅端"浓度正常 / [报警]"日志</td><td>终端 C</td><td>订阅回调与阈值判断（04 节 ③）</td></tr>
+          <tr><td><code>ros2 topic info</code> 输出</td><td>终端 D</td><td>话题类型、收发端数量、QoS 实况（03 节 QoS）</td></tr>
+          <tr><td><code>ros2 topic hz</code> 改前/改后两张</td><td>终端 D</td><td>参数化设计：运行时不改代码调频率</td></tr>
+          <tr><td><code>ros2 topic echo</code> 与 Subscription count=2</td><td>终端 D</td><td>一对多与位置透明（02 节三个承诺）</td></tr>
+          <tr><td>打火机放气时的 ppm 跳升</td><td>实物 + 终端 B/C</td><td>端到端链路的物理验证</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- 09 注意与验收 -->
+    <section class="blk reveal" id="s9">
+      <h2><span class="sn">06</span>注意事项与验收清单</h2>
+      <table>
+        <thead><tr><th>⚠️ 注意项</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td>QoS 一致性</td><td>发布/订阅端须同为 <code>Reliable + KeepLast(10)</code>，否则可能收不到消息</td></tr>
+          <tr><td>环境加载</td><td>每次新开终端都要 <code>source install/setup.bash</code></td></tr>
+          <tr><td>话题命名</td><td><code>/gas_sensor</code> 以 <code>/</code> 开头为全局命名空间</td></tr>
+          <tr><td>安全提示</td><td>MQ5 通电后表面发热勿用手触；测试仅低浓度演示，<b>严禁明火</b></td></tr>
+        </tbody>
+      </table>
+      <ul class="check">
+        <li>双节点运行，<span class="out">ros2 node list</span> 同时显示两个节点</li>
+        <li><span class="out">ros2 topic info /gas_sensor</span> 显示 Pub=1、Sub≥1，类型 <span class="out">std_msgs/msg/Float32</span></li>
+        <li><span class="out">ros2 topic hz</span> ≈ 1.000 Hz，改 <span class="out">publish_period:=0.5</span> 后变 ≈ 2Hz</li>
+        <li>第三方 <span class="out">ros2 topic echo</span> 可同时接收（一对多验证）</li>
+        <li>调低 <span class="out">alarm_threshold:=100.0</span> 后出现 <b>[报警]</b> 日志</li>
+        <li>口头解释：为什么发布端不用知道订阅端 IP？MQ5 对数换算四步链路？</li>
+      </ul>
+    </section>
+
+    <!-- 10 总结 -->
+    <section class="blk reveal" id="s10">
+      <h2><span class="sn teal">07</span>实验总结与思考题</h2>
+      <div class="kgrid">
+        <div class="kcard"><div class="kt">✅ 完成成果</div><div class="kd">跑通 gas_sensor_node + gas_monitor 双节点链路；掌握 topic echo/hz/info 自省；会用 <code class="inline">--ros-args -p</code> 动态调参。</div></div>
+        <div class="kcard"><div class="kt">🧠 原理收获</div><div class="kd">发布/订阅如何用"话题名"解耦两端；QoS 三要素与"请求 ≤ 提供"兼容规则；MQ5 ADC → 电压 → ratio → ppm 对数链路。</div></div>
+        <div class="kcard"><div class="kt">🛠 技能收获</div><div class="kd">Publisher/Subscriber 标准代码模式（参数声明、QoS 配置、回调处理）；ADC → 物理量的信号处理套路，可迁移到 DHT11/MAX30102。</div></div>
+        <div class="kcard"><div class="kt">❓ 常见问题</div><div class="kd">订阅无输出 → 查话题名/QoS/DOMAIN_ID；浓度恒为 0 → 查硬件与 scale；数值跳变 → 回调里加滑动平均滤波。</div></div>
+      </div>
+      <div class="tip">📝 <b>思考题 1</b>：CURVE_M = −0.362 为负值，说明 ppm 与 Rs/R0 是什么单调关系？请结合物理特性解释"浓度越高、内阻越低"的原因。</div>
+      <div class="tip">📝 <b>思考题 2</b>：MQ5 无法区分甲烷 / 酒精蒸气。若要设计能区分"炒菜酒精"与"燃气泄漏"的厨房监控系统，请给出一个多传感器 + ROS2 话题通信的架构方案（提示：每种传感器一个话题，融合节点订阅全部）。</div>
+    </section>
+
+    <nav class="expnav reveal">
+      <a href="../exp-05-node/index.html"><div class="dir">← 上一个实验</div><div class="t">EXP-05 节点</div></a>
+      <a class="r" href="../exp-07-service/index.html"><div class="dir">下一个实验 →</div><div class="t">EXP-07 服务通讯（指纹传感器）</div></a>
+    </nav>
+
+  </main>
+</div>
+
+<footer>CORE-01 · 机器人 ROS2 应用与开发 · 实验 06 话题通讯（MQ5）· 基于 ros_practice 实验讲义改编 · 样式：clean-tech-ui</footer>
+
+<script>
+/* ================= QoS 实验台：兼容性检查 + 消息流模拟 ================= */
+var SIM_N = 10;          // 模拟发布 10 条消息
+var SIM_LATE_AT = 5;     // 「订阅端晚到」时，从第几条消息起才算在线
+
+function qosVals(){
+  function v(id){ return document.getElementById(id).value; }
+  return {
+    pubRel: v('pubRel'), pubDur: v('pubDur'), pubDep: v('pubDep'),
+    subRel: v('subRel'), subDur: v('subDur'), subDep: v('subDep'),
+    late: document.getElementById('subLate').checked
+  };
+}
+function relName(x){ return x === 'R' ? 'RELIABLE' : 'BEST_EFFORT'; }
+function durName(x){ return x === 'T' ? 'TRANSIENT_LOCAL' : 'VOLATILE'; }
+function depName(x){ return x === '0' ? 'KEEP_ALL' : 'KEEP_LAST(' + x + ')'; }
+
+/* 兼容规则：订阅端「请求」不得高于发布端「提供」 */
+function compatReasons(c){
+  var r = [];
+  if(c.subRel === 'R' && c.pubRel === 'B')
+    r.push('订阅端要求 RELIABLE，但发布端只提供 BEST_EFFORT —— 请求 > 提供，DDS 拒绝匹配');
+  if(c.subDur === 'T' && c.pubDur === 'V')
+    r.push('订阅端要求 TRANSIENT_LOCAL（要补发存量），但发布端 VOLATILE 不保留历史 —— 无法满足');
+  if(c.subDep === '0' && c.pubDep !== '0')
+    r.push('订阅端要求 KEEP_ALL 全部历史，但发布端只保留 KEEP_LAST 队列 —— 无法满足');
+  return r;
+}
+
+function checkQos(){
+  var c = qosVals();
+  var reasons = compatReasons(c);
+  var el = document.getElementById('qosResult');
+  if(!el) return;
+  if(reasons.length === 0){
+    el.className = 'ok';
+    el.textContent = '✔ 兼容 —— 两端 QoS 请求 ≤ 提供，DDS 将建立连接，消息可以正常分发';
+  } else {
+    el.className = 'bad';
+    el.textContent = '✘ 不兼容 —— ' + reasons[0];
+  }
+}
+
+/* 生成一次模拟的「逐条结果」 */
+function buildPlan(){
+  var c = qosVals();
+  var reasons = compatReasons(c);
+  var pub = [], sub = [], i;
+  for(i = 0; i < SIM_N; i++){ pub.push('sent'); sub.push('miss'); }
+  var plan = { c: c, reasons: reasons, pub: pub, sub: sub,
+               compatible: reasons.length === 0, got: 0,
+               transLost: [], covered: [], missed: [], hold: [] };
+  if(!plan.compatible) return plan;
+
+  var start = c.late ? SIM_LATE_AT : 1;             // 第 start 条起订阅端在线
+
+  /* ① 传输层：BEST_EFFORT 会真的丢包（固定丢第 3、7 条，便于对照） */
+  for(i = 1; i <= SIM_N; i++){
+    if(c.pubRel === 'B' && (i === 3 || i === 7)){ pub[i-1] = 'lost'; plan.transLost.push(i); }
+  }
+  /* ② 订阅端在线之前的数据：VOLATILE 一律错过 */
+  for(i = 1; i <= SIM_N; i++){
+    if(i < start){ sub[i-1] = 'miss'; plan.missed.push(i); continue; }
+    sub[i-1] = (pub[i-1] === 'lost') ? 'lost' : 'recv';
+  }
+  /* ③ 晚到 + TRANSIENT_LOCAL：把加入前的「最后一条」补发过来 */
+  if(c.late && c.pubDur === 'T' && start > 1){
+    var k = start - 1;
+    if(sub[k-1] === 'miss'){
+      sub[k-1] = 'hold';
+      plan.hold.push(k);
+      plan.missed = plan.missed.filter(function(x){ return x !== k; });
+    }
+  }
+  /* ④ 慢消费者 + 队列深度：只留得住 N 条，超出的被新消息覆盖 */
+  var limit = (c.pubDep === '0') ? Infinity : parseInt(c.pubDep, 10);
+  var vis = [];
+  for(i = 1; i <= SIM_N; i++){ if(sub[i-1] === 'recv' || sub[i-1] === 'hold') vis.push(i); }
+  if(vis.length > limit){
+    var drop = vis.slice(0, vis.length - limit);
+    for(i = 0; i < drop.length; i++){
+      sub[drop[i]-1] = 'lost';
+      plan.covered.push(drop[i]);
+    }
+    plan.hold = plan.hold.filter(function(x){ return drop.indexOf(x) === -1; });
+  }
+  plan.got = sub.filter(function(x){ return x === 'recv' || x === 'hold'; }).length;
+  return plan;
+}
+
+function renderCells(){
+  var p = document.getElementById('simPub'), s = document.getElementById('simSub');
+  if(!p || !s) return;
+  p.innerHTML = ''; s.innerHTML = '';
+  for(var i = 1; i <= SIM_N; i++){
+    var a = document.createElement('div'); a.className = 'cell'; a.textContent = i; p.appendChild(a);
+    var b = document.createElement('div'); b.className = 'cell'; b.textContent = i; s.appendChild(b);
+  }
+}
+function cellAt(box, i){ return document.getElementById(box).children[i-1]; }
+function setCell(box, i, cls){ var el = cellAt(box, i); if(el) el.className = 'cell ' + cls; }
+
+function resetSim(){
+  renderCells();
+  var log = document.getElementById('simLog');
+  if(log) log.innerHTML = '点击「▶ 跑 10 条消息」开始模拟……';
+  var vd = document.getElementById('simVerdict');
+  if(vd){ vd.style.display = 'none'; vd.className = 'sim-verdict'; }
+  checkQos();
+}
+
+function logHeader(c){
+  return '<span class="d">$ ros2 topic echo /gas_sensor</span>\n'
+    + '<span class="d">[发布端] ' + relName(c.pubRel) + ' · ' + durName(c.pubDur) + ' · ' + depName(c.pubDep) + '</span>\n'
+    + '<span class="d">[订阅端] ' + relName(c.subRel) + ' · ' + durName(c.subDur) + ' · ' + depName(c.subDep)
+    + (c.late ? ' · 第 ' + SIM_LATE_AT + ' 条之后才启动' : ' · 全程在线') + '</span>\n\n';
+}
+function rangeText(arr){
+  if(!arr.length) return '';
+  return arr.length > 3 ? ('第 ' + arr[0] + '–' + arr[arr.length-1] + ' 条') : ('第 ' + arr.join('、') + ' 条');
+}
+
+function simulateQos(){
+  var plan = buildPlan();
+  var c = plan.c;
+  renderCells();
+  var log = document.getElementById('simLog');
+  var vd = document.getElementById('simVerdict');
+  log.innerHTML = logHeader(c) + '<span class="d">模拟推进中……</span>';
+
+  /* 逐条播放：先亮「发出」，再亮「收到/丢弃」 */
+  for(var i = 1; i <= SIM_N; i++){
+    (function(i){
+      setTimeout(function(){
+        setCell('simPub', i, plan.pub[i-1] === 'lost' ? 'lost' : 'sent');
+      }, i * 150);
+      setTimeout(function(){
+        setCell('simSub', i, plan.sub[i-1]);
+      }, i * 150 + 90);
+    })(i);
+  }
+
+  setTimeout(function(){
+    var lines = [];
+    if(!plan.compatible){
+      lines.push('<span class="r">✘ 0/10 条送达 —— 两端在"发现阶段"就没匹配上</span>');
+      lines.push('<span class="d">  └ ' + plan.reasons[0] + '</span>');
+      lines.push('<span class="d">  订阅端不会报错，只是安静地什么都收不到 —— 这是 QoS 问题最难查的地方</span>');
+      vd.style.display = 'block'; vd.className = 'sim-verdict bad';
+      vd.textContent = '✘ DDS 拒绝匹配：订阅端一条都收不到';
+    } else {
+      lines.push('<span class="' + (plan.got === SIM_N ? 'g' : 'y') + '">'
+        + (plan.got === SIM_N ? '✅ 送达 ' : '⚠️ 只送达 ') + plan.got + '/' + SIM_N + ' 条</span>');
+      if(plan.transLost.length)
+        lines.push('<span class="r">· 传输丢失 ' + plan.transLost.length + ' 条（' + rangeText(plan.transLost)
+          + '）：BEST_EFFORT 尽力而为，网络一抖就丢，且不重传</span>');
+      if(plan.missed.length)
+        lines.push('<span class="r">· 错过 ' + plan.missed.length + ' 条（' + rangeText(plan.missed)
+          + '）：订阅端当时还没上线，' + (c.pubDur === 'V'
+            ? 'VOLATILE 不留存量，这些数据永远拿不回来'
+            : 'TRANSIENT_LOCAL 只补"最后一条"，更早的照样拿不到') + '</span>');
+      if(plan.hold.length)
+        lines.push('<span class="y">✔ 补发存量 ' + plan.hold.length + ' 条（' + rangeText(plan.hold)
+          + '）：TRANSIENT_LOCAL 把"最后一条"补给了晚到的订阅端</span>');
+      if(plan.covered.length)
+        lines.push('<span class="r">· 队列覆盖 ' + plan.covered.length + ' 条（' + rangeText(plan.covered)
+          + '）：订阅端 0.8s 才处理一条，而 ' + depName(c.pubDep) + ' 留不住那么多，旧消息被新消息顶掉了</span>');
+      if(!plan.transLost.length && !plan.missed.length && !plan.covered.length)
+        lines.push('<span class="g">· 可靠传输 + 队列深度足够 + 订阅端全程在线 —— 一条都没丢</span>');
+      vd.style.display = 'block';
+      if(plan.got === SIM_N){ vd.className = 'sim-verdict ok'; vd.textContent = '✔ 10/10 条全部送达 —— 这份"合同"是健康的'; }
+      else { vd.className = 'sim-verdict warn'; vd.textContent = '⚠️ 只送到 ' + plan.got + '/10 条 —— 看下面日志，找出是谁把消息弄丢了'; }
+    }
+    log.innerHTML = logHeader(c) + lines.join('\n');
+  }, SIM_N * 150 + 320);
+}
+
+document.addEventListener('DOMContentLoaded', function(){
+  ['pubRel','pubDur','pubDep','subRel','subDur','subDep'].forEach(function(id){
+    var el = document.getElementById(id);
+    if(el) el.addEventListener('change', checkQos);
+  });
+  var late = document.getElementById('subLate');
+  if(late) late.addEventListener('change', checkQos);
+  renderCells();
+  checkQos();
+});
+
+// MQ5 换算计算器与曲线（互动 6-2）
+var MQ5CFG={Vr:5,RL:1,R0:10,B:0.186,M:-0.362,DEF:1.714};
+function mq5ppmOf(v){
+  if(!(v>0&&v<MQ5CFG.Vr)) return 0;
+  var rs=MQ5CFG.RL*(MQ5CFG.Vr-v)/v;
+  var ratio=rs/MQ5CFG.R0;
+  if(ratio<=0) return 0;
+  return Math.pow(10,(Math.log10(ratio)-MQ5CFG.B)/MQ5CFG.M);
+}
+var MQ5G={x0:60,x1:618,y0:26,y1:286,Lmin:-1,Lmax:6};
+function mq5px(v){return MQ5G.x0+(v/5)*(MQ5G.x1-MQ5G.x0);}
+function mq5py(p){
+  var L=Math.log10(p);
+  if(!isFinite(L)) L=MQ5G.Lmin;
+  if(L<MQ5G.Lmin) L=MQ5G.Lmin;
+  if(L>MQ5G.Lmax) L=MQ5G.Lmax;
+  return MQ5G.y1-((L-MQ5G.Lmin)/(MQ5G.Lmax-MQ5G.Lmin))*(MQ5G.y1-MQ5G.y0);
+}
+function mq5curve(){
+  var d='',v;
+  for(v=0.05;v<4.951;v+=0.02){
+    d+=(d?'L':'M')+mq5px(v).toFixed(1)+' '+mq5py(mq5ppmOf(v)).toFixed(1)+' ';
+  }
+  var el=document.getElementById('mq5path');
+  if(el) el.setAttribute('d',d);
+}
+function mq5calc(){
+  var inEl=document.getElementById('mv'),sl=document.getElementById('mslider');
+  var v=parseFloat(inEl.value);
+  if(isNaN(v)) return;
+  if(sl&&Math.abs(parseFloat(sl.value)-v)>0.0005) sl.value=v;
+  var out=document.getElementById('mppm'),reads=document.getElementById('mreads'),vd=document.getElementById('mverdict');
+  var dot=document.getElementById('mq5dot'),lx=document.getElementById('mq5lx'),ly=document.getElementById('mq5ly'),tip=document.getElementById('mq5tip');
+  if(!(v>0&&v<5)){
+    out.style.color='#e11d48';
+    out.textContent='量程保护：return 0.0';
+    reads.textContent='v = '+v.toFixed(3)+' V 不在开区间 (0, 5) 内，voltage_to_ppm 直接走第一个分支';
+    vd.style.color='#e11d48';
+    vd.innerHTML='✘ 这就是代码里 <b>v &lt;= 0 or v &gt;= V_REF</b> 拦住的情况：保护分支返回 0.0，日志和话题里都表现为 ppm = 0。把电压拖回 (0, 5) 内继续。';
+    if(dot){dot.setAttribute('opacity','0');lx.setAttribute('opacity','0');ly.setAttribute('opacity','0');tip.setAttribute('opacity','0');}
+    return;
+  }
+  var rs=MQ5CFG.RL*(MQ5CFG.Vr-v)/v,ratio=rs/MQ5CFG.R0,ppm=Math.pow(10,(Math.log10(ratio)-MQ5CFG.B)/MQ5CFG.M);
+  out.style.color='#0d9488';
+  out.textContent='ppm = '+ppm.toFixed(2);
+  reads.textContent='Rs = '+rs.toFixed(3)+' kΩ · ratio = '+ratio.toFixed(3)+' · lg(ratio) = '+(Math.log10(ratio)).toFixed(3);
+  var cx=mq5px(v),cy=mq5py(ppm);
+  dot.setAttribute('cx',cx.toFixed(1));dot.setAttribute('cy',cy.toFixed(1));dot.setAttribute('opacity','1');
+  lx.setAttribute('x1',cx.toFixed(1));lx.setAttribute('x2',cx.toFixed(1));lx.setAttribute('y1',cy.toFixed(1));lx.setAttribute('opacity','1');
+  ly.setAttribute('y1',cy.toFixed(1));ly.setAttribute('y2',cy.toFixed(1));ly.setAttribute('x2',cx.toFixed(1));ly.setAttribute('opacity','1');
+  tip.setAttribute('x',Math.min(cx+10,504).toFixed(1));tip.setAttribute('y',Math.max(cy-12,40).toFixed(1));
+  tip.textContent=v.toFixed(3)+' V → '+ppm.toFixed(2)+' ppm';tip.setAttribute('opacity','1');
+  vd.style.color='#0d9488';
+  vd.innerHTML='✔ 当前点 ('+v.toFixed(3)+' V，'+ppm.toFixed(2)+' ppm) 已标在曲线上，和上方日志是同一套公式。曲线越往右越陡：同样是 +0.5 V，1 V 附近跳的 ppm 和 4 V 附近跳的 ppm 差着数量级，表格里「线性插值会严重低估高浓度区间」说的就是这个形状。';
+}
+document.getElementById('mv').addEventListener('input',mq5calc);
+document.getElementById('mslider').addEventListener('input',function(){
+  document.getElementById('mv').value=this.value;
+  mq5calc();
+});
+document.getElementById('mreset').addEventListener('click',function(){
+  document.getElementById('mv').value=MQ5CFG.DEF;
+  document.getElementById('mslider').value=MQ5CFG.DEF;
+  mq5calc();
+});
+mq5curve();
+mq5calc();
+
+// 侧边栏高亮 + reveal
+(function(){
+  var links = Array.prototype.slice.call(document.querySelectorAll('.sidebar a[href^="#"]'));
+  var targets = links.map(function(a){ return document.querySelector(a.getAttribute('href')); });
+  function onScroll(){
+    var y = scrollY + 120, idx = 0;
+    targets.forEach(function(t,i){ if(t && t.offsetTop <= y) idx = i; });
+    links.forEach(function(a,i){ a.classList.toggle('active', i === idx); });
+  }
+  addEventListener('scroll', onScroll, {passive:true});
+  onScroll();
+  links.forEach(function(a){ a.addEventListener('click', function(){
+    document.querySelector('.sidebar').classList.remove('open');
+  });});
+  var io = new IntersectionObserver(function(es){
+    es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('visible'); io.unobserve(e.target);} });
+  },{threshold:0, rootMargin:'0px 0px -8% 0px'});
+  document.querySelectorAll('.reveal').forEach(function(el){ io.observe(el); });
+  /* 兜底：超高元素（高于视口 10 倍）永远达不到百分比阈值，滚动时按位置直接判定 */
+  function revealByPos(){
+    var vh = window.innerHeight;
+    document.querySelectorAll('.reveal:not(.visible)').forEach(function(el){
+      var r = el.getBoundingClientRect();
+      if (r.top < vh * 0.92 && r.bottom > 0) el.classList.add('visible');
+    });
+  }
+  window.addEventListener('scroll', revealByPos, {passive:true});
+  window.addEventListener('resize', revealByPos);
+  revealByPos();
+  setTimeout(revealByPos, 400);
+})();
+</script>
+
+<div id="lightbox" onclick="this.classList.remove('on')"><img alt=""></div>
+<script>
+function lbShow(fig){var lb=document.getElementById('lightbox');if(!lb)return;var im=fig.querySelector('img');if(!im)return;lb.querySelector('img').src=im.src;lb.querySelector('img').alt=im.alt||'';lb.classList.add('on');}
+document.addEventListener('keydown',function(e){if(e.key==='Escape'){var lb=document.getElementById('lightbox');if(lb)lb.classList.remove('on');}});
+</script>
+
+<script>
+/* ↓ 命令/代码块一键复制：给页面里所有 <pre> 加一个复制按钮 */
+(function(){
+  if(window.__preCopyReady) return; window.__preCopyReady=1;
+  var CSS='.pre-wrap{position:relative}'
+    +'.copy-btn{position:absolute;top:8px;right:8px;z-index:3;background:rgba(30,41,59,.92);color:#94a3b8;border:1px solid #334155;border-radius:7px;padding:3px 10px;font-size:11.5px;font-family:inherit;line-height:1.6;cursor:pointer;opacity:.5;transition:opacity .18s,background .18s,color .18s;user-select:none;-webkit-user-select:none}'
+    +'.pre-wrap:hover .copy-btn{opacity:1}'
+    +'.copy-btn:hover{background:#334155;color:#e2e8f0}'
+    +'.copy-btn.done{background:#065f46;border-color:#10b981;color:#d1fae5;opacity:1}';
+  function flash(btn,txt,ok){
+    btn.textContent=txt;
+    if(ok) btn.classList.add('done');
+    setTimeout(function(){ btn.textContent='复制'; btn.classList.remove('done'); },1600);
+  }
+  function fallback(text,btn){
+    var ta=document.createElement('textarea');
+    ta.value=text; ta.setAttribute('readonly','');
+    ta.style.cssText='position:fixed;top:0;left:-9999px';
+    document.body.appendChild(ta); ta.select();
+    try{ ta.setSelectionRange(0,ta.value.length); }catch(e){}
+    try{ document.execCommand('copy'); flash(btn,'已复制 ✓',1); }
+    catch(e){ flash(btn,'复制失败',0); }
+    document.body.removeChild(ta);
+  }
+  function doCopy(pre,btn){
+    var text=pre.textContent.replace(/\u00a0/g,' ').replace(/^\n+/,'').replace(/\s+$/,'');
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(function(){ flash(btn,'已复制 ✓',1); },
+        function(){ fallback(text,btn); });
+    } else { fallback(text,btn); }
+  }
+  function setup(){
+    var st=document.createElement('style'); st.textContent=CSS; document.head.appendChild(st);
+    var list=document.querySelectorAll('pre');
+    for(var i=0;i<list.length;i++){
+      var pre=list[i];
+      if(pre.parentNode && pre.parentNode.className==='pre-wrap') continue;
+      var wrap=document.createElement('div'); wrap.className='pre-wrap';
+      pre.parentNode.insertBefore(wrap,pre); wrap.appendChild(pre);
+      var btn=document.createElement('button');
+      btn.type='button'; btn.className='copy-btn'; btn.textContent='复制';
+      btn.title='复制这段命令';
+      (function(p,b){ btn.addEventListener('click',function(e){ e.preventDefault(); doCopy(p,b); }); })(pre,btn);
+      wrap.appendChild(btn);
+    }
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',setup);
+  else setup();
+})();
+</script>
+</body>
+</html>

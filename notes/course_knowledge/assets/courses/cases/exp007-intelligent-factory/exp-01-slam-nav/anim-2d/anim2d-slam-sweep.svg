@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 340" font-family="'Noto Sans CJK SC','WenQuanYi Micro Hei',sans-serif">
+  <rect width="640" height="340" rx="12" fill="#f8fafc"/>
+
+  <!-- 地图网格 -->
+  <g stroke="#e2e8f0" stroke-width="1">
+    <path d="M40 60 H600 M40 110 H600 M40 160 H600 M40 210 H600 M40 260 H600 M40 310 H600"/>
+    <path d="M40 60 V310 M120 60 V310 M200 60 V310 M280 60 V310 M360 60 V310 M440 60 V310 M520 60 V310 M600 60 V310"/>
+  </g>
+
+  <!-- 障碍物轮廓：随扫描逐步显现 -->
+  <path d="M140 250 V150 H250" fill="none" stroke="#0d9488" stroke-width="3"
+        stroke-dasharray="260" stroke-dashoffset="260">
+    <animate attributeName="stroke-dashoffset" values="260;0;0;260" keyTimes="0;0.55;0.9;1"
+             dur="6s" repeatCount="indefinite"/>
+  </path>
+  <path d="M420 100 H520 V220" fill="none" stroke="#0d9488" stroke-width="3"
+        stroke-dasharray="240" stroke-dashoffset="240">
+    <animate attributeName="stroke-dashoffset" values="240;0;0;240" keyTimes="0;0.55;0.9;1"
+             dur="6s" repeatCount="indefinite"/>
+  </path>
+
+  <!-- 扫描光束 -->
+  <g>
+    <animateTransform attributeName="transform" type="rotate"
+                      from="0 320 200" to="360 320 200" dur="4s" repeatCount="indefinite"/>
+    <path d="M320 200 L320 40 A160 160 0 0 1 433 98 Z" fill="#0891b2" opacity="0.14"/>
+    <line x1="320" y1="200" x2="320" y2="40" stroke="#0891b2" stroke-width="2.5" opacity="0.9"/>
+    <!-- 扫描命中点：光束扫过时短暂点亮 -->
+    <g fill="#2563eb">
+      <circle cx="256" cy="98"  r="3.5"><animate attributeName="opacity" values="0;1;0.15" dur="4s" repeatCount="indefinite"/></circle>
+      <circle cx="392" cy="72"  r="3.5"><animate attributeName="opacity" values="0;1;0.15" dur="4s" begin="-1s" repeatCount="indefinite"/></circle>
+      <circle cx="464" cy="150" r="3.5"><animate attributeName="opacity" values="0;1;0.15" dur="4s" begin="-2s" repeatCount="indefinite"/></circle>
+      <circle cx="184" cy="196" r="3.5"><animate attributeName="opacity" values="0;1;0.15" dur="4s" begin="-3s" repeatCount="indefinite"/></circle>
+    </g>
+  </g>
+
+  <!-- 机器人 -->
+  <g>
+    <rect x="300" y="188" width="40" height="26" rx="6" fill="#2563eb"/>
+    <circle cx="320" cy="201" r="5" fill="#ffffff"/>
+    <path d="M320 188 L314 178 L326 178 Z" fill="#0f172a"/>
+  </g>
+
+  <!-- 标注 -->
+  <text x="24" y="34" font-size="15" font-weight="700" fill="#0f172a">激光扫描建图</text>
+  <text x="520" y="34" font-size="12" fill="#94a3b8">6s / 循环</text>
+
+  <!-- 命中点累计计数（伪数据） -->
+  <g font-family="'Cascadia Code',Consolas,monospace" font-size="12" fill="#64748b">
+    <text x="24" y="326">hits: <tspan fill="#2563eb" font-weight="700" id="hits">—</tspan></text>
+  </g>
+  <script type="application/ecmascript"><![CDATA[
+    var t = 0, el = document.getElementById('hits');
+    setInterval(function(){ t = (t + 37) % 4096; if (el) el.textContent = t; }, 120);
+  ]]></script>
+</svg>

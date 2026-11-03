@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-04 · 视觉巡检闭环与报告 | IND-05 工业巡检应用场景</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+  :root{--theme:#059669;--theme-deep:#047857;--theme-bg:#ecfdf5;--theme-bd:#a7f3d0}
+  figure.shot{margin:18px 0;border:1px solid var(--theme-bd);border-radius:12px;overflow:hidden;background:#fff}
+  figure.shot img{display:block;width:100%;height:auto}
+  figure.shot svg{display:block;width:100%;height:auto;background:#0b1220}
+  figure.shot figcaption{padding:10px 14px;font-size:13px;color:#065f46;background:var(--theme-bg);border-top:1px solid var(--theme-bd)}
+  .tag.hl{background:var(--theme-bg);border-color:var(--theme-bd);color:var(--theme-deep)}
+  .rpt{white-space:pre-wrap;background:#0b1220;color:#a7f3d0;border:1px solid var(--theme-bd);border-radius:10px;padding:12px 14px;font-size:13px;line-height:1.75;margin-top:12px}
+/* ── 五星学习法 · 课程分段 ── */
+.fivestar-note{font-size:13px;color:#5b6b78;margin-top:12px}
+.fs-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:14px}
+.fs-cell{border:1px solid var(--theme-bd);border-radius:12px;padding:10px 8px;text-align:center;background:var(--theme-bg)}
+.fs-cell .st{font-size:12.5px;font-weight:800;color:var(--theme-deep)}
+.fs-cell .tm{font-family:var(--font-mono,monospace);font-size:11px;color:#0f766e;margin-top:3px;font-weight:700}
+.fs-cell .ds{font-size:11.5px;color:#5b6b78;margin-top:4px;line-height:1.5}
+.seg{display:inline-block;font-size:11px;font-weight:700;font-family:var(--font-mono,monospace);background:var(--theme-bg);color:var(--theme-deep);border:1px solid var(--theme-bd);border-radius:99px;padding:2px 10px;margin-left:8px;vertical-align:middle;white-space:nowrap}
+.tl{width:100%;border-collapse:collapse;font-size:13px;margin-top:14px;background:#fff}
+.tl th,.tl td{border:1px solid #e2ece9;padding:7px 10px;text-align:left;vertical-align:top}
+.tl th{background:var(--theme-bg);color:var(--theme-deep);font-size:12.5px;white-space:nowrap}
+.tl .m{font-family:var(--font-mono,monospace);color:var(--theme-deep);font-weight:700;white-space:nowrap}
+@media(max-width:900px){.fs-grid{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="bar-in">
+    <a class="logo" href="../../../index.html"><b>课程</b>巡检</a>
+    <nav class="crumb"><a href="../../../index.html#ind">总首页</a> / <a href="../index.html">IND-05 工业巡检</a> / EXP-04</nav>
+  </div>
+</header>
+<div class="wrap">
+  <aside class="side">
+    <h4>本页目录 · 五星学习法</h4>
+    <a href="#s0">00 课程节奏 · 8 段微课</a>
+    <a href="#s1" class="now">01 学习目标 ①聚焦问题</a>
+    <a href="#s2">02 原理 ①聚焦 ②激活</a>
+    <a href="#s3">03 硬件与材料 ③示证新知</a>
+    <a href="#s4">04 操作步骤 ④应用新知</a>
+    <a href="#s5">05 关键命令 ④应用新知</a>
+    <a href="#s6">06 动画 ③示证新知</a>
+    <a href="#s7">07 互动 ④应用新知</a>
+    <a href="#s8">08 常见问题 ⑤融会贯通</a>
+    <a href="#s9">09 拓展 ⑤融会贯通</a>
+    <a href="#s10">10 思考题 ⑤融会贯通</a>
+    <h4>兄弟实验</h4>
+    <a href="../exp-01-sdk-motion/index.html">EXP-01 控制与巡检准备</a>
+    <a href="../exp-02-lidar-slam/index.html">EXP-02 3D 激光建图</a>
+    <a href="../exp-03-amcl-nav2/index.html">EXP-03 定位与多点导航</a>
+  </aside>
+  <main class="content">
+    <div class="exp-head">
+      <div class="code">EXP-04 · 8 学时</div>
+      <h1>视觉巡检闭环与报告</h1>
+      <p class="desc">在巡检点拍照/录像，用 YOLOv8/ONNX 识别表计读数或异常目标，汇总生成巡检报告，最后自主回充。验收标准：完成「建图 - 定位 - 巡检 - 识别 - 报告」五环闭环；关键技巧：光照不足需补光、目标阈值要标定。</p>
+      <div class="meta"><span class="tag hl">实践</span><span class="tag">YOLOv8 / ONNX</span><span class="tag">coco_detector</span><span class="tag">自主回充</span></div>
+    </div>
+
+    <!-- 00 -->
+    <section class="blk" id="s0">
+      <h2><span class="no">00</span>课程节奏：五星学习法 · 8 段微课（每段 ≤ 15 min）</h2>
+      <p>本实验按<b>五星学习法</b>组织：先用一个真实故障<b>聚焦问题</b>，再<b>激活旧知</b>（EXP-01~03 全链路 + 图像识别直觉 + 概率与阈值），接着<b>示证新知</b>（YOLO 一次看完 + 巡检日报数据流 + 回充分段动画），然后动手<b>应用新知</b>完成从到点拍照到自主回充的全闭环，最后借排障与拓展<b>融会贯通</b>。全程切成 <b>8 段微课、每段不超过 15 分钟</b>，段间停顿 1~2 分钟消化；纯讲授合计约 100 分钟，其余课时用于动手实操与个别辅导。</p>
+      <div class="fs-grid">
+        <div class="fs-cell"><div class="st">① 聚焦问题</div><div class="tm">课段 1 · 12 min</div><div class="ds">"烟雾报警狼来了"故障现场，带着问题开课</div></div>
+        <div class="fs-cell"><div class="st">② 激活旧知</div><div class="tm">课段 2 · 8 min</div><div class="ds">EXP-01~03 全链路 · 图像识别直觉 · 概率与阈值</div></div>
+        <div class="fs-cell"><div class="st">③ 示证新知</div><div class="tm">课段 3~4 · 27 min</div><div class="ds">YOLO 一次看完 + 日报数据流 + 回充分段</div></div>
+        <div class="fs-cell"><div class="st">④ 应用新知</div><div class="tm">课段 5~7 · 40 min</div><div class="ds">到点拍照→识别→阈值标定→日报→自主回充</div></div>
+        <div class="fs-cell"><div class="st">⑤ 融会贯通</div><div class="tm">课段 8 · 13 min</div><div class="ds">排障口诀 · 拓展阅读 · 思考题</div></div>
+      </div>
+      <table class="tl">
+        <tr><th>课段</th><th>五星阶段</th><th>时长</th><th>对应章节</th><th>本段任务</th></tr>
+        <tr><td class="m">课段 1</td><td>聚焦问题</td><td class="m">12 min</td><td>§01 + §02 前半</td><td>抛出现场故障"烟雾报警狼来了"，明确本课要解决的目标</td></tr>
+        <tr><td class="m">课段 2</td><td>激活旧知</td><td class="m">8 min</td><td>§02 后半</td><td>用 EXP-01~03 全链路、图像识别直觉、概率与阈值三条旧知解释故障成因</td></tr>
+        <tr><td class="m">课段 3</td><td>示证新知</td><td class="m">15 min</td><td>§03</td><td>认识相机、coco_detector、ONNX 与回充桩硬件</td></tr>
+        <tr><td class="m">课段 4</td><td>示证新知</td><td class="m">12 min</td><td>§06</td><td>看懂 YOLO 检测与自主回充三阶段动画</td></tr>
+        <tr><td class="m">课段 5</td><td>应用新知</td><td class="m">15 min</td><td>§04 S1~S3 + §05 ①②③</td><td>到点停稳 + 补光拍照 + coco_detector 实时识别（边讲边演）</td></tr>
+        <tr><td class="m">课段 6</td><td>应用新知</td><td class="m">15 min</td><td>§04 S4~S5 + §05 ④⑤</td><td>阈值标定 + 生成日报 + 自主回充——课段 1 的故障就此根除</td></tr>
+        <tr><td class="m">课段 7</td><td>应用新知</td><td class="m">10 min</td><td>§07</td><td>置信度阈值标定台与报告生成器自测，全通方可结课</td></tr>
+        <tr><td class="m">课段 8</td><td>融会贯通</td><td class="m">13 min</td><td>§08~§10</td><td>排障口诀收口，挑战题与思考题拔高迁移</td></tr>
+      </table>
+      <p class="fivestar-note">讲课提示：课段 1/2 以讲授 + 提问为主；课段 3~6 边讲边演（实物 / 动画 / 命令行）；课段 7 学员独立完成；课段 8 答疑拔高。段与段之间停顿 1~2 分钟，确认学员跟上再进下一段。</p>
+    </section>
+
+    <section class="blk" id="s1">
+      <h2><span class="no">01</span>学习目标<span class="seg">课段 1 · 聚焦问题 · 12 min</span></h2>
+      <ul class="check">
+        <li>用自己的话讲清 YOLO：看图圈目标——一次看完一整张图，同时给出框、类别和置信度。</li>
+        <li>读懂置信度阈值的两难：调高漏检、调低误检，理解「阈值标定」为什么是技巧项。</li>
+        <li>在巡检点完成拍照取帧，并喂给 YOLOv8/ONNX 模型得到检测结果。</li>
+        <li>把「到点—拍照—识别—记录」串联起来，生成一份结构化巡检日报。</li>
+        <li>让 Go2 巡检结束后自主回充，打通「建图-定位-巡检-识别-报告」全闭环并复盘。</li>
+      </ul>
+      <div class="tip amber"><b>素材说明：</b>本课无视频素材——识别效果以官方案例仓库截图与自制 SVG 动画呈现，不虚构实拍录像。</div>
+    </section>
+
+    <section class="blk" id="s2">
+      <h2><span class="no">02</span>原理：视觉识别与巡检闭环讲透<span class="seg">课段 1 收尾 + 课段 2 · 激活旧知 · 8 min</span></h2>
+      <div class="tip amber"><span class="lab">❓ 聚焦问题（课段 1）</span>学员现场最常遇到的怪事：<b>反光被认成烟雾连报三次，真渗漏却一声不吭</b>——「狼来了」式的误报让运维把告警当耳旁风，等到真泄漏反而漏掉了。问题出在哪？带着这个故障听完全课——到课段 6 你会亲手把阈值标定到位，让狼不再乱叫、真狼跑不掉。</div>
+      <p><b>YOLO 就是「看图圈目标」：</b>给它一张巡检照片，它一次看完，直接在图上画框：「表计，置信度 0.91」「烟雾，置信度 0.63」。名字 YOLO = You Only Look Once（你只需看一次）——不像老办法要拿小窗口在图上一寸寸挪。每个框带一个 <b>0~1 的置信度</b>，代表模型有多确信框里真是那个东西；我们用一条<b>阈值线</b>筛它：线划高了真目标被划掉（漏检），划低了影子反光也来凑数（误检）——所以实训技巧叫「目标阈值标定」。</p>
+      <h3>三条到手的路（本课走前两条）</h3>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">① 现成检出（课堂主线）</div><div class="kt">go2_ros2_sdk 内置图像话题 go2_camera/color/image，配合 coco_detector 节点（ros2 run coco_detector coco_detector_node）实时发布 /detected_objects——零训练先跑通闭环。</div></div>
+        <div class="kcard"><div class="kd">② 自训表计模型</div><div class="kt">Ultralytics CLI 一行训练：yolo detect train；smart-gas-meter 案例（MIT）给出标数据→train_yolo.py→infer_yolo.py→导出 model_digit_yolo.onnx 的全流程。</div></div>
+        <div class="kcard"><div class="kd">③ ONNX 边缘部署</div><div class="kt">导出 .onnx 后在 Jetson Orin 40 TOPS 上推理，弱网也能本地出结果——识别不依赖云端。</div></div>
+        <div class="kcard"><div class="kd">光照是成败手</div><div class="kt">算法再好，欠曝/眩光都白搭：背光表位补光灯常开，这就是「光照不足需补光」技巧的由来。</div></div>
+      </div>
+      <h3>回充：巡检的最后一个动作</h3>
+      <p>识别完不是结束——电量与流程都要求狗<b>自己回桩</b>。Nav2 的 Docking Framework（opennav_docking）把回充分成几个阶段：先在远处把桩放进视野<b>粗对准</b>，再挪到桩前的<b>预备位（staging）</b>（参数 staging_x_offset 控制提前量），最后<b>直线对接入库</b>，插桩成功发完成信号。桩插上的那一刻，「建图-定位-巡检-识别-报告」五环才算真正扣成一圈。</p>
+      <div class="tip tealb"><b>类比收束：</b>整个 IND-05 就是一家物流公司——EXP-02 画「配送地图」，EXP-03 是「定位+路线规划」，EXP-04 是「送货上门（拍照识别）+ 签收回单（报告）+ 空车回库（回充）」。</div>
+      <div class="tip teal"><span class="lab">↺ 激活旧知（课段 2）</span>回忆三条旧知：① <b>EXP-01~03 的全链路</b>（建图→定位→到点拍照，是识别的输入前提）；② <b>图像识别直觉</b>（人眼一眼圈目标，机器怎么学）；③ <b>概率与阈值</b>（0~1 置信度 + 阈值线 = 漏检/误检的跷跷板）。三条合起来，正好解释课段 1 那个故障。</div>
+      <figure class="shot">
+        <img src="./images/fig-meter-yolo-thumb.jpg" alt="smart-gas-meter 表计 YOLO 识别案例" loading="lazy">
+        <figcaption>图 4-1｜表计数字 YOLO 识别开源案例（来自 Cian911/smart-gas-meter 仓库，MIT 协议）：训练管线 calibrate → label → prepare → train_yolo → infer_yolo，产出 model_digit_yolo.onnx——表计读数任务的完整参考实现。</figcaption>
+      </figure>
+      <figure class="shot">
+        <svg viewBox="0 0 720 230" role="img" aria-label="巡检日报生成流程示意图">
+          <g font-size="13" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif">
+            <text x="360" y="30" fill="#6ee7b7" font-weight="bold">从检测结果到巡检日报（数据流示意图）</text>
+            <rect x="30" y="60" width="140" height="72" rx="10" fill="#064e3b" stroke="#34d399" stroke-width="2"/><text x="100" y="88" fill="#d1fae5" font-weight="bold">各巡检点</text><text x="100" y="110" fill="#6ee7b7" font-size="11">照片 + 位姿 + 时间戳</text>
+            <rect x="210" y="60" width="150" height="72" rx="10" fill="#064e3b" stroke="#34d399" stroke-width="2"/><text x="285" y="88" fill="#d1fae5" font-weight="bold">YOLO / coco_detector</text><text x="285" y="110" fill="#6ee7b7" font-size="11">类别 + 置信度 + 框</text>
+            <rect x="400" y="60" width="140" height="72" rx="10" fill="#064e3b" stroke="#34d399" stroke-width="2"/><text x="470" y="88" fill="#d1fae5" font-weight="bold">规则判定</text><text x="470" y="110" fill="#6ee7b7" font-size="11">读数/异常/阈值过滤</text>
+            <rect x="580" y="60" width="115" height="72" rx="10" fill="#78350f" stroke="#fbbf24" stroke-width="2"/><text x="637" y="88" fill="#fde68a" font-weight="bold">巡检日报</text><text x="637" y="110" fill="#fbbf24" font-size="11">Markdown/JSON</text>
+            <defs><marker id="a05g41" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#34d399"/></marker></defs>
+            <line x1="172" y1="96" x2="204" y2="96" stroke="#34d399" stroke-width="2" marker-end="url(#a05g41)"/><line x1="362" y1="96" x2="394" y2="96" stroke="#34d399" stroke-width="2" marker-end="url(#a05g41)"/><line x1="542" y1="96" x2="574" y2="96" stroke="#34d399" stroke-width="2" marker-end="url(#a05g41)"/>
+            <rect x="30" y="160" width="665" height="56" rx="10" fill="#0b1220" stroke="#334155"/><text x="362" y="184" fill="#a7f3d0" font-size="12">日报字段范例：点位编号 · 到达时间 · 读数值 · 异常类别 · 置信度 · 照片路径 · 结论(正常/告警)</text><text x="362" y="205" fill="#64748b" font-size="11">五环闭环验收 = 地图(EXP-02) ⊕ 定位(EXP-03) ⊕ 巡检点到达 ⊕ 识别结果 ⊕ 本报告 归档齐全</text>
+          </g>
+        </svg>
+        <figcaption>图 4-2｜巡检日报生成数据流（自制示意图）：每个巡检点的「照片+位姿+时间」经检测、规则判定后汇总成结构化日报，是闭环验收的最终凭证。</figcaption>
+      </figure>
+      <figure class="shot">
+        <svg viewBox="0 0 720 220" role="img" aria-label="自主回充分阶段示意图">
+          <g font-size="13" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif">
+            <text x="360" y="30" fill="#6ee7b7" font-weight="bold">自主回充三阶段：opennav_docking（SimpleChargingDock）示意（示意图）</text>
+            <rect x="45" y="60" width="195" height="110" rx="10" fill="#0b1220" stroke="#334155"/><text x="142" y="84" fill="#d1fae5" font-weight="bold">① 发现与粗对准</text><text x="142" y="106" fill="#94a3b8" font-size="11">看到桩（AprilTag/轮廓）</text><text x="142" y="124" fill="#94a3b8" font-size="11">在代价地图里认出 dock</text>
+            <rect x="120" y="140" width="45" height="18" rx="4" fill="#fbbf24"/><text x="142" y="153" fill="#78350f" font-size="10" font-weight="bold">Go2</text><rect x="200" y="76" width="34" height="60" fill="#334155"/><rect x="204" y="118" width="26" height="14" fill="#059669"/><text x="217" y="160" fill="#6ee7b7" font-size="10">充电桩</text>
+            <rect x="270" y="60" width="195" height="110" rx="10" fill="#0b1220" stroke="#334155"/><text x="367" y="84" fill="#d1fae5" font-weight="bold">② 预备位 staging</text><text x="367" y="106" fill="#94a3b8" font-size="11">staging_x_offset 提前量</text><text x="367" y="124" fill="#94a3b8" font-size="11">对齐中轴、姿态摆正</text>
+            <rect x="320" y="140" width="45" height="18" rx="4" fill="#fbbf24"/><text x="342" y="153" fill="#78350f" font-size="10" font-weight="bold">Go2</text><defs><marker id="a05g42" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#fbbf24"/></marker></defs>
+            <path d="M368,149 L430,149" stroke="#fbbf24" stroke-width="2" stroke-dasharray="4 3" marker-end="url(#a05g42)"/><rect x="430" y="76" width="34" height="60" fill="#334155"/><rect x="434" y="118" width="26" height="14" fill="#059669"/>
+            <rect x="495" y="60" width="195" height="110" rx="10" fill="#064e3b" stroke="#34d399" stroke-width="2"/><text x="592" y="84" fill="#d1fae5" font-weight="bold">③ 对接入库 ✓</text><text x="592" y="106" fill="#a7f3d0" font-size="11">直线进桩，触点闭合</text><text x="592" y="124" fill="#a7f3d0" font-size="11">发布 dock 成功 → 开充</text>
+            <rect x="600" y="140" width="45" height="18" rx="4" fill="#fbbf24"/><text x="622" y="153" fill="#78350f" font-size="10" font-weight="bold">Go2</text><rect x="660" y="76" width="30" height="60" fill="#334155"/><rect x="646" y="140" width="14" height="18" fill="#059669"/><circle cx="637" cy="149" r="12" fill="none" stroke="#34d399" stroke-width="2" stroke-dasharray="3 3"/>
+            <text x="360" y="202" fill="#94a3b8" font-size="11.5">粗对准（还能看偏）→ 预备位（拉直线距离）→ 入库（只做纯直线）：把难动作拆成三段，成功率才上得去</text>
+          </g>
+        </svg>
+        <figcaption>图 4-3｜自主回充三阶段（自制示意图，对应 Nav2 opennav_docking 框架与 SimpleChargingDock 插件）：发现桩 → 停到预备位（staging_x_offset）→ 直线入库充电。</figcaption>
+      </figure>
+    </section>
+
+    <section class="blk" id="s3">
+      <h2><span class="no">03</span>硬件与材料<span class="seg">课段 3 · 示证新知 · 15 min</span></h2>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">前置相机</div><div class="kt">Go2 高清相机；SDK 侧 example/front_camera/camera_opencv.py 可直接取帧，ROS2 侧 go2_camera/color/image。</div></div>
+        <div class="kcard"><div class="kd">补光设备</div><div class="kt">巡检点位一盏补光灯/手电：背光表位、昏暗泵房必备——光照不足识别率腰斩。</div></div>
+        <div class="kcard"><div class="kd">算力</div><div class="kt">Jetson Orin 40 TOPS 机载跑 ONNX/yolov8n 足够；也可先在工控机跑通再下移。</div></div>
+        <div class="kcard"><div class="kd">充电桩</div><div class="kt">回充分段用；EXP-02 建图时已用 Start At Dock 定过原点，桩位与地图一致。</div></div>
+      </div>
+      <table>
+        <thead><tr><th>检查项</th><th>标准</th><th>不达标后果</th></tr></thead>
+        <tbody>
+          <tr><td>图像话题</td><td>go2_camera/color/image 有帧滚动</td><td>取不到图，coco_detector 无输入</td></tr>
+          <tr><td>模型文件</td><td>best.pt / model_digit_yolo.onnx 就位</td><td>识别环节开天窗</td></tr>
+          <tr><td>阈值标定</td><td>用 10 张混合样本调出阈值并记录</td><td>漏检/误检，报告结论不可信</td></tr>
+          <tr><td>光照</td><td>每个点位试拍，直方图不过暗</td><td>欠曝图喂给再好的模型也白搭</td></tr>
+          <tr><td>电量</td><td>≥30%，否则先回充再执行闭环</td><td>报告没写完狗先趴窝</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="blk" id="s4">
+      <h2><span class="no">04</span>操作步骤<span class="seg">课段 5~6 · 应用新知 · 2×15 min</span></h2>
+      <div class="flow">
+        <div class="step"><b class="n">S1</b>到点停稳<br><small>EXP-03 队列 + 定位收敛</small></div>
+        <div class="arr">→</div>
+        <div class="step"><b class="n">S2</b>补光拍照<br><small>camera_opencv / 图像话题取帧</small></div>
+        <div class="arr">→</div>
+        <div class="step"><b class="n">S3</b>YOLO 识别<br><small>coco_detector 或自训模型推理</small></div>
+        <div class="arr">→</div>
+        <div class="step"><b class="n">S4</b>阈值标定<br><small>调阈值压漏检误检并记录</small></div>
+        <div class="arr">→</div>
+        <div class="step"><b class="n">S5</b>报告与回充<br><small>汇总日报 → follow_waypoints 回桩 → docking</small></div>
+      </div>
+      <ol style="margin:14px 0 6px;padding-left:22px;line-height:1.9">
+        <li><b>到点停稳：</b>沿用 EXP-03 的巡检队列，每到一个点等定位收敛；把「到点事件」作为拍照触发器。</li>
+        <li><b>补光拍照：</b>检查取景点光照，不足先开补光；SDK 侧跑 <code>camera_opencv.py</code> 存帧，或直接录 <code>/go2_camera/color/image</code> 话题。</li>
+        <li><b>识别（零训练主线）：</b>启动 <code>ros2 run coco_detector coco_detector_node</code>，订阅图像话题，检出结果发布到 <code>/detected_objects</code>——先用现成类别跑通链路。</li>
+        <li><b>识别（自训表计）：</b>按 smart-gas-meter 流程：标定 calibrate → 标注 label → 整理 prepare → <code>train_yolo.py</code> 训练 → <code>infer_yolo.py</code> 推理 → 导出 <code>model_digit_yolo.onnx</code>；训练命令用 Ultralytics CLI（<code>yolo detect train model=yolov8n.pt data=... epochs=50</code>）。</li>
+        <li><b>阈值标定（技巧）：</b>取 10 张亮/暗/反光混合样本扫阈值（0.3→0.8），画出漏检/误检代价，选定工作点并写进报告参数栏。</li>
+        <li><b>生成报告：</b>按图 4-2 的字段汇总各点结果，输出结构化日报（JSON）+ 可读版（Markdown）。</li>
+        <li><b>自主回充：</b>把充电桩作为终点加入 waypoint 队列驶近，再交给 opennav_docking 分三段对接；桩位对齐 EXP-02 的 Dock 原点，插桩成功即闭环完成。</li>
+      </ol>
+      <div class="tip amber"><b>验收闸门：</b>五环（建图-定位-巡检-识别-报告）每环都有产物：map.yaml、巡检点到达记录、检测结果、阈标记录、日报文件，缺一不认。</div>
+    </section>
+
+    <section class="blk" id="s5">
+      <h2><span class="no">05</span>关键命令<span class="seg">随课段 5 / 6 对照使用</span></h2>
+      <p class="dim">coco_detector 用法来自 go2_ros2_sdk；训练/推理命令来自 Ultralytics 与 smart-gas-meter 官方脚本。</p>
+      <pre><span class="c"># ① 话题侧：看图像帧、看检测结果</span>
+ros2 topic hz /go2_camera/color/image
+ros2 topic echo /detected_objects        <span class="c"># coco_detector 输出：类别+框</span>
+
+<span class="c"># ② 启动检测节点（go2_ros2_sdk 提供，detection_threshold 可在此粗调）</span>
+ros2 run coco_detector coco_detector_node --ros-args -p detection_threshold:=0.5
+
+<span class="c"># ③ SDK 侧前置相机拍照存帧（需图形界面，ESC 退出）</span>
+python3 ./example/front_camera/camera_opencv.py
+
+<span class="c"># ④ 自训表计模型（smart-gas-meter / Ultralytics 官方 CLI）</span>
+yolo detect train model=yolov8n.pt data=meter.yaml epochs=50 imgsz=640
+python3 train_yolo.py                    <span class="c"># 案例仓库训练脚本</span>
+python3 infer_yolo.py                    <span class="c"># 案例仓库推理脚本</span>
+yolo export model=best.pt format=onnx    <span class="c"># 导出 ONNX 上机载部署</span>
+
+<span class="c"># ⑤ 巡检终点=充电桩：waypoint 驶近后转入 docking 对接（示意调用）</span>
+ros2 service call /dock_robot nav2_msgs/srv/DockRobot \
+  "{dock_id: 'home', start_policy: 0}"</pre>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">阈值标定怎么做</div><div class="kt">固定模型扫 0.3~0.8 五档，数漏检/误检各几次，取代价和最小档；结果写进报告「参数」栏。</div></div>
+        <div class="kcard"><div class="kd">补光到什么程度</div><div class="kt">试拍直方图不贴暗端、表盘数字无反光白斑；宁可两盏柔光也别一盏直射。</div></div>
+        <div class="kcard"><div class="kd">检测在哪跑</div><div class="kt">课堂先工控机跑通，验收时切到 Jetson Orin（40 TOPS）证明边缘可行。</div></div>
+        <div class="kcard"><div class="kd">闭环产物清单</div><div class="kt">地图 + 到达记录 + 检测图/JSON + 阈标表 + 日报 + 回充成功截图（六件套）。</div></div>
+      </div>
+    </section>
+
+    <section class="blk" id="s6">
+      <h2><span class="no">06</span>动画：YOLO 检测与回充分段<span class="seg">课段 4 · 示证新知 · 12 min</span></h2>
+      <div class="anim-box">
+        <svg viewBox="0 0 720 250" width="100%" role="img" aria-label="YOLO 检测框与置信度动画">
+          <g font-size="13" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif">
+            <text x="360" y="30" fill="#6ee7b7" font-weight="bold">YOLO = 看图圈目标：一次前向，全图框 + 置信度</text>
+            <rect x="50" y="48" width="380" height="170" rx="10" fill="#111c2e" stroke="#334155"/><rect x="80" y="76" width="150" height="96" rx="6" fill="#1e293b" stroke="#475569"/><circle cx="155" cy="124" r="34" fill="#0f172a" stroke="#64748b" stroke-width="3"/><text x="155" y="130" fill="#94a3b8" font-size="14">表盘</text>
+            <rect x="270" y="96" width="120" height="76" rx="6" fill="#1e293b" stroke="#475569"/><text x="330" y="140" fill="#64748b" font-size="12">管道阀门</text>
+            <rect x="70" y="66" width="170" height="116" fill="none" stroke="#fbbf24" stroke-width="3" stroke-dasharray="520" stroke-dashoffset="520"><animate attributeName="stroke-dashoffset" values="520;0;0;520" dur="4s" repeatCount="indefinite"/></rect>
+            <rect x="70" y="46" width="128" height="20" fill="#fbbf24" opacity="0"><animate attributeName="opacity" values="0;1;1;0" dur="4s" repeatCount="indefinite"/></rect>
+            <text x="134" y="61" fill="#78350f" font-size="12" font-weight="bold" opacity="0">meter 0.93<tspan font-weight="normal">(✓通过阈值)</tspan><animate attributeName="opacity" values="0;1;1;0" dur="4s" repeatCount="indefinite"/></text>
+            <rect x="262" y="88" width="136" height="92" fill="none" stroke="#f43f5e" stroke-width="2.5" stroke-dasharray="6 4" opacity="0"><animate attributeName="opacity" values="0;0.9;0.9;0" dur="4s" repeatCount="indefinite"/></rect>
+            <rect x="262" y="68" width="110" height="20" fill="#f43f5e" opacity="0"><animate attributeName="opacity" values="0;0.9;0.9;0" dur="4s" repeatCount="indefinite"/></rect>
+            <text x="317" y="83" fill="#fff" font-size="12" opacity="0">valve 0.41 ✗低于阈值0.5<animate attributeName="opacity" values="0;0.9;0.9;0" dur="4s" repeatCount="indefinite"/></text>
+            <rect x="470" y="56" width="46" height="162" rx="6" fill="#0f172a" stroke="#334155"/><rect x="476" y="132" width="34" height="80" rx="4" fill="#059669"/><rect x="476" y="112" width="34" height="20" rx="4" fill="#f43f5e" opacity="0.75"/><rect x="476" y="86" width="34" height="26" rx="4" fill="#fbbf24" opacity="0.9"/>
+            <line x1="466" y1="118" x2="540" y2="118" stroke="#ef4444" stroke-width="2.5" stroke-dasharray="5 3"><animate attributeName="y1" values="118;118;96;96;118" dur="4s" repeatCount="indefinite"/><animate attributeName="y2" values="118;118;96;96;118" dur="4s" repeatCount="indefinite"/></line>
+            <text x="558" y="112" fill="#fca5a5" font-size="11" text-anchor="start">阈值线（动画中自动标定）</text><text x="558" y="134" fill="#6ee7b7" font-size="11" text-anchor="start">0.93 通过 → 报告「表计正常」</text><text x="558" y="156" fill="#fda4af" font-size="11" text-anchor="start">0.41 拦下 → 避免误报</text>
+            <text x="558" y="184" fill="#94a3b8" font-size="11" text-anchor="start">阈值↑ 检出少（漏检↑）</text><text x="558" y="204" fill="#94a3b8" font-size="11" text-anchor="start">阈值↓ 检出多（误检↑）</text>
+            <text x="240" y="238" fill="#64748b" font-size="11">左=巡检画面（黄框通过 / 红框被拦）　右=置信度分布条与滑动阈值线</text>
+          </g>
+        </svg>
+        <div class="anim-cap">动画 4-1：黄框 0.93 高于阈值线进入报告，红框 0.41 被动态下压/抬升的阈值线拦下——「漏检与误检的跷跷板」随线移动实时可见。</div>
+      </div>
+      <div class="anim-box">
+        <svg viewBox="0 0 720 200" width="100%" role="img" aria-label="回充分阶段与五环闭环动画">
+          <text x="360" y="30" fill="#6ee7b7" font-size="13" font-weight="bold" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif">回充三阶段推进 + 五环闭环扣合</text>
+          <g font-size="12" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif">
+            <rect x="40" y="46" width="640" height="64" rx="10" fill="#0b1220" stroke="#334155"/><line x1="240" y1="52" x2="240" y2="104" stroke="#334155" stroke-dasharray="4 4"/><line x1="440" y1="52" x2="440" y2="104" stroke="#334155" stroke-dasharray="4 4"/>
+            <text x="140" y="66" fill="#64748b" font-size="10.5">① 发现与粗对准</text><text x="340" y="66" fill="#64748b" font-size="10.5">② staging 预备位</text><text x="540" y="66" fill="#64748b" font-size="10.5">③ 直线入库</text>
+            <rect x="650" y="62" width="26" height="40" fill="#334155"/><rect x="654" y="90" width="18" height="10" fill="#059669"/><path d="M75,80 L75,96 M85,80 L85,96" stroke="#fbbf24" stroke-width="1.5"/><circle cx="75" cy="88" r="5" fill="#34d399"/>
+            <rect x="-10" y="-8" width="20" height="16" rx="4" fill="#fbbf24" stroke="#78350f"><animateMotion dur="6s" repeatCount="indefinite" keyPoints="0;0.25;0.25;0.55;0.55;0.97;1" keyTimes="0;0.25;0.35;0.6;0.7;0.95;1" calcMode="linear" path="M75,88 L200,88 L340,88 L440,88 L560,88 L653,88"/></rect>
+            <g fill="none" stroke-width="3">
+              <circle cx="110" cy="155" r="17" stroke="#34d399" stroke-dasharray="107" stroke-dashoffset="107"><animate attributeName="stroke-dashoffset" values="107;0" dur="1.2s" begin="0s" fill="freeze"/></circle><circle cx="235" cy="155" r="17" stroke="#34d399" stroke-dasharray="107" stroke-dashoffset="107"><animate attributeName="stroke-dashoffset" values="107;0" dur="1.2s" begin="1.2s" fill="freeze"/></circle>
+              <circle cx="360" cy="155" r="17" stroke="#34d399" stroke-dasharray="107" stroke-dashoffset="107"><animate attributeName="stroke-dashoffset" values="107;0" dur="1.2s" begin="2.4s" fill="freeze"/></circle><circle cx="485" cy="155" r="17" stroke="#34d399" stroke-dasharray="107" stroke-dashoffset="107"><animate attributeName="stroke-dashoffset" values="107;0" dur="1.2s" begin="3.6s" fill="freeze"/></circle>
+              <circle cx="610" cy="155" r="17" stroke="#fbbf24" stroke-dasharray="107" stroke-dashoffset="107"><animate attributeName="stroke-dashoffset" values="107;0" dur="1.2s" begin="4.8s" fill="freeze"/></circle>
+            </g>
+            <text x="110" y="159" fill="#d1fae5" font-size="10">建图</text><text x="235" y="159" fill="#d1fae5" font-size="10">定位</text><text x="360" y="159" fill="#d1fae5" font-size="10">巡检</text><text x="485" y="159" fill="#d1fae5" font-size="10">识别</text><text x="610" y="159" fill="#fde68a" font-size="10">报告·回充</text>
+            <line x1="127" y1="155" x2="218" y2="155" stroke="#334155" stroke-width="2"/><line x1="252" y1="155" x2="343" y2="155" stroke="#334155" stroke-width="2"/><line x1="377" y1="155" x2="468" y2="155" stroke="#334155" stroke-width="2"/><line x1="502" y1="155" x2="593" y2="155" stroke="#334155" stroke-width="2"/>
+          </g>
+        </svg>
+        <div class="anim-cap">动画 4-2：上半部分 Go2 分三段回充（发现→预备位→直线入库，站位停顿对应每个阶段的收尾判定）；下半五环按「建图→定位→巡检→识别→报告/回充」依次点亮扣合成闭环。</div>
+      </div>
+      <div class="tip violet"><span class="lab">观察</span>动画 4-1 中阈值线上移时红框先消失、黄框还在；继续上移黄框也没了——<b>漏检从这条线开始</b>。「阈值标定」就是在这张跷跷板上找业务能接受的平衡点。</div>
+    </section>
+
+    <section class="blk" id="s7">
+      <h2><span class="no">07</span>互动：置信度阈值标定台 + 报告生成器<span class="seg">课段 7 · 应用新知 · 10 min</span></h2>
+      <div class="ix-panel">
+        <div class="ix-title">第一步：拖动阈值看漏检/误检如何此消彼长；第二步：勾选检测结果一键生成巡检日报</div>
+        <div class="ctl-row">
+          <label class="ctl">置信度阈值
+            <input type="range" id="thr" min="10" max="95" value="50" step="5" oninput="visSim()">
+          </label>
+          <label class="ctl">
+            <input type="checkbox" id="lowLight" onchange="visSim()"> 场景：昏暗无补光（置信度整体-0.25）
+          </label>
+          <button class="btn ghost" onclick="visReset()">重置</button>
+        </div>
+        <div class="io" id="visIo"></div>
+        <div class="ctl-row" style="margin-top:10px">
+          <label><input type="checkbox" class="repCb" value="P1 表计读数 0.082 MPa（meter 0.93）正常" checked> P1 表计 0.93</label>
+          <label><input type="checkbox" class="repCb" value="P2 阀门异响疑似渗漏（valve 0.71）告警" checked> P2 阀门 0.71</label>
+          <label><input type="checkbox" class="repCb" value="P3 温度表读数 41.5℃（meter 0.88）正常" checked> P3 温度表 0.88</label>
+          <label><input type="checkbox" class="repCb" value="P4 反光疑似烟雾（smoke 0.44）待复核"> P4 烟雾 0.44</label>
+          <button class="btn" onclick="genReport()">生成巡检日报 ↓</button>
+        </div>
+        <div class="rpt" id="rpt" style="display:none"></div>
+      </div>
+      <p style="margin-top:10px">阈值定在 0.5 左右拿「0.93/0.88/0.71」稳稳的，「0.44」被拦——把场景切到昏暗，所有置信度被打 75 折，同一阈值立刻出现漏检：这就是报告里必须记录<b>阈值 + 光照条件</b>的原因。</p>
+    </section>
+
+    <section class="blk" id="s8">
+      <h2><span class="no">08</span>常见问题<span class="seg">课段 8 · 融会贯通 · 13 min</span></h2>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">Q 图像话题没数据？</div><div class="kt">先 ros2 topic hz /go2_camera/color/image；CONN_TYPE=webrtc 时部分图像链路受限，优先 cyclonedds 网线直连。</div></div>
+        <div class="kcard"><div class="kd">Q coco_detector 起不来？</div><div class="kt">确认工作空间已 source、模型权重路径正确；detection_threshold 参数别设成超过 1 的数。</div></div>
+        <div class="kcard"><div class="kd">Q 表计数字总认错？</div><div class="kt">框住整个表盘 ≠ 读数：digit 级任务按 smart-gas-meter 分位裁切标注，先 collect 数据再训。</div></div>
+        <div class="kcard"><div class="kd">Q 阈值该定多少？</div><div class="kt">没有万能值：按 s7 标定台方法在真实样本上扫档，漏检代价高的场景偏低、误报代价高的偏高，并写进报告。</div></div>
+        <div class="kcard"><div class="kd">Q 反光被当烟雾？</div><div class="kt">眩光是头号假阳性源：调相机角度+偏振/柔光补光；仍误判就加时间维度（连续多帧同判）再报警。</div></div>
+        <div class="kcard"><div class="kd">Q 报告字段哪些必填？</div><div class="kt">点位、时间、结果（值/类别）、置信度、阈值、光照条件、结论——缺阈值与光照的报告无法复核。</div></div>
+        <div class="kcard"><div class="kd">Q 回充对不准桩？</div><div class="kt">三段拆开查：发现阶段看桩检测；staging 调 staging_x_offset；入库段地面打滑/桩歪需人工复位后重试。</div></div>
+        <div class="kcard"><div class="kd">Q 算力不够帧率低？</div><div class="kt">换 yolov8n/量化 ONNX、降推理分辨率；检测可以隔帧跑，到点拍照这一张必须跑全精度。</div></div>
+      </div>
+    </section>
+
+    <section class="blk" id="s9">
+      <h2><span class="no">09</span>拓展阅读<span class="seg">课段 8 · 融会贯通</span></h2>
+      <ul class="check">
+        <li><b>smart-gas-meter</b>（MIT）：表计识别全管线参考——calibrate/label/prepare/train_yolo/infer_yolo 脚本化，数据集 meter-captures（HuggingFace，CC-BY-4.0）可直接练手。</li>
+        <li><b>Ultralytics 官方文档</b>：detect 任务 train/val/predict/export 全参数表；导出格式还有 TensorRT（Jetson 更快）。</li>
+        <li><b>Nav2 Docking Framework</b>：opennav_docking（Apache-2.0），dock_plugins 可自定义桩检测，SimpleChargingDock 适合直线桩演示——https://api.nav2.org/nav2-rolling/html/md_nav2_docking_README.html</li>
+        <li><b>unitree_rl_gym</b>（BSD-3）：把「回充对接最后一厘米」交给强化学习策略，是进阶课题方向。</li>
+        <li><b>webhook/告警集成</b>：日报里「告警」条目推送企业微信/钉钉，把实训报告升级成真告警系统。</li>
+      </ul>
+    </section>
+
+    <section class="blk" id="s10">
+      <h2><span class="no">10</span>思考题 · 自测<span class="seg">课段 8 · 融会贯通</span></h2>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">✅ 完成成果</div><div class="kt">「建图-定位-巡检-识别-报告」六件套产物齐全并成功回充。</div></div>
+        <div class="kcard"><div class="kd">🧠 原理收获</div><div class="kt">讲清 YOLO 一次看全图的机制、阈值跷跷板与回充三段式拆解。</div></div>
+        <div class="kcard"><div class="kd">🛠 技能收获</div><div class="kt">独立完成拍照→识别→阈标→日报→回充全流程并排除至少一个光照/阈值问题。</div></div>
+        <div class="kcard"><div class="kd">📐 评分速览</div><div class="kt">闭环完整性 40% + 阈标记录 20% + 报告质量 20% + 动画互动 20%。</div></div>
+      </div>
+      <div class="tip violet"><span class="lab">思考 1</span>漏检和误检哪个对巡检业务更不可接受？按「漏检=隐患没报、误检=狼来了」两种代价，推导你负责的厂区应把阈值推向哪边，并说明如何用数据支撑这个选择。</div>
+      <div class="tip violet"><span class="lab">思考 2</span>为什么回充分成「粗对准—预备位—入库」三段，而不是一步伺服到位？用「误差分层吸收」的角度解释 staging_x_offset 存在的意义。</div>
+    </section>
+
+    <nav class="expnav">
+      <a class="prev" href="../exp-03-amcl-nav2/index.html">← 上一个：EXP-03 定位与多点导航</a>
+      <a class="next" href="../index.html">返回课程目录 →</a>
+    </nav>
+    <footer>
+      <div>IND-05 · 工业巡检应用场景 · EXP-04 视觉巡检闭环与报告</div>
+      <div>8 学时 · 实践 · 基于 培训方案"课程5" + go2_ros2_sdk / Ultralytics / smart-gas-meter 改编</div>
+    </footer>
+  </main>
+</div>
+
+<script>
+var DETS=[{n:'meter 表计',c:0.93},{n:'valve 阀门',c:0.71},{n:'meter 温度表',c:0.88},{n:'smoke 烟雾(反光)',c:0.44},{n:'person 人员闯入',c:0.79},{n:'shadow 阴影误框',c:0.32}];
+function visSim(){
+  var t=parseInt(document.getElementById('thr').value,10)/100;
+  var dark=document.getElementById('lowLight').checked;
+  var pass=[],drop=[],found=[];
+  DETS.forEach(function(d){
+    var c=dark?Math.max(0.05,d.c-0.25):d.c;
+    (c>=t?pass:drop).push(d.n+' '+c.toFixed(2));
+    if(c>=t)found.push(d.n);
+  });
+  var FGT=['meter 表计','valve 阀门','meter 温度表','person 人员闯入'];
+  var miss=FGT.filter(function(x){return found.indexOf(x)<0;});
+  var falseAlarm=found.filter(function(x){return FGT.indexOf(x)<0;});
+  var grade;
+  if(miss.length===0&&falseAlarm.length===0)grade='<span class="ok">工作点优秀：0 漏检 0 误检</span>';
+  else if(miss.length>1)grade='<span class="bad">漏检 '+miss.length+' 个真目标——阈值过'+(dark?'高/光照太差':'高')+'</span>';
+  else if(falseAlarm.length>0)grade='<span class="warn">误检 '+falseAlarm.length+' 个（'+falseAlarm.join('、')+'）进入报告——阈值偏低</span>';
+  else grade='<span class="warn">漏检 '+miss.length+' 个：边缘样本被拦，结合光照复核</span>';
+  document.getElementById('visIo').innerHTML=
+    '阈值 = <b>'+t.toFixed(2)+'</b>'+(dark?'　光照：<b>昏暗（全置信度 -0.25）</b>':'　光照：正常')+'\n'
+    +'<span class="ok">通过 '+pass.length+'：'+(pass.join('、')||'无')+'</span>\n'
+    +'<span class="dim">拦下 '+drop.length+'：'+(drop.join('、')||'无')+'</span>\n'
+    +grade+'\n'
+    +'报告参数栏必须同时记录「阈值 + 光照条件」，否则结果无法复核。';
+}
+function visReset(){
+  document.getElementById('thr').value=50;
+  document.getElementById('lowLight').checked=false;
+  visSim();
+}
+function genReport(){
+  var picks=[];
+  var cbs=document.querySelectorAll('.repCb');
+  for(var i=0;i<cbs.length;i++){if(cbs[i].checked)picks.push(cbs[i].value);}
+  var dark=document.getElementById('lowLight').checked;
+  var t=(parseInt(document.getElementById('thr').value,10)/100).toFixed(2);
+  var box=document.getElementById('rpt');
+  if(picks.length===0){
+    box.style.display='block';
+    box.textContent='未勾选任何检测结果——至少勾一项再生成（这正是「无检测不入报告」的规则）。';
+    return;
+  }
+  var alarm=/告警|待复核/.test(picks.join(''));
+  var lines=['IND-05 巡检日报（自动生成）','================================================','巡检区域：厂区 A 区　执行者：Go2 Edu（EXP-04 闭环）','识别参数：conf_threshold='+t+'　光照条件：'+(dark?'昏暗-无补光':'正常/已补光'),'------------------------------------------------','检测条目（已选 '+picks.length+' 项）：'];
+  picks.forEach(function(p,i){lines.push('  '+(i+1)+'. '+p);});
+  lines.push('------------------------------------------------');
+  lines.push('总体结论：'+(alarm?'存在告警/待复核项，需人工二次确认':'全部正常'));
+  lines.push('闭环状态：建图✓ 定位✓ 巡检✓ 识别✓ 报告✓ → 自主回充');
+  lines.push('生成脚本参考：检测 JSON → 规则判定 → Markdown（见图 4-2 数据流）');
+  box.style.display='block';
+  box.textContent=lines.join('\n');
+}
+visSim();
+</script>
+<script src="../shared/tutorial.js" defer></script>
+</body>
+</html>

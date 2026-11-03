@@ -1,0 +1,386 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/cases/exp006b-object-tracking/exp-08-events-degrade/index.html
+TITLE: EXP-08 · 事件日志与故障降级 — 通用目标追踪综合项目
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+EXP-08 · 事件日志与故障降级 — 通用目标追踪综合项目
+🎓 具身智能课程 ·
+通用目标追踪
+综合项目
+/
+通用目标追踪
+/ EXP-08
+本页目录
+01 问题引入：出事了，谁的锅？
+02 原理通俗讲解：黑匣子与各退一步
+03 关联知识点：五类事件 + 降级链
+04 实验目标
+05 实验环境与准备
+06 动画讲解：故障注入与降级路径
+07 互动讲解：故障注入沙盘
+08 实操步骤：事件触发与注入
+09 重点与易错点
+10 总结与思考
+CASE-04 · 通用目标追踪
+EXP-01 需求分析
+EXP-02 TrackEngine 架构
+EXP-03 配置详解
+EXP-04 DeepSORT 底座
+EXP-05 LLM 门控
+EXP-06 VLM 选目标
+EXP-07 语音与 TTS
+EXP-08 日志与降级
+EXP-09 全功能验证
+EXP-08 · 第 3 章 · 综合性 · 6 学时
+事件日志与故障降级：坏了也不能崩，事后还能查
+边缘 AI 设备 7×24 跑在真实环境里，断网、拔相机、杀播放器是常态。本实验两条主线：
+事件日志
+——
+events.jsonl
+每事件一行 JSON（append_event_log，tracking/events.py L7-18，写失败吞异常不反噬主循环），五类 kind：
+lost
+（follow 目标从 confirmed 差分消失，engine L131-145）/
+unlock_all
+（清除或 unlock_on_loss 全丢）/
+command
+（执行了锁定/清除）/
+camera_stall
+（读帧连续失败
+_cam_fail>=30
+，L115-122）/
+pause_timeout
+（LLM 处理挂死超 30.0s，L101-107）；
+fail-closed 降级
+——任何"不确定锁谁"分支不调
+submit_effect()
+，配合 _rule_fallback 断网兜底、ReID 超时 features=None 纯 IoU、aplay 被杀重启降级打印，做到"任何异常都收敛、不挂起"。
+难度 ⭐⭐⭐ · 6 学时
+events.jsonl
+lost 差分
+fail-closed 三道闸
+故障注入
+01
+问题引入：出事了，谁的锅？
+前面的实验都在"一切正常"的前提下验证功能。真实部署会遇到：
+1
+目标跟丢了——
+什么时候丢的？是出画还是跟踪器提前放弃？
+没有记录就无法回答
+2
+锁定莫名其妙解除了——是用户说了"清除"，还是 unlock_on_loss 全丢自动解？
+两种路径要能区分追责
+3
+用户说"追踪一百号目标"——id=100 根本不存在，此时
+锁一个差不多的？解锁当前的？还是什么都不做？
+4
+断网了 LLM 连不上、ReID worker 全崩、aplay 被杀、相机线松了——
+主循环绝不能崩、不能挂起
+5
+LLM 指令处理期间主循环暂停读帧，若 LLM 挂死——
+画面冻结 30 秒后谁来解冻？
+⚠️ 两条设计红线
+① 状态变化必须留结构化痕迹（events.jsonl）供事后追责；② 任何"不确定"分支
+零副作用
+，全部故障都有收敛策略——这就是 fail-closed + 降级。
+02
+原理通俗讲解：黑匣子与各退一步
+比喻 1
+events.jsonl = 飞机黑匣子 + 值班日志本
+每发生一件"有状态意义"的事（锁定、跟丢、解锁、断流、超时）就
+追加一行 JSON
+，永不改写历史。就像黑匣子只记录不辩解：tail -f 实时看、jq 逐行查。写失败也只吞异常——
+日志系统自己绝不能把主程序弄死
+。
+比喻 2
+fail-closed = 拿不准就不盖章的银行柜员
+柜员办业务时身份证对不上，规范做法是
+"退回材料，不盖章也不涂改"
+——宁可这单不办，也不能盖错章。对应代码：所有 fail 分支的共同点是
+不调用 engine.submit_effect()
+；锁是印章，只在完全确定时落下去。
+比喻 3
+空 submit = 误会也会毁约
+有人问"追踪一百号"，若空集合也算一次 submit，就会
+把现在好好锁着的 id3 解掉
+——用户没让你解锁，你却解锁了（误导误锁的状态翻转）。所以"不确定 → 维持现状 + 引导"，把错误状态转移概率压到零。
+比喻 4
+降级链 = 各个工位的备胎方案
+主厨（LLM）请假 → 切配工按标准菜单做（_rule_fallback：追踪/清除/截图仍可用，闲聊本来就不标准化——回"没听懂"）；验貌师傅（ReID）病了 → 门卫改按运动轨迹认人（features=None 纯 IoU，ID 可能短暂跳但不崩）；广播（aplay）坏了 → 改贴告示（打印降级）。
+每个岗位坏了都有下位方案，全店照常营业。
+比喻 5
+两个看门狗 = 水位报警器
+相机断流就"连续 30 次读不到"才报警（camera_stall + 暂停 1s 周期性重连，而不是 0.2s 一次无脑忙等）；LLM 卡死就"pending 持续 30.0s"解除暂停（pause_timeout）——
+像水库设警戒线：到线才动作，既不误报也不放任漫坝。
+比喻 6
+有界队列 = 快递柜满了拒收最旧的
+CommandWorker 队列 maxsize=8，put_nowait 满了丢弃最旧（E6，L220/L247-250）。LLM 风暴式连发指令也不会把内存撑爆——
+柜子就这么大，新件进不来时淘汰超期旧件
+，这是背压（backpressure）的最朴素形态。
+🎯 一句话本质
+健壮性 =
+留痕
+（结构化事件，可追责）+
+不作恶
+（不确定时零副作用）+
+各退一步
+（每层故障有收敛策略，绝不挂起）。三件事缺一件，系统就经不起真实环境。
+03
+关联知识点：五类事件 + 降级链
+事件 kind
+触发条件
+源码位置
+追责价值
+lost
+follow 目标从 confirmed 集合差分消失（prev_ids−cur_ids）
+engine L131-145 + events.py L7-18
+何时出画/被遮挡、跟踪器是否提前丢掉（TTS"idX 已消失"）
+unlock_all
+① clear_track 全清 ② unlock_on_loss=true 且全丢；
+部分丢失不写
+engine L142-144 + gate L320-337
+回答"系统为何放弃锁定"，两路径合并记录
+command
+执行了锁定/清除等指令副作用
+_apply_effect 链路
+谁在何时下了什么令
+camera_stall
+相机模式读帧失败连续
+_cam_fail>=30
+次
+engine L115-122
+相机节点挂了/线松，周期探测重连证据
+pause_timeout
+pause_wait=true 且 pending 持续超 30.0s
+engine L101-107
+LLM 挂死、画面解冻的诊断锚点
+故障 → 收敛降级全链路（每条都有实验步骤对应）：
+故障
+收敛策略
+位置
+断网 / LLM 不可达
+_rule_fallback：追踪/清除/截图仍全功能，闲聊回"没听懂"
+L620-628，调用方 L275/284/299/313/316/547
+ReID worker 全挂
+extract get(timeout=10) 超时 → 全零特征 → 纯 IoU 匹配，主循环不断流
+reidpool L37-47 + pipeline L33-36/L44-52
+aplay 被杀
+_restart_playback 重启；持续失败置 _failed 丢音频打印降级，互斥释放回 IDLE
+speech/tts.py Playback
+VLM 无结果
+_vlm_none() 引导，不锁
+L402-405
+指令队列满
+put_nowait 满丢最旧（maxsize=8）
+L220 / L247-250
+04
+实验目标
+目标 1
+掌握事件日志
+触发并核对 events.jsonl 各 kind，能按 kind/时间做事后追责查询。
+目标 2
+理解降级一致性
+fail-closed 降级不崩线程、不挂起、不空 submit——任何异常收敛。
+目标 3
+完成故障注入
+断网 ReID / 相机断流 / aplay 被杀 / 无 VLM 四类注入并验证主循环存活。
+目标 4
+用好 CLI 覆盖
+CLI>config 覆盖在调试中的正确用法（只改显式键，见 EXP-03）。
+目标 5
+迁移设计模式
+把"事件日志 + fail-closed"迁移到其他边缘 AI 运维场景。
+05
+实验环境与准备
+类别
+内容
+硬件
+具身智能实验箱 B2 / 小车 C1（需板端；事件日志在 runs/logs/）
+系统
+Ubuntu 22.04 + ROS 2 Humble，Python 3.10
+核心库
+同前（RKNN / ReID / RKLLM）
+关键命令
+tail -f runs/logs/events.jsonl
+、
+--video … --text
+参考文档
+docs/09_事件与故障测试用例.md（E 用例）
+实验前清空事件文件
+，否则旧记录会污染"新增事件"的判定：
+cd ~/ros2_ws/src/xflz_eai_car1/app/object_tracking
+> runs/logs/events.jsonl
+# 清空便于判定新增（log.dir 可配置）
+tail -f runs/logs/events.jsonl
+# 另终端常开，实时观察追加
+06
+动画讲解：故障注入与降级路径
+故障注入 → 收敛降级：每个红框故障都有一条绿色去处，主循环永远不死
+TrackEngine 主循环
+读帧 → pipeline → 事件
+① 断网 / LLM 挂死
+chat fallback failed
+② ReID worker 全挂
+extract 超时 10s
+③ 相机断流 / LLM 超时
+_cam_fail≥30 / 30.0s
+④ aplay 被杀 / 无 VLM
+write 返回 False
+_rule_fallback 规则兜底
+features=None 纯 IoU
+stall 事件+暂停重试/解冻
+重启/打印降级 || _vlm_none
+events.jsonl（黑匣子）
+lost·unlock_all·command·stall·timeout
+红=注入故障（脉冲闪烁） · 绿=预设收敛路径 · 黄=状态变化落盘 · 全程无一条箭头指向"线程退出"
+图：四类故障各有绿色出口汇回主循环（绿框脉冲 = 持续存活），唯一的"离开"只往事件文件里写一行——绝不往 exit 写。
+07
+互动讲解：故障注入沙盘
+🎛️ 故障注入沙盘 — 点一个故障，看降级路径、事件落盘与最终副作用
+目标出画（lost）
+清除/全丢（unlock_all）
+E1 追踪一百号
+E2 描述无果
+断网（LLM 不可达）
+ReID 全超时
+相机断流 30 次
+LLM 挂死 30s
+队列满（E6）
+重置
+← 点击左侧任一故障/事件：观察降级路径、events.jsonl 新增行与副作用结论
+九条路径覆盖 docs/09 的 E1-E3/E5/E6 与四类注入：
+fail 分支全部"不 submit"
+；断网后追踪/清除仍可用（规则兜底）、闲聊不可是设计预期；ReID/aplay/camera_stall 都是
+降级不退出
+。
+⚠️ 注入要在安全环境做
+断网、拔相机、
+kill -9 $(pgrep aplay)
+会短暂影响实机，做完必须按步骤恢复；pause_timeout 某次实验没出现属正常（说明 LLM 没挂死），先区分"未触发"与"丢日志"。
+08
+实操步骤：事件触发与故障注入
+1
+触发 lost（约 70min）：文本模式追踪 id3 → 目标出画 → tail 核对 command/lost 两行
+2
+验证 unlock_all（约 90min）：输入"清除"看 clear 路径；再验证 unlock_on_loss 全丢路径——部分丢失只写 lost 不写 unlock_all
+3
+文本模式跑 fail-closed E1-E3/E5/E6（约 90min）：一百号/无蓝车/清除/id999 逐条断言"不锁"
+4
+断网规则兜底（约 90min）：pkill -f llm_server → 追踪/清除仍可用、闲聊回引导；顺手验 ReID 超时降级
+5
+完整 E2E + 注入（约 90min）：唤醒→VLM 锁→假 id→清除→闲聊；拔相机 camera_stall、杀 aplay 降级
+步骤 1-2 · 触发 lost / unlock_all 并核对
+：
+cd ~/ros2_ws/src/xflz_eai_car1/app/object_tracking
+python3 apps/track_app.py --video /home/iflytek/ros2_ws/src/xflz_eai_car1/vision/07_multi_object_tracking/test.mp4 --text --mjpeg
+小飞小飞
+→
+追踪 id3
+→ 待目标出画 →
+清除
+# 另终端：
+tail -f runs/logs/events.jsonl
+{"t": ..., "kind": "command", "ids": [3], ...}
+# 锁定留痕
+{"t": ..., "kind": "lost", "ids": [3]}
+# 差分 prev_ids-cur_ids，TTS"id3 已消失"
+{"t": ..., "kind": "unlock_all", "ids": [3]}
+# 全清才写；部分丢失不写
+步骤 3 · fail-closed 用例（全程断言"不产生副作用"）
+：
+追踪一百号目标
+→ track_ids 数值不对齐 {100} →
+[LLM] 未找到该 ID 目标
+# E1：不锁、不走 VLM、不 grid dump
+追踪蓝色皮卡
+（无蓝车）→
+[track_vlm] 无法识别
+→ 回引导
+# E2：_vlm_none，不锁
+清除
+→
+[track_app] 清除语义指令，执行 clear_track
+# E3：clear_words 拦截短路
+追踪 id999
+→ 未找到该 ID 目标
+# E5：不存在的 id
+# E6：连发指令撑满队列 → put_nowait 满丢最旧（q maxsize=8，L220/L247-250）
+步骤 4 · 断网注入 → 规则兜底 + ReID 降级
+：
+pkill -f llm_server
+# 或 config 关 llm.enabled=false 重跑
+python3 apps/track_app.py --video .../test.mp4 --text --mjpeg
+小飞小飞
+→
+追踪 id3
+[track_app] chat fallback failed
+→
+_rule_fallback L620-628
+：parse_instruction 直解 → 追踪/清除仍可用
+[LLM] 没听懂…
+# 闲聊无规则可兜——设计预期不是缺陷
+# ReID 全 worker 崩：extract get(timeout=10) 超时 → 全零特征
+# pipeline L44-52：features 长度≠dets 数 → 归零 → tracker.update(dets, features=None) 纯 IoU，不断流
+步骤 5 · 相机/aplay 注入 + 完整性收尾
+：
+python3 apps/track_app.py --camera --mjpeg
+# 注入① 拔相机线：连续 30 次读帧失败（_cam_fail>=30，engine L115-122）
+{"t": ..., "kind": "camera_stall"}
++ 暂停 1s 周期重连（其余失败仅 sleep 0.2s）
+{"t": ..., "kind": "pause_timeout"}
+# LLM 挂死期间 pending 超 30.0s → 清 pending 解冻（L101-107）
+# 注入② 另终端杀播放器看降级：
+kill -9 $(pgrep aplay)
+→ _restart_playback 重启；持续失败置 _failed → 打印降级，状态机不卡 SPEAKING
+tail -f runs/logs/events.jsonl
+# 收尾：核对本轮产生的各 kind 是否齐全
+09
+重点与易错点
+fail-closed 的判据只有一条
+：该分支是否调用了 submit_effect()。任何"不确定锁谁"（id 不对齐 / VLM 无果 / 解析失败）都必须零副作用，只回引导。
+绝不空 submit
+：submit_effect(set()) 会清掉当前锁定——"追踪一百号"导致 id3 被误解锁，就是灾难级误导误锁。
+lost 是差分不是单帧
+：DeepSORT confirmed 目标 max_age=70 帧内仍存活，判定用帧间 confirmed 集合差分（prev_ids−cur_ids），单帧检测缺失不算丢。
+unlock_all 只在"全解锁"时写
+：clear_track 或 unlock_on_loss 全丢两条路径；follow 集合仍非空的部分丢失只写 lost。
+没 follow 就没有 lost
+：纯视觉 video 不追踪时日志里不出 lost 属正常——先"追踪 id3"再等出画。
+完整性 = 产生的都有写
+：pause_timeout/camera_stall 未出现只说明故障没触发；排查先区分"未触发"与"丢了日志"（写失败本身被吞）。
+断网后闲聊不可是预期
+：_rule_fallback 只覆盖追踪/清除/截图三类；若断网后连追踪都不行，查 parse_instruction 与 registry.tools。
+注入后必须恢复
+：llm_server、aplay、相机节点、events.jsonl 清空状态都要复位，否则污染下一实验。
+问题
+原因
+解决
+lost 事件缺失
+没有 follow（没追踪）
+先"追踪 idX"让目标出画再看日志
+unlock_all 缺失
+只部分丢失 / 没清除
+激活清除或 unlock_on_loss=true 再测
+画面冻结不解
+LLM 挂死 pending 不清
+看 pause_timeout 事件（30.0s）→ 查 LLM 进程/8080
+断网后追踪不可
+_rule_fallback 未生效
+确认 parse_instruction / registry.tools 可用
+相机不断但 stall 报警
+_cam_fail 连续 30 次阈值
+查话题 /ascamera_hp60c/.../rgb0/image 与保活
+jsonl 写失败没报错
+写失败只吞异常（设计）
+检查 runs/logs/ 权限与磁盘空间，属静默降级
+🎯 数值示例
+camera_stall：连续 30 次读帧失败 → 事件 + 暂停 1s；普通失败 sleep 0.2s。pause_timeout=30.0s。队列 maxsize=8。ReID extract timeout=10s。mp -l 队列消费：满丢最旧（E6）。JSONL 样例：
+{"t":1788849463,"kind":"lost","ids":[3]}
+。
+10
+总结与思考
+本实验把系统的"下限"补齐了：events.jsonl 让状态变化可追责（五类 kind 各答一个问题），fail-closed 三条闸门（清除短路 / id 对齐 / VLM 收口）保证"不确定就零副作用"，四条降级链（规则兜底 / 纯 IoU / 播放重启 / 引导语）保证"任何异常都收敛、不挂起"，两个看门狗（camera_stall、pause_timeout）保证外部依赖卡死不冻结主循环。这是从"能跑"到"敢上线"的关键一跃。产出：E1-E3 执行表、四类注入降级记录、jsonl 完整性核对。
+🤔 思考题 1
+lost / unlock_all / command / camera_stall / pause_timeout 各在什么条件下触发？分别回答了追责链上的什么问题？为什么"部分丢失"不写 unlock_all？
+🤔 思考题 2
+fail-closed 为什么要禁止"空 submit"？如果空集合也能提交，系统会被带到什么错误状态（结合"追踪一百号"时手正锁着 id3 想）？再想想：降级链里 ReID 退回纯 IoU 与 LLM 退回规则兜底，各自牺牲了什么能力、保住了什么底线？
+CASE-04 · 通用目标追踪综合项目 · EXP-08 事件日志与故障降级
+6 学时 · 综合性 · 基于 object_tracking 实验讲义改编

@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>图 20-1 · link 与 joint 结构树</title>
+<style>
+:root{--bg-page:#ffffff;--text:#0f172a;--text2:#475569;--muted:#94a3b8;--border:#e2e8f0;
+  --teal:#0891b2;--green:#059669;--purple:#7c3aed;--orange:#ea580c;--red:#e11d48;--gray:#64748b;
+  --teal-bg:rgba(8,145,178,.08);--green-bg:rgba(5,150,105,.08);--purple-bg:rgba(124,58,237,.08);
+  --orange-bg:rgba(234,88,12,.10);--red-bg:rgba(225,29,72,.08);--gray-bg:rgba(100,116,139,.08)}
+*{box-sizing:border-box}
+body{margin:0;background:#fff;color:var(--text);font-family:system-ui,"PingFang SC","Microsoft YaHei",sans-serif;padding:16px 14px 12px}
+.hd h1{font-size:15px;margin:0 0 4px}
+.hd .q{font-size:12px;color:var(--text2);margin:0}
+svg{width:100%;height:auto;display:block}
+.t{font:600 12.5px system-ui,sans-serif;fill:var(--text)}
+.s{font:400 10.5px system-ui,sans-serif;fill:var(--text2)}
+.l{font:600 10.5px ui-monospace,Consolas,monospace;fill:var(--text2)}
+.bnd{font:700 11px system-ui,sans-serif;fill:var(--green)}
+.dock{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.dock span{font-size:11.5px;border-radius:999px;padding:3px 10px;line-height:1.6}
+.ok{background:#ecfdf5;color:#047857;border:1px solid #a7f3d0}
+.warn{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca}
+.evid{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}
+.ft{font-size:10.5px;color:var(--muted);margin-top:8px;text-align:right}
+html.embedded .hd,html.embedded .dock,html.embedded .ft{display:none}
+</style>
+<script>if(window.self!==window.top)document.documentElement.className+=' embedded';</script>
+</head>
+<body>
+<div class="hd">
+  <h1>图 20-1 · link 三重属性 × joint 结构树</h1>
+  <p class="q">本图回答的问题：一份 URDF 用什么把机器人拆成部件，又用什么把部件连回一棵树？</p>
+</div>
+<svg viewBox="0 0 800 440" role="img" aria-label="URDF link joint 结构树">
+  <defs>
+    <marker id="v-g" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#059669"/></marker>
+    <marker id="v-r" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#e11d48"/></marker>
+  </defs>
+
+  <!-- 根 link -->
+  <rect x="315" y="30" width="170" height="66" rx="6" fill="#fff"/>
+  <rect x="315" y="30" width="170" height="66" rx="6" fill="var(--purple-bg)" stroke="var(--purple)" stroke-width="1.5"/>
+  <text class="t" x="400" y="58" text-anchor="middle">link: chassis（根）</text>
+  <text class="s" x="400" y="80" text-anchor="middle">box 0.40×0.25×0.08 · mass 3.0</text>
+
+  <!-- 三重属性胶囊 -->
+  <rect x="560" y="24" width="210" height="26" rx="13" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1.5"/>
+  <text class="s" x="665" y="41" text-anchor="middle" fill="var(--teal)">visual · 给 RViz 看外观</text>
+  <rect x="560" y="56" width="210" height="26" rx="13" fill="var(--green-bg)" stroke="var(--green)" stroke-width="1.5"/>
+  <text class="s" x="665" y="73" text-anchor="middle" fill="var(--green)">collision · 给 Gazebo 碰撞</text>
+  <rect x="560" y="88" width="210" height="26" rx="13" fill="var(--purple-bg)" stroke="var(--purple)" stroke-width="1.5"/>
+  <text class="s" x="665" y="105" text-anchor="middle" fill="var(--purple)">inertial · mass + 惯性矩阵</text>
+  <line x1="485" y1="63" x2="558" y2="63" stroke="var(--gray)" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#v-g)" transform="translate(0,0)"/>
+  <text class="l" x="492" y="54">三属性</text>
+
+  <!-- joint 边（绿：运动约束） -->
+  <line x1="360" y1="96" x2="160" y2="244" stroke="var(--green)" stroke-width="1.5" marker-end="url(#v-g)"/>
+  <text class="l" x="215" y="165">continuous · axis Y</text>
+  <line x1="400" y1="96" x2="400" y2="244" stroke="var(--green)" stroke-width="1.5" marker-end="url(#v-g)"/>
+  <text class="l" x="408" y="175">continuous · axis Y</text>
+  <line x1="445" y1="96" x2="645" y2="244" stroke="var(--green)" stroke-width="1.5" marker-end="url(#v-g)"/>
+  <text class="l" x="560" y="165">fixed（零自由度）</text>
+
+  <!-- 子 link -->
+  <rect x="95" y="250" width="170" height="62" rx="6" fill="#fff"/>
+  <rect x="95" y="250" width="170" height="62" rx="6" fill="var(--purple-bg)" stroke="var(--purple)" stroke-width="1.5"/>
+  <text class="t" x="180" y="277" text-anchor="middle">left_wheel</text>
+  <text class="s" x="180" y="298" text-anchor="middle">cylinder r=0.05</text>
+
+  <rect x="315" y="250" width="170" height="62" rx="6" fill="#fff"/>
+  <rect x="315" y="250" width="170" height="62" rx="6" fill="var(--purple-bg)" stroke="var(--purple)" stroke-width="1.5"/>
+  <text class="t" x="400" y="277" text-anchor="middle">right_wheel</text>
+  <text class="s" x="400" y="298" text-anchor="middle">cylinder r=0.05</text>
+
+  <rect x="575" y="250" width="170" height="62" rx="6" fill="#fff"/>
+  <rect x="575" y="250" width="170" height="62" rx="6" fill="var(--purple-bg)" stroke="var(--purple)" stroke-width="1.5"/>
+  <text class="t" x="660" y="277" text-anchor="middle">front_caster</text>
+  <text class="s" x="660" y="298" text-anchor="middle">sphere r=0.025</text>
+
+  <!-- joint origin 标注 -->
+  <text class="l" x="100" y="345">joint origin xyz="0.0 -0.15 -0.03" = 子轮相对父底盘的安装位姿</text>
+
+  <!-- 风险 -->
+  <rect x="95" y="366" width="650" height="54" rx="6" fill="#fff"/>
+  <rect x="95" y="366" width="650" height="54" rx="6" fill="var(--red-bg)" stroke="var(--red)" stroke-width="1.5" stroke-dasharray="6,4"/>
+  <text class="t" x="420" y="389" text-anchor="middle" fill="var(--red)">把轮子偏移写进 visual origin 而不是 joint origin</text>
+  <text class="s" x="420" y="409" text-anchor="middle">轮子原地自转却装不到车轴上——两种 origin 语义完全不同</text>
+  <line x1="420" y1="418" x2="420" y2="424" stroke="var(--red)" stroke-width="1.5" stroke-dasharray="4,3"/>
+</svg>
+<div class="dock">
+  <span class="ok">✅ 结论：link 装属性、joint 定自由度，单根树结构与 TF 树同构</span>
+  <span class="warn">⚠️ 风险：两种 origin 混淆 → 轮子转圈装不上轴</span>
+  <span class="evid">🔍 验证：04 节 check_urdf 输出 root Link: chassis has 3 child(ren)</span>
+</div>
+<div class="ft">EXP-20 · URDF 与 Xacro 机器人建模</div>
+</body>
+</html>

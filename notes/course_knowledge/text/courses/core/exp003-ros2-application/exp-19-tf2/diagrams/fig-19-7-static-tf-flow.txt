@@ -1,0 +1,41 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp003-ros2-application/exp-19-tf2/diagrams/fig-19-7-static-tf-flow.html
+TITLE: 图 19-7 · 五步实验路线
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+图 19-7 · 五步实验路线
+图 19-7 · 五步实验路线：从读懂一棵树到查任意两位姿
+本图回答的问题：五步分别针对 ros2 launch car1_description display.launch.py 的哪个部分，动手做什么、看什么输出？
+① 理解树概念
+URDF 的 link/joint
+= frame/边 · node list
+② 发布静态边
+fixed 关节 → /tf_static
+echo 读回 · 与 URDF 对账
+③ 发布动态边
+拖滑块 → /joint_states
+→ /tf 持续刷新 hz > 0
+④ 可视化验证
+view_frames + RViz
+rqt_tf_tree ⟳ 点刷新
+⑤ 查询相对位姿
+tf2_echo 父 子
+或 Buffer.lookup_transform
+看得见：3 节点在场
+整棵树轮廓认全
+看得见：echo 数值
+= URDF 原值
+看得见：拖滑块四处
+同动（角/tf/rviz/查边）
+看得见：frames.pdf
+＋ RViz 轴与帧名
+看得见：
+[0.000, 0.000, 0.029]
+两处高频错：frame 名大小写差一个字符 · target/source 顺序写反
+前者 Frame does not exist，后者坐标直接飞出（等于求了逆变换）
+调试三板斧
+echo 查单边 → frames 查全树 → RViz 看效果
+五步走完 = 单边、全树、现场三重证据齐 → 05 节验收六条逐条打勾
+✅ 结论：五步各有产出，末步的对账数字来自首步读过的 URDF
+⚠️ 风险：名字与顺序两类错都会让第 ⑤ 步查询落空
+🔍 验证：04 节各步命令卡逐条执行 · 05 节验收 6 条
+EXP-19 · TF2 坐标系变换

@@ -1,0 +1,532 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp003-ros2-application/exp-17-launch/index.html
+TITLE: EXP-17 · Launch 启动文件 — 机器人 ROS2 应用与开发
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+EXP-17 · Launch 启动文件 — 机器人 ROS2 应用与开发
+🧠 具身智能课程 ·
+教程首页
+核心课程
+/
+ROS2 应用与开发
+/ EXP-17
+本页目录
+★ 课程目标
+01 问题引入：五个终端的手忙脚乱
+02 先看现象：一条命令、一次停
+03 原理讲解
+04 实验步骤
+05 注意事项与验收
+06 本课总结与验证题
+CH4 · 工具链
+EXP-14 rqt 工具箱
+EXP-15 rviz2 可视化
+EXP-16 rosbag2 数据录制
+EXP-17 Launch 启动系统
+EXP-18 元功能包集成
+EXP-17 · 第四章 · 设计性 · 2 学时
+ROS2 Launch 启动文件：一键编排多节点系统
+系统有 5 个节点，开机要开 5 个终端、按顺序 source、一个个敲 run——漏一个就是"话题没数据"的灵异现场。Launch 文件把整个系统声明成一份"启动剧本"：一条命令起全部，一次 Ctrl+C 停全部。本课直接用现成的 display.launch.py：先跑出带小车的 RViz 现象，再讲清解析、拉起、优雅退出的全过程，一个案例说透 remap / 条件 / 事件，最后把这份 37 行源码逐段拆开。
+难度 ⭐⭐
+2 学时
+设计性
+关键词 LaunchDescription · remap · IfCondition · OnProcessExit
+目标
+本课学完，你应该能做到
+① 说清逻辑
+launch 执行逻辑
+能说清
+ros2 launch
+从解析 .launch.py、逐个拉起子进程、到一次 Ctrl+C 级联退出的完整执行链条。
+② 看懂写法
+读懂 display.launch.py
+能逐段读懂 37 行源码：入口函数、
+LaunchDescription
+列表、
+Node
+各参数（package/executable/name/parameters/arguments/output）分别控制什么。
+③ 分清三件套
+remap / 条件 / 事件
+能说出三件套各解决什么问题、怎么改：改话题名用 remap、起不起用 condition、什么时候起用事件，并牢记 remap 方向写反会静默失效。
+④ 复现与解释
+一条命令拉起小车
+能用
+ros2 launch car1_description display.launch.py
+拉起 RViz 小车界面，说出三个进程的分工，一次 Ctrl+C 干净退出。
+本课的重点与难点
+重点
+：remap 的方向不能写反（
+(源码名, 系统名)
+），写反会静默失效、不报错。
+难点
+：理解事件驱动编排：LaunchDescription 是静态列表，"A 退出后起 B"必须靠事件机制。
+和前后的关系
+本课是
+把前面十几个实验"打包成系统"的关键一步
+。EXP-18 会再上一层，用元包把多个包聚起来。
+01
+问题引入：五个终端的手忙脚乱
+先回忆
+EXP-05~08 每个实验都要开 2~3 个终端、逐条敲
+ros2 run
+、关错一个整组全崩——这些重复劳动正是本章要消灭的对象：
+一个命令、一份文件，拉起整支机器人队伍
+，并且让它们同生共死。
+1
+现状
+雷达驱动、定位、规划、控制、可视化 = 5 个终端，每个都要 source、按序启动
+2
+事故
+新同学少 source 了一步，规划器收不到 /scan，排查一下午发现是"没起步"
+3
+更糟
+关机时逐个 Ctrl+C，漏关的僵尸节点还在发 cmd_vel——车突然自己动了
+4
+正解
+把 5 个节点写进一份 Launch 文件：
+ros2 launch
+一条命令全起，Ctrl+C 一次全停
+定义
+Launch 文件
+（.launch.py / .launch.xml / .launch.yaml）声明：启动哪些节点、各自带什么参数、话题怎么重映射、按什么顺序和条件编排。
+ros2 launch
+解析这份声明并执行——它是从"手工业"到"一键部署"的关键一跃，也是后续 EXP-18 元功能包、EXP-19/20 模型加载的统一入口。
+🔎 是什么
+一份
+声明式启动剧本
+：用代码写清"起哪些节点、带什么参数、话题怎么改名、什么条件下起、谁退出触发谁"。
+❓ 为什么
+多节点系统的启动是
+重复、易错、有顺序
+的劳动。人肉启动无法保证一致性，也无法保证"同生共死"——这类确定性工作必须交给机器。
+🛠 怎么用
+写
+.launch.py
+放进包的
+launch/
+目录 →
+colcon build
+→
+source install/setup.bash
+→
+ros2 launch pkg file.py [key:=value]
+。
+02
+先看现象：一条命令、一次停
+不写任何文件，直接跑
+car1_description 包里已经带好了
+launch/display.launch.py
+：一条命令同时拉起 joint_state_publisher_gui、robot_state_publisher、rviz2 三个进程，弹出带小车的 RViz2 窗口（EXP-15 见过的界面）；一次 Ctrl+C 全部干净退出——这就是 01 节"五个终端手忙脚乱"的一键解药。
+命令 · 一条命令拉起三个进程（右上角可复制）
+$
+ros2 launch car1_description display.launch.py
+运行效果（复用 EXP-15 实拍）：左窗是 joint_state_publisher_gui 的关节滑条，右侧 RViz2 里显示小车模型与 TF——三个进程都由这一条 launch 监管。
+此刻你已经亲眼确认的两件事
+①
+同生共死
+：这一个命令带起的 3 个进程都归 launch 管，一次 Ctrl+C 全部
+finished cleanly
+（终端可见）；
+②
+剧本真实存在
+：display.launch.py 就是那份"启动剧本"——03 讲它怎么被执行，04 直接把它拆开。
+03
+原理讲解
+解析、拉起、优雅退出的全过程
+1
+解析剧本
+ros2 launch 读入
+.launch.py
+，调用入口函数
+generate_launch_description()
+，拿到一份 Action 列表（LaunchDescription）
+2
+逐个拉起
+按列表顺序执行 Action：先声明参数，再为每个 Node 创建子进程、注入参数与 remap；带条件的 Action 执行到它时才求值，为 False 直接跳过
+3
+常驻监管
+节点全部拉起后
+launch 并不退出
+——它留在前台收信号、盯状态，各节点日志因此汇总到同一个终端
+4
+级联退出
+一次 Ctrl+C → 向所有子进程广播 SIGINT → 每个节点各一行
+process has finished cleanly
+，同生共死
+要点
+Launch 是
+编排层不是运行时
+：它负责起进程、注参数、建重映射，起完之后自己还活着做"监管员"（收信号、管退出）。所以节点崩了日志里会看到
+[rviz2-3] process has died
+——这行监管日志就是 Launch 身份的最好证明。
+图 17-1 · 解析 → Runner → 子进程 → SIGINT 级联
+——ros2 launch 读完剧本后做了什么？一次 Ctrl+C 怎么停干净全部节点？
+✅ 一次 Ctrl+C 全停 = Runner 广播 SIGINT 级联清理
+⚠️ kill 父进程留孤儿 · condition False 的 name 也占号
+🔍 02 节：3 行 process started + 同终端日志
+remap、条件、事件三件套：一个案例说明
+remap · 改名字
+干什么：启动那一刻把话题改名
+解决什么：两个雷达驱动源码都写死发
+/scan
+，同机就撞车。怎么改：Node 加一行
+remappings=[('/scan', '/scan_front')]
+——
+左边源码名、右边新名，写反会静默失效不报错
+；源码一个字不用动。
+条件 · 起不起
+干什么：挂个开关决定节点启不启动
+解决什么：一份文件既要真机跑、又要仿真跑。怎么改：加
+condition=IfCondition(LaunchConfiguration('use_sim'))
+，命令行
+use_sim:=true
+才起；不写 condition 的恒启动。
+事件 · 何时起
+干什么：监听进程退出去触发下一个动作
+解决什么：静态列表不知道 A 什么时候结束。怎么改：
+RegisterEventHandler(OnProcessExit(target_action=A, on_exit=[B]))
+——A 一退出（含崩溃）就起 B；target_action 必须传 A 的变量，不能写字符串名。
+# 案例：同一份 launch 管"改名 + 开关 + 接续"三件事
+rear_lidar = Node(package=
+'lidar_driver'
+, executable=
+'lidar'
+,
+                  name=
+'rear_lidar'
+, output=
+'screen'
+,
+                  remappings=[(
+'/scan'
+,
+'/scan_rear'
+)])
+# 1) 改名：源码发 /scan，出来叫 /scan_rear
+diag       = Node(package=
+'diag_tools'
+, executable=
+'scan_diag'
+,
+                  name=
+'scan_diag'
+,
+                  condition=IfCondition(
+                      LaunchConfiguration(
+'use_sim'
+)))
+# 2) 条件：use_sim:=true 才起
+LaunchDescription([
+    DeclareLaunchArgument(
+'use_sim'
+, default_value=
+'false'
+),
+    rear_lidar, diag,
+    RegisterEventHandler(
+# 3) 事件：rear_lidar 退出 → 起补位驱动
+OnProcessExit(target_action=rear_lidar,
+                      on_exit=[Node(package=
+'lidar_driver'
+,
+                                    name=
+'rear_lidar_backup'
+, ...)])),
+])
+# 运行：ros2 launch pkg demo.launch.py use_sim:=true
+就记一句
+remap 改名字（源码名 → 新名，方向别反）、条件定起不起、事件定什么时候起——三句话就是三件套的全部，其余编排都建立在上半节"解析 → 拉起 → 退出"这条主干上。
+04
+实验步骤
+本节不新建任何文件：直接拆解 02 节运行过的
+car1_description/launch/display.launch.py
+。源码 37 行，一个入口函数、三个 Node——把它逐段看懂，launch 文件的写法就看懂了。
+源码全文 · display.launch.py
+# ① 导入：剧本类、节点 Action、包路径工具
+from
+launch
+import
+LaunchDescription
+from
+launch_ros.actions
+import
+Node
+from
+ament_index_python.packages
+import
+get_package_share_directory
+import
+os
+def
+generate_launch_description():
+# ② 入口函数：名字必须一字不差，ros2 launch 靠它找剧本
+pkg_share = get_package_share_directory(
+'car1_description'
+)
+    urdf_file = os.path.join(pkg_share,
+'urdf'
+,
+'car1.urdf'
+)
+with
+open
+(urdf_file,
+'r'
+)
+as
+f:
+        robot_desc = f.read()
+# ③ 读入 URDF —— 模型就是这一大段 XML 字符串
+rviz_config = os.path.join(pkg_share,
+'rviz'
+,
+'car1.rviz'
+)
+# rviz 布局文件
+return
+LaunchDescription([
+# ④ 节点 1：关节滑条窗口（截图左侧），发布各关节角
+Node(
+            package=
+'joint_state_publisher_gui'
+,
+            executable=
+'joint_state_publisher_gui'
+,
+            name=
+'joint_state_publisher_gui'
+,
+            parameters=[{
+'robot_description'
+: robot_desc}]
+        ),
+# ⑤ 节点 2：拿 URDF + 关节角，发布 TF（车架坐标系）
+Node(
+            package=
+'robot_state_publisher'
+,
+            executable=
+'robot_state_publisher'
+,
+            name=
+'robot_state_publisher'
+,
+            parameters=[{
+'robot_description'
+: robot_desc}],
+            output=
+'screen'
+# 日志进 launch 终端，带 [robot_state_publisher-2] 前缀
+),
+# ⑥ 节点 3：按 car1.rviz 配置打开 RViz，小车画面就在里面（截图右侧）
+Node(
+            package=
+'rviz2'
+,
+            executable=
+'rviz2'
+,
+            name=
+'rviz2'
+,
+            arguments=[
+'-d'
+, rviz_config],
+# -d：启动时加载指定配置文件
+output=
+'screen'
+)
+    ])
+🔎 是什么
+若干 import + 一个固定命名的入口函数 + 一个
+LaunchDescription
+列表；列表里每个元素都是一个 Action，这个文件里是 3 个
+Node
+。
+❓ 为什么
+入口函数名由
+ros2 launch
+硬编码查找，
+一个字符都不能错
+；
+output='screen'
+把子进程日志汇入同一终端，02 节看到的前缀日志就是它给的。
+🛠 怎么用
+文件放在包的
+launch/
+目录，随
+colcon build
+装进
+share/
+；之后
+ros2 launch car1_description display.launch.py
+一键定位（02 节已跑通）。
+逐段拆解
+行号（原文件）
+这一段干什么
+关键点
+1–4
+导入 LaunchDescription、Node、包路径工具
+Node 是最常用的 Action
+8–9
+定位包共享目录，拼出 car1.urdf 的绝对路径
+拼的是 install/share 下的真实文件
+11–12
+把 URDF 全文读进
+robot_desc
+字符串
+"机器人模型"在 launch 里就是一段字符串
+14
+拼出 rviz/car1.rviz 配置文件路径
+rviz 显示布局也随包一起安装
+16
+return LaunchDescription([...])
+剧本开始，按列表顺序逐个执行
+17–22
+起 joint_state_publisher_gui：弹出滑条窗口、发布各关节角
+接收 robot_description 参数（截图左侧窗口）
+23–29
+起 robot_state_publisher：URDF + 关节角 → 发布 TF
+同样接收 robot_description，带 output='screen'
+30–36
+起 rviz2：
+-d
+加载 car1.rviz，显示小车
+不吃 robot_description，靠 TF + RobotModel 还原画面（截图右侧）
+要点
+robot_description 是"参数注入"，不是话题传来传去
+：同一个 URDF 字符串被 launch 分别塞进 gui 和 rsp 两个节点；rviz2 则通过订阅 TF + RobotModel 插件自己还原画面。三个进程互不调用，靠参数注入 + 标准话题组合成一个系统——这正是 ROS2 的组合方式。
+对照 02 的现象
+终端里 3 行
+process started with pid
+、截图里的
+[rviz2-3]
+/
+[joint_state_publisher_gui-1]
+前缀，与上面三个 Node 一一对应；
+只关掉一个窗口（比如 RViz）只会死一个进程
+——launch 作为监管员打出
+process has died
+并继续管另外两个，要整组退出只有一次 Ctrl+C。
+05
+注意事项与验收
+类别
+注意事项
+⚠️ 环境
+Launch 文件必须放在功能包的
+launch/
+目录，并在编译时通过
+install(DIRECTORY launch DESTINATION share/${PROJECT_NAME})
+安装到
+share/
+⚠️ 函数名
+入口函数必须精确命名为
+generate_launch_description
+，小写加下划线，一个字符都不能错
+⚠️ 进程管理
+Launch 是父进程，退出时会自动终止所有子节点。不要在运行期间直接
+kill
+Launch 进程，用
+Ctrl+C
+优雅退出
+⚠️ 节点命名
+同一 LaunchDescription 中每个 Node 的
+name
+必须唯一（或用 namespace 区分）——条件为 False 的节点也占号
+⚠️ 参数类型
+LaunchConfiguration
+返回的是 Substitution 而非字符串，参与字符串拼接必须走
+PythonExpression
+或
+TextSubstitution
+⚠️ 调试手段
+行为不符预期时，先加
+LogInfo(msg=[...])
+把中间变量打出来，比猜快十倍
+验收 1：复现现象——一条命令拉起 RViz 小车，说出终端三行 process started 对应的三个进程，一次 Ctrl+C 后全部 finished cleanly
+验收 2：口述全过程——解析剧本 → 逐个拉起 → 常驻监管 → Ctrl+C 级联退出，并解释"launch 起完为什么不退出、节点日志为何在同一终端"
+验收 3：读懂源码——指出 display.launch.py 的入口函数名、robot_description 注入给了哪两个节点、rviz2 的
+-d
+参数作用
+验收 4：三件套各一句——两雷达撞名怎么改（remap 与方向）、真机/仿真二选一怎么写（条件）、A 退出后接 B 怎么写（事件，target_action 传什么）
+验收 5：排查与收尾——按三连定位 "No launch file found"；说清 Node 的 name 为什么要唯一、
+output='screen'
+不写会怎样
+验收口径
+"找不到 launch 文件"是最常见的验收障碍，按固定顺序排查只需 30 秒：
+build 有没有成功 → source install/setup.bash 了没有 → CMakeLists 是否 install 了 launch 目录
+。口述得出这个三连，本身就是对"launch 文件如何从源码走到可执行"这条链路的理解证明。
+06
+本课总结与验证题
+执行逻辑
+解析 → 拉起 → 级联退出
+ros2 launch 解析 .launch.py 得到 Action 列表，逐个拉起子进程后常驻监管，一次 Ctrl+C 级联全停。
+三件套
+remap / 条件 / 事件
+remap 不改码适配多实例；If/Unless 一文件多场景；OnProcessExit 串起流程自动化。
+参数化
+Declare + Config + :=
+命令行 key:=value 运行时覆盖默认值，一份文件服务调试/生产/仿真。
+工程闭环
+launch 是部署资产
+install 规则 + 一键启动 + 全量退出——与 params、.rviz、bag 一样进 git。
+三问一句话收束
+是什么
+：一份用 Python 写的声明式启动剧本（LaunchDescription + Action 列表）。
+为什么
+：多节点启动重复、易错、有顺序，人肉启动既保证不了一致性，也保证不了同生共死——这些确定性工作必须交给机器。
+怎么用
+：写
+.launch.py
+进
+launch/
+→ 三件套（package.xml / CMakeLists install / 入口函数名）到位 →
+colcon build
++
+source
+→
+ros2 launch pkg file.py key:=value
+→ 用 remap/条件/事件编排复杂度。
+✎ 验证题（改动型 · 做完对照得分点）——答案需动手执行后用自己的话归纳，参考答案点击展开。
+验证题
+Q1
+（覆盖目标①④ 现象读进程）运行
+ros2 launch car1_description display.launch.py
+，数一数终端里有几行
+process started
+、分别是哪个节点；Ctrl+C 后又有几行
+finished cleanly
+。用"解析 → 拉起 → 监管 → 级联退出"四步把这两组数字解释一遍。
+参考答案与得分点
+启动 3 行 started：joint_state_publisher_gui-1、robot_state_publisher-2、rviz2-3（顺序即 LaunchDescription 列表顺序）；Ctrl+C 后 3 行 finished cleanly，RViz 窗口关闭、ros2 node list 为空。得分点：①数字与节点名对应（3 分）；②四步链条套用正确（3 分）；③说清 launch 中间一直在前台监管（2 分）。
+Q2
+（覆盖目标② 读源码）不翻文件，按顺序说出 display.launch.py 起了哪 3 个节点、各自干什么；
+robot_description
+被注入给了哪两个节点？rviz2 的
+arguments=['-d', ...]
+是什么意思？
+参考答案与得分点
+① joint_state_publisher_gui 弹滑条、发关节角；② robot_state_publisher 拿 URDF+关节角发 TF；③ rviz2 按配置显示小车。robot_description 同一字符串注入前两个节点（rviz2 不吃它，走 TF + RobotModel）；-d = 启动时加载指定的 rviz 配置文件（car1.rviz）。得分点：①三节点顺序与分工（4 分）；②robot_description 注入对象（2 分）；③-d 含义（2 分）。
+Q3
+（覆盖目标③ remap）车上前后两个雷达驱动源码都写死发
+/scan
+，同机必然撞名。写出 launch 里的改法：两个 Node 片段（name 各不相同 + 各带一行 remap）；再说明若写成
+remappings=[('/scan_front', '/scan')]
+会怎样、为什么不报错。
+参考答案与得分点
+示例：Node(..., name='front_lidar', remappings=[('/scan','/scan_front')])；Node(..., name='rear_lidar', remappings=[('/scan','/scan_rear')])。方向=(源码名, 新名)：写成 ('/scan_front','/scan') 等于"改源码里的 /scan_front"，而源码根本没有这个名字 → 规则匹配不到，静默无效、无任何报错，两个实例仍在 /scan 上打架。得分点：①两段 Node 正确且 name 唯一（3 分）；②方向解释清楚（3 分）；③静默失效结论（2 分）。
+Q4
+（覆盖目标③ 条件+事件）对 display.launch.py 做两处"假想改造"（写在报告里即可，不用真改包）：① 让 rviz2 只在
+use_rviz:=true
+时启动，写出"声明参数 + 条件"两行；② 写出"rviz2 退出后自动打印一行收尾日志"的事件注册，并说明
+target_action
+该传什么、传字符串会怎样。
+参考答案与得分点
+① DeclareLaunchArgument('use_rviz', default_value='true') + Node(..., name='rviz2', condition=IfCondition(LaunchConfiguration('use_rviz')))；② RegisterEventHandler(OnProcessExit(target_action=rviz2_node, on_exit=[LogInfo(msg='rviz closed')]))。target_action 必须传同一 LaunchDescription 里的 Node 变量引用；传字符串匹配不到任何 Action，事件永不触发且不报错。得分点：①条件两行正确（3 分）；②事件结构正确（3 分）；③target_action=变量、传字符串失效（2 分）。
+Q5
+（覆盖目标① 单点退出 vs 整组退出）launch 运行中另开终端
+ros2 node list
+看到什么？回主终端只关掉 RViz 窗口（不 Ctrl+C），再查 node list、看 launch 终端日志各是什么？最后 Ctrl+C 一次又是什么？三步对照说明"谁在监管谁"。
+参考答案与得分点
+① 3 个节点都在；② 关 RViz 后 rviz2 消失，gui/rsp 仍在，launch 终端打出 [rviz2-3] process has died——单点退出，launch 作为监管员继续管另外两个；③ Ctrl+C 一次：剩余进程全部 finished cleanly，node list 清空。得分点：①三次状态如实（4 分）；②"died ≠ 整组退出"（3 分）；③监管员角色说清（1 分）。
+CORE-01 · 机器人 ROS2 应用与开发 · EXP-17 Launch 启动文件
+2 学时 · 设计性

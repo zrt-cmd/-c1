@@ -1,0 +1,272 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/cases/exp006-smart-factory/exp-06-sorting/index.html
+TITLE: EXP-06 · 智能分拣 — 智慧工厂装货分拣码垛综合项目
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+EXP-06 · 智能分拣 — 智慧工厂装货分拣码垛综合项目
+🧠 具身智能课程 ·
+教程首页
+综合项目
+/
+智慧工厂装货分拣码垛
+/ EXP-06
+本页目录
+01 问题引入
+02 原理通俗讲解
+03 关联知识点
+04 实验目标
+05 实验环境与准备
+06 动画讲解
+07 互动讲解
+08 实操步骤
+09 重点与易错点
+10 总结与思考
+CASE-01 · 智慧工厂
+EXP-01 需求分析
+EXP-02 五节点架构
+EXP-03 接口设计
+EXP-04 语音交互集成
+EXP-05 视觉自适应装货
+EXP-06 智能分拣
+EXP-07 自主码垛
+EXP-08 危险检测与急停
+EXP-09 全功能快速验证
+EXP-06 · 第 2 章 · 综合性 · 4 学时
+智能分拣：手动打点 + 固定八步抓放
+分拣任务走与装货不同的技术路线：
+vision: false
+，不做 tag 检测与 pick_offset 纠偏，
+    改用"手动打点"示教出 observe_pose / place_pose，靠固定八步 _do_fixed_grasp 完成"抓—移—放—回位"
+    （对应需求 R5）。掌握示教流程、八步时序与动静两套抓放逻辑的差异，是本实验的核心。
+📦 固定八步抓放
+手动打点示教
+vision:false 分支
+lift_height / place_lift
+TG6 / TG7 用例
+01
+问题引入：不是所有任务都需要"眼睛"
+装货区的箱子会乱放，所以要视觉纠偏；但分拣区的物料是
+工位固定
+的——取料口、分拣格都在确定位置。
+    源讲义里
+grasp.tasks.sort
+明确写着
+vision: false
+：既然位置已知，就别为确定的事情付出
+    检测耗时与失败率，直接用示教好的固定位姿执行。
+于是问题变成：固定路线怎么设计才安全（不撞箱、不拖料）？示教位姿怎么记录进 yaml？
+    中途被人打断怎么停下（TG7）？——这就是 R5 分拣任务要回答的三件事。
+02
+原理通俗讲解：仓库师傅的"肌肉记忆"
+固定八步抓放，就像仓库师傅搬固定货位的箱子——闭着眼也知道套路：
+先张手
+第 ① 步：先开夹爪再伸手
+移动前先张开夹爪并等
+gripper_duration + 0.2s
+（
+_call_gripper
+L494-515）。
+        这跟生活直觉一致：
+要拿东西先把手张开
+，否则张着拳头过去会撞歪箱子。
+再俯身
+第 ② ③ 步：到位、合拢
+移动到打点记录的取料位（含示教好的俯仰角 pitch），停稳后合拢夹爪。位姿来自手动打点——
+        人拖着机械臂到位，把关节角写进 yaml，之后每次原样复现。
+先提后移
+第 ④ ⑤ 步：垂直抬升再横移
+抓稳后先垂直抬
+lift_height=0.03m
+，再水平移到分拣位。
+先抬后移是防刮擦铁律
+：不抬就横走，箱子会拖倒料堆。
+放、再抬、回
+第 ⑥ ⑦ ⑧ 步：松手、脱身、复位
+放到分拣位后开爪，再抬
+place_lift=0.05m
+脱离（比抓取抬得更高，因为放货区有围栏/邻箱），
+        最后 go_work 回待命位（R4.1 每步回位）。结束日志
+=== fixed grasp-place sequence done ===
+，状态
+sort|done
+。
+对照
+装货（vision: true）：检测 → TF → pick_offset 动态补；分拣（vision: false）：示教位姿直接用，
+自然没有 pick_offset 生效环节
+——偏了不能在线纠，只能回打点位重新示教。
+03
+关联知识点
+vision:false 分支
+L273-278
+该分支不再调用 pick/place 检测服务，自行组合 set_gripper ＋ target_pose 指令驱动机械臂，路径更短更稳。
+示教位姿
+yaml grasp.tasks.sort
+observe [0.0622, -0.1158, 0.1951, 3.0371]；place [0.1434, -0.1296, 0.2075, 2.7283]（约 174°，
+        末端翻转朝向分拣格）。四元数/角度数值来自实际打点，不得凭空改。
+可调参数
+两个抬升高度
+grasp.lift_height=0.03
+（抓后抬）、
+grasp.place_lift=0.05
+（放后抬），
+        可用
+ros2 param set /eai_factory_grasp grasp.lift_height 0.05
+在线试，但
+二者是全局参数，码垛同样受影响
+。
+语音闭环
+R3 + R7 链路复检
+"分拣" → "好的，开始分拣" → 八步执行 → done → "分拣完成"（scheduler 固定话术）。
+        热词误听"风景/封建"时靠 hotwords + intent_hints 纠正。
+04
+实验目标
+完成分拣区手动打点，生成 observe_pose / place_pose 并写入 yaml，重启 launch 后位姿可复现。
+逐条跟踪固定八步 _do_fixed_grasp（L413-485）执行日志，能说出每步对应的关节动作。
+解释"先开爪再移动"与"抓后抬 place_lift 更高"两个设计的几何原因。
+区分 vision:true 与 vision:false 两条分支的代码路径差异，说明分拣为何不做 pick_offset。
+通过 TG6（八步完整性）与 TG7（语音打断复位）测试用例。
+05
+实验环境与准备
+机械臂手动示教模式可用（断使能拖动到位、记录关节角的工具就绪）。
+yaml 核对：
+grasp.tasks.sort: {vision: false, observe: [...], place: [...]}
+；
+      观察位姿应使夹爪正对取料口、俯仰角适合垂直下抓。
+分拣区清场：取料口只有一个待抓物料，分拣格空置，四周无晃动遮挡物。
+启动：
+ros2 launch eai_factory eai_factory.launch.py
+（可
+start_voice:=true
+走语音触发；纯调测时
+start_vision:=false
+减少无关节点）。
+预演打断命令（TG7 用）：
+ros2 topic pub -1 /eai_factory/interrupt std_msgs/msg/Bool "{data: true}"
+。
+06
+动画讲解：固定八步时序
+_do_fixed_grasp 固定八步（L413-485）
+① 张开夹爪（等 gripper_duration+0.2s）
+② 移到取料位（示教 observe_pose + pitch）
+③ 合拢夹爪抓稳
+④ 垂直抬 lift_height = 0.03m
+⑤ 平移到分拣位（示教 place_pose ≈174°）
+⑥ 张爪放件
+⑦ 抬 place_lift = 0.05m 脱离
+⑧ go_work 回待命位 → done 播报"分拣完成"
+侧视：为什么"先抬再移"
+不抬会刮倒邻箱
+抬升高度：抓后 0.03 ｜ 放后 0.05
+分支对照
+装货 vision: true → tag 检测 + TF + pick_offset
+分拣 vision: false → 示教位姿直驱（L273-278）
+打断(TG7) → interrupt → 停抓放 + 回位 + 状态清零
+图 6-1　左：八步时序纵轴，光点循环走一遍即一次完整分拣；右上：抓取高度几何——先抬 0.03 再横移防刮擦，放后抬 0.05 脱离围栏；右下：两条抓放分支的取舍与打断复位。
+07
+互动讲解：流程单步播放器
+逐击"下一步"，按真实日志推进固定八步，或"到底"一次播完；也可模拟 TG7 打断：
+🎛️ 分拣八步单步播放器
+下一步 ▸
+跑到底 ⏩
+TG7 打断 ⛔
+复位
+共 8 步。点击"下一步"开始，观察 gripper / target_pose 指令与状态迁移……
+观察点
+第 ① 步输出的是 set_gripper（开）而不是 move——
+这正是 vision:false 分支自组指令的证据
+；
+      若第一步是检测服务调用，说明跑错了分支。
+08
+实操步骤
+1
+手动打点
+：进示教模式，把机械臂拖到取料口正上方（含合适俯仰角）记录为 observe_pose；
+      再拖到分拣格上方记录 place_pose，写入
+grasp.tasks.sort
+。
+2
+核对 yaml
+grep -A4 "sort:" config/eai_factory.yaml
+sort: { vision: false, observe: [0.0622, -0.1158, 0.1951, 3.0371],
+             place: [0.1434, -0.1296, 0.2075, 2.7283] }
+3
+启动并触发
+ros2 launch eai_factory eai_factory.launch.py
+# 语音喊"执行分拣"，或直接：
+ros2 service call /eai_factory/start_sort std_srvs/srv/Trigger
+4
+对照日志走八步
+：从"开爪"到
+=== fixed grasp-place sequence done ===
+，核对每步与 s6 动画一致；观察总耗时含三处等待
+      （gripper_duration+0.2、move_delay、指令间隔）。
+5
+TG6 完整性用例
+：连续跑 3 次全流程，记录成功次数与失败步号，
+      失败在第几步就查第几步的位姿/等待时间。
+6
+在线调抬升高度
+ros2 param set /eai_factory_grasp grasp.lift_height 0.05
+# 注意：码垛也用该参数，调完要做回归：再跑一次 start_palletize
+7
+TG7 打断用例
+：在第 ⑤ 步平移中发打断，终端应出现
+VOICE INTERRUPT — stopping grasp, going work
+，机械臂停止当前动作并回 work 位，
+重触发须等或先经 abort 复位。
+8
+语音闭环复检
+：走语音链路确认
+      "分拣"→"好的，开始分拣"→八步→"分拣完成"四段齐全（R3/R7）。
+09
+重点与易错点
+诊断
+固定流程"错一步、步步歪"：
+失败步号
+是第一线索——
+    第 ①② 步错查开爪与取料位，第 ③ 步空抓查 pitch 与下探，第 ④⑤ 步挂碰查抬升高度，第 ⑥⑦ 步压件查 place_pose。
+现象
+根因
+处理
+去抓时撞倒物料
+第 ① 步没先开爪，或 gripper_duration 太短未等到位
+核对 _call_gripper L494-515 的 0.2s 追加等待
+抓空
+observe 打点偏移或 pitch 不对
+重新示教；视线确认夹爪正对物料中心
+横移刮倒邻箱
+lift_height=0.03 不够
+param set 抬到 0.05，回归测试码垛
+放入时压围栏
+place_lift 或 place 打点高度不对
+重打 place 点，验证 ⑦ 步脱离间隙
+调了 offset 没效果
+vision:false 分支不走 pick_offset
+改打点位姿，勿在装货参数上白调
+打断后无法重触发
+状态未复位，串行保护拒绝
+等 done/回位或调 abort 复位后再触发
+评分自测（源讲义 25/30/20/15/10）：八步流程 25、打点复现 30、分支理解 20、打断复位 15、记录规范 10。
+报告附八步日志全文（含 done 行）与 3 次 TG6 成功/失败统计。
+lift_height / place_lift 是全局参数——任何一课改动都要回归码垛任务。
+10
+总结与思考
+取舍
+vision:false
+位置确定就不上视觉——省时间也省失败率，代价是不能在线纠偏。
+示教
+手动打点入 yaml
+observe 定"看/取的位置"，place 定"放的位置"，改场景重打点。
+八步
+开—移—抓—抬—移—放—抬—回
+先张手、先抬后移、放后高抬，三个顺序都不能颠倒。
+全局
+lift_height / place_lift
+分拣改参数，码垛受影响，改完必回归。
+思考 1
+固定八步与装货的视觉八步差异在哪？为什么"第 ① 步先开夹爪"必须发生在移动之前、而不是到位后再开？
+      （提示：到位再开会夹到什么？）
+思考 2
+lift_height 管抓后、place_lift 管放后，为什么放后要抬得更高（0.05 > 0.03）？
+      若码摞堆叠场景改反了会出什么事故？
+CASE-01 · 智慧工厂装货分拣码垛 · EXP-06 智能分拣
+4 学时 · 综合性 · 基于 llm_practice 实验讲义改编

@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-06 逆运动学固定抓取 · 机器人机械臂应用与开发</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+:root{--theme:#dc2626;--theme-deep:#b91c1c;--theme-bg:#fee2e2;--theme-bd:#fecaca}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit" title="返回课程首页">🤖 具身智能课程 · <i>教程首页</i></a>
+  <div class="crumb"><a href="../../../index.html#core">核心课程</a> / <a href="../index.html">机械臂应用与开发</a> / EXP-06</div>
+</div>
+
+<div class="wrap">
+<aside class="side">
+  <h4>本页目录</h4>
+  <nav>
+    <a class="now" href="#s1">01 · 问题引入</a>
+    <a href="#s2">02 · 原理通俗讲解</a>
+    <a href="#s3">03 · 关联知识点</a>
+    <a href="#s4">04 · 实验目标</a>
+    <a href="#s5">05 · 实验环境与准备</a>
+    <a href="#s6">06 · 动画讲解</a>
+    <a href="#s7">07 · 互动讲解</a>
+    <a href="#s8">08 · 实操步骤</a>
+    <a href="#s9">09 · 重点与易错点</a>
+    <a href="#s10">10 · 总结与思考</a>
+  </nav>
+  <h4>本课程实验</h4>
+  <nav>
+    <a href="../exp-01-urdf-simulation/index.html">EXP-01 URDF 模型与仿真控制</a>
+    <a href="../exp-02-serial-pwm/index.html">EXP-02 串口协议与 PWM</a>
+    <a href="../exp-03-kinematics/index.html">EXP-03 正运动学基础</a>
+    <a href="../exp-04-ik-solver/index.html">EXP-04 逆运动学基础与 IK 解算</a>
+    <a href="../exp-05-action-replay/index.html">EXP-05 ROS2 架构与动作回放</a>
+    <a class="now" href="../exp-06-fixed-grasp/index.html">EXP-06 逆运动学固定抓取</a>
+    <a href="../exp-07-visual-grasp/index.html">EXP-07 视觉动态抓取</a>
+  </nav>
+</aside>
+
+<main>
+<div class="exp-head">
+  <span class="code">EXP-06 · 第 3 章 · 综合性 · 4 学时</span>
+  <h1>逆运动学固定抓取</h1>
+  <p class="desc">坐标已知（手工量好、写死发布），让机械臂完成一套完整抓取：set_pick_target 只记目标不动、/arm_controller/pick 触发六阶段状态机、分步移动避开奇异、四组抓取参数决定成败——这是全课程第一次"闭环干实事"。</p>
+  <span class="tag hl">⭐⭐⭐ · pick/place · 状态机</span>
+</div>
+
+<!-- 01 -->
+<section class="blk" id="s1">
+<h2><span class="no">01</span>问题引入</h2>
+<p>前五课你集齐了所有零件：协议会发、动作会放、IK 会解。现在把它们串成一件事——<b>抓住桌上那个立方块</b>。视觉还没有介入（那是 EXP-07 的事），目标坐标由你用刻度尺量出来、手工发布。别小看"写死的坐标"：从坐标到成功抓起，中间隔着目标缓存、IK 反解、分步移动、六阶段状态机、下探深度一整条链，任何一环失调都会撞桌、撞臂或空抓。</p>
+<div class="tip amber"><b>两条必须先背下来的接口事实（讲义特别警告）：</b>
+<ul class="check" style="margin-top:6px">
+<li>抓取/放置走 <code>/arm_controller/set_pick_target</code> 话题——<b>只存目标，不会让臂先动一次</b>；而 <code>/arm_controller/target_pose</code> 会<b>立即执行 IK 并移动</b>，用于预检可达性。</li>
+<li><code>/arm_controller/pick</code>、<code>/arm_controller/place</code> 是 <code>std_srvs/srv/Trigger</code>（<b>无请求字段，命令体留空</b>），不是 car1_arm_msgs/srv/Pick。</li>
+</ul></div>
+</section>
+
+<!-- 02 -->
+<section class="blk" id="s2">
+<h2><span class="no">02</span>原理通俗讲解</h2>
+<p><b>set_pick_target 像把东西写进"待办清单"，pick 像按下"执行"键。</b>发话题只是记下"我要抓 (0.28, 0, 0.10)"——胳膊一动不动；直到 Trigger 服务被调用，状态机才开工。这个"先记账、后执行"的设计让你可以慢慢核对目标，而不用担心手一抖臂就飞出去。</p>
+<p><b>分步移动 = 挥铁锹先对准、再下铲。</b>如果五个关节同时动，末端轨迹像泼水一样不可预测，还极易经过奇异位姿。car1 的 <code>two_stage_move()</code>：<b>STAGE 1</b> 只转底座 J1 对准目标方位，<b>STAGE 2</b> 保持 J1、驱动 J2-J5 到目标姿态——先粗后精，工业机械臂的标配打法。</p>
+<p><b>六阶段状态机 = 一套广播体操口令。</b>IDLE（立正）→ APPROACH（抬手到预抓点）→ DESCEND（下探）→ GRASP（合爪）→ LIFT（提起）→ HOLD（抱着待命）。每个口令只做一件事，做完检查（软限位、奇异）再进下一个——出错随时能停在明确的阶段上排查。</p>
+<div class="tip amber"><span class="lab">⚠️ 先说清一件事：这套"状态名"没有对外发布</span>讲义和上面的类比讲的是 <b>IDLE→APPROACH→DESCEND→GRASP→LIFT→HOLD</b> 这六个<b>阶段</b>，它帮你理解流程。但<b>读源码会发现</b>：<code>arm_controller.py</code> 是<b>一条顺序执行的 <code>_execute_pick()</code> 函数</b>，没有状态变量、没有对外的状态话题——<code>/arm/grasp_state</code> <b>在当前仓库里并不存在</b>。所以：<b>别去 echo 一个不存在的状态话题</b>；要看过程，就看节点日志里的六步顺序，或者看机械臂实际在做什么。</div>
+<p><b>源码里 <code>_execute_pick()</code> 的六个动作，逐条对上：</b></p>
+<table>
+<tr><th>步</th><th>源码做什么</th><th>对应阶段名</th></tr>
+<tr><td>1</td><td><code>_set_gripper(True)</code> → 延时 <code>gripper_duration+0.2</code></td><td>开爪</td></tr>
+<tr><td>2</td><td>IK 解 <code>(x, y, grasp_z + pre_grasp_height)</code> → <code>_move_stepwise()</code>（<b>这里含 STAGE1 转底座</b>）</td><td>APPROACH</td></tr>
+<tr><td>3</td><td>IK 解 <code>(x, y, grasp_z)</code> → <code>_move_joints(.., 1.5)</code>，只走 1.5 秒</td><td>DESCEND</td></tr>
+<tr><td>4</td><td><code>_set_gripper(False)</code> → 延时</td><td>GRASP</td></tr>
+<tr><td>5</td><td>IK 解回 <code>(x, y, grasp_z + pre_grasp_height)</code>，<b>这才是抬升</b></td><td>LIFT</td></tr>
+<tr><td>6</td><td>IK 解 <code>post_grasp_pose</code> → <code>_move_stepwise()</code></td><td>回观察位（HOLD 的实体）</td></tr>
+</table>
+<div class="kgrid">
+  <div class="kcard"><div class="kd">gripper_depth</div><div class="kt">下探多深算"抓实"</div><p><b>源码口径：<code>grasp_z = 检测点z − gripper_depth</code>。</b>所以<b>正值 = 往下探</b>（0.01~0.03 按物深夹），<b>负值 = 抬高</b>（指尖跨住物侧）。节点默认 0.0 = TCP 停在表面；<code>arm_params.yaml</code> 实配 <b>−0.040</b>（抬高 40 mm）。浅了抓不牢，深了穿桌。</p></div>
+  <div class="kcard"><div class="kd">奇异检测</div><div class="kt">胳膊伸直的"死点"</div><p><b>理论上</b>：Jacobian 条件数 cond(J) 越大越接近奇异（腿绷直了使不上劲）。<b>但源码里这个检测没有实现</b>——<code>arm_controller.py</code> 只做 <code>_check_limits()</code>（关节角 ±2.356 rad 的软限位），没有 cond(J) 计算、没有备用解切换。<b>现在的防奇异手段是"分步移动 + 目标点设计"</b>：先转 J1 避开、再把 z 抬高避开完全伸直。想加真检测，是本实验的开放改进项。</p></div>
+</div>
+</section>
+
+<!-- 03 -->
+<section class="blk" id="s3">
+<h2><span class="no">03</span>关联知识点</h2>
+<p><b>四组抓取参数</b>（GraspConfig，全部米/弧度）：</p>
+<table>
+<tr><th>参数</th><th>节点默认</th><th>含义与调法</th></tr>
+<tr><td>gripper_depth</td><td>0.0<br><span style="font-size:.72em;color:#b91c1c">arm_params.yaml 实配 −0.040</span></td><td><b>源码算的是 <code>grasp_z = 检测点z − gripper_depth</code></b>，所以：<b>正值 = 往下多探</b>（0.01~0.03 按物深夹）；<b>负值 = 抬高</b>（指尖越过表面、跨住物侧）。节点默认 0.0 = TCP 停在检测表面；yaml 实配 −0.040 是为了让夹爪"跨"住物块。<b>正得太大穿桌，负得太多夹空。</b></td></tr>
+<tr><td>pre_grasp_height</td><td>0.03</td><td>预抓取净空：<b>接近点 = grasp_z + pre_grasp_height</b>。撞桌就加大；退出也走这一点。<b>抬升实际也由它决定</b>（见下一行）</td></tr>
+<tr><td>lift_height</td><td>0.05<br><span style="font-size:.72em;color:#b91c1c">源码未使用</span></td><td><b>声明了但从未参与计算</b>——<b>改它没有任何效果</b>。真实抬升 = 退回 <code>z + pre_grasp_height</code> → 再走 <code>post_grasp_pose</code>。<b>想抬得更高，调 pre_grasp_height，不是它。</b></td></tr>
+<tr><td>grasp_pitch</td><td>π（180°）</td><td>末端俯仰（自竖直量起，同 EXP-04 纪律）：0°=朝上 · 90°=水平 · <b>180°=夹爪垂直朝下</b>（桌面抓取恒 180°，即四元数 {0,1,0,0}）</td></tr>
+<tr><td>grasp_x_offset</td><td>0.0</td><td>抓取点 X 补偿：重力 + 齿轮间隙让臂实际停在比指令<b>更远</b>约 1.5 cm 处，<b>负值</b>把抓取点往回拉。yaml 默认 0（不再用固定值掩盖模型偏差）。<b>它同时作用于接近/下探/退回三个点</b>，所以改了不会让路径歪掉。</td></tr>
+<tr><td>post_grasp_pose</td><td>[0.20, 0, 0.22, π]</td><td>抓完回到的姿态：work 位 (0.186, 0, 0.365)、pitch=90° 水平向前。源码特意<b>从 pre_grasp 直接跳到这里</b>，中间不加"垂直上抬"点——因为那个中间点在 pitch=180° 下不可达，auto-pitch 会偷偷把它掰到 ~165°，再切回 180° 时腕部翻转、末端"点头"下沉。</td></tr>
+</table>
+<div class="tip amber"><span class="lab">⚠️ 这一行最容易讲错，务必分清</span><b>抬升高度 ≠ lift_height。</b>源码里 <code>lift_h = self.lift_height</code> 确实被赋值了，但后续 6 个步骤一次都没用它。真正让物体离桌的是第 5 步"退回 pre_grasp 位置"——它把 TCP 抬回 <code>grasp_z + pre_grasp_height</code>。所以物体离桌高度就是 <b>pre_grasp_height</b>。这条是读码发现的讲义勘误，实测"改 lift_height 毫无变化"就是这个原因。</div>
+<p><b>四位姿四元数速查</b>（orientation 字段）：目标垂直向下用 <code>{x:0, y:1, z:0, w:0}</code>（pitch=180°）；示例放置点 (0.059, 0.074, 0.219) 用 <code>{x:0, y:0.9826, z:0, w:0.1856}</code>。</p>
+<p><b>状态机遥测</b>：<code>/arm/grasp_state</code> 话题字段 current_state(string)、target_pose、progress(0-100)；状态值 IDLE、APPROACH、DESCEND、GRASP、LIFT、HOLD、PLACE_DESCEND、RELEASE。</p>
+<p><b>参数调优（讲义 6.2 口径）</b>：四参数是<b>节点参数</b>（运行时传入；没有"按物体形状分组的配置文件"——不同物块调出不同值是<b>调参结果</b>，不是预置分组）。抓之前用 <b>预演三工具</b>核对：① 仿真器 <code>http://&lt;IP&gt;:8000/viewer</code>（/viewer 后缀不能省）；② 离线 FK <code>pwm_to_fk_demo.py 2150 1200 2200 2275 1500</code>（输入五路 PWM，输出 TCP 位姿/RPY/四元数/PoseStamped）；③ 单独发 target_pose 看 5 路 PWM 确认无一路接近 500/2500 极限。</p>
+</section>
+
+<!-- 04 -->
+<section class="blk" id="s4">
+<h2><span class="no">04</span>实验目标</h2>
+<ul class="check">
+  <li>掌握 /arm_controller/set_pick_target 话题与 pick/place Trigger 服务的完整工作流程，说清"只记账"与"立即动"的区别。</li>
+  <li>独立完成一次端到端固定抓取：设点 → pick（5~8 秒六阶段）→ 设放置点 → place。</li>
+  <li>能读懂抓取日志中的 STAGE 1/STAGE 2 与 /arm/grasp_state 状态迁移。</li>
+  <li>调优抓取参数：以默认 0.0 为基线，做 gripper_depth 0 / 0.01 / 0.03 三档对比，并实证"改 lift_height 无效 → 该调的是 pre_grasp_height"。</li>
+  <li>能用软限位（servo_limits.yaml）与 Jacobian 条件数奇异检测解释"为什么抓取会中止"。</li>
+</ul>
+</section>
+
+<!-- 05 -->
+<section class="blk" id="s5">
+<h2><span class="no">05</span>实验环境与准备</h2>
+<table>
+<tr><th>项</th><th>要求</th></tr>
+<tr><td>主入口</td><td><code>arm/car1_arm_controller/car1_arm_controller/arm_controller.py</code></td></tr>
+<tr><td>接口</td><td>话题 <code>/arm_controller/set_pick_target</code> (PoseStamped)、<code>/arm_controller/target_pose</code>（即时移动）；服务 <code>/arm_controller/pick</code>、<code>/arm_controller/place</code>（std_srvs/Trigger）</td></tr>
+<tr><td>前置实验</td><td>EXP-04（IK 库与偏移补偿已标定）、EXP-02（串口正常、work 零位可信）</td></tr>
+<tr><td>标定工具</td><td>pwm_to_fk_demo.py（离线 FK）、http://&lt;IP&gt;:8000/viewer 仿真器、servo_limits.yaml 软限位</td></tr>
+<tr><td>场地</td><td>目标物（30mm 级立方块）、刻度尺——物体实际位置必须与发布坐标对齐</td></tr>
+</table>
+<div class="tip amber"><b>上机前四条红线：</b>① 先单独发 target_pose 查看 IK 解的 5 路 PWM，确认无一路接近 500/2500；② 首次抓取选 (0.28, 0, 0.10) 这类已验证示例位；③ 观察区域清空，急停意识常备；④ 物品坐标用刻度尺对齐发布值，"目测摆放"是空抓主因。</div>
+</section>
+
+<!-- 06 -->
+<section class="blk" id="s6">
+<h2><span class="no">06</span>动画讲解：抓取六阶段 + 分步移动</h2>
+<div class="anim-box">
+<svg viewBox="0 0 640 300" xmlns="http://www.w3.org/2000/svg">
+  <rect x="0" y="0" width="640" height="300" fill="#0b1120"></rect>
+  <!-- 桌面与物体 -->
+  <line x1="40" y1="240" x2="600" y2="240" stroke="#475569" stroke-width="3"></line>
+  <rect x="430" y="228" width="20" height="12" fill="#fbbf24">
+    <animate attributeName="opacity" values="1;1;1;1;1;0;0;1" keyTimes="0;0.42;0.5;0.62;0.72;0.75;0.95;1" dur="10s" repeatCount="indefinite"/>
+    <animate attributeName="y" values="228;228;228;228;228;200;200;228" keyTimes="0;0.42;0.5;0.62;0.72;0.75;0.95;1" dur="10s" repeatCount="indefinite"/>
+    <animate attributeName="x" values="430;430;430;430;430;430;250;430" keyTimes="0;0.42;0.5;0.62;0.72;0.75;0.95;1" dur="10s" repeatCount="indefinite"/>
+  </rect>
+  <!-- 机械臂：底座固定，臂走两段式 -->
+  <rect x="80" y="222" width="52" height="18" fill="#475569"></rect>
+  <line id="arm1" x1="106" y1="222" x2="106" y2="150" stroke="#f87171" stroke-width="8" stroke-linecap="round">
+    <animate attributeName="x2" values="106;106;330;330;330;330;330;200;106" keyTimes="0;0.1;0.3;0.42;0.5;0.72;0.9;0.95;1" dur="10s" repeatCount="indefinite"/>
+    <animate attributeName="y2" values="150;120;120;120;196;196;90;120;150" keyTimes="0;0.1;0.3;0.42;0.5;0.72;0.9;0.95;1" dur="10s" repeatCount="indefinite"/>
+  </line>
+  <line x1="106" y1="150" x2="106" y2="150" stroke="#fbbf24" stroke-width="7" stroke-linecap="round">
+    <animate attributeName="x1" values="106;106;330;330;330;330;330;200;106" keyTimes="0;0.1;0.3;0.42;0.5;0.72;0.9;0.95;1" dur="10s" repeatCount="indefinite"/>
+    <animate attributeName="y1" values="150;120;120;120;196;196;90;120;150" keyTimes="0;0.1;0.3;0.42;0.5;0.72;0.9;0.95;1" dur="10s" repeatCount="indefinite"/>
+    <animate attributeName="x2" values="106;106;420;420;436;436;430;300;106" keyTimes="0;0.1;0.3;0.42;0.5;0.72;0.9;0.95;1" dur="10s" repeatCount="indefinite"/>
+    <animate attributeName="y2" values="130;110;118;130;208;208;100;112;130" keyTimes="0;0.1;0.3;0.42;0.5;0.72;0.9;0.95;1" dur="10s" repeatCount="indefinite"/>
+  </line>
+  <!-- 夹爪开合 -->
+  <g stroke="#4ade80" stroke-width="5" stroke-linecap="round">
+    <line x1="436" y1="208" x2="436" y2="224"><animate attributeName="x1" values="436;436;436;436;428;432;430;430;436" keyTimes="0;0.42;0.5;0.6;0.65;0.72;0.9;0.95;1" dur="10s" repeatCount="indefinite"/><animate attributeName="y1" values="208;208;208;208;218;186;72;96;208" keyTimes="0;0.42;0.5;0.6;0.65;0.72;0.9;0.95;1" dur="10s" repeatCount="indefinite"/><animate attributeName="y2" values="224;224;232;236;232;202;88;112;224" keyTimes="0;0.42;0.5;0.6;0.65;0.72;0.9;0.95;1" dur="10s" repeatCount="indefinite"/><animate attributeName="x2" values="436;436;436;436;433;437;434;434;436" keyTimes="0;0.42;0.5;0.6;0.65;0.72;0.9;0.95;1" dur="10s" repeatCount="indefinite"/></line>
+    <line x1="452" y1="208" x2="452" y2="224"><animate attributeName="x1" values="452;452;452;452;456;454;452;452;452" keyTimes="0;0.42;0.5;0.6;0.65;0.72;0.9;0.95;1" dur="10s" repeatCount="indefinite"/><animate attributeName="y1" values="208;208;208;208;218;186;72;96;208" keyTimes="0;0.42;0.5;0.6;0.65;0.72;0.9;0.95;1" dur="10s" repeatCount="indefinite"/><animate attributeName="y2" values="224;224;232;236;232;202;88;112;224" keyTimes="0;0.42;0.5;0.6;0.65;0.72;0.9;0.95;1" dur="10s" repeatCount="indefinite"/><animate attributeName="x2" values="452;452;452;452;460;457;456;456;452" keyTimes="0;0.42;0.5;0.6;0.65;0.72;0.9;0.95;1" dur="10s" repeatCount="indefinite"/></line>
+  </g>
+  <!-- 阶段标签 -->
+  <g font-family="monospace" font-size="13">
+    <text x="150" y="52" fill="#94a3b8">IDLE →（STAGE 1 底座对准）→ APPROACH → DESCEND → GRASP → LIFT → HOLD</text>
+    <text x="150" y="74" fill="#fbbf24">STAGE1 只转 J1 · STAGE2 J2~J5 到位 —— 两步分开，避开奇异</text>
+    <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.1;0.9;1" dur="10s" repeatCount="indefinite"/>
+  </g>
+  <!-- pre_grasp / lift 高度参考线 -->
+  <line x1="380" y1="120" x2="470" y2="120" stroke="#60a5fa" stroke-width="1" stroke-dasharray="5 4">
+    <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.15;0.45;0.55" dur="10s" repeatCount="indefinite"/>
+  </line>
+  <text x="474" y="124" fill="#60a5fa" font-size="11" font-family="monospace">pre_grasp 0.05<animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.15;0.45;0.55" dur="10s" repeatCount="indefinite"/></text>
+  <text x="30" y="285" fill="#64748b" font-size="12" font-family="monospace">10 秒一循环：记账(set_pick_target) → 两段移动 → 六阶段口令 → HOLD(等待 place)</text>
+</svg>
+</div>
+<p class="anim-cap">动画 10 秒一循环：先底座对准（STAGE 1），再臂部两连杆带着夹爪到预抓点、下探（DESCEND 至物体上方 pre_grasp_height → 目标点）、合爪（GRASP，绿色爪闭合）、提起（LIFT 带物离桌）进入 HOLD。物体随 LIFT 抬起、随 place 落回——每一次状态迁移前都过一遍软限位与奇异检查。</p>
+</section>
+
+<!-- 07 -->
+<section class="blk" id="s7">
+<h2><span class="no">07</span>互动讲解：抓取参数配置台</h2>
+<div class="ix-panel">
+  <div class="ix-title">互动台 · 参数组选型 + 安全窗口校验</div>
+  <div class="ctl-row">
+    <label class="ctl">物体预设
+      <select id="obj" onchange="preset()">
+        <option value="cube">立方块 · 浅 0.01</option>
+        <option value="sph">大球 · 深 0.03</option>
+        <option value="cyl">圆柱 · 中 0.02</option>
+      </select>
+    </label>
+    <label class="ctl">gripper_depth (m)<input type="number" id="gd" value="0" step="0.005"></label>
+    <label class="ctl">pre_grasp_height (m)<input type="number" id="ph" value="0.03" step="0.01"></label>
+    <label class="ctl">lift_height (m)<input type="number" id="lh" value="0.05" step="0.01"></label>
+    <label class="ctl">grasp_pitch (°)<input type="number" id="gp" value="180" step="5"></label>
+    <button class="btn" onclick="checkGrasp()">组包并校验</button>
+  </div>
+  <div class="io" id="ixout">基线（节点参数默认）：gripper_depth 0.0（arm_params.yaml 实配 <b>−0.040</b>）／ pre_grasp_height 0.03 ／ lift_height 0.05（<b>源码未使用，调了无效！</b>）／ grasp_pitch π=180°。对照档：depth +0.01 / +0.03（往下探）。校验：depth 勿穿桌、pre 勿低于 0.02、pitch 保持 180° 夹爪朝下。</div>
+</div>
+<p>选"大球"预设填入 depth 0.03 / pitch 180°；手动把 pre_grasp_height 压到 0.02 以下点"组包"，会得到 <span class="bad">撞桌风险</span> 警告——对应讲义"抓取过程撞桌面 → 增大 pre_grasp_height"的排查入口。右侧输出即你要写进 pick 调用/参数发布里的完整 GraspConfig。</p>
+</section>
+
+<!-- 08 -->
+<section class="blk" id="s8">
+<h2><span class="no">08</span>实操步骤</h2>
+<div class="flow">
+  <div class="step"><b>Step 1 · 起栈验零</b><br>bringup + arm_controller，确认零位与软限位。</div>
+  <div class="arr">→</div>
+  <div class="step"><b>Step 2 · 勘察接口</b><br>确认话题/服务名与类型，Trigger 无请求体。</div>
+  <div class="arr">→</div>
+  <div class="step"><b>Step 3 · 预检可达</b><br>pwm_to_fk_demo / 仿真器核对目标位姿。</div>
+  <div class="arr">→</div>
+  <div class="step"><b>Step 4 · 记账+执行</b><br>set_pick_target → pick，盯六阶段。</div>
+  <div class="arr">→</div>
+  <div class="step"><b>Step 5 · 放置与调参</b><br>place 完成闭环，改参数对比。</div>
+</div>
+<pre><span class="c"># 步骤 1 · 启动（先 bringup 再控制器，顺序即安全）</span>
+ros2 launch car1_bringup bringup.launch.py
+ros2 launch car1_arm_controller arm_controller.launch.py
+
+<span class="c"># 步骤 2 · 勘察（确认接口，别猜）</span>
+ros2 topic list | grep arm_controller
+ros2 service list | grep arm_controller
+<span class="y"># 预期话题：/arm_controller/target_pose、/arm_controller/set_pick_target、/arm_controller/joint_command</span>
+<span class="y"># 预期服务：pick、place、set_grasp_target、set_gripper、go_home、go_work、emergency_stop</span>
+<span class="y"># 注意：/arm_controller/pick、/place 是 std_srvs/srv/Trigger（无请求字段）</span>
+
+<span class="c"># 步骤 3 · 离线预演（不动舵机）：五路 PWM → TCP 位姿交叉核对</span>
+cd ~/ros2_ws/src/xflz_eai_car1/arm/kinematics/kinematics
+python3 pwm_to_tcp.py 1500 1100 2200 1850 1500
+<span class="y"># 输出 TCP 位置 / RPY / 四元数，用于核对 set_pick_target 的目标</span>
+<span class="y"># 仿真预演：http://&lt;设备IP&gt;:8000/viewer  （/viewer 后缀不能省）</span>
+
+<span class="c"># 步骤 4a · 设置抓取目标点（只记账，臂不会动）</span>
+ros2 topic pub --once /arm_controller/set_pick_target geometry_msgs/msg/PoseStamped \
+  "{header: {frame_id: 'base_link'}, pose: {position: {x: 0.28, y: 0.0, z: 0.10}, orientation: {x: 0.0, y: 1.0, z: 0.0, w: 0.0}}}"
+<span class="y"># orientation y=1,w=0 → pitch 180° 夹爪垂直朝下</span>
+
+<span class="c"># 步骤 4b · 触发抓取（Trigger 无请求字段，命令体留空 "{}"）</span>
+ros2 service call /arm_controller/pick std_srvs/srv/Trigger "{}"
+<span class="g"># 约 5~8 秒：开爪 → 抬到 pre_grasp_height → 下探 → 合爪 → 抬升 → 回 post_grasp_pose</span>
+<span class="y"># 另一条路（立即执行用于预检）：ros2 topic pub --once /arm_controller/target_pose ...（会直接动！）</span>
+<span class="y"># 过程怎么看：盯 arm_controller 的终端日志（六步顺序 + IK 解的 5 路角度），没有状态话题可 echo</span></pre>
+  <pre><span class="c"># 步骤 5a · 设置放置目标点（仍走 set_pick_target，同时覆盖 pick_target 与 place_target）</span>
+ros2 topic pub --once /arm_controller/set_pick_target geometry_msgs/msg/PoseStamped \
+  "{header: {frame_id: 'base_link'}, pose: {position: {x: 0.059, y: 0.074, z: 0.219}, orientation: {x: 0.0, y: 0.9826, z: 0.0, w: 0.1856}}}"
+<span class="c"># 步骤 5b · 触发放置（同样 Trigger 空体）</span>
+ros2 service call /arm_controller/place std_srvs/srv/Trigger "{}"
+
+<span class="c"># 步骤 5c · gripper_depth 调优对比（基线/抬高/下探三档，用 -p 覆盖节点参数）</span>
+<span class="c"># 重启 arm_controller 并带上新参数：</span>
+ros2 run car1_arm_controller arm_controller --ros-args -p gripper_depth:=0.02
+<span class="y"># 对照档：-0.040（yaml 实配，抬高）/ 0.0（节点默认，停在表面）/ +0.02（往下探）</span>
+<span class="y"># 可调项：pre_grasp_height 0.02~0.10（撞桌加大，抬升也靠它）；grasp_pitch 保持 180 夹爪朝下</span>
+<span class="y"># lift_height 改了没用（源码未使用）——这一点要在报告里实测证明一次</span></pre>
+
+<div class="tip tealb"><span class="lab">🔍 一个隐藏的坑：publish + call 会赛跑</span><code>arm_controller</code> 用的是 <code>MultiThreadedExecutor</code>，<code>set_pick_target</code> 的 topic 回调和 <code>pick</code> 的服务回调<b>跑在不同线程上</b>。如果你用脚本"发完 topic 立刻 call pick"，<b>pick 可能先看到旧目标</b>——源码注释里专门写了这件事，并为此提供了服务形式 <code>/arm_controller/set_grasp_target</code>（<code>SetGraspTarget</code> 类型，有请求字段、会等响应，所以"存完再走"是确定的）。<br><b>命令行手敲没这个问题</b>（两条命令之间有几秒人手的间隔），但写成脚本自动抓取时必须换服务，否则会随机抓到上一个点。</div>
+</section>
+
+<!-- 09 -->
+<section class="blk" id="s9">
+<h2><span class="no">09</span>重点与易错点</h2>
+<div class="tip tealb"><b>预检纪律：</b>先单独发布 <code>/arm_controller/target_pose</code> 或用 pwm_to_fk_demo 查看 IK 解的 5 路 PWM，<b>确认无任何一路接近 500/2500 极限</b>，再调 pick。极限位附近要么软限位拒绝、要么舵机憋着力——都比"跑起来再说"便宜得多。</div>
+<table>
+<tr><th>坑</th><th>现象</th><th>对策</th></tr>
+<tr><td>误用 target_pose 当记账</td><td>指令一发臂就动</td><td>记账用 set_pick_target；target_pose 是"立即 IK+移动"的预检口</td></tr>
+<tr><td>pick 传请求字段</td><td>服务调用报类型错误</td><td>std_srvs/Trigger 无字段，命令体写 "{}"</td></tr>
+<tr><td>抓取撞桌面</td><td>DESCEND 阶段触桌</td><td>增大 pre_grasp_height；gripper_depth 用负值抬高；物体坐标对不齐查 TF——<b>别改 lift_height，源码未使用</b></td></tr>
+<tr><td>分步移动卡在转底座</td><td>底座转完臂不动</td><td>检查 J1 软限位（±2.356）与目标方位（目标在身后）；看日志 <code>limit violation: arm_joint1=...</code></td></tr>
+<tr><td>物体未夹稳掉落</td><td>退回后掉落</td><td>增大 gripper_depth（往下多探）；物体实物位置必须与发布坐标刻度尺对齐</td></tr>
+<tr><td>"接近奇异中止"却找不到日志</td><td>以为被奇异检测拦了</td><td><b>本仓库没有奇异检测</b>——中止只可能来自 IK 报错、关节限位或急停，按这三项查</td></tr>
+<tr><td>目标明明设了却抓旧点</td><td>脚本连发时随机抓错</td><td>publish 与 call 赛跑：改用 <code>/arm_controller/set_grasp_target</code> 服务，或两条命令间加延时</td></tr>
+<tr><td>echo /arm/grasp_state 无输出</td><td>以为节点挂了</td><td>该话题<b>不存在</b>；过程看节点日志的六步顺序</td></tr>
+</table>
+<ul class="check">
+  <li>成功判据：pick 后 5~8 秒完成六阶段至 HOLD；place 后回 IDLE；全程无越限告警。</li>
+  <li>参数调优至少做一组对照：gripper_depth 0 / 0.01 / 0.03 各抓一次（默认 0.0 即基线），记录成功率与掉落情况。</li>
+  <li>坐标纪律：目标物挪了 1cm，发布坐标也要跟着改——固定抓取的"固定"指的是坐标系，不是运气。</li>
+</ul>
+</section>
+
+<!-- 10 -->
+<section class="blk" id="s10">
+<h2><span class="no">10</span>总结与思考</h2>
+<div class="kgrid">
+  <div class="kcard"><div class="kd">接口二分</div><div class="kt">记账 vs 立即动</div><p>set_pick_target 只存；target_pose 即时 IK+移动。</p></div>
+  <div class="kcard"><div class="kd">两段移动</div><div class="kt">STAGE1 底座 · STAGE2 臂</div><p>先粗后精，绕开奇异与轨迹失控。</p></div>
+  <div class="kcard"><div class="kd">六阶段</div><div class="kt">IDLE→…→HOLD</div><p>每步过软限位+奇异检查，遥测看 grasp_state。</p></div>
+  <div class="kcard"><div class="kd">四参数</div><div class="kt">depth/pre/lift/pitch</div><p>组随物体换：0.015/0.03/0.025 深度三组预设。</p></div>
+</div>
+<p><b>练习 · 前 / 前左 / 前右三方位抓取</b>——同一半径 0.28 m 旋到三个方位（REP-103 坐标系：<b>x 向前 · y 向左 · z 向上</b>；±45° 取 cos45°≈0.707 → 0.28×0.707≈0.198）。物块要用尺子摆到对应坐标，否则夹空气：</p>
+<pre><span class="c"># 方位一 · 正前（基线）</span>
+ros2 topic pub --once /arm_controller/set_pick_target geometry_msgs/msg/PoseStamped \
+  "{header: {frame_id: 'base_link'}, pose: {position: {x: 0.28, y: 0.0, z: 0.10}, orientation: {x: 0.0, y: 1.0, z: 0.0, w: 0.0}}}"
+ros2 service call /arm_controller/pick std_srvs/srv/Trigger "{}"
+
+<span class="c"># 方位二 · 前左（+y 侧，底座向左转 45°）</span>
+ros2 topic pub --once /arm_controller/set_pick_target geometry_msgs/msg/PoseStamped \
+  "{header: {frame_id: 'base_link'}, pose: {position: {x: 0.198, y: 0.198, z: 0.10}, orientation: {x: 0.0, y: 1.0, z: 0.0, w: 0.0}}}"
+ros2 service call /arm_controller/pick std_srvs/srv/Trigger "{}"
+
+<span class="c"># 方位三 · 前右（−y 侧，底座向右转 45°）</span>
+ros2 topic pub --once /arm_controller/set_pick_target geometry_msgs/msg/PoseStamped \
+  "{header: {frame_id: 'base_link'}, pose: {position: {x: 0.198, y: -0.198, z: 0.10}, orientation: {x: 0.0, y: 1.0, z: 0.0, w: 0.0}}}"
+ros2 service call /arm_controller/pick std_srvs/srv/Trigger "{}"
+
+<span class="y"># 纪律：每换一个方位先用 target_pose 预检可达（09 节预检纪律），确认无 PWM 贴近 500/2500 再 pick</span>
+<span class="y"># 对照观察：STAGE 1 底座转向与 EXP-01 里你用话题转过的 ±45° 对得上号吗？/arm/grasp_state 看迁移</span></pre>
+<div class="tip violet"><b>思考题 1：</b>为什么讲义坚持"先 set_pick_target 记账、再 pick 执行"的两步走？如果把记账和执行合并成一步（发完坐标立即动），调试体验和安全性分别会发生什么退化？</div>
+<div class="tip violet"><b>思考题 2：</b>按 EXP-04 的 pitch 纪律（0°朝上 · 90°水平 · <b>180°夹爪垂直朝下</b>）分析：为什么桌面抓取必须恒 180°？若把 grasp_pitch 误设成 0，接触点会跑到哪、会先撞什么？结合四元数 {0,1,0,0} 说明"grasp_pitch 与 orientation 是同一件事的两种记法"。</div>
+</section>
+
+<nav class="expnav">
+  <a href="../exp-04-ik-solver/index.html"><span class="lb">← 上一个实验</span>EXP-04 逆运动学基础与 IK 解算</a>
+  <a class="next" href="../exp-07-visual-grasp/index.html"><span class="lb">下一个实验 →</span>EXP-07 视觉动态抓取</a>
+</nav>
+<footer>
+  <span>CORE-05 · 机器人机械臂应用与开发 · EXP-06 逆运动学固定抓取</span>
+  <span>4 学时 · 综合性 · 基于 arm_practice 实验讲义改编</span>
+</footer>
+</main>
+</div>
+
+<script>
+function preset(){
+  var v=document.getElementById('obj').value;
+  if(v==='cube'){document.getElementById('gd').value='0.01';document.getElementById('ph').value='0.03';document.getElementById('lh').value='0.05';document.getElementById('gp').value='180';}
+  if(v==='sph'){document.getElementById('gd').value='0.03';document.getElementById('ph').value='0.05';document.getElementById('lh').value='0.05';document.getElementById('gp').value='180';}
+  if(v==='cyl'){document.getElementById('gd').value='0.02';document.getElementById('ph').value='0.03';document.getElementById('lh').value='0.05';document.getElementById('gp').value='180';}
+}
+function checkGrasp(){
+  var gd=parseFloat(document.getElementById('gd').value),
+      ph=parseFloat(document.getElementById('ph').value),
+      lh=parseFloat(document.getElementById('lh').value),
+      gp=parseFloat(document.getElementById('gp').value);
+  var msg=[],bad=false;
+  if(gd>0.03){msg.push('<span class="bad">depth='+gd+'&gt;0.03：可能顶穿被抓物/撞桌</span>');bad=true;}
+  else if(gd<0){msg.push('<span class="warn">depth='+gd+'（负值=抬高：grasp_z = 检测z+'+(-gd).toFixed(3)+'，TCP 高于检测面、指尖跨住物侧。arm_params.yaml 实配 −0.040 即此语义）</span>');}
+  else if(gd===0){msg.push('<span class="ok">depth=0.0 基线：tcp 停在检测表面点（节点参数默认）</span>');}
+  else if(gd<0.01){msg.push('<span class="warn">depth='+gd+'&lt;0.01：偏浅，立方块易滑脱（对照 0 / 0.01 / 0.03 三档实测选值）</span>');}
+  else{msg.push('<span class="ok">depth='+gd+' 在 0.01~0.03 常用档内</span>');}
+  if(ph<0.02){msg.push('<span class="bad">pre_grasp='+ph+' 过低：侧面撞桌高危（撞桌→增大 pre_grasp_height）</span>');bad=true;}
+  if(lh<ph+0.05){msg.push('<span class="warn">lift('+lh+') 未比 pre('+ph+') 高 0.05——且源码根本不使用 lift_height，真实抬升只看 pre：这个旋钮别调了</span>');}
+  document.getElementById('ixout').innerHTML=
+    'GraspConfig 组包预览：\n'
+    +'gripper_depth: '+gd+'\npre_grasp_height: '+ph+'\nlift_height: '+lh+'\ngrasp_pitch: '+gp+'° ('+(gp*Math.PI/180).toFixed(3)+' rad)\n'
+    +'—— 校验 ——\n'+msg.join('\n')
+    +'\n<span class="dim">'+(bad?'先修正上述红旗再调用 pick':'确认物体坐标与实物刻度尺对齐后，set_pick_target → pick "{}"')+'</span>';
+}
+</script>
+<script src="../shared/tutorial.js" defer></script>
+</body>
+</html>

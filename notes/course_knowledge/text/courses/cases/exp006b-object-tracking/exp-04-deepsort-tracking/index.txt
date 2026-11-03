@@ -1,0 +1,325 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/cases/exp006b-object-tracking/exp-04-deepsort-tracking/index.html
+TITLE: EXP-04 · DeepSORT 追踪底座 — 通用目标追踪综合项目
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+EXP-04 · DeepSORT 追踪底座 — 通用目标追踪综合项目
+🎓 具身智能课程 ·
+通用目标追踪
+综合项目
+/
+通用目标追踪
+/ EXP-04
+本页目录
+01 问题引入：遮挡一帧就换 ID
+02 原理通俗讲解：工牌+运动记忆的保安
+03 关联知识点：DeepSORT 九要点
+04 实验目标
+05 实验环境与准备
+06 动画讲解：预测-更新与 ID 保持
+07 互动讲解：IoU 阈值匹配实验
+08 实操步骤：pytest 回归与 ID 底座验证
+09 重点与易错点
+10 总结与思考
+CASE-04 · 通用目标追踪
+EXP-01 需求分析
+EXP-02 TrackEngine 架构
+EXP-03 配置详解
+EXP-04 DeepSORT 底座
+EXP-05 LLM 门控
+EXP-06 VLM 选目标
+EXP-07 语音与 TTS
+EXP-08 日志与降级
+EXP-09 全功能验证
+EXP-04 · 第 2 章 · 综合性 · 8 学时
+DeepSORT 追踪底座：车被挡住三秒，ID 依然不换
+纯 IoU 关联的 SORT 只要目标被遮挡几帧，轨迹即断、换新 ID。本项目的
+tracking/
+模块是 DeepSORT 标准结构的
+纯 numpy 自实现
+（零新增依赖）：
+卡尔曼常速模型
+（8 维状态、按框高缩放噪声、CHI2INV95 马氏门控）负责"猜目标下一帧在哪"，
+级联匹配
+按
+time_since_update
+排优先级，
+ReID 外观特征
+（deepsort.rknn，64×128 ImageNet 归一化、cosine ≤ max_dist=0.2）让遮挡后的同一辆车认回来，
+min_box=32 / max_stale=15
+负责净场。本实验跑 97 项 pytest 回归 + track_demo ID 底座验证。
+难度 ⭐⭐⭐ · 8 学时
+Kalman 8 维
+级联匹配
+ReID 64×128
+CHI2INV95
+01
+问题引入：遮挡一帧就换 ID
+地下车道里一辆白车被货车挡了两秒——再出现时，如果系统给它发了个新号，"追踪 id3"就永远追不到它了：
+1
+纯 IoU 关联：两帧框重叠才算"同一个人" → 被遮挡 IoU 归零 →
+轨迹断，换新 ID
+2
+没有运动记忆：目标被挡时连"它大概会从哪冒出来"都不知道 → 重逢不相识
+3
+没有外观记忆：白色皮卡 vs 白色轿车在低分辨率下长得很像 → 胡乱认亲
+4
+目标太小 / 早已消失的幽灵轨迹还占着 ID 名额 → 画面乱画、VLM 被误导
+5
+对策：
+预测先跟上 + 外观来认人 + 净场扫幽灵
+= DeepSORT 三件套
+💡 为什么是 R3 的核心
+R3 要求"追踪 ID 连续"。ID 一跳，上游的"追 id3"、下游的 follow 过滤、VLM 选车全部失效——所以追踪底座是全链路的地基，本实验 8 学时打这个地基。
+02
+原理通俗讲解：工牌+运动记忆的保安
+比喻一
+卡尔曼 = 根据旧轨迹猜新位置
+保安盯着一个人，他突然被货架挡住——保安不会站着发呆，而是
+顺着他的走向往前多看两步
+："他应该快从那头出来了"。这就是
+predict()
+：8 维状态
+[cx, cy, aspect, h, vx, vy, va, vh]
+（中心、宽高比、高 + 各自速度），常速模型
+x' = Fx
+即"位置 += 速度"；人一露头，
+再用观测框修正猜测
+（
+update()
+）。猜错不要紧，观测会把它拉回正轨。
+比喻二
+级联匹配 = 先给刚见过的人发号
+发号窗口同时排着"一秒钟前刚见过"和"五分钟没见"的两张旧凭证——先认刚见过的。级联按
+time_since_update
+从 1 到 max_age 逐层分配：刚更新过的 track 优先匹配，
+长期遮挡的旧 track 预测已经不可靠，不许它抢新目标的检测框
+。
+比喻三
+ReID = 衣着认人
+光靠"往哪走"还是会认错（两辆车并排拐弯）。ReID 给每个检测框拍张
+标准证件照
+（crop 缩到 64×128、ImageNet 归一化）提成特征向量，用余弦距离比对："衣着发型对得上，就是刚才那个人"（≤ max_dist=0.2 才认）。特征库存的是
+历史平均外观
+而非单帧快照，抗抖动。
+比喻四
+min_box / max_stale = 门卫净场
+监控角落里闪现的小噪点（框宽或高 < 32 像素）不发工牌；人早走了还留在寻人启事上的照片（连续
+15 帧
+没命中）就撤下来——但和"档案彻底注销"（max_age=70 帧）是两码事：先撤下启事（不画但留档），70 帧还没回来才注销档案。
+🎯 合起来一句话
+DeepSORT =
+运动记忆（Kalman）+ 排队优先权（级联）+ 衣着认人（ReID）+ 净场规则（min_box/max_stale）
+。本项目
+tracker.update()
+（tracking/tracker.py L72-75）每帧三步：预测 → 级联匹配 → 剩余 detection 与未确认 track 做 IoU 匹配。
+03
+关联知识点：DeepSORT 九要点
+知识点
+要点与位置
+3.1.1 结构
+卡尔曼预测 + IoU/外观级联关联 + 确认框；Track 生命周期 Tentative→Confirmed（hits≥n_init）→Deleted（tracking/track.py）（前置 1.2.2）
+3.1.2 常速模型
+8 维均值 + 4 维协方差、噪声按框高缩放（σ_pos=1/20、σ_vel=1/160）、CHI2INV95 门控（df2→5.9915）（tracking/kalman.py）
+3.1.3 双闸剔除
+min_box_w/h=32 小框剔除 + max_stale=15 超龄剔除（tracking/pipeline.py L53-62）（前置 3.1.1）
+3.2.1 外观特征
+deepsort.rknn 64×128 ImageNet 归一化，消除单帧漏检换 ID（tracking/reid.py preprocess_crop L20-29）（前置 3.1.1）
+3.2.2 异步池
+ReIDPool 4 worker（RKNN 非线程安全，每线程独立实例）、extract 超时 timeout=10 → features=None 走纯 IoU（tracking/reidpool.py L24-67）
+3.2.3 ID 调参
+min_confidence=0.3 与 ID 稳定性（pipeline.py L20-21 两级置信过滤，与 detect.score_thr=0.25 配合）（前置 3.1.1）
+3.3.1 类别限定
+class_filter=[car]，COCO 80 类通用检测（前置 1.1.1）
+3.3.2 底座验证
+track_demo --list / --text 验证 ID 底座，无 LLM、stdin 直达 engine（前置 3.2.3）
+3.3.3 丢失恢复
+遮挡丢失后同 ID 恢复靠 ReID；unlock_on_loss 全丢则恢复全显示（前置 3.2.1）
+💡 与 SORT 的差别
+SORT = 卡尔曼 + IoU，快但怕遮挡；DeepSORT 在其上补了
+外观特征与级联匹配
+两项。本模块对照 nwojke/deep_sort 的 BSD 参考实现，用纯 numpy 重写（kalman.py / matching.py），不引入 torch/GPU 依赖。
+04
+实验目标
+目标 1
+掌握追踪原理
+掌握卡尔曼预测 + 级联关联的多目标追踪原理，能画出 DeepSORT 结构与 8 维常速模型示意。
+目标 2
+理解 ReID 的作用
+理解外观重识别如何消除"单帧漏检换 ID"，以及 extract 超时时降级纯 IoU 而不崩线程的容错契约。
+目标 3
+掌握过滤与调参
+掌握 min_box/max_stale 过滤语义；把 min_confidence 0.3 调低到 0.1 观察 ID 跳变，再恢复 tuned 值。
+目标 4
+独立完成验证
+独立完成
+python3 -m pytest tests/ -v
+纯逻辑回归（97 项）+
+track_demo --list
+验证 ID 底座。
+目标 5
+迁移
+把 DeepTrack（卡尔曼 + ReID）追踪模式迁移到其他多目标场景（车 / 人 / 箱）。
+05
+实验环境与准备
+类别
+内容
+硬件
+具身智能实验箱 B2 / 具身智能机器人小车 C1 + 深度相机（实时模式可选；pytest 与 track_demo 视频模式可无实机）
+OS / 语言
+Ubuntu 22.04 + ROS 2 Humble · Python 3.10
+核心库
+numpy（
+追踪核心纯 numpy，零新增依赖
+）· pytest（纯逻辑 x86 可跑，无 RKNN/ROS 依赖）
+模型
+yolov8n.rknn / deepsort.rknn / coco_classes.json（板端）
+源码路径
+~/ros2_ws/src/xflz_eai_car1/app/object_tracking/
+（tracking/kalman.py · tracker.py · track.py · matching.py · reid.py · reidpool.py · pipeline.py）
+参考视频
+/home/iflytek/ros2_ws/src/xflz_eai_car1/vision/07_multi_object_tracking/test.mp4
+测试用例
+docs/08_视觉测试用例.md
+的 O2（多车 ID 稳定）/ O3（遮挡 ReID 恢复）/ O4（小框剔除）
+⚠️ 顺序纪律
+pytest 纯逻辑验证（无需 rknn/rclpy）
+先于任何硬件验证
+；实验结束后恢复 min_confidence=0.3、class_filter=[car] tuned 值。
+06
+动画讲解：预测-更新与 ID 保持
+追踪器每帧做"两步舞"：
+预测
+（虚线框按速度前移）→
+更新
+（实测框把虚线拉回真实位置并修正速度）。中间一段遮挡期只有预测在飞，ReID 外观负责把重逢的目标接回
+同一个 ID
+：
+预测（虚线）→ 更新（实线实测）→ 遮挡后 ReID 认回同一 ID
+t 帧
+t+1 预测
+t+1 更新
+t+2…t+4 遮挡
+t+5 重逢
+id3
+观测框 · 速度记入 8 维状态
+x' = F·x（位置 += 速度）
+id3
+马氏距离 ≤ 5.9915 才接受
+遮挡
+time_since_update +1/帧
+id3
+cos ≤ 0.2 认回 · 不换号
+Tentative（hits≥n_init 才确认）· max_age=70 帧未更新才删除 · max_stale=15 帧不画但留档
+轨迹生命周期：蓝=正常观测 · 黄=纯预测 · 灰=遮挡 · 绿=ReID 认回
+动画：预测-更新两步舞——虚线框是卡尔曼按速度前移的猜测，实线实测框在更新步把猜测拉回（马氏距离超 5.9915 的观测直接拒收）；遮挡期只有灰点预测在飘，重逢时余弦距离 ≤0.2 被判为同一外观，id3 原号接回。
+07
+互动讲解：IoU 阈值匹配实验
+选一组两帧框的重叠场景与匹配阈值，判定台复算 IoU 并给出"是否指派为同一目标"——体验 IoU 关联的敏感与马氏/外观门控的必要性：
+🎯 IoU 匹配判定实验（互动台）
+重叠 82%
+追尾级 45%
+擦边 12%
+已离开 0%
+遮挡后重逢（无 IoU）
+重置
+← 依次点按：先感受纯 IoU 判定，再看遮挡场景下 ReID 如何救场
+对照源码：
+max_iou_distance=0.8
+（级联完剩余未确认 track 用 IoU 匹配，代价 1−IoU 需 ≤0.8，即 IoU ≥0.2）；
+_appearance_cost
+用余弦距离、经
+gate_cost_matrix
+把马氏超阈项置 1e5 大值，匈牙利算法就不会选它。
+三道闸各管一段：
+短时靠运动、重逢靠外观、太远直接拒收。
+08
+实操步骤：pytest 回归与 ID 底座验证
+1
+纯逻辑 pytest 全绿（约 90min）：ID 分配/follow 过滤/显隐、ReID 遮挡保 ID、越界 crop 与超时哨兵、min_box/stale 剔除、门控路由、录音自愈
+2
+精读卡尔曼 + 级联（约 150min）：kalman.py L29-65、track.py 生命周期、tracker.py L68-90；记录 8 维状态与 F=I₄ 置块的常速映射
+3
+精读 ReID（约 100min）：reid.py 预处理四步、reidpool 异步池、test_reid_tracking 对照 use_reid 开/关差异
+4
+净场与调参（约 90min）：test_pipeline_tracker 的 min_box/max_stale 用例；min_confidence 0.3→0.1 看 ID 跳变再恢复
+5
+track_demo ID 底座（约 80min）：--list 每帧打印当前确认目标；按 docs/08 跑 O2 多车稳定 / O3 遮挡恢复 / O4 小框剔除
+步骤 1 · 纯逻辑回归（x86 可跑，无 RKNN/ROS 依赖）
+：
+cd ~/ros2_ws/src/xflz_eai_car1/app/object_tracking
+python3 -m pytest tests/ -v
+platform linux -- Python 3.10.12, pytest-6.2.5 ...
+rootdir: /home/iflytek/ros2_ws/src/xflz_eai_car1/app/object_tracking
+collected 97 items
+tests/test_tracker_session.py::... PASSED    # ID 分配 / follow 过滤 / 显隐
+tests/test_reid_tracking.py::... PASSED     # use_reid=true 遮挡保原 ID vs false 新建
+tests/test_reid_crop_heal.py::... PASSED    # 越界 crop 不喂错特征 / extract 超时零哨兵
+tests/test_pipeline_tracker.py::... PASSED  # min_box 剔除 / stale 超龄剔除
+tests/test_native_wiring.py::... PASSED     # 门控路由（EXP-05 复用）
+# 全部 PASSED 即通过——这是后续所有实验的行为基线
+步骤 4 · min_confidence 调低看 ID 跳变
+：
+cp config/track_config.yaml /tmp/tc.bak
+sed -i 's/min_confidence: 0.3 /min_confidence: 0.1 /' config/track_config.yaml
+python3 apps/track_demo.py --video /home/iflytek/ros2_ws/src/xflz_eai_car1/vision/07_multi_object_tracking/test.mp4 --text --list --mjpeg
+# 现象：低置信噪声进 tracker，大量 Tentative 新建 → ID 频繁跳变
+cp /tmp/tc.bak config/track_config.yaml
+# 恢复 0.3，验证 ID 恢复稳定
+步骤 5 · track_demo 验证 ID 底座
+（无 VoiceLoop、无 LLM，stdin 直达 engine，
+无唤醒词
+）：
+printf '追踪 id3\n' | python3 apps/track_demo.py --video /home/iflytek/ros2_ws/src/xflz_eai_car1/vision/07_multi_object_tracking/test.mp4 --text --list --mjpeg
+[命令] 追踪 id3
+当前目标： （当前无确认目标）
+id3 已消失
+全部跟随目标已消失，恢复全显示
+# --list 每帧打印 scene_summary；锁定 → 仅绘该 ID；丢失 → lost + unlock_on_loss 恢复全显示
+09
+重点与易错点
+别用手工 IoU 替代级联
+：级联按 time_since_update 排优先级，保证长期遮挡的旧 track 不夺走新目标的匹配；纯 IoU 会让长时遮挡后误关联。
+区分 max_stale=15 与 max_age=70
+：前者是"不画但保留轨道"的软阈值，后者是轨道生命周期上限（超了直接 DELETED）——先撤启事，再注销档案。
+ReID 不是万能
+：目标外观剧烈变化（背转面）时余弦距离兜不住，需要 max_stale 配合剔除真消失目标。
+超时降级不抛异常
+：ReIDPool.extract 超时（timeout=10）→ 整帧 features=None 走纯 IoU、失败 crop 用零向量哨兵补齐——任何一步失败都回到纯 IoU，
+主循环绝不挂死
+。
+纯 numpy 不加依赖
+：Kalman/匹配核心勿引入 torch/GPU 依赖；pytest 纯逻辑 x86 可跑，先于硬件验证。
+tuned 值复原
+：min_confidence 调参后务必恢复 0.3（可接受 0.25–0.6）；class_filter 保持 [car]。
+track_demo 无唤醒词
+：stdin 直达 engine，比 track_app 少一层语音；--list 是验证 ID 底座的核心调试开关。
+问题
+原因
+解决
+追踪 ID 跳变
+min_confidence 过低 / class_filter 扩类
+恢复 0.3 / [car] tuned 值
+长遮挡后新 ID
+无外观特征（use_reid=false）
+开启 use_reid + ReID 特征
+小目标乱画框
+min_box_w/h 过低
+用 32 像素阈值剔除噪点
+pytest 失败
+改了默认配置值
+对照 tests 断言与配置基线恢复
+🎯 数值手感
+h=100 像素时位置噪声标准差 = h/20 = 5px、速度噪声 = h/160 ≈ 0.625px/帧；新建 track 首帧速度完全未知，初值协方差放得更大（位置 2σ·h=10px、速度 10σ·h=6.25px/帧）——猜得越没底，越要等观测来教。
+10
+总结与思考
+本实验打通了追踪底座的四层机制：卡尔曼给出"运动记忆"（8 维常速预测 + 按框高缩放噪声 + 马氏门控），级联匹配给出"排队公平"（刚见过的先认），ReID 给出"衣着认人"（64×128 特征、cosine ≤0.2、历史均值抗噪），min_box/max_stale 给出"净场规则"（32 像素与 15 帧两道闸）。97 项 pytest 是行为基线，track_demo --list 是肉眼验证。产出：pytest 全绿记录、卡尔曼+级联示意图、ReID 遮挡恢复观察、调参笔记、ID 底座验证结果。
+🤔 思考题 1
+卡尔曼常速模型如何用 8 维状态 + 框高缩放噪声预测下一帧？级联匹配为什么按
+time_since_update
+从 1 到 max_age 逐层分配——如果改成"全都一起抢"会发生什么？
+🤔 思考题 2
+ReID 如何消除"单帧漏检换 ID"？为什么 extract 超时要
+降级纯 IoU 而非抛异常
+崩线程？再想想：min_box/max_stale 各剔除掉哪些目标，调低 min_confidence 为什么导致 ID 跳变？
+CASE-04 · 通用目标追踪综合项目 · EXP-04 DeepSORT 追踪底座
+8 学时 · 综合性 · 基于 object_tracking 实验讲义改编

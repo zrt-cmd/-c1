@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-01 · 需求分析（R1–R12） — 老人跌倒监护综合项目</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+:root{--theme:#059669;--theme-deep:#047857;--theme-bg:#d1fae5;--theme-bd:#a7f3d0}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit" title="返回课程首页">🧠 具身智能课程 · <i>教程首页</i></a>
+  <div class="crumb"><a href="../../../index.html#case">综合项目</a> / <a href="../index.html">老人跌倒监护</a> / EXP-01</div>
+</div>
+
+<div class="wrap">
+
+<aside class="side">
+  <h4>本页目录</h4>
+  <a href="#s1" class="now">01 问题引入：居家跌倒为什么必须"先问后救"</a>
+  <a href="#s2">02 原理通俗讲解：R1–R12 像一份"养老服务合同"</a>
+  <a href="#s3">03 关联知识点：需求条目 ⇄ 系统模块映射</a>
+  <a href="#s4">04 实验目标</a>
+  <a href="#s5">05 实验环境与准备</a>
+  <a href="#s6">06 动画讲解：需求全景与三条核心时序</a>
+  <a href="#s7">07 互动讲解：R5 与 R6 分流自查台</a>
+  <a href="#s8">08 实操步骤：精读 docs/01 并做覆盖核对</a>
+  <a href="#s9">09 重点与易错点</a>
+  <a href="#s10">10 总结与思考</a>
+  <h4>CH1 · 需求与配置</h4>
+  <a href="../exp-01-requirements/index.html">EXP-01 需求分析</a>
+  <a href="../exp-02-architecture/index.html">EXP-02 分层架构</a>
+  <a href="../exp-03-config/index.html">EXP-03 配置详解</a>
+  <h4>CH2 · 感知与交互</h4>
+  <a href="../exp-04-voice/index.html">EXP-04 语音交互</a>
+  <a href="../exp-05-pose-detection/index.html">EXP-05 检测与姿态</a>
+  <a href="../exp-06-fall-judgment/index.html">EXP-06 跌倒状态机</a>
+  <h4>CH3 · 告警与验证</h4>
+  <a href="../exp-07-alert-evidence/index.html">EXP-07 告警证据链</a>
+  <a href="../exp-08-llm-vlm/index.html">EXP-08 LLM·VLM</a>
+  <a href="../exp-09-full-verification/index.html">EXP-09 全功能验证</a>
+</aside>
+
+<main class="content">
+
+<div class="exp-head">
+  <span class="code">EXP-01 · 第 1 章 · 验证性 · 4 学时</span>
+  <h1>需求分析：从居家场景到 R1–R12</h1>
+  <p class="desc">写代码之前先把"合同"签好。本实验从老人居家跌倒监护的真实场景出发，把系统职责拆成 <b>R1–R12 十二条可验收需求</b>，按输入 / 检测 / 判定 / 交互 / 告警 / 证据 / 调试七个维度分组，画出<b>跌倒检测、语音询问、告警存档</b>三条核心时序，并明确"先问后救"设计背后的六大时序防护 —— 后面八个实验的每一段代码都能回溯到这里。</p>
+  <div class="meta">
+    <span class="tag hl">难度 ⭐ · 4 学时</span>
+    <span class="tag">需求工程</span><span class="tag">R1-R12</span>
+    <span class="tag">三条核心时序</span><span class="tag">六时序防护</span>
+  </div>
+</div>
+
+<!-- 01 -->
+<section class="blk" id="s1">
+  <h2><span class="no">01</span>问题引入：居家跌倒为什么必须"先问后救"</h2>
+  <p>我国独居与空巢老人数量庞大，跌倒是老年人伤害致死的首因之一。<b>跌倒后能否在黄金时间被发现</b>，决定了预后好坏 —— 但如果系统"一惊一乍"，误报几次之后就会被家属直接拔电。一个真实的监护系统要同时满足：</p>
+  <div class="flow">
+    <div class="step"><span class="n">1</span><b>看得见</b>：持续接入摄像头视频流，检测并跟踪画面中的老人（R1–R3）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span><b>判得准</b>：用躯干角、宽高比等几何特征判定跌倒，而不是单帧"看着像"（R4）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span><b>先问后救</b>：跌倒确认后先温和询问，老人应答"没事"则取消，沉默或呼救才升级告警（R5、R6）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span><b>报得出、查得到</b>：告警可靠送达下位机，且全过程留证可回溯（R7、R8、R11）</div>
+  </div>
+  <div class="tip amber"><span class="lab">💡 为什么"先问后救"是需求而不是实现细节</span>卧床翻身、弯腰捡东西、坐下躺下都"形似跌倒"。<b>先询问、给老人一个亲口取消的机会</b>，是对老人自主权的尊重，也是把误报率压到可接受水平的唯一路径 —— 所以它必须写进需求（R5），而不是留给算法碰运气。</div>
+</section>
+
+<!-- 02 -->
+<section class="blk" id="s2">
+  <h2><span class="no">02</span>原理通俗讲解：R1–R12 像一份"养老服务合同"</h2>
+  <p>把需求想象成家政服务合同的条款：<b>每一条都能验收</b> —— 做到了就是做到了，没做到就是没做到，不能含糊。十二条规定七个维度：</p>
+  <table>
+    <thead><tr><th>维度</th><th>需求编号</th><th>通俗理解（合同条款）</th></tr></thead>
+    <tbody>
+      <tr><td>输入</td><td>R1</td><td>"眼睛"：持续接收摄像头视频流</td></tr>
+      <tr><td>检测</td><td>R2、R3</td><td>"认出人"：框出画面里的老人并持续跟踪，多人不跟丢</td></tr>
+      <tr><td>判定</td><td>R4</td><td>"下判断"：躯干角 &gt; 50°、宽高比 &lt; 0.5 等几何特征判定跌倒姿态</td></tr>
+      <tr><td>交互</td><td>R5、R6、R9、R10</td><td>"搭句话"：跌倒后先语音询问（R5）；未跌倒但听到呼救直接告警（R6）；播报与聆听的窗口管理（R9、R10）</td></tr>
+      <tr><td>告警</td><td>R7、R8</td><td>"叫人来"：向串口/下位机发告警，触发灯光、蜂鸣等现场提醒</td></tr>
+      <tr><td>证据</td><td>R11</td><td>"留凭据"：告警前后视频、图片与事件日志落盘，事后可查</td></tr>
+      <tr><td>调试</td><td>R12</td><td>"可彩排"：<code>--text</code> 文本通道驱动同一台状态机，无摄像头/无麦克风也能回归测试</td></tr>
+    </tbody>
+  </table>
+  <div class="tip tealb"><span class="lab">🔔 R5 vs R6：两条独立的告警路径</span>R5 是"<b>跌倒 → 确认 → 询问 → 升级/取消</b>"的完整确认流；R6 是"<b>没跌倒但喊'救命'</b>"的直通流 —— 人还清醒、能呼救，本身就意味着情况危急，不该再等 12 秒确认。<b>两条路径互不依赖</b>，混为一谈是需求分析最常见的错。</div>
+</section>
+
+<!-- 03 -->
+<section class="blk" id="s3">
+  <h2><span class="no">03</span>关联知识点：需求条目 ⇄ 系统模块映射</h2>
+  <p>本课程的分层架构（EXP-02）不是凭空画的，每一层都"认领"了若干需求：</p>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">感知层</div><div class="kt">承接 R1–R4</div><p>视频流接入、YOLOv8 人体检测、BlazePose/RTMPose 姿态估计、躯干角与宽高比几何计算 —— 判定的全部原料在这里产出。</p></div>
+    <div class="kcard"><div class="kd">决策层</div><div class="kt">承接 R4–R6、R9、R10</div><p>六状态机 IDLE→FALLING→LYING→ASK→ALERT/CANCELLED 把几何特征翻译成"要不要问、要不要报"的时序决策。</p></div>
+    <div class="kcard"><div class="kd">交互层</div><div class="kt">承接 R5、R6、R9、R10</div><p>TTS 播报"您还好吗"、ASR 聆听确认词（救命/帮/疼/起不来）与取消词（没事/不用），12s 超时升级。</p></div>
+    <div class="kcard"><div class="kd">输出层</div><div class="kt">承接 R7、R8、R11</div><p>0xAA55 + CRC8 串口告警帧驱动 LED/蜂鸣器/OLED，证据链落盘三件套与 events.jsonl。</p></div>
+    <div class="kcard"><div class="kd">调试通道</div><div class="kt">承接 R12</div><p><code>--text</code> 文本输入直接喂进 voice_loop —— "小飞小飞"相当于唤醒、"救命"相当于呼救、"没事"相当于取消，与音频通道<b>同一台状态机</b>。</p></div>
+    <div class="kcard"><div class="kd">明确不做</div><div class="kt">非目标（docs/01）</div><p>不做 ROS 业务节点、不做多人会话仲裁 —— 需求文档同样规定"什么不做什么"，防止范围蔓延。</p></div>
+  </div>
+</section>
+
+<!-- 04 -->
+<section class="blk" id="s4">
+  <h2><span class="no">04</span>实验目标</h2>
+  <ul class="check">
+    <li>能复述并按七个维度默写 <span class="ok">R1–R12</span> 十二条需求，说清每条的验收标准</li>
+    <li>能准确区分 <span class="ok">R5（跌倒后询问）</span> 与 <span class="ok">R6（呼救直告警）</span> 两条独立路径</li>
+    <li>能画出<span class="ok">跌倒检测、语音询问、告警存档</span>三条核心时序的关键节点（含 1.5s / 3.0s / 12s 时间参数）</li>
+    <li>能说出六大时序防护各自的"防的是什么"（播报竞态、迟到回复、重复询问……）</li>
+    <li>完成 docs/01 需求文档的覆盖核对：<span class="ok">每条 R 编号都能指到对应模块与代码位置</span></li>
+  </ul>
+</section>
+
+<!-- 05 -->
+<section class="blk" id="s5">
+  <h2><span class="no">05</span>实验环境与准备</h2>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>硬件到位：深度摄像头 + XFM 六麦阵列 + 工控主机（详见课程总览；本实验以文档精读为主，硬件仅需在场）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>进入工程目录：<code>~/ros2_ws/src/xflz_eai_car1/app/elderly_companion</code>，确认 <code>docs/01</code> 需求文档存在</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>备好纸笔或绘图工具：三条核心时序要求<b>手绘一遍</b>，画过才算数</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span>预习 config/fall_config.yaml 的 state 段默认值：angle_thr 50.0 / aspect_thr 0.5 / falling_window 1.5 / lying_time 3.0 / ask_timeout 12.0 / cooldown 60.0（EXP-03 细讲）</div>
+  </div>
+  <div class="tip"><span class="lab">💡 伦理准备</span>本项目处理的是老人的<b>视频与语音</b>：讨论需求时就要确立"数据只留告警证据、不作他用、验证用素材不带真实身份"的隐私意识。</div>
+</section>
+
+<!-- 06 -->
+<section class="blk" id="s6">
+  <h2><span class="no">06</span>动画讲解：需求全景与三条核心时序</h2>
+  <p class="lead">上半幅是 R1–R12 的七维全景（高亮块循环点亮各维度），下半幅是"跌倒检测 → 语音询问 → 告警存档"三段时序的推进动画：</p>
+  <div class="anim-box">
+    <svg viewBox="0 0 720 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="R1-R12 需求七维全景与三条核心时序动画">
+      <rect x="8" y="8" width="704" height="150" rx="12" fill="#111827" stroke="#334155"/>
+      <text x="360" y="32" text-anchor="middle" font-size="13.5" font-weight="700" fill="#6ee7b7">R1–R12 · 七维需求全景</text>
+      <g font-size="11.5" text-anchor="middle" font-family="sans-serif">
+        <g><rect x="28" y="52" width="88" height="42" rx="9" fill="#1e293b" stroke="#059669" stroke-width="1.6"><animate attributeName="stroke-width" values="1.6;3;1.6" dur="4.9s" repeatCount="indefinite"/></rect><text x="72" y="70" fill="#cbd5e1">输入 R1</text><text x="72" y="86" fill="#64748b" font-size="10">视频流</text></g>
+        <g><rect x="124" y="52" width="88" height="42" rx="9" fill="#1e293b" stroke="#2563eb" stroke-width="1.6"><animate attributeName="stroke-width" values="1.6;3;1.6" dur="4.9s" begin="0.7s" repeatCount="indefinite"/></rect><text x="168" y="70" fill="#cbd5e1">检测 R2·R3</text><text x="168" y="86" fill="#64748b" font-size="10">框人·跟踪</text></g>
+        <g><rect x="220" y="52" width="88" height="42" rx="9" fill="#1e293b" stroke="#d97706" stroke-width="1.6"><animate attributeName="stroke-width" values="1.6;3;1.6" dur="4.9s" begin="1.4s" repeatCount="indefinite"/></rect><text x="264" y="70" fill="#cbd5e1">判定 R4</text><text x="264" y="86" fill="#64748b" font-size="10">躯干角·宽高比</text></g>
+        <g><rect x="316" y="52" width="88" height="42" rx="9" fill="#1e293b" stroke="#7c3aed" stroke-width="1.6"><animate attributeName="stroke-width" values="1.6;3;1.6" dur="4.9s" begin="2.1s" repeatCount="indefinite"/></rect><text x="360" y="70" fill="#cbd5e1">交互 R5·6·9·10</text><text x="360" y="86" fill="#64748b" font-size="10">询问·聆听·播报</text></g>
+        <g><rect x="412" y="52" width="88" height="42" rx="9" fill="#1e293b" stroke="#e11d48" stroke-width="1.6"><animate attributeName="stroke-width" values="1.6;3;1.6" dur="4.9s" begin="2.8s" repeatCount="indefinite"/></rect><text x="456" y="70" fill="#cbd5e1">告警 R7·R8</text><text x="456" y="86" fill="#64748b" font-size="10">串口·现场提醒</text></g>
+        <g><rect x="508" y="52" width="88" height="42" rx="9" fill="#1e293b" stroke="#0891b2" stroke-width="1.6"><animate attributeName="stroke-width" values="1.6;3;1.6" dur="4.9s" begin="3.5s" repeatCount="indefinite"/></rect><text x="552" y="70" fill="#cbd5e1">证据 R11</text><text x="552" y="86" fill="#64748b" font-size="10">三件套·日志</text></g>
+        <g><rect x="604" y="52" width="88" height="42" rx="9" fill="#1e293b" stroke="#a78bfa" stroke-width="1.6"><animate attributeName="stroke-width" values="1.6;3;1.6" dur="4.9s" begin="4.2s" repeatCount="indefinite"/></rect><text x="648" y="70" fill="#cbd5e1">调试 R12</text><text x="648" y="86" fill="#64748b" font-size="10">--text 回归</text></g>
+      </g>
+      <g stroke="#475569" stroke-width="1.4" stroke-dasharray="5 5">
+        <line x1="72" y1="104" x2="72" y2="128"><animate attributeName="stroke-dashoffset" values="0;-20" dur="1.2s" repeatCount="indefinite"/></line>
+        <line x1="552" y1="104" x2="552" y2="128"><animate attributeName="stroke-dashoffset" values="0;-20" dur="1.2s" repeatCount="indefinite"/></line>
+      </g>
+      <text x="360" y="146" text-anchor="middle" font-size="11" fill="#64748b">感知 → 决策 → 交互 → 告警 → 留证 · 每层认领对应需求</text>
+
+      <rect x="8" y="172" width="704" height="160" rx="12" fill="#111827" stroke="#334155"/>
+      <text x="360" y="196" text-anchor="middle" font-size="13.5" font-weight="700" fill="#93c5fd">三条核心时序 · 报文推进</text>
+      <g font-size="11" font-family="sans-serif">
+        <g>
+          <rect x="28" y="212" width="104" height="34" rx="8" fill="#1e293b" stroke="#64748b"/><text x="80" y="233" text-anchor="middle" fill="#cbd5e1">帧流入</text>
+          <line x1="132" y1="229" x2="196" y2="229" stroke="#475569" stroke-width="2" stroke-dasharray="6 5"><animate attributeName="stroke-dashoffset" values="0;-22" dur="1.1s" repeatCount="indefinite"/></line>
+          <rect x="196" y="212" width="118" height="34" rx="8" fill="#1e293b" stroke="#d97706"/><text x="255" y="233" text-anchor="middle" fill="#fde68a">1.5s 跌倒窗口</text>
+          <line x1="314" y1="229" x2="378" y2="229" stroke="#475569" stroke-width="2" stroke-dasharray="6 5"><animate attributeName="stroke-dashoffset" values="0;-22" dur="1.1s" begin=".4s" repeatCount="indefinite"/></line>
+          <rect x="378" y="212" width="118" height="34" rx="8" fill="#1e293b" stroke="#d97706"/><text x="437" y="233" text-anchor="middle" fill="#fde68a">3.0s 躺姿确认</text>
+          <line x1="496" y1="229" x2="560" y2="229" stroke="#475569" stroke-width="2" stroke-dasharray="6 5"><animate attributeName="stroke-dashoffset" values="0;-22" dur="1.1s" begin=".8s" repeatCount="indefinite"/></line>
+          <rect x="560" y="212" width="130" height="34" rx="8" fill="#1e293b" stroke="#059669"/><text x="625" y="233" text-anchor="middle" fill="#6ee7b7">① 跌倒检测时序</text>
+        </g>
+        <g>
+          <rect x="28" y="258" width="118" height="34" rx="8" fill="#1e293b" stroke="#7c3aed"/><text x="87" y="279" text-anchor="middle" fill="#c4b5fd">TTS 您还好吗</text>
+          <line x1="146" y1="275" x2="210" y2="275" stroke="#475569" stroke-width="2" stroke-dasharray="6 5"><animate attributeName="stroke-dashoffset" values="0;-22" dur="1.1s" begin=".2s" repeatCount="indefinite"/></line>
+          <rect x="210" y="258" width="122" height="34" rx="8" fill="#1e293b" stroke="#7c3aed"/><text x="271" y="279" text-anchor="middle" fill="#c4b5fd">ASR 聆听 12s</text>
+          <line x1="332" y1="275" x2="396" y2="275" stroke="#475569" stroke-width="2" stroke-dasharray="6 5"><animate attributeName="stroke-dashoffset" values="0;-22" dur="1.1s" begin=".6s" repeatCount="indefinite"/></line>
+          <g opacity="0"><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.3;.7;1" dur="6s" repeatCount="indefinite"/><rect x="396" y="258" width="150" height="34" rx="8" fill="#1e293b" stroke="#f87171"/><text x="471" y="279" text-anchor="middle" fill="#fca5a5">救命→ALERT / 没事→取消</text></g>
+          <rect x="560" y="258" width="130" height="34" rx="8" fill="#1e293b" stroke="#818cf8"/><text x="625" y="279" text-anchor="middle" fill="#a5b4fc">② 语音询问时序</text>
+        </g>
+        <g>
+          <rect x="28" y="304" width="130" height="22" rx="7" fill="#1e293b" stroke="#e11d48"/><text x="93" y="319" text-anchor="middle" fill="#fda4af" font-size="10.5">0xAA55+CRC8 告警帧</text>
+          <line x1="158" y1="315" x2="222" y2="315" stroke="#475569" stroke-width="2" stroke-dasharray="6 5"><animate attributeName="stroke-dashoffset" values="0;-22" dur="1.1s" begin="1s" repeatCount="indefinite"/></line>
+          <rect x="222" y="304" width="146" height="22" rx="7" fill="#1e293b" stroke="#0891b2"/><text x="295" y="319" text-anchor="middle" fill="#67e8f9" font-size="10.5">三件套 jpg/avi + jsonl</text>
+          <line x1="368" y1="315" x2="432" y2="315" stroke="#475569" stroke-width="2" stroke-dasharray="6 5"><animate attributeName="stroke-dashoffset" values="0;-22" dur="1.1s" begin="1.3s" repeatCount="indefinite"/></line>
+          <rect x="432" y="304" width="118" height="22" rx="7" fill="#1e293b" stroke="#4ade80"/><text x="491" y="319" text-anchor="middle" fill="#86efac" font-size="10.5">cooldown 60s</text>
+          <rect x="560" y="304" width="130" height="22" rx="7" fill="#1e293b" stroke="#34d399"/><text x="625" y="319" text-anchor="middle" fill="#6ee7b7" font-size="10.5">③ 告警存档时序</text>
+        </g>
+      </g>
+    </svg>
+  </div>
+  <div class="anim-cap">动画 1-1｜上：七个维度依次点亮，十二条规定各归其位；下：三条核心时序的关键节拍（1.5s → 3.0s → 12s → 60s）循环推进</div>
+</section>
+
+<!-- 07 -->
+<section class="blk" id="s7">
+  <h2><span class="no">07</span>互动讲解：R5 与 R6 分流自查台</h2>
+  <p class="lead">选一个场景，看系统按哪条需求、走哪条路径决策：</p>
+  <div class="ix-panel">
+    <div class="ix-title">需求分流自查台 · R5 / R6 Router</div>
+    <div class="ctl-row">
+      <button class="btn" onclick="scenFallAnswer()">🩺 跌倒后答"救命"</button>
+      <button class="btn ghost" onclick="scenSilent()">😶 跌倒后 12s 沉默</button>
+      <button class="btn ghost" onclick="scenCancel()">🙂 跌倒后答"没事"</button>
+      <button class="btn ghost" onclick="scenCry()">📢 没跌倒但喊救命</button>
+      <button class="btn ghost" onclick="resetScen()">↺ 复位</button>
+    </div>
+    <div class="io" id="routeIo"><span class="dim">// 选择一个场景，观察 R5 / R6 两条路径的决策差异</span>
+<span class="ok">R5 路径：跌倒 → 确认(1.5s+3.0s) → 询问 → 答复判定 → 升级/取消</span>
+<span class="warn">R6 路径：呼救关键词命中 → 不经确认直接告警</span></div>
+  </div>
+  <div class="tip violet"><span class="lab">🙋 人文视角</span>询问窗口给了老人"<b>我没事，别麻烦别人</b>"的机会 —— 对健康老人而言，被反复误报的骚扰本身就是一种伤害。需求里保留 R5，本质是保留老人说"不"的权利。</div>
+</section>
+
+<!-- 08 -->
+<section class="blk" id="s8">
+  <h2><span class="no">08</span>实操步骤：精读 docs/01 并做覆盖核对</h2>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>进入工程目录，确认需求文档与配置文件就位</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>通读 docs/01：逐条摘出 R1–R12，按七维分组做成核对表（本页第 02 节表格可作底稿）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>画三条核心时序：务必标出 1.5s 跌倒窗口、3.0s 躺姿确认、12s 询问超时三个时间参数</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span>对照"明确不做"清单（不做 ROS 业务节点、不做多人会话仲裁），给需求表加上边界列</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">5</span>预读 config/fall_config.yaml 的 state 段，把需求中的时间参数与配置键一一对应</div>
+  </div>
+  <pre><span class="c"># ① 进入工程目录</span>
+<span class="g">cd</span> ~/ros2_ws/src/xflz_eai_car1/app/elderly_companion
+
+<span class="c"># ② 确认需求文档与配置存在（后续实验反复用到）</span>
+<span class="g">ls</span> docs/ config/fall_config.yaml
+
+<span class="c"># ③ state 段关键默认值 —— 三条核心时序的时间参数来源（config L57-L62 附近）</span>
+<span class="c">#   angle_thresh: 50.0      躯干角阈值（度）   → 判定需求 R4</span>
+<span class="c">#   aspect_thresh: 0.5      宽高比阈值        → 判定需求 R4</span>
+<span class="c">#   falling_window: 1.5     跌倒窗口（秒）     → 检测确认时序</span>
+<span class="c">#   lying_time: 3.0         躺姿持续（秒）     → 确认后才询问</span>
+<span class="c">#   ask_timeout: 12.0       询问超时（秒）     → 超时升级告警 R5</span>
+<span class="c">#   cooldown: 60.0          告警冷却（秒）     → 防重复轰炸</span></pre>
+  <div class="tip tealb"><span class="lab">🔍 覆盖核对法</span>核对表画两列：<b>左列 R 编号、右列代码/配置位置</b>。右列填不出来的 R，就是后面实验要重点盯的"悬空需求"；左列有剩余代码找不到归属，就是范围蔓延。</div>
+</section>
+
+<!-- 09 -->
+<section class="blk" id="s9">
+  <h2><span class="no">09</span>重点与易错点</h2>
+  <ul class="check">
+    <li>R5 与 R6 是<span class="ok">两条独立路径</span>：R5 需要"跌倒确认"前置，R6 只要呼救关键词即告警</li>
+    <li>三条时序必须包含<span class="ok">1.5s / 3.0s / 12s</span> 三个时间参数，缺了就不是本系统的时序</li>
+    <li>六时序防护逐条能说出"防什么"：<span class="ok">播报竞态、ASR 无 partial 兜底、2s 快答强制提交、打断 epoch 丢弃迟到回复、单次应答去重、8s 静默重播归位</span></li>
+    <li>需求有"边界"：<span class="ok">不做 ROS 业务节点、不做多人会话仲裁</span>同样是需求的一部分</li>
+  </ul>
+  <table>
+    <thead><tr><th>⚠️ 常见坑</th><th>现象 → 解法</th></tr></thead>
+    <tbody>
+      <tr><td>R5 / R6 混淆</td><td>把"呼救直告警"也画进询问确认链 → R6 不经 ASK 确认流，单独成支</td></tr>
+      <tr><td>时序漏时间参数</td><td>流程图画了"确认后询问"但没写 1.5s / 3.0s → 验收无法判定"确认"是否达标</td></tr>
+      <tr><td>把实现细节当需求</td><td>需求里出现"用某个模型" → 需求写"检测画面中的人"，模型选型属于设计（EXP-02/05）</td></tr>
+      <tr><td>忽略非目标</td><td>自由发挥出多人仲裁功能 → 先查"明确不做"清单，防止范围蔓延</td></tr>
+      <tr><td>需求无验收标准</td><td>"系统要稳定"没法测 → 每条 R 必须能指出可观察的验收动作</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 10 -->
+<section class="blk" id="s10">
+  <h2><span class="no">10</span>总结与思考</h2>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">✅ 完成成果</div><div class="kt">R1–R12 七维核对表</div><p>十二条规定、七维分组、三条核心时序手绘图与非目标边界清单。</p></div>
+    <div class="kcard"><div class="kd">🧠 原理收获</div><div class="kt">先问后救 + 六时序防护</div><p>理解为什么"确认升级"是伦理需求而非算法妥协，以及六道时序防线各防什么。</p></div>
+    <div class="kcard"><div class="kd">🛠 技能收获</div><div class="kt">覆盖核对方法</div><p>"左列需求、右列代码"的双向核对法，后续每个实验都复用。</p></div>
+    <div class="kcard"><div class="kd">❓ 排障思路</div><div class="kt">从行为反查需求</div><p>现场发现怪行为，先问"违反了哪条 R"，再决定改需求还是改实现。</p></div>
+  </div>
+  <div class="tip violet"><span class="lab">📝 思考题 1</span>R6 规定"没跌倒但呼救 → 直接告警"。如果老人在说梦话或电视里有人喊"救命"，会造成误告警 —— 在<b>不改 R6 语义</b>的前提下，你会在后续哪个实验（EXP-04 语音？EXP-06 状态机？EXP-08 LLM 语义判断？）加防线？说明理由。</div>
+  <div class="tip violet"><span class="lab">📝 思考题 2</span>cooldown 60s 意味着：一次告警后的 60 秒内，询问升级被抑制但<b>新跌倒不被阻挡</span>。请设计一个场景（老人摔倒 → 被扶起 → 再次摔倒），说明六状态机在这 60 秒内应如何表现才算满足 R5？把你的答案带到 EXP-06 验证。</div>
+</section>
+
+<nav class="expnav">
+  <a href="../index.html"><span class="lb">← 返回</span>课程目录 · 老人跌倒监护</a>
+  <a class="next" href="../exp-02-architecture/index.html"><span class="lb">下一个实验 →</span>EXP-02 分层系统架构</a>
+</nav>
+
+<footer>
+  <span>CASE-03 · 老人跌倒监护 · EXP-01 需求分析（R1–R12）</span>
+  <span>4 学时 · 验证性 · 基于 elderly_companion 实验讲义改编</span>
+</footer>
+
+</main>
+</div>
+
+<script>
+// R5 / R6 分流自查台
+var baseIo='<span class="dim">// 选择一个场景，观察 R5 / R6 两条路径的决策差异</span>\n'+
+'<span class="ok">R5 路径：跌倒 → 确认(1.5s+3.0s) → 询问 → 答复判定 → 升级/取消</span>\n'+
+'<span class="warn">R6 路径：呼救关键词命中 → 不经确认直接告警</span>';
+function setIo(t){document.getElementById('routeIo').innerHTML=t;}
+function scenFallAnswer(){
+  setIo('<span class="dim">// 场景：六状态机已进入 ASK（跌倒确认完成）</span>\n'+
+'<span class="ok">✔ 播报"您还好吗" → 开启聆听窗口（ask_timeout 12.0s）</span>\n'+
+'<span class="ok">✔ ASR 命中 confirm_words：救命 / 帮 / 疼 / 起不来</span>\n'+
+'<span class="bad">→ 走 R5 升级分支：立即进入 ALERT，触发告警与证据落盘</span>\n'+
+'<span class="dim">依据：R5 · 交互维度 —— 跌倒确认后的应答升级</span>');
+}
+function scenSilent(){
+  setIo('<span class="dim">// 场景：跌倒确认完成，询问后无应答</span>\n'+
+'<span class="ok">✔ TTS 播报完成 → 聆听窗口开启</span>\n'+
+'<span class="warn">⚠ 12.0s 内始终无有效 partial（老人可能昏迷或无法动弹）</span>\n'+
+'<span class="bad">→ 走 R5 超时分支：沉默即升级，进入 ALERT 告警</span>\n'+
+'<span class="dim">依据：R5 —— 问了没答，按最坏情况处理，宁可扰民不可漏救</span>');
+}
+function scenCancel(){
+  setIo('<span class="dim">// 场景：跌倒确认完成，老人应答</span>\n'+
+'<span class="ok">✔ ASR 命中 cancel_words：没事 / 不用</span>\n'+
+'<span class="ok">→ 走 R5 取消分支：CANCELLED，不告警、不留告警证据</span>\n'+
+'<span class="warn">⚠ 进入 cooldown 60.0s：期间不再重复询问（防轰炸），但新跌倒仍受理</span>\n'+
+'<span class="dim">依据：R5 —— 尊重老人"我没事"的自主表达</span>');
+}
+function scenCry(){
+  setIo('<span class="dim">// 场景：状态机处于 IDLE，几何判据未触发跌倒</span>\n'+
+'<span class="ok">✔ 语音链路识别到呼救关键词（救命）—— 不需要跌倒确认</span>\n'+
+'<span class="bad">→ 走 R6 独立路径：不经 1.5s/3.0s 确认、不经 12s 询问，直接告警</span>\n'+
+'<span class="dim">依据：R6 —— 能呼救说明人清醒且处境危急，时间比确认更宝贵</span>');
+}
+function resetScen(){setIo(baseIo);}
+</script>
+<script src="../shared/tutorial.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-04 · 真机推理与分拣复现 | IND-03 物料分拣应用场景</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+  :root{
+    --theme:#d97706;
+    --theme-deep:#b45309;
+    --theme-bg:#fffbeb;
+    --theme-bd:#fde68a;
+  }
+  figure.shot{margin:18px 0;border:1px solid var(--theme-bd);border-radius:12px;overflow:hidden;background:#fff}
+  figure.shot img{display:block;width:100%;height:auto}
+  figure.shot figcaption{padding:10px 14px;font-size:13px;color:#92400e;background:var(--theme-bg);border-top:1px solid var(--theme-bd)}
+  .img-block{margin:14px 0;text-align:center}
+  .img-block img{max-width:100%;border-radius:10px;border:1px solid var(--theme-bd);box-shadow:0 4px 12px rgba(217,119,6,.12)}
+  .img-block figcaption{font-size:12.5px;color:#92400e;margin-top:6px}
+/* ── 五星学习法 · 课程分段 ── */
+.fivestar-note{font-size:13px;color:#5b6b78;margin-top:12px}
+.fs-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:14px}
+.fs-cell{border:1px solid var(--theme-bd);border-radius:12px;padding:10px 8px;text-align:center;background:var(--theme-bg)}
+.fs-cell .st{font-size:12.5px;font-weight:800;color:var(--theme-deep)}
+.fs-cell .tm{font-family:var(--font-mono,monospace);font-size:11px;color:#0f766e;margin-top:3px;font-weight:700}
+.fs-cell .ds{font-size:11.5px;color:#5b6b78;margin-top:4px;line-height:1.5}
+.seg{display:inline-block;font-size:11px;font-weight:700;font-family:var(--font-mono,monospace);background:var(--theme-bg);color:var(--theme-deep);border:1px solid var(--theme-bd);border-radius:99px;padding:2px 10px;margin-left:8px;vertical-align:middle;white-space:nowrap}
+.tl{width:100%;border-collapse:collapse;font-size:13px;margin-top:14px;background:#fff}
+.tl th,.tl td{border:1px solid #e2ece9;padding:7px 10px;text-align:left;vertical-align:top}
+.tl th{background:var(--theme-bg);color:var(--theme-deep);font-size:12.5px;white-space:nowrap}
+.tl .m{font-family:var(--font-mono,monospace);color:var(--theme-deep);font-weight:700;white-space:nowrap}
+@media(max-width:900px){.fs-grid{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="bar-in">
+    <a class="logo" href="../../../index.html"><b>课程</b>工厂</a>
+    <nav class="crumb"><a href="../../../index.html#ind">总首页</a> / <a href="../index.html">IND-03 物料分拣</a> / EXP-04</nav>
+  </div>
+</header>
+
+<div class="wrap">
+  <aside class="side">
+    <h4>本页目录 · 五星学习法</h4>
+    <a href="#s0">00 课程节奏 · 8 段微课</a>
+    <a href="#s1" class="now">01 学习目标 ①聚焦问题</a>
+    <a href="#s2">02 原理 ①聚焦 ②激活</a>
+    <a href="#s3">03 硬件与材料 ③示证新知</a>
+    <a href="#s4">04 操作步骤 ④应用新知</a>
+    <a href="#s5">05 关键命令 ④应用新知</a>
+    <a href="#s6">06 动画 ③示证新知</a>
+    <a href="#s7">07 互动 ④应用新知</a>
+    <a href="#s8">08 常见问题 ⑤融会贯通</a>
+    <a href="#s9">09 拓展 ⑤融会贯通</a>
+    <a href="#s10">10 思考题 ⑤融会贯通</a>
+    <h4>兄弟实验</h4>
+    <a href="../exp-01-case-overview/index.html">EXP-01 成果演示</a>
+    <a href="../exp-02-teleop-collection/index.html">EXP-02 遥操作采集</a>
+    <a href="../exp-03-data-training/index.html">EXP-03 转换与训练</a>
+  </aside>
+
+  <main class="content">
+    <div class="exp-head">
+      <div class="code">EXP-04 · 8 学时</div>
+      <h1>真机推理与分拣复现</h1>
+      <p class="desc">加载训练好的 checkpoint，三终端拉起 ROS2 推理节点，50Hz 决策 100Hz 执行，让双臂在真实桌面复现「左黑右银、各归各格」的自主分拣。</p>
+      <div class="meta"><span class="tag hl">ROS2 推理</span><span class="tag">DRY_RUN 安全</span><span class="tag">案例复盘</span></div>
+    </div>
+
+    <!-- 00 -->
+    <section class="blk" id="s0">
+      <h2><span class="no">00</span>课程节奏：五星学习法 · 8 段微课（每段 ≤ 15 min）</h2>
+      <p>本实验按<b>五星学习法</b>组织：先抛出"开闸猛跳/放错格"的推理翻车现场<b>聚焦问题</b>，再用反射弧与新手手动挡<b>激活旧知</b>，接着对照硬件实物与感知-决策-执行闭环动画<b>示证新知</b>，然后动手三终端启动并练推理控制台<b>应用新知</b>，最后借常见问题与思考题<b>融会贯通</b>。全程切成 <b>8 段微课、每段不超过 15 分钟</b>，段间停顿 1~2 分钟消化；纯讲授合计约 100 分钟，其余课时用于动手实操与个别辅导。</p>
+      <div class="fs-grid">
+        <div class="fs-cell"><div class="st">① 聚焦问题</div><div class="tm">课段 1 · 12 min</div><div class="ds">"开闸猛跳/放错格"推理翻车现场</div></div>
+        <div class="fs-cell"><div class="st">② 激活旧知</div><div class="tm">课段 2 · 8 min</div><div class="ds">反射弧·新手手动挡·缓抬离合</div></div>
+        <div class="fs-cell"><div class="st">③ 示证新知</div><div class="tm">课段 3~4 · 27 min</div><div class="ds">本体/checkpoint/场景 + 感知决策执行闭环动画</div></div>
+        <div class="fs-cell"><div class="st">④ 应用新知</div><div class="tm">课段 5~7 · 40 min</div><div class="ds">三终端启动·关键命令·推理控制台</div></div>
+        <div class="fs-cell"><div class="st">⑤ 融会贯通</div><div class="tm">课段 8 · 13 min</div><div class="ds">排障收口·拓展·思考题拔高</div></div>
+      </div>
+      <table class="tl">
+        <tr><th>课段</th><th>五星阶段</th><th>时长</th><th>对应章节</th><th>本段任务</th></tr>
+        <tr><td class="m">课段 1</td><td>聚焦问题</td><td class="m">12 min</td><td>§01 + §02 前半</td><td>抛出"开闸猛跳/放错格"推理翻车，明确本课目标</td></tr>
+        <tr><td class="m">课段 2</td><td>激活旧知</td><td class="m">8 min</td><td>§02 后半</td><td>用反射弧/新手手动挡激活闭环与平滑旧知</td></tr>
+        <tr><td class="m">课段 3</td><td>示证新知</td><td class="m">15 min</td><td>§03</td><td>对照实物认识本体/checkpoint/复现场景与安全设备</td></tr>
+        <tr><td class="m">课段 4</td><td>示证新知</td><td class="m">12 min</td><td>§06</td><td>看感知-决策-执行闭环动画，理解反馈与闭环</td></tr>
+        <tr><td class="m">课段 5</td><td>应用新知</td><td class="m">15 min</td><td>§04 前半 + §05 ①②</td><td>配置检查→三终端拉起，对应配置与启动命令</td></tr>
+        <tr><td class="m">课段 6</td><td>应用新知</td><td class="m">15 min</td><td>§04 后半 + §05 ③</td><td>空跑→开闸→复盘评估，对应推理控制命令</td></tr>
+        <tr><td class="m">课段 7</td><td>应用新知</td><td class="m">10 min</td><td>§07</td><td>推理控制台模拟器，练 DRY_RUN 与开闸顺序</td></tr>
+        <tr><td class="m">课段 8</td><td>融会贯通</td><td class="m">13 min</td><td>§08~§10</td><td>排障收口，拓展与思考题拔高迁移</td></tr>
+      </table>
+      <p class="fivestar-note">讲课提示：课段 1/2 以讲授 + 提问为主；课段 3~4 用实物 + 动画；课段 5~6 边看视频边动手；课段 7 学员独立完成；课段 8 答疑拔高。段间停顿 1~2 分钟。</p>
+    </section>
+
+    <!-- 01 学习目标 -->
+    <section class="blk" id="s1">
+      <h2><span class="no">01</span>学习目标<span class="seg">课段 1 · 聚焦问题 · 12 min</span></h2>
+      <ul class="check">
+        <li>读懂推理节点架构：三路相机 + 16 维关节状态 → 预处理 → ACT select_action → 后处理平滑 → 发布。</li>
+        <li>掌握 DRY_RUN 仿真验证与 ramp 起点准备，理解三层平滑如何杜绝上电跳变。</li>
+        <li>独立完成三终端启动与 /model_ifrun 服务开关操作，会看 step=0/10/20 推理日志。</li>
+        <li>按案例复盘方法评估复现效果：环境一致、采集量与训练步数达标、成功判据明确。</li>
+      </ul>
+    </section>
+
+    <!-- 02 原理 -->
+    <section class="blk" id="s2">
+      <h2><span class="no">02</span>原理：感知 → 决策 → 执行的毫秒闭环<span class="seg">课段 1 收尾 + 课段 2 · 激活旧知 · 8 min</span></h2>
+      <div class="tip amber"><span class="lab">❓ 聚焦问题（课段 1）</span>学员最怕的翻车：一开 /model_ifrun 双臂猛地一跳，差点撞坏零件——回头查才发现 ramp 没准备、当前位姿离采集起点差太远。或者抓得起却放错格：左手把银件塞进了黑格。问题出在推理的安全机制与数据一致性。带着这个痛点学完整课——到课段 6 你会亲手让双臂稳稳分拣。</div>
+      <p>推理就像「熟练工的反射弧」：<b>感知</b>（三路相机拍下此刻画面 + 关节编码器读出 16 维状态）→ <b>决策</b>（ACT 把观测喂进网络，一次吐出 100 步动作块存入 FIFO 队列按帧取用）→ <b>执行</b>（后处理把动作限幅平滑后发给双臂）。50Hz 推理、100Hz 发布——决策不必每毫秒重算，但执行必须时刻柔顺。</p>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">恒等映射</div><div class="kt">本课程数据集未做 cyclic-shift，16 维状态直通：L0-L6 + 夹爪 + R0-R6 + 夹爪，训练/推理完全一致。</div></div>
+        <div class="kcard"><div class="kd">三层平滑</div><div class="kt">5 帧滑动窗口 + EMA（α=0.15）+ 步长限幅（MAX_ARM_STEP_RAD=0.003、MAX_GRIP_STEP=0.02），防抖防突跳。</div></div>
+        <div class="kcard"><div class="kd">ramp 起步</div><div class="kt">start_cmd 取当前实测关节弧度起步渐升，避免从零点硬冲——像起步缓抬离合。</div></div>
+        <div class="kcard"><div class="kd">双闸门</div><div class="kt">DRY_RUN=True 只跑仿真不下发；/model_ifrun 服务 true/false 随时接管/交还，双重保险。</div></div>
+      </div>
+      <div class="tip teal"><span class="lab">↺ 激活旧知（课段 2）</span>回忆两件旧事：① 反射弧——眼睛看到→大脑决定→手脚执行，本课的感知-决策-执行毫秒闭环就是机器人版的反射弧；② 新手开手动挡——脑海里有套路但脚下要靠缓抬离合防熄火，ramp 起步与三层平滑就是机器人的离合，DRY_RUN 与 /model_ifrun 则是教练的副刹。</div>
+      <div class="tip amber"><b>生活化类比：</b>真机推理像「刚拿到驾照的新手」——脑海里的动作块是背熟的套路（chunk_size=100），脚下还要靠限滑（三层平滑）防止一脚地板油；教练的副刹就是 DRY_RUN 与 /model_ifrun 两个开关。</div>
+      <div class="tip amber"><b>推理配置要点：</b>ACT 不含 PaliGemma tokenizer、observation 字典不含 task 字段、状态为 16 维向量。<code>DRY_RUN</code> 开关控制是否真下发动作——<b>强烈建议首次推理先用 DRY_RUN 验证</b>。</div>
+      <div class="tip amber"><b>节点运行机制：</b>fixed 版恒等映射 → 安全机制分层 → ROS2 三类接口：<b>订阅</b>（/camera 图像、/joint_states 关节角）+ <b>发布</b>（/cmd_joints 动作）+ <b>服务</b>（/model_ifrun 开关）。</div>
+      <div class="tip amber"><b>模型加载与 ramp：</b><code>MODEL_PATH</code> 指定 checkpoint（如 <code>outputs/sort/ACT/checkpoints/050000/pretrained_model</code>），准备阶段 <code>start_cmd</code> 取当前实测弧度渐升，<b>杜绝起点跳变</b>。</div>
+      <div class="img-block">
+        <img src="./images/photo-final-demo.jpg" alt="双臂自主分拣：黑件入左格、银件入右格" loading="lazy">
+        <figcaption>图 4-1｜真机分拣完成：训练好的 ACT 策略部署回 LDT-01，双臂自主完成「左手抓黑件入左格、右手抓银件入右格」的分拣循环。</figcaption>
+      </div>
+    </section>
+
+    <!-- 03 硬件与材料 -->
+    <section class="blk" id="s3">
+      <h2><span class="no">03</span>硬件与材料<span class="seg">课段 3 · 示证新知 · 15 min</span></h2>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">LDT01-STD 本体</div><div class="kt">双从动臂 + 双夹爪 + 三路在线相机 + 4060 Ti 16GB 工控机，与采集时同一台、同一线序。</div></div>
+        <div class="kcard"><div class="kd">checkpoint</div><div class="kt">MODEL_PATH 示例指向 output/act_fac/050000/pretrained_model（EXP-03 训练产物）。</div></div>
+        <div class="kcard"><div class="kd">复现场景</div><div class="kt">与采集完全一致的桌面、收纳盒位姿、黑/银零件；开工前卷尺复测距离。</div></div>
+        <div class="kcard"><div class="kd">安全设备</div><div class="kt">急停按钮、2 米半圆清场、双人值守（一人盯程序一人盯机械臂）。</div></div>
+      </div>
+      <div class="tip amber"><b>模型加载与 ramp 准备：</b>三终端启动 ROS2 推理节点后，<code>MODEL_PATH</code> 指向 checkpoint 目录，准备阶段 <code>start_cmd</code> 取当前实测弧度渐升——像起步缓抬离合，杜绝起点跳变。</div>
+      <div class="img-block">
+        <img src="./images/photo-sorting-action.jpg" alt="双臂分拣动作瞬间：正在抓取银色零件" loading="lazy">
+        <figcaption>图 4-2｜分拣动作瞬间：训练好的策略正在抓取银色零件，准备放入右侧收纳格。</figcaption>
+      </div>
+    </section>
+
+    <!-- 04 操作步骤 -->
+    <section class="blk" id="s4">
+      <h2><span class="no">04</span>操作步骤：三终端启动与复现评估<span class="seg">课段 5~6 · 应用新知 · 2×15 min</span></h2>
+      <div class="flow">
+        <div class="step"><b class="n">S1</b>DRY_RUN 验证<br><small>True 空跑：日志/动作正常</small></div>
+        <div class="arr">→</div>
+        <div class="step"><b class="n">S2</b>三终端拉起<br><small>robot → node → service</small></div>
+        <div class="arr">→</div>
+        <div class="step"><b class="n">S3</b>开闸推理<br><small>/model_ifrun true</small></div>
+        <div class="arr">→</div>
+        <div class="step"><b class="n">S4</b>复盘评估<br><small>150 采集 × 500000+ 步</small></div>
+      </div>
+      <ol style="margin:14px 0 6px;padding-left:22px;line-height:1.9">
+        <li><b>配置检查</b>：修改 MODEL_PATH 指向目标 checkpoint；首次先保持 DRY_RUN=True。</li>
+        <li><b>终端 1</b>：01start_robot_act.sh 启动机器人侧；<b>终端 2</b>：激活环境后运行 lerobot_inference_node_act.py，观察 ramp 准备打印。</li>
+        <li><b>终端 3</b>：ros2 service call /model_ifrun ... "{data: true}" 开启推理，step=0/10/20 日志滚动即正常；false 即停。</li>
+        <li><b>空跑合格后</b>置 DRY_RUN=False 重进节点，清场 2 米半圆、双人到位再开闸，观察双臂自主分拣。</li>
+        <li><b>停止与接管</b>：服务 false 停推理；异常立即急停（故障码 61445 按手册复位）。</li>
+        <li><b>复现评估</b>：复盘案例口径——采集 150 次左右、训练步数 500000 步以上、桌面环境一致；判据：机械臂能正常将零件放入收纳盒中即实验成功。</li>
+      </ol>
+      <div class="tip tealb"><b>开闸前 60 秒检查清单（双人逐项口述确认）：</b>
+        <ul class="check" style="margin-top:8px">
+          <li>桌面布局、收纳盒位置与采集现场一致（卷尺复测）。</li>
+          <li>MODEL_PATH 指向的 checkpoint 存在且为本次目标步数。</li>
+          <li>DRY_RUN=True 空跑已完成，step 日志节奏正常、无报错。</li>
+          <li>急停按钮在安全员手中，2 米半圆清场完成。</li>
+          <li>/model_ifrun 服务出现在 ros2 service list 中。</li>
+          <li>双臂当前位姿与采集起点接近（ramp 才能平滑接管）。</li>
+        </ul>
+      </div>
+      <div class="tip amber"><b>开闸动作：</b>激活 lerobot 环境 → 运行推理节点 → <code>ros2 service call /model_ifrun std_srvs/srv/SetBool data:\{data: true\}</code> 下发 true/false 控制自主分拣起停。</div>
+      <div class="tip amber"><b>质量回溯：</b>采集中误差点「本次采集失败」——该组不计入训练；复盘时据此核对有效样本量是否达标（训练集数量 = 采集总数 - 失败标记数）。</div>
+      <div class="tip amber"><b>云端联动：</b>采集数据经上传按钮传至云服务器，一键安装后解压转换数据，训练与推理共享同一数据出口。</div>
+      <div class="tip amber"><b>成功判据（工厂案例 §5 复现效果评估原文）：</b>将环境恢复至采集阶段，桌面环境与预设一致，机械臂能正常将零件放入收纳盒中则实验成功——<b>黑件左格、银件右格，动作连贯不交叉</b>。若失败，先检查桌面环境参数与预设是否一致，其次检查采集与训练次数是否足够（相对简单任务建议采集 150 次左右、训练步数 500000 步以上）。</div>
+    </section>
+
+    <!-- 05 关键命令 -->
+    <section class="blk" id="s5">
+      <h2><span class="no">05</span>关键命令<span class="seg">随课段 5 / 6 对照使用</span></h2>
+      <pre><span class="c"># ① 配置（04-推理）</span>
+MODEL_PATH=<span class="g">"/home/lindenbot/lerobot-0.4.1/output/act_fac/050000/pretrained_model"</span>
+DRY_RUN = True   <span class="c"># 首跑空仿真；验证无误后改 False 真下发</span>
+
+<span class="c"># ② 三终端启动（原文 04-推理 运行方法）</span>
+<span class="b">终端1</span> bash /home/lindenbot/iflytek_armtele_project/start_bash/<span class="b">04model_run_demo/01start_robot_act.sh</span>
+<span class="b">终端2</span> bash /home/lindenbot/lerobot-0.4.1/<span class="b">run_act_node.sh</span>
+<span class="b">终端3</span> source /home/lindenbot/iflytek_armtele_project/install/setup.bash
+ros2 service call /model_ifrun std_srvs/srv/SetBool <span class="g">"{data: true}"</span>   <span class="c"># 启动</span>
+
+<span class="c"># ③ 推理进行/停止</span>
+ros2 service call /model_ifrun std_srvs/srv/SetBool <span class="g">"{data: true}"</span>   <span class="c"># 开</span>
+ros2 service call /model_ifrun std_srvs/srv/SetBool <span class="y">"{data: false}"</span>  <span class="c"># 停</span>
+<span class="c"># 日志出现 mode=1 切换与 step=0/10/20 输出 = 推理循环正常</span></pre>
+      <div class="tip teal"><span class="lab">🖥️ 启动日志对照（DRY_RUN=True 干跑，原文 04-推理）</span>
+        <pre style="margin-top:8px">🚀 LeRobot ACT 推理节点启动
+⚠️  <span class="b">DRY_RUN=True：只打印动作，不发布到机械臂</span>
+   ✓ 相机设备: /dev/cam_head
+   ✓ 相机设备: /dev/cam_left
+   ✓ 相机设备: /dev/cam_right
+📦 加载 ACT 模型 ...
+🖥️  设备: cuda
+✅ ACT 模型/处理器加载成功 (chunk_size=100)
+📡 创建订阅者 ...
+   ✓ 机械臂状态: /cerebellum_sdk/arm/joint_states
+   ✓ 夹爪状态: /slave/gripper/{left,right}/states
+📤 创建发布者 ...
+   ✓ 臂命令 /cerebellum_sdk/arm/joint_commands + 夹爪命令
+✅ 节点初始化完成，等待 /model_ifrun 启动指令
+🎬 启动推理
+🔎 /joint_states 实际关节名(14): [left_shoulder_pitch_joint, left_shoulder_roll_joint, ...]
+🪜 ramp 起点(ROS顺序) L_pitch=+0.123 R_pitch=-0.456 -&gt; 目标 L_pitch=+0.130 R_pitch=-0.450
+🔄 推理循环启动 (50 Hz)
+📡 发布线程启动 (100 Hz, slew限速)
+step=0 L_arm[+0.130 -0.200 +0.100 -0.050 +0.300 +0.010 -0.150] L_grip=0.750 ...</pre>
+      </div>
+      <div class="tip amber"><span class="lab">🔧 DRY_RUN=False 真机切换</span>把 `DRY_RUN` 改为 False 后重启节点，启动日志会多一行 <code>🔴 DRY_RUN=False：将真正发布命令到机械臂！</code>；开始推理后出现 <code>✅ 已切换臂控制模式 mode=1</code>；停止时打印 <code>⏸️ 停止推理 / 🛑 推理循环结束 / 🛑 发布线程结束</code>。开闸前务必 2 米半圆清场、双人手不离急停。</div>
+    </section>
+
+    <!-- 06 动画 -->
+    <section class="blk" id="s6">
+      <h2><span class="no">06</span>动画：感知-决策-执行闭环<span class="seg">课段 4 · 示证新知 · 12 min</span></h2>
+      <div class="anim-box">
+        <svg viewBox="0 0 720 250" width="100%" role="img" aria-label="感知决策执行闭环动画">
+          <defs>
+            <marker id="a4" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#b45309"/></marker>
+          </defs>
+          <g font-size="13" font-family="Noto Sans CJK SC, sans-serif" text-anchor="middle">
+            <rect x="40" y="30" width="180" height="70" rx="12" fill="#fffbeb" stroke="#fde68a" stroke-width="2"/>
+            <text x="130" y="60" fill="#92400e" font-weight="bold">① 视觉感知</text>
+            <text x="130" y="84" fill="#b45309" font-size="11">三路相机 + 16 维关节状态</text>
+            <rect x="270" y="30" width="180" height="70" rx="12" fill="#fffbeb" stroke="#fde68a" stroke-width="2"/>
+            <text x="360" y="60" fill="#92400e" font-weight="bold">② 分拣决策</text>
+            <text x="360" y="84" fill="#b45309" font-size="11">ACT 50Hz · 动作块 FIFO</text>
+            <rect x="500" y="30" width="180" height="70" rx="12" fill="#fffbeb" stroke="#fde68a" stroke-width="2"/>
+            <text x="590" y="60" fill="#92400e" font-weight="bold">③ 双臂执行</text>
+            <text x="590" y="84" fill="#b45309" font-size="11">平滑限幅 · 100Hz 发布</text>
+            <line x1="225" y1="65" x2="265" y2="65" stroke="#b45309" stroke-width="2" marker-end="url(#a4)"/>
+            <line x1="455" y1="65" x2="495" y2="65" stroke="#b45309" stroke-width="2" marker-end="url(#a4)"/>
+            <path d="M 590 105 L 590 165 L 130 165 L 130 105" fill="none" stroke="#d97706" stroke-width="2" stroke-dasharray="6,4" marker-end="url(#a4)"/>
+            <text x="360" y="190" fill="#a16207" font-size="11.5">④ 闭环反馈：新观测覆盖旧帧，下一决策基于「已经动过的手」</text>
+            <circle r="8" fill="#d97706">
+              <animate attributeName="cx" values="130;360;590;590;360;130;130" dur="5s" repeatCount="indefinite"/>
+              <animate attributeName="cy" values="65;65;65;165;165;65;65" dur="5s" repeatCount="indefinite"/>
+            </circle>
+            <rect x="180" y="210" width="360" height="28" rx="8" fill="#fef3c7" stroke="#fde68a"/>
+            <text x="360" y="229" fill="#92400e" font-size="11.5">黑件→左格 · 银件→右格：闭环每转一圈，一批零件归位</text>
+          </g>
+        </svg>
+        <div class="anim-cap">动画：感知→决策→执行再回到感知的循环——光点闭环一圈，桌面上少一个待分拣零件。</div>
+      </div>
+      <div class="tip violet"><span class="lab">观察</span>反馈箭头为什么重要？没有闭环的「开环播放」会在第一次抓偏之后一路错到底；闭环每一圈都<b>用新观测修正偏差</b>。</div>
+    </section>
+
+    <!-- 07 互动 -->
+    <section class="blk" id="s7">
+      <h2><span class="no">07</span>互动：推理控制台模拟器<span class="seg">课段 7 · 应用新知 · 10 min</span></h2>
+      <div class="ix-panel">
+        <div class="ix-title">依次操作开关，观察控制台反馈（试试不改 DRY_RUN 直接开闸会发生什么）</div>
+        <div class="ctl-row">
+          <button class="btn" onclick="setDry(true)">DRY_RUN=True</button>
+          <button class="btn" onclick="setDry(false)">DRY_RUN=False</button>
+          <button class="btn" onclick="ctrl('true')">服务开闸 true</button>
+          <button class="btn" onclick="ctrl('false')">服务关闸 false</button>
+          <button class="btn" onclick="resetCtrl()">复位</button>
+        </div>
+        <div class="io" id="ctrlIo"><span class="dim">节点未启动：先配置 DRY_RUN，再按「终端1→2→3」顺序开闸。</span></div>
+      </div>
+      <p style="margin-top:10px">控制台背后的真实日志（04-推理）：启动打印 ramp 准备（start_cmd=当前实测弧度），切 true 后出现 mode=1 与 step=0/10/20 逐级输出，切 false 停止打印并交还控制权。</p>
+    </section>
+
+    <!-- 08 常见问题 -->
+    <section class="blk" id="s8">
+      <h2><span class="no">08</span>常见问题<span class="seg">课段 8 · 融会贯通 · 13 min</span></h2>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">Q 一开闸双臂猛跳？</div><div class="kt">检查 ramp 是否被绕过、当前姿态与采集起点是否差太远；三层平滑参数（0.003 / 0.02 / α=0.15）是否被改动。</div></div>
+        <div class="kcard"><div class="kd">Q 服务调用无响应？</div><div class="kt">终端 2 推理节点没起来或 source 错环境；先确认 ros2 service list 里有 /model_ifrun。</div></div>
+        <div class="kcard"><div class="kd">Q 抓得起但放错格？</div><div class="kt">典型数据病：采集时左右分工被破坏，或复现场景与采集不一致（盒位移动）。回 EXP-02 查有效样本。</div></div>
+        <div class="kcard"><div class="kd">Q 动作一顿一顿？</div><div class="kt">推理频率掉线或 FIFO 队列空转：查 GPU 占用与日志节拍；先回 DRY_RUN 看决策输出本身是否平滑。</div></div>
+      </div>
+    </section>
+
+    <!-- 09 拓展 -->
+    <section class="blk" id="s9">
+      <h2><span class="no">09</span>拓展阅读<span class="seg">课段 8 · 融会贯通</span></h2>
+      <ul class="check">
+        <li>04-推理 §节点架构：get_observation / run_inference_once / _slew_toward 三段源码逐行精读。</li>
+        <li>command/9_inference_dual_arm.sh：工程脚本版的双臂推理入口与环境准备。</li>
+        <li>LDT-01 手册 §模型推理流程：ENGINE_PATH / PKL_PATH / MODEL_RUN_SPEED 与轨迹重播的玩法。</li>
+        <li>LDT-01 手册 §Q&amp;A：急停故障码 61445（STO）复位流程与主从不一致的排查顺序。</li>
+        <li>《聆动机器人案例-家庭场景》复盘：换任务后如何用同一套推理栈快速验收。</li>
+        <li>00-硬件参数 §行业课程表：物料分拣场景对标的职业能力项（主从遥操作、视觉抓取、轨迹学习）。</li>
+      </ul>
+    </section>
+
+    <!-- 10 思考题 -->
+    <section class="blk" id="s10">
+      <h2><span class="no">10</span>思考题 · 自测<span class="seg">课段 8 · 融会贯通</span></h2>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">✅ 完成成果</div><div class="kt">真机自主分拣连续 ≥10 轮黑件左格、银件右格，日志与视频留档，达到案例成功判据。</div></div>
+        <div class="kcard"><div class="kd">🧠 原理收获</div><div class="kt">说清 50Hz/100Hz 双频率、三层平滑与 ramp 各自防的是哪类事故。</div></div>
+        <div class="kcard"><div class="kd">🛠 技能收获</div><div class="kt">会配置 MODEL_PATH / DRY_RUN、三终端启动、服务开关与急停复位全流程。</div></div>
+        <div class="kcard"><div class="kd">📐 评分速览</div><div class="kt">交互模拟器 20% + 真机复现表现 50% + 思考题 30%。</div></div>
+      </div>
+      <div class="tip violet"><span class="lab">思考 1</span>三层平滑（滑窗 → EMA → 限幅）中去掉任何一层各会怎样？按「噪声毛刺 / 持续偏置 / 瞬时跳变」对号入座。</div>
+      <div class="tip violet"><span class="lab">思考 2</span>案例要求「训练步数在 500000 步以上」且「桌面环境一致」。若复现时盒位比采集时挪了 5cm 就失手，这暴露了行为克隆的什么短板？可能的补救思路有哪些？</div>
+    </section>
+
+    <nav class="expnav">
+      <a class="prev" href="../exp-03-data-training/index.html">← 上一个：EXP-03 转换与训练</a>
+      <a class="next" href="../index.html">回到课程目录 →</a>
+    </nav>
+    <footer>
+      <div>IND-03 · 物料分拣应用场景 · EXP-04 真机推理与分拣复现</div>
+      <div>8 学时 · 综合实践实验 · 基于 聆动课程指导文档《04-聆动机器人推理》《聆动机器人案例-工厂场景》改编</div>
+    </footer>
+  </main>
+</div>
+
+<script>
+var dry = true, running = false;
+function render(msg, cls){
+  document.getElementById('ctrlIo').innerHTML = '<span class="' + cls + '">' + msg + '</span>';
+}
+function setDry(v){
+  if(running){ render('运行中禁止切换 DRY_RUN——先服务关闸 false 再改配置。', 'warn'); return; }
+  dry = v;
+  render('DRY_RUN = ' + v + (v ? '：空仿真模式，动作只打印不下发，安全。' : '：真下发模式，开闸后关节将实际运动！'), v ? 'ok' : 'warn');
+}
+function ctrl(cmd){
+  if(cmd === 'true'){
+    if(running){ render('已经在推理中……step 日志持续滚动。', 'ok'); return; }
+    running = true;
+    if(dry){
+      render('DRY_RUN=True：推理循环启动，ramp 就绪 → mode=1 → step=0/10/20 打印，但不动真机械臂。', 'ok');
+    }else{
+      render('DRY_RUN=False：真闸打开！双臂开始自主分拣——保持 2 米清场，手不离急停。', 'warn');
+    }
+  }else{
+    if(!running){ render('当前无推理在跑。', 'dim'); return; }
+    running = false;
+    render('服务返回 false：推理停止，控制权交还，日志停止打印。', 'ok');
+  }
+}
+function resetCtrl(){
+  dry = true; running = false;
+  render('已复位：DRY_RUN=True，节点未启动。按「终端1→2→3」顺序重新开始。', 'dim');
+}
+</script>
+<script src="../shared/tutorial.js" defer></script>
+</body>
+</html>

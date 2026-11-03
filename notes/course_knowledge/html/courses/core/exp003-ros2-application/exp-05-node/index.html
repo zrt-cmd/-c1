@@ -1,0 +1,1504 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-05 · 节点：ROS2 里的"一个岗位" — 机器人 ROS2 应用与开发</title>
+<link rel="stylesheet" href="../shared/tutorial.css?v=20261027b">
+<style>:root{--theme:#0891b2;--theme-deep:#0e7490;--theme-bg:#cffafe;--theme-bd:#a5f3fc}
+/* ↓ 本页专属：s3「节点全景」样式 */
+.atlas-grid{display:grid;grid-template-columns:196px 1fr 1.3fr;gap:14px}
+.atlas-layers{display:flex;flex-direction:column;gap:7px}
+.atlas-layer-btn{display:block;width:100%;text-align:left;background:#1a2230;border:1px solid #334155;border-left:4px solid #475569;color:#cbd5e1;border-radius:10px;padding:9px 11px;font-size:12.5px;font-family:'Noto Sans CJK SC','Microsoft YaHei',sans-serif;cursor:pointer;transition:.18s}
+.atlas-layer-btn:hover{border-color:#64748b}
+.atlas-layer-btn.on{background:#0b0f17;color:#fff;font-weight:700}
+.atlas-layer-btn .cnt{float:right;font-family:var(--font-mono);font-size:11px;color:#64748b}
+.atlas-nodes{background:#0b0f17;border:1px solid #1e293b;border-radius:12px;padding:9px;display:flex;flex-direction:column;gap:6px;max-height:352px;overflow-y:auto}
+.atlas-node{display:block;width:100%;text-align:left;background:#111a26;border:1px solid #1e293b;border-radius:9px;padding:7px 11px;cursor:pointer;font-family:'Noto Sans CJK SC','Microsoft YaHei',sans-serif}
+.atlas-node:hover{border-color:#475569}
+.atlas-node.on{background:#0f172a;border-color:#fbbf24}
+.atlas-node .nm{font-family:var(--font-mono);font-size:12.5px;color:#e2e8f0;display:block;line-height:1.5}
+.atlas-node .rl{font-size:11.5px;color:#94a3b8}
+.atlas-detail{background:#0b0f17;border:1px solid #1e293b;border-radius:12px;padding:15px 17px;font-family:'Noto Sans CJK SC','Microsoft YaHei',sans-serif}
+.atlas-detail h5{font-family:var(--font-mono);font-size:14.5px;color:#fbbf24;margin:0 0 3px;line-height:1.5}
+.atlas-detail .sub{font-size:11.5px;color:#64748b;margin-bottom:10px}
+.atlas-detail dt{font-size:11.5px;color:#64748b;letter-spacing:.05em;margin-top:9px}
+.atlas-detail dd{margin:2px 0 0;font-size:13px;color:#cbd5e1;line-height:1.75}
+.atlas-detail dd code{background:#1e293b;border:none;color:#a5f3fc;font-size:12px}
+.atlas-detail .pin{display:inline-block;font-size:11px;background:#1e293b;border-radius:999px;padding:3px 11px;color:#fcd34d;margin-top:13px}
+@media(max-width:1100px){.atlas-grid{grid-template-columns:1fr}}
+@media(max-width:1100px){.atlas-nodes{flex-direction:row;flex-wrap:wrap;max-height:none}.atlas-node{width:auto}}/* ↓ 本页专属：s4「三范式通信」样式 */
+.comm-tabs{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:14px}
+.comm-tab{background:#1a2230;border:1px solid #334155;color:#cbd5e1;border-radius:10px;padding:9px 16px;font-size:13px;font-family:'Noto Sans CJK SC','Microsoft YaHei',sans-serif;cursor:pointer;transition:.18s}
+.comm-tab:hover{border-color:#64748b}
+.comm-tab .no{font-family:var(--font-mono);font-size:11px;color:#64748b;margin-right:6px}
+.comm-tab.on{background:#0b0f17;color:#fbbf24;border-color:#fbbf24;font-weight:700}
+.comm-tab.on .no{color:#fbbf24}
+.comm-stage{background:#0b0f17;border:1px solid #1e293b;border-radius:12px;padding:10px 12px}
+.comm-stage svg{display:block;margin:0 auto;max-width:100%;height:auto}
+.comm-flow{stroke-dasharray:9 7;animation:commdash 1.05s linear infinite}
+.comm-flow.slow{animation-duration:1.65s}
+@keyframes commdash{to{stroke-dashoffset:-32}}
+.comm-detail{background:#0b0f17;border:1px solid #1e293b;border-radius:12px;padding:15px 17px;margin-top:14px;font-family:'Noto Sans CJK SC','Microsoft YaHei',sans-serif}
+.comm-detail h5{font-family:var(--font-mono);font-size:14.5px;color:#fbbf24;margin:0 0 3px;line-height:1.5}
+.comm-detail .sub{font-size:11.5px;color:#64748b;margin-bottom:10px}
+.comm-detail .row{display:grid;grid-template-columns:112px 1fr;gap:3px 14px;font-size:13px;line-height:1.8}
+.comm-detail .k{color:#64748b;font-size:12px}
+.comm-detail .v{color:#cbd5e1}
+.comm-detail .v code{background:#1e293b;border:none;color:#a5f3fc;font-size:12px}
+.comm-detail .v b{color:#fcd34d}
+.comm-detail .pin{display:inline-block;font-size:11px;background:#1e293b;border-radius:999px;padding:3px 11px;color:#fcd34d;margin-top:12px}
+@media(max-width:1100px){.comm-detail .row{grid-template-columns:1fr}}
+/* ↓ 本页专属：s7「逐条命令实操」样式 */
+.termbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:20px 0 10px}
+.termbar .tl{background:var(--head);color:#fff;border-radius:999px;padding:3px 13px;font-family:var(--font-mono);font-size:11.5px;letter-spacing:.04em}
+.termbar b{font-size:14.5px;color:var(--head)}
+.termbar .note{font-size:12.5px;color:var(--muted)}
+.cmdstep{background:var(--bg-soft);border:1px solid var(--border);border-left:3px solid var(--theme);border-radius:12px;padding:13px 17px;margin:11px 0}
+.cmdstep .cs-hd{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.cmdstep .cs-no{font-family:var(--font-mono);font-size:12px;font-weight:700;background:var(--theme);color:#fff;border-radius:999px;min-width:22px;height:22px;text-align:center;line-height:22px;padding:0 5px;flex:none}
+.cmdstep .cs-hd b{font-size:14.5px;color:var(--head)}
+.cmdstep .cs-where{margin-left:auto;font-family:var(--font-mono);font-size:11px;background:var(--theme-bg);color:var(--theme-deep);border:1px solid var(--theme-bd);border-radius:999px;padding:3px 11px;white-space:nowrap}
+.cmdstep .cs-why{font-size:13.5px;color:#475569;margin:7px 0 0}
+.cmdstep pre{margin:9px 0 0;font-size:13px;padding:12px 15px}
+.cmdstep table{margin:10px 0 0;font-size:13.5px}
+.cmdstep .cs-see{font-size:12.5px;color:#0f766e;margin:8px 0 0;line-height:1.7}
+.cmdstep .io{margin:10px 0 0;font-size:12.5px;color:#e2e8f0}
+/* ===== 步骤内嵌截图/示意图（响应式：窄屏不溢出）===== */
+.shot{margin:12px 0 0;cursor:zoom-in}
+.shot img{display:block;margin:0 auto;
+  width:auto;max-width:100%;
+  max-height:min(340px,46vh);
+  height:auto}
+.shot.wide{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.shot.wide img{width:100%;max-width:100%;max-height:none;height:auto}
+.shot figcaption{font-size:12.5px;color:#64748b;line-height:1.65;margin-top:8px;text-align:center}
+@media (max-width:720px){
+  .shot img{max-height:min(260px,38vh)}
+  .shot.wide img{width:auto;min-width:520px;max-width:none}
+  .shot figcaption{font-size:12px;text-align:left}
+  .shot.wide::after{content:'← 左右滑动查看完整图 →';display:block;font-size:11px;color:#94a3b8;text-align:center;margin-top:4px}
+}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit" title="返回课程首页">🧠 具身智能课程 · <i>教程首页</i></a>
+  <div class="crumb"><a href="../../../index.html#core">核心课程</a> / <a href="../index.html">ROS2 应用与开发</a> / EXP-05</div>
+</div>
+<div class="wrap">
+<aside class="side">
+  <h4>本页目录</h4>
+  <a href="#goal">00 本课学完，你应该能做到</a>
+  <a href="#s1" class="now">01 问题引入：一台机器人里有多少个程序在干活</a>
+  <a href="#s2">02 核心原理：跟着一个真实节点，把生命周期走一遍</a>
+  <a href="#s6">03 节点 API 速查手册</a>
+  <a href="#s7">04 实操 A：编译并运行 gas_sensor_node</a>
+  <a href="#s8">05 实操 B：三节点组网与身份切换</a>
+  <a href="#s9">06 注意事项与验收清单</a>
+  <a href="#s10">07 本课总结与思考题</a>
+  <h4>CH2 · 通信机制</h4>
+  <a href="../exp-05-node/index.html">EXP-05 节点</a>
+  <a href="../exp-06-topic/index.html">EXP-06 话题</a>
+  <a href="../exp-07-service/index.html">EXP-07 服务</a>
+  <a href="../exp-08-action/index.html">EXP-08 动作</a>
+  <a href="../exp-09-custom-msg/index.html">EXP-09 自定义接口</a>
+  <a href="../exp-10-parameter/index.html">EXP-10 参数</a>
+</aside>
+<main class="content">
+<div class="exp-head">
+  <span class="code">EXP-05 · 第 2 章 · 验证性 · 2 学时</span>
+  <h1>节点：ROS2 里的"一个岗位"</h1>
+  <p class="desc">一台机器人身上有二十多个程序在同时干活——看路的、算位置的、决定往哪走的、拧电机的。ROS2 给它们各自划一个岗位、发一张工牌，让它们既能各干各的、又能互相传数据，这就是<b>节点</b>。本课把"节点到底是什么、为什么这么拆、怎么自己写一个"讲透。</p>
+  <div class="meta"><span class="tag hl">难度 ⭐</span><span class="tag">2 学时</span><span class="tag">验证性</span><span class="tag">关键词 node · rclpy · 计算图</span></div>
+</div>
+
+<section class="blk reveal" id="goal">
+<h2><span class="no">目标</span>本课学完，你应该能做到</h2>
+<div class="kgrid">
+  <div class="kcard"><div class="kd">① 说清本质</div><div class="kt">节点是什么</div><p>能讲出节点 = 一个继承 <code>rclpy.node.Node</code> 的独立进程，并能说明"构造 → spin → 销毁"三个阶段各干什么、为什么是这个顺序。</p></div>
+  <div class="kcard"><div class="kd">② 读懂骨架</div><div class="kt">看懂一份节点代码</div><p>拿到像 <code>gas_sensor_node</code> 这样的节点，能指出：类继承、构造函数里的资源创建顺序、回调方法、<code>main()</code> 的固定四步。</p></div>
+  <div class="kcard"><div class="kd">③ 独立验证</div><div class="kt">跑起来并证明它存在</div><p>能编译运行节点，用 <code>ros2 node list</code> / <code>ros2 node info</code> 确认它已进入 ROS2 图，并解释启动日志与 <code>Ctrl+C</code> 退出分别对应哪个阶段。</p></div>
+  <div class="kcard"><div class="kd">④ 迁移套用</div><div class="kt">换传感器照样写</div><p>能把这套骨架（继承 → 构造 → 回调 → main 入口）直接套到温度、IMU、超声波等其它传感器节点上。</p></div>
+</div>
+<div class="tip tealb"><span class="lab">本课的重点与难点</span>
+<b>重点</b>：<code>class XxxNode(Node)</code> 的继承写法，以及构造函数里"注册节点 → 声明参数 → 创建发布者/定时器"的顺序。<br>
+<b>难点</b>：① 为什么<b>不调用 <code>rclpy.spin()</code> 就等于没开机</b>；② "一个节点 = 一个独立进程"这条设计原则，在工程上有哪些优缺点。</div>
+<div class="tip amber"><span class="lab">和前后的关系</span>
+上一课（EXP-04）讲了怎么建包，这一课讲包里最核心的东西怎么写。本课用的 <code>gas_sensor_node</code> <b>正是 EXP-06 的主角</b>——这里从"<b>节点</b>"角度拆它的结构和生命周期，EXP-06 再从"<b>话题</b>"角度拆它怎么发数据。</div>
+</section>
+
+<section class="blk" id="s1">
+<h2><span class="no">01</span>问题引入：一台机器人里，到底有多少个程序在干活</h2>
+
+<p>先别看代码，看一个更实在的问题。你让小车"到桌前把那瓶水拿过来"，它身上同时发生着这些事：</p>
+<div class="flow">
+  <div class="step"><div class="n">1</div><b>相机一直在拍</b>，每秒 30 张，不断说出"我看到了什么"。</div>
+  <div class="step"><div class="n">2</div><b>雷达一直在转</b>，每秒 10 圈，不断说出"周围哪边有东西、多远"。</div>
+  <div class="step"><div class="n">3</div><b>有个程序不停在算</b>："根据刚才看到的，我现在在屋里的哪个位置。"</div>
+  <div class="step"><div class="n">4</div><b>还有个程序负责想</b>："桌在前面 3 米，先绕过椅子，走过去。"</div>
+  <div class="step"><div class="n">5</div><b>最后有个程序只干一件事</b>：把"往前 0.3 米/秒"翻译成四个轮子该转多快，然后写进电机。</div>
+</div>
+
+<p>这五件事，<b>没有一件能等另一件慢慢做完</b>——相机不会为了等规划算完就停产 30 秒。它们必须同时跑、各干各的、只把结果交出去。数下来，一台能干活的机器人身上通常同时跑着 <b>20 个以上</b>这样的程序。</p>
+
+<div class="tip tealb"><span class="lab">💡 一个类比：节点就是给程序"分岗位"</span>
+把机器人想成一家餐厅：<b>采购</b>每天进货、<b>厨师</b>只管做菜、<b>服务员</b>端盘子、<b>收银员</b>只管收钱。四件事同时进行，谁也不替谁干活，只把"东西"往前传。<br>
+ROS2 干的事一模一样：把上面那五个程序各封成一个岗位，<b>一个岗位就是一个节点</b>。<br>
+· 岗位要有<b>工牌</b>（节点名），不然叫谁都不知道；<br>
+· 岗位之间要能<b>传东西</b>（话题/服务/动作，后面几课细讲）；<br>
+· 一个岗位生病了（崩溃），<b>只停它一个</b>，餐厅照常营业。</div>
+
+<h3>但这个类比有三处会带你走偏，先划清边界</h3>
+<p><b>类比只是脚手架，不能当定义用。</b>上面这套"岗位"说法帮你快速理解"为什么要拆"，但它有三条不成立的边界——每一条后面都会展开，这里先记住正确说法：</p>
+
+<table>
+  <thead><tr><th style="width:27%">类比说法</th><th style="width:36%">✅ 事实</th><th>会踩什么坑</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>"一个岗位 = 一个节点 = 只干一件事"</td>
+      <td><b>一个节点内部可以同时发布多个话题、订阅多个话题、提供多个服务</b>，承担多项工作。拆分原则是<b>职责内聚</b>，不是"一事一节点"。</td>
+      <td>以为必须拆得极碎，结果几十个节点互相追数据，反而更难维护。</td>
+    </tr>
+    <tr>
+      <td>"每个程序配一张工牌"</td>
+      <td><b>可执行文件与节点不是一一绑定</b>：一个可执行程序里可以创建多个 Node；节点也只是进程里的一个对象。<b>进程 ≠ 节点。</b></td>
+      <td>用 <code>ps</code> 数进程去核对 <code>ros2 node list</code>，发现数目对不上就以为出错了。</td>
+    </tr>
+    <tr>
+      <td>"岗位只讲分工"</td>
+      <td>分工只是一半。节点的核心能力是<b>通过话题 / 服务与其它节点通信，共同组成计算图</b>（把正在跑的节点和连线画成一张"谁连谁"的图，下面就画一张看看）。没有通信，孤立的节点毫无意义。</td>
+      <td>只记"拆"，不记"连"，后面学话题/服务时接不上。</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="tip"><span class="lab">📖 严谨定义（记住这一句，比类比更管用）</span>
+<b>ROS2 节点是参与 ROS 计算图通信的基础单元</b>，依托 <code>rcl</code> / <code>rclpy</code> 库创建，在 DDS 发现网络里表现为一个<b>参与者</b>（Participant 侧的端点集合）。<br>
+它具备的能力是：<b>有名字</b>（可被图查询）、<b>有通信端点</b>（可发布/订阅/提供服务）、<b>由执行器驱动</b>（spin 才能干活）。三者缺一，就不算一个"活着的节点"。</div>
+
+<div class="tip tealb"><span class="lab">🔍 "计算图"是什么：先拿上一课的例子画一张</span>
+定义里那句"参与 <b>ROS 计算图</b>通信"，拆开说：<b>计算图就是把正在运行的节点、话题和它们之间的连线画成一张图</b>。椭圆是一个节点，矩形是一条话题，箭头是数据流动的方向；谁发布了、谁订阅了、哪条线断了，图上一眼全露馅。光背定义没用，拿 EXP-01 跑过的 talker / listener 当例子，三个终端按序开，亲手画一次：</div>
+<div class="cmdstep" style="margin-top:8px">
+  <div class="cs-hd"><span class="cs-no">0.1</span><b>开两个老朋友：talker 和 listener</b><span class="cs-where">终端 A / B</span></div>
+  <p class="cs-why">每个新开终端都先加载环境，这是 EXP-01 养成的老规矩。</p>
+  <pre data-copy="cmd"><span class="c"># 终端 A：发布者</span>
+<span class="g">source</span> /opt/ros/humble/setup.bash
+<span class="g">ros2</span> run demo_nodes_cpp talker
+
+<span class="c"># 终端 B：订阅者</span>
+<span class="g">source</span> /opt/ros/humble/setup.bash
+<span class="g">ros2</span> run demo_nodes_cpp listener</pre>
+</div>
+<div class="cmdstep">
+  <div class="cs-hd"><span class="cs-no">0.2</span><b>先装看图工具（只需一次）</b><span class="cs-where">终端 C</span></div>
+  <p class="cs-why"><code>rqt_graph</code> <b>不是 ROS2 基础包自带的</b>——它装在独立的 <code>ros-humble-rqt-graph</code> 包里。没装就直接 <code>ros2 run</code>，会报 <code>Package 'rqt_graph' not found</code>。<b>先装一次，以后就不用再装。</b></p>
+  <pre data-copy="cmd"><span class="c"># -y 表示自动确认，省掉一次 y/n 交互</span>
+<span class="g">sudo</span> apt install -y ros-humble-rqt-graph</pre>
+  <div class="io"><span class="dim">$ sudo apt install -y ros-humble-rqt-graph</span>
+Reading package lists... Done
+The following NEW packages will be installed:
+  ros-humble-rqt-graph
+...
+Setting up ros-humble-rqt-graph (...) ...
+<span class="g"># 出现 "Setting up ... rqt-graph" 就是装好了</span></div>
+  <p class="cs-see">✔ 已经装过的话这行会提示 <code>ros-humble-rqt-graph is already the newest version</code>，可以直接跳到下一步。</p>
+</div>
+<div class="cmdstep">
+  <div class="cs-hd"><span class="cs-no">0.3</span><b>把计算图画出来</b><span class="cs-where">终端 C</span></div>
+  <p class="cs-why"><code>rqt_graph</code> 是 ROS2 的"看图窗口"，完整用法 EXP-14 细讲，这里只要会打开、会读箭头。</p>
+  <pre data-copy="cmd"><span class="g">source</span> /opt/ros/humble/setup.bash
+<span class="g">ros2</span> run rqt_graph rqt_graph</pre>
+  <p class="cs-see">✔ 三个观察点逐个对：① 图里有两个椭圆 <code>/talker</code>、<code>/listener</code>；② 中间是矩形 <code>/chatter</code>，左边一支箭头从 talker 指进来，右边一支从它指去 listener（发布 → 话题 → 订阅）；③ 回终端 A 按 <code>Ctrl+C</code>，talker 的椭圆和箭头立刻从图上消失，重新 run 又自己连回来。</p>
+  <figure class="shot wide" onclick="lbShow(this)">
+    <img src="../assets/image-20261027-rqt-graph-talker-chatter-listener.png" alt="rqt_graph 显示的计算图：/talker 椭圆经 /chatter 话题指向 /listener 椭圆" loading="eager">
+    <figcaption>实拍｜<b><code>rqt_graph</code> 画出来的样子</b>：左<b>红色椭圆 <code>/talker</code></b>（发布者）、中间<b>绿色矩形 <code>/chatter</code></b>（话题）、右<b>黑色椭圆 <code>/listener</code></b>（订阅者）。<b>箭头方向就是数据流向</b>：talker → chatter → listener。<br>记住这个读图规则：<b>椭圆 = 节点，矩形 = 话题，箭头 = 数据流动方向</b>。后面 EXP-06 加订阅者、EXP-07 加服务时，图会越画越大，但读法永远是这三条。</figcaption>
+  </figure>
+</div>
+<div class="tip amber"><span class="lab">这一步其实证明了什么</span>
+你亲眼见到了"计算图"三个字的分量：<b>节点是死是活、连没连上，ROS2 自己心里有数，随时能整张画给你看</b>。杀掉 talker 图就缺一块，说明图反映的是<b>此刻真实的连接</b>，不是文档里的设计稿。<br>
+没有图形界面的机器（纯 SSH）画不了图，用 <code>ros2 node list</code> 加 <code>ros2 topic info /chatter</code> 看"Publisher count: 1, Subscription count: 1"，结论完全一样；图形环境怎么配，回看 EXP-01 turtlesim 冒烟测试那段。</div>
+
+<div class="tip amber"><span class="lab">📌 先记住这三句，后面逐步兑现</span>
+① <b>职责内聚 ≠ 一事一节点</b>——怎么划边界，02 节用 <code>gas_sensor_node</code> 演示（它同时有发布者、定时器、参数）。<br>
+② <b>进程 ≠ 节点</b>——EXP-05 全程按"一进程一节点"练手，但要知道这只是常见做法，不是规定。<br>
+③ <b>节点真正的价值在"连"</b>——话题在 EXP-06、服务在 EXP-07、动作在 EXP-08；计算图上面刚画过一张，02 节的发现建连动画里再展开一遍。</div>
+
+<h3>那这 20 多个节点，是随便乱拆的吗</h3><p>不是。真实机器人里的节点有一条约定的分工纪律，按"信号往哪个方向走"分成四层。<b>上层只做判断、不碰硬件；下层只碰硬件、不做判断</b>——记住这一句，下面这张图就全看懂了。</p>
+
+<div class="anim-box">
+<svg viewBox="0 0 960 760" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="system-ui,-apple-system,'Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="ahSense" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#22d3ee"/></marker>
+    <marker id="ahLocate" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#34d399"/></marker>
+    <marker id="ahPlan" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#a78bfa"/></marker>
+    <marker id="ahAct" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#fbbf24"/></marker>
+  </defs>
+
+  <text x="480" y="26" fill="#94a3b8" font-size="13" text-anchor="middle">「导航到桌前 → 伸臂对准 → 抓取」这一次任务里，同时在跑的节点有 20 个以上</text>
+
+  <!-- ============ 左：机器人本体 ============ -->
+  <rect x="36" y="150" width="256" height="420" rx="18" fill="#0b1220" stroke="#334155" stroke-width="2" stroke-dasharray="7 6"/>
+  <text x="161" y="184" fill="#e2e8f0" font-size="15" font-weight="bold" text-anchor="middle">一台机器人</text>
+  <text x="161" y="205" fill="#94a3b8" font-size="11.5" text-anchor="middle">硬件 + 一块主控计算机</text>
+
+  <!-- 激光雷达 -->
+  <text x="131" y="306" fill="#64748b" font-size="10" text-anchor="middle">360° 激光雷达</text>
+  <ellipse cx="131" cy="322" rx="23" ry="8" fill="#164e63" stroke="#22d3ee" stroke-width="1.6"/>
+  <!-- 机械臂 + 夹爪 -->
+  <text x="240" y="266" fill="#64748b" font-size="10" text-anchor="middle">6DOF 机械臂</text>
+  <polyline points="183,386 183,326 236,296" stroke="#22d3ee" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M236,296 l15,-10 M236,296 l15,10" stroke="#67e8f9" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <circle cx="183" cy="326" r="6" fill="#0b1220" stroke="#22d3ee" stroke-width="2"/>
+  <circle cx="236" cy="296" r="6" fill="#0b1220" stroke="#22d3ee" stroke-width="2"/>
+  <!-- 底盘：上位机 + 下位机 -->
+  <rect x="97" y="386" width="128" height="76" rx="12" fill="#111a26" stroke="#0891b2" stroke-width="2.5"/>
+  <rect x="109" y="396" width="104" height="26" rx="7" fill="#0b1220" stroke="#22d3ee" stroke-width="1.2"/>
+  <text x="161" y="413" fill="#a5f3fc" font-size="9" text-anchor="middle">上位机 RK3576</text>
+  <rect x="109" y="428" width="104" height="26" rx="7" fill="#0b1220" stroke="#67e8f9" stroke-width="1.2" stroke-dasharray="4 3"/>
+  <text x="161" y="445" fill="#a5f3fc" font-size="9" text-anchor="middle">下位机 STM32</text>
+  <!-- 深度相机 -->
+  <rect x="226" y="404" width="20" height="15" rx="3" fill="#164e63" stroke="#22d3ee" stroke-width="1.5"/>
+  <text x="250" y="416" fill="#64748b" font-size="9.5">深度相机</text>
+  <!-- 麦克纳姆轮 -->
+  <circle cx="114" cy="472" r="16" fill="#1e293b" stroke="#22d3ee" stroke-width="2"/>
+  <circle cx="208" cy="472" r="16" fill="#1e293b" stroke="#22d3ee" stroke-width="2"/>
+  <text x="161" y="508" fill="#64748b" font-size="10" text-anchor="middle">麦克纳姆轮 ×4 · 编码器电机 ×4</text>
+  <text x="161" y="540" fill="#94a3b8" font-size="10.5" text-anchor="middle">右侧节点跑在上位机，下位机做实时控制</text>
+
+  <!-- ============ 连接：机器人 → 四层 ============ -->
+  <line x1="292" y1="360" x2="316" y2="360" stroke="#334155" stroke-width="2" stroke-dasharray="5 5"/>
+  <line x1="316" y1="113" x2="316" y2="593" stroke="#334155" stroke-width="2" stroke-dasharray="5 5"/>
+  <line x1="316" y1="113" x2="344" y2="113" stroke="#22d3ee" stroke-width="2" marker-end="url(#ahSense)"/>
+  <line x1="316" y1="273" x2="344" y2="273" stroke="#34d399" stroke-width="2" marker-end="url(#ahLocate)"/>
+  <line x1="316" y1="433" x2="344" y2="433" stroke="#a78bfa" stroke-width="2" marker-end="url(#ahPlan)"/>
+  <line x1="316" y1="593" x2="344" y2="593" stroke="#fbbf24" stroke-width="2" marker-end="url(#ahAct)"/>
+
+  <!-- ============ 右：四层节点 ============ -->
+
+  <!-- 第 1 层 感知 -->
+  <rect x="346" y="44" width="594" height="138" rx="14" fill="#0c1e26" stroke="#164e63" stroke-width="1.6"/>
+  <rect x="346" y="44" width="5" height="138" rx="2.5" fill="#22d3ee"/>
+  <text x="364" y="67" fill="#67e8f9" font-size="13" font-weight="bold">感知层</text>
+  <text x="416" y="67" fill="#64748b" font-size="11">· 把物理世界的状态翻译成 ROS2 消息</text>
+  <rect x="360" y="76" width="277" height="44" rx="9" fill="#0f172a" stroke="#164e63"/>
+  <text x="373" y="104" fill="#e2e8f0" font-size="11.5" font-family="ui-monospace,Consolas,monospace">camera_node</text>
+  <text x="624" y="104" fill="#94a3b8" font-size="10.5" text-anchor="end">深度相机彩色流</text>
+  <rect x="649" y="76" width="277" height="44" rx="9" fill="#0f172a" stroke="#164e63"/>
+  <text x="662" y="104" fill="#e2e8f0" font-size="11.5" font-family="ui-monospace,Consolas,monospace">depth_node</text>
+  <text x="913" y="104" fill="#94a3b8" font-size="10.5" text-anchor="end">深度图采集</text>
+  <rect x="360" y="128" width="277" height="44" rx="9" fill="#0f172a" stroke="#164e63"/>
+  <text x="373" y="156" fill="#e2e8f0" font-size="11.5" font-family="ui-monospace,Consolas,monospace">lidar_node</text>
+  <text x="624" y="156" fill="#94a3b8" font-size="10.5" text-anchor="end">360° 激光雷达</text>
+  <rect x="649" y="128" width="277" height="44" rx="9" fill="#0f172a" stroke="#164e63"/>
+  <text x="662" y="156" fill="#e2e8f0" font-size="11.5" font-family="ui-monospace,Consolas,monospace">imu_node</text>
+  <text x="913" y="156" fill="#94a3b8" font-size="10.5" text-anchor="end">惯性测量</text>
+
+  <!-- 第 1→2 层 箭头 -->
+  <line x1="643" y1="184" x2="643" y2="202" stroke="#34d399" stroke-width="2" marker-end="url(#ahLocate)"/>
+
+  <!-- 第 2 层 定位与坐标 -->
+  <rect x="346" y="204" width="594" height="138" rx="14" fill="#0a1f1a" stroke="#0f766e" stroke-width="1.6"/>
+  <rect x="346" y="204" width="5" height="138" rx="2.5" fill="#34d399"/>
+  <text x="364" y="227" fill="#6ee7b7" font-size="13" font-weight="bold">定位与坐标层</text>
+  <text x="455" y="227" fill="#64748b" font-size="11">· 回答"我在哪、每个部件相对在哪"</text>
+  <rect x="360" y="236" width="277" height="44" rx="9" fill="#0f172a" stroke="#0f766e"/>
+  <text x="373" y="264" fill="#e2e8f0" font-size="11.5" font-family="ui-monospace,Consolas,monospace">odom_node</text>
+  <text x="624" y="264" fill="#94a3b8" font-size="10.5" text-anchor="end">里程计推算</text>
+  <rect x="649" y="236" width="277" height="44" rx="9" fill="#0f172a" stroke="#0f766e"/>
+  <text x="662" y="264" fill="#e2e8f0" font-size="11.5" font-family="ui-monospace,Consolas,monospace">robot_state_publisher</text>
+  <text x="913" y="264" fill="#94a3b8" font-size="10.5" text-anchor="end">关节坐标广播</text>
+  <rect x="360" y="288" width="277" height="44" rx="9" fill="#0f172a" stroke="#0f766e"/>
+  <text x="373" y="316" fill="#e2e8f0" font-size="11.5" font-family="ui-monospace,Consolas,monospace">static_transform_publisher</text>
+  <text x="624" y="316" fill="#94a3b8" font-size="10.5" text-anchor="end">固定外参</text>
+  <rect x="649" y="288" width="277" height="44" rx="9" fill="#0f172a" stroke="#0f766e"/>
+  <text x="662" y="316" fill="#e2e8f0" font-size="11.5" font-family="ui-monospace,Consolas,monospace">amcl_node</text>
+  <text x="913" y="316" fill="#94a3b8" font-size="10.5" text-anchor="end">全局定位</text>
+
+  <!-- 第 2→3 层 箭头 -->
+  <line x1="643" y1="344" x2="643" y2="362" stroke="#a78bfa" stroke-width="2" marker-end="url(#ahPlan)"/>
+
+  <!-- 第 3 层 决策规划 -->
+  <rect x="346" y="364" width="594" height="138" rx="14" fill="#171233" stroke="#4c1d95" stroke-width="1.6"/>
+  <rect x="346" y="364" width="5" height="138" rx="2.5" fill="#a78bfa"/>
+  <text x="364" y="387" fill="#c4b5fd" font-size="13" font-weight="bold">决策规划层</text>
+  <text x="442" y="387" fill="#64748b" font-size="11">· 决定下一步怎么走、怎么抓</text>
+  <rect x="360" y="396" width="277" height="44" rx="9" fill="#0f172a" stroke="#4c1d95"/>
+  <text x="373" y="424" fill="#e2e8f0" font-size="11.5" font-family="ui-monospace,Consolas,monospace">nav2_planner</text>
+  <text x="624" y="424" fill="#94a3b8" font-size="10.5" text-anchor="end">全局路径规划</text>
+  <rect x="649" y="396" width="277" height="44" rx="9" fill="#0f172a" stroke="#4c1d95"/>
+  <text x="662" y="424" fill="#e2e8f0" font-size="11.5" font-family="ui-monospace,Consolas,monospace">nav2_controller</text>
+  <text x="913" y="424" fill="#94a3b8" font-size="10.5" text-anchor="end">局部速度控制</text>
+  <rect x="360" y="448" width="277" height="44" rx="9" fill="#0f172a" stroke="#4c1d95"/>
+  <text x="373" y="476" fill="#e2e8f0" font-size="11.5" font-family="ui-monospace,Consolas,monospace">move_group</text>
+  <text x="624" y="476" fill="#94a3b8" font-size="10.5" text-anchor="end">机械臂轨迹规划</text>
+  <rect x="649" y="448" width="277" height="44" rx="9" fill="#0f172a" stroke="#4c1d95"/>
+  <text x="662" y="476" fill="#e2e8f0" font-size="11.5" font-family="ui-monospace,Consolas,monospace">mission_node</text>
+  <text x="913" y="476" fill="#94a3b8" font-size="10.5" text-anchor="end">任务调度大脑</text>
+
+  <!-- 第 3→4 层 箭头 -->
+  <line x1="643" y1="504" x2="643" y2="522" stroke="#fbbf24" stroke-width="2" marker-end="url(#ahAct)"/>
+
+  <!-- 第 4 层 执行驱动 -->
+  <rect x="346" y="524" width="594" height="138" rx="14" fill="#251a06" stroke="#92400e" stroke-width="1.6"/>
+  <rect x="346" y="524" width="5" height="138" rx="2.5" fill="#fbbf24"/>
+  <text x="364" y="547" fill="#fcd34d" font-size="13" font-weight="bold">执行驱动层</text>
+  <text x="442" y="547" fill="#64748b" font-size="11">· 把速度与关节指令变成电机的 PWM</text>
+  <rect x="360" y="556" width="277" height="44" rx="9" fill="#0f172a" stroke="#92400e"/>
+  <text x="373" y="584" fill="#e2e8f0" font-size="11.5" font-family="ui-monospace,Consolas,monospace">base_driver</text>
+  <text x="624" y="584" fill="#94a3b8" font-size="10.5" text-anchor="end">底盘电机驱动</text>
+  <rect x="649" y="556" width="277" height="44" rx="9" fill="#0f172a" stroke="#92400e"/>
+  <text x="662" y="584" fill="#e2e8f0" font-size="11.5" font-family="ui-monospace,Consolas,monospace">arm_driver</text>
+  <text x="913" y="584" fill="#94a3b8" font-size="10.5" text-anchor="end">6DOF 机械臂驱动</text>
+  <rect x="360" y="608" width="277" height="44" rx="9" fill="#0f172a" stroke="#92400e"/>
+  <text x="373" y="636" fill="#e2e8f0" font-size="11.5" font-family="ui-monospace,Consolas,monospace">gripper_driver</text>
+  <text x="624" y="636" fill="#94a3b8" font-size="10.5" text-anchor="end">夹爪开合</text>
+  <rect x="649" y="608" width="277" height="44" rx="9" fill="#0f172a" stroke="#92400e"/>
+  <text x="662" y="636" fill="#e2e8f0" font-size="11.5" font-family="ui-monospace,Consolas,monospace">safety_node</text>
+  <text x="913" y="636" fill="#94a3b8" font-size="10.5" text-anchor="end">急停与安全</text>
+
+  <!-- 系统与工具层 -->
+  <rect x="346" y="680" width="594" height="58" rx="14" fill="#0f172a" stroke="#334155" stroke-width="1.4" stroke-dasharray="6 5"/>
+  <rect x="346" y="680" width="5" height="58" rx="2.5" fill="#94a3b8"/>
+  <text x="364" y="704" fill="#cbd5e1" font-size="12.5" font-weight="bold">系统与工具层</text>
+  <text x="364" y="723" fill="#64748b" font-size="10.5">每台机器人都有，不参与业务逻辑</text>
+  <rect x="500" y="689" width="100" height="40" rx="8" fill="#111a26" stroke="#334155"/>
+  <text x="550" y="706" fill="#e2e8f0" font-size="9.5" font-family="ui-monospace,Consolas,monospace" text-anchor="middle">rosout</text>
+  <text x="550" y="720" fill="#94a3b8" font-size="9" text-anchor="middle">日志聚合</text>
+  <rect x="608" y="689" width="100" height="40" rx="8" fill="#111a26" stroke="#334155"/>
+  <text x="658" y="706" fill="#e2e8f0" font-size="9.5" font-family="ui-monospace,Consolas,monospace" text-anchor="middle">param_events</text>
+  <text x="658" y="720" fill="#94a3b8" font-size="9" text-anchor="middle">参数广播</text>
+  <rect x="716" y="689" width="100" height="40" rx="8" fill="#111a26" stroke="#334155"/>
+  <text x="766" y="706" fill="#e2e8f0" font-size="9.5" font-family="ui-monospace,Consolas,monospace" text-anchor="middle">rosbag2</text>
+  <text x="766" y="720" fill="#94a3b8" font-size="9" text-anchor="middle">录包回放</text>
+  <rect x="824" y="689" width="100" height="40" rx="8" fill="#111a26" stroke="#334155"/>
+  <text x="874" y="706" fill="#e2e8f0" font-size="9.5" font-family="ui-monospace,Consolas,monospace" text-anchor="middle">teleop</text>
+  <text x="874" y="720" fill="#94a3b8" font-size="9" text-anchor="middle">键盘遥控</text>
+</svg>
+</div>
+<p class="anim-cap">信号在层间<b>单向流动</b>：感知 → 定位 → 决策 → 执行。真正让轮子转起来的那条链是 <code>lidar_node → amcl_node → nav2_planner → nav2_controller → base_driver</code>；而 <code>mission_node</code> 只发目标、不下命令。四层架构是通行惯例而非 ROS2 的强制规定——但正因为它，任何一层换实现时，其他层一行代码都不用改。</p>
+
+<table>
+  <tr><th>分层</th><th>典型节点</th><th>一句话职责</th><th>它"不该"做的事</th></tr>
+  <tr><td><b>感知层</b></td><td>camera / depth / lidar / imu</td><td>把物理量翻译成 ROS2 消息</td><td>不做任何逻辑判断</td></tr>
+  <tr><td><b>定位与坐标层</b></td><td>odom / robot_state_publisher / amcl</td><td>回答"我在哪、各部件相对在哪"</td><td>不产生任何运动</td></tr>
+  <tr><td><b>决策规划层</b></td><td>nav2_planner / nav2_controller / move_group</td><td>决定"下一步怎么走、怎么抓"</td><td>不直接碰硬件寄存器</td></tr>
+  <tr><td><b>执行驱动层</b></td><td>base_driver / arm_driver / gripper_driver</td><td>把指令变成电机的 PWM</td><td>不自己改目标、不做规划</td></tr>
+</table>
+
+<div class="ix-panel">
+  <div class="ix-title">Node Atlas · 逐层点开，看每个节点到底在干什么</div>
+  <div class="atlas-grid">
+    <div class="atlas-layers" id="atlasLayers"></div>
+    <div class="atlas-nodes" id="atlasNodes"></div>
+    <div class="atlas-detail" id="atlasDetail"></div>
+  </div>
+</div>
+
+<div class="tip tealb"><span class="lab">一句话记住分层</span>上层只做判断、不碰硬件；下层只碰硬件、不做判断。判断错了改上层，硬件换了改下层——这就是"崩溃域、节奏、语言三重解耦"在真实机器人系统里的具体样子。</div>
+
+<h3>那为什么非要拆成这么多程序？</h3>
+<p>先别急着接受"要拆"，我们看一个<b>真会发生的场景</b>——如果硬把这三件事写进同一个程序，会怎样：</p>
+
+<div class="anim-box">
+<svg viewBox="0 0 860 492" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="system-ui,-apple-system,'Noto Sans CJK SC',sans-serif">
+  <text x="430" y="26" fill="#e2e8f0" font-size="14.5" font-weight="bold" text-anchor="middle">同一个故障，两种后果：相机驱动抛了一个异常</text>
+
+  <!-- 左：单体 -->
+  <text x="212" y="58" fill="#f87171" font-size="13" font-weight="bold" text-anchor="middle">✗ 写成一个程序：一处出错，全部停下</text>
+  <rect x="24" y="72" width="376" height="250" rx="14" fill="#111827" stroke="#7f1d1d" stroke-width="1.8"/>
+  <text x="212" y="94" fill="#94a3b8" font-size="11" text-anchor="middle">robot_app.py（一个大进程）</text>
+  <rect x="48" y="106" width="328" height="52" rx="9" fill="#1e293b" stroke="#475569"/>
+  <text x="66" y="128" fill="#cbd5e1" font-size="12">相机采集 30Hz</text>
+  <text x="66" y="147" fill="#f87171" font-size="11">画面抖动，抛了未捕获异常</text>
+  <text x="212" y="176" fill="#f87171" font-size="11" text-anchor="middle">↓ 异常没人接，整个进程直接退出</text>
+  <rect x="48" y="188" width="328" height="44" rx="9" fill="#1e293b" stroke="#450a0a" stroke-dasharray="5 4"/>
+  <text x="66" y="215" fill="#64748b" font-size="12">算位置　<tspan fill="#7f1d1d">■ 一起停了</tspan></text>
+  <rect x="48" y="242" width="328" height="44" rx="9" fill="#1e293b" stroke="#450a0a" stroke-dasharray="5 4"/>
+  <text x="66" y="269" fill="#64748b" font-size="12">拧电机　<tspan fill="#7f1d1d">■ 一起停了</tspan></text>
+  <text x="212" y="308" fill="#fca5a5" font-size="11.5" text-anchor="middle">车停在半路，还得有人去现场按重启</text>
+
+  <!-- 右：拆分 -->
+  <text x="648" y="58" fill="#4ade80" font-size="13" font-weight="bold" text-anchor="middle">✓ 拆成三个进程：只停坏的那个</text>
+  <rect x="470" y="72" width="356" height="250" rx="14" fill="#0b1220" stroke="#164e63" stroke-width="1.8"/>
+  <text x="648" y="94" fill="#94a3b8" font-size="11" text-anchor="middle">三个独立进程，各自跑各自的</text>
+
+  <rect x="494" y="106" width="308" height="46" rx="9" fill="#1e293b" stroke="#7f1d1d" stroke-width="1.6"/>
+  <text x="512" y="126" fill="#cbd5e1" font-size="12">相机进程 · 挂了 ✗</text>
+  <text x="512" y="144" fill="#f87171" font-size="10.5">异常只在它自己内部，进程退出</text>
+
+  <rect x="494" y="164" width="308" height="46" rx="9" fill="#1e293b" stroke="#166534" stroke-width="1.6"/>
+  <text x="512" y="184" fill="#cbd5e1" font-size="12">定位进程 · 照常运行 ✓</text>
+  <text x="512" y="202" fill="#4ade80" font-size="10.5">继续用自己的节奏算位置</text>
+
+  <rect x="494" y="222" width="308" height="46" rx="9" fill="#1e293b" stroke="#166534" stroke-width="1.6"/>
+  <text x="512" y="242" fill="#cbd5e1" font-size="12">底盘进程 · 照常运行 ✓</text>
+  <text x="512" y="260" fill="#4ade80" font-size="10.5">继续响应急停 / 遥控，车不失控</text>
+
+  <text x="648" y="296" fill="#86efac" font-size="11.5" text-anchor="middle">相机可以单独重启，另外两个一秒都没停</text>
+  <text x="648" y="312" fill="#64748b" font-size="10.5" text-anchor="middle">（这就是"独立崩溃域"：异常不会跨进程传播）</text>
+
+  <!-- 底部结论 -->
+  <rect x="24" y="342" width="802" height="132" rx="12" fill="#0f172a" stroke="#334155"/>
+  <text x="44" y="368" fill="#fbbf24" font-size="12.5" font-weight="bold">同一个故事，还能再撞两堵墙</text>
+  <text x="44" y="392" fill="#cbd5e1" font-size="11.8">· <tspan fill="#f87171" font-weight="bold">节奏</tspan>：相机 30Hz、雷达 10Hz、底盘 100Hz、导航 1Hz。四种节奏塞进一个循环，只能按最慢的走。</text>
+  <text x="58" y="411" fill="#94a3b8" font-size="11.5">要么 100Hz 的电机被 1Hz 的导航拖住，要么快的抢光 CPU、把慢的饿死。</text>
+  <text x="44" y="434" fill="#cbd5e1" font-size="11.8">· <tspan fill="#f87171" font-weight="bold">语言</tspan>：点云处理要 C++ 的性能，业务逻辑想用 Python 的灵活。同一个进程只能选一种，<tspan fill="#94a3b8">要么牺牲性能，要么牺牲开发效率。</tspan></text>
+  <text x="44" y="457" fill="#86efac" font-size="11.5">拆成独立进程后：崩溃不传播、节奏各自定、语言各自选 —— 这就是"拆"换来的三样东西。</text>
+</svg>
+</div>
+<p class="anim-cap">图 1-2｜拆与不拆，差别不在"代码好不好看"，而在于<b>故障会不会扩散、节奏会不会互相拖累</b>。这也解释了为什么机器人软件几乎一定得多进程。</p>
+
+<p>所以 ROS2 的解法就是"拆岗位"：<b>拆成多个独立进程，各自独立崩溃域、独立执行节奏、可选各自的语言，再用标准接口对话</b>。代价也很实在——你要多管一份进程、多一份通信开销，所以不是"越碎越好"，而是<b>按职责边界拆</b>（怎么拆见下节的四层）。</p>
+
+<h3>但"拆成独立进程"不等于"一个进程塞一个节点"</h3>
+<p>这两件事经常被混为一谈，先把它们分清楚：</p>
+
+<table>
+  <thead><tr><th style="width:18%"></th><th style="width:41%">进程（Process）</th><th>节点（Node）</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><b>它是什么</b></td>
+      <td>操作系统层面"正在运行的程序"，有自己的内存空间</td>
+      <td>ROS2 图里的一个<b>身份</b>，有名字、有通信端点</td>
+    </tr>
+    <tr>
+      <td><b>谁看得见</b></td>
+      <td>操作系统（<code>ps</code>、任务管理器）</td>
+      <td>ROS2（<code>ros2 node list</code>）</td>
+    </tr>
+    <tr>
+      <td><b>数量关系</b></td>
+      <td colspan="2"><b>不是一一对应。</b>一个进程里可以只放 1 个节点，也可以放 3 个。节点是进程里的对象，进程是装这些对象的屋子。</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="tip tealb"><span class="lab">🔍 "一对一更省心"到底省在哪</span>
+本课和大部分入门教程都用<b>「一个程序 = 一个节点」</b>：写完 <code>gas_sensor_node.py</code>，跑起来就是一个进程、一个节点。好处很实在——<b>出问题时好对付</b>：<br>
+· 某个节点行为不对，你可以<b>直接 Ctrl+C 只停它</b>，其它节点毫发无损；<br>
+· 反过来，如果三个节点挤在一个程序里，你想单独停掉其中一个，<b>只能把整块一起停</b>，另外两个也跟着没了；<br>
+· 排查时也直观：终端窗口里谁在刷屏，基本就能对上是哪个节点。<br>
+<b>一句话：一对一不是规定，是"好管"。</b></div>
+
+<p>但 ROS2 <b>并不要求</b>这样。同一个程序里创建多个节点完全可以，还能省掉进程间传输开销。看这段 rclpy 示例：</p>
+
+<pre data-copy="cmd"><span class="b">import</span> rclpy
+<span class="b">from</span> rclpy.node <span class="b">import</span> Node
+
+<span class="c"># ── 同一个 context（同一个进程、同一套 ROS 运行环境）──</span>
+ctx1 = rclpy.Context()
+rclpy.init(context=ctx1)
+node_a = Node(<span class="y">'a'</span>, context=ctx1)   <span class="c"># 节点 a</span>
+node_b = Node(<span class="y">'b'</span>, context=ctx1)   <span class="c"># 节点 b —— 与 a 同进程、同 context</span>
+<span class="c"># 此时 `ros2 node list` 看到 2 个节点，但系统里只多了 1 个进程</span>
+
+<span class="c"># ── 再起一个 context：仍在这一个进程里，但是彼此独立的 ROS 实例 ──</span>
+ctx2 = rclpy.Context()
+rclpy.init(context=ctx2)
+node_c = Node(<span class="y">'c'</span>, context=ctx2)   <span class="c"># 节点 c：同进程，但属于另一套 ROS 运行环境</span>
+
+<span class="c"># 结果：3 个节点全部在同一个 Python 进程内 —— 进程 1 个，节点 3 个</span></pre>
+
+<div class="tip amber"><span class="lab">⚠ 一句话记住这个区别</span>
+<b>进程是"屋子"，节点是"屋里的人"。</b>一间屋子可以住一个人（最常见、最好管），也可以住三个（省房租、串门快，但一个人出事容易连累整屋）。<br>
+ROS2 把这两件事分开设计，是为了让你<b>按需选择</b>：传感器驱动这种"挂了别拖累别人"的角色，单独一间屋；同一套算法里高度耦合的几块，可以合住一间屋。</div>
+
+<div class="tip"><span class="lab">📌 本课怎么练</span>
+本课实操<b>全程按"一个程序一个节点"</b>来，因为这样最容易把生命周期、节点名、<code>node list</code> 三者的对应关系看清楚。<br>
+等你学完 EXP-17 launch，会看到另一种组织方式的真实写法——那时再回头看这段示例，就会有"原来可以这样省资源"的感觉。</div>
+</section>
+
+<section class="blk" id="s2">
+<h2><span class="no">02</span>核心原理：跟着一个真实节点，把生命周期走一遍</h2>
+
+<p>上一节说"节点是岗位"。可岗位怎么设立、怎么开始干活、怎么下班？<b>我们直接拿一个真节点当标本</b>——<code>gas_sensor_node</code>，实验箱上读 MQ5 气体传感器、每秒报一次浓度的那个程序。</p>
+
+<div class="tip tealb"><span class="lab">💡 为什么拿它当例子</span>
+① 它是本课程后面反复出现的<b>真实代码</b>；<br>
+② 它足够小——<b>一个发布者 + 一个定时器</b>，刚好把节点骨架完整露出来；<br>
+③ 它正是 EXP-06 的主角，两课能互相印证。</div>
+
+<p>全部代码不到 30 行，去掉 import 只剩四块。先扫一眼，再一块块拆：</p>
+
+<pre data-copy="cmd"><span class="b">from</span> rclpy.node <span class="b">import</span> Node
+
+<span class="b">class</span> GasSensorNode(Node):                 <span class="c"># 块1：继承 Node，拿到"入场券"</span>
+    <span class="b">def</span> __init__(self):
+        super().__init__(<span class="y">'gas_sensor_node'</span>)      <span class="c"># ① 报名字 → 进 ROS2 图</span>
+        self.declare_parameter(<span class="y">'publish_period'</span>, <span class="y">1.0</span>)  <span class="c"># ② 声明旋钮</span>
+        self.pub = self.create_publisher(Float32, <span class="y">'/gas_sensor'</span>, qos)  <span class="c"># ③ 开出口</span>
+        self.timer = self.create_timer(period, self.timer_cb)          <span class="c"># ④ 定闹钟</span>
+<span class="c">        # 注：period 在 __init__ 里就能读到，因为 super().__init__() 已执行完，</span>
+<span class="c">        #     节点此时已完整；但声明(②)一定要在读(period)之前。</span>
+
+    <span class="b">def</span> timer_cb(self):                       <span class="c"># 块3：回调，被闹钟触发</span>
+        raw, v, ppm, err = read_mq5_once()
+        self.pub.publish(Float32(data=ppm))
+        self.get_logger().info(<span class="y">f'raw={raw} voltage={v:.3f}V ppm={ppm:.2f}'</span>)
+
+<span class="b">def</span> main(args=<span class="b">None</span>):                         <span class="c"># 块4：入口，固定四步</span>
+    rclpy.init(args=args)                     <span class="c"># 开门前的准备</span>
+    node = GasSensorNode()                    <span class="c"># 装修 + 挂牌（构造）</span>
+    <span class="b">try</span>: rclpy.spin(node)                   <span class="c"># 站到柜台后（运行）</span>
+    <span class="b">except</span> KeyboardInterrupt: <span class="b">pass</span>
+    node.destroy_node(); rclpy.shutdown()     <span class="c"># 打烊摘牌（销毁）</span></pre>
+
+<p>就四块。但这四块之间<b>有严格的先后依赖</b>，顺序错了程序直接崩。下面这张图是它的完整生命周期，以及每一步"为什么必须在前一步之后"：</p>
+
+<div class="anim-box">
+<svg viewBox="0 0 900 566" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="system-ui,-apple-system,'Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="ahL1" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#22d3ee"/></marker>
+    <marker id="ahL2" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#f87171"/></marker>
+  </defs>
+
+  <text x="450" y="24" fill="#e2e8f0" font-size="14.5" font-weight="bold" text-anchor="middle">gas_sensor_node 的一生：4 个阶段，顺序不可交换</text>
+  <text x="450" y="45" fill="#64748b" font-size="11.5" text-anchor="middle">左边＝代码在做什么，右边＝这一步漏掉或放错位置会怎样</text>
+
+  <!-- 1 初始化 -->
+  <rect x="20" y="64" width="300" height="96" rx="12" fill="#0c1e26" stroke="#22d3ee" stroke-width="1.8"/>
+  <rect x="20" y="64" width="5" height="96" rx="2.5" fill="#22d3ee"/>
+  <text x="40" y="88" fill="#67e8f9" font-size="12.5" font-weight="bold">① 准备进场　rclpy.init()</text>
+  <text x="40" y="110" fill="#cbd5e1" font-size="12">打开 ROS2 客户端库，建好底层环境</text>
+  <text x="40" y="130" fill="#94a3b8" font-size="11.5" font-family="ui-monospace,Consolas,monospace">rclpy.init(args)</text>
+  <text x="40" y="149" fill="#64748b" font-size="11">此刻还没有任何节点存在</text>
+
+  <rect x="344" y="64" width="536" height="96" rx="10" fill="#111a26" stroke="#7f1d1d" stroke-width="1.2" stroke-dasharray="5 4"/>
+  <text x="362" y="88" fill="#fca5a5" font-size="12" font-weight="bold">漏了会怎样</text>
+  <text x="362" y="110" fill="#94a3b8" font-size="12">后面任何 <tspan font-family="ui-monospace,Consolas,monospace" fill="#a5f3fc">Node(...)</tspan> 都直接抛异常：</text>
+  <text x="362" y="131" fill="#fca5a5" font-size="11.5" font-family="ui-monospace,Consolas,monospace">RuntimeError: rclpy.init() must be called first</text>
+  <text x="362" y="150" fill="#64748b" font-size="11">相当于没开门就喊营业</text>
+
+  <line x1="170" y1="160" x2="170" y2="188" stroke="#22d3ee" stroke-width="2" marker-end="url(#ahL1)"/>
+
+  <!-- 2 构造 -->
+  <rect x="20" y="190" width="300" height="156" rx="12" fill="#0a1f1a" stroke="#34d399" stroke-width="1.8"/>
+  <rect x="20" y="190" width="5" height="156" rx="2.5" fill="#34d399"/>
+  <text x="40" y="214" fill="#6ee7b7" font-size="12.5" font-weight="bold">② 装修挂牌　__init__()</text>
+  <text x="40" y="235" fill="#cbd5e1" font-size="11.8">super().__init__('gas_sensor_node')</text>
+  <text x="40" y="253" fill="#94a3b8" font-size="11.3">→ 报名字进图，此刻就能被 list 看到</text>
+  <text x="40" y="276" fill="#cbd5e1" font-size="11.8">declare_parameter('publish_period', 1.0)</text>
+  <text x="40" y="294" fill="#94a3b8" font-size="11.3">→ 声明一个运行时可调的旋钮</text>
+  <text x="40" y="317" fill="#cbd5e1" font-size="11.8">create_publisher + create_timer</text>
+  <text x="40" y="335" fill="#94a3b8" font-size="11.3">→ 开出口、定闹钟（还没开始用）</text>
+
+  <rect x="344" y="190" width="536" height="156" rx="10" fill="#111a26" stroke="#7f1d1d" stroke-width="1.2" stroke-dasharray="5 4"/>
+  <text x="362" y="214" fill="#fca5a5" font-size="12" font-weight="bold">顺序错了会怎样（最高频的错误）</text>
+  <text x="362" y="237" fill="#94a3b8" font-size="12">把 <tspan font-family="ui-monospace,Consolas,monospace" fill="#a5f3fc">super().__init__()</tspan> 挪到后面：</text>
+  <text x="362" y="258" fill="#fca5a5" font-size="11.5" font-family="ui-monospace,Consolas,monospace">AttributeError: object has no attribute '_clock'</text>
+  <text x="362" y="281" fill="#94a3b8" font-size="12">因为 <tspan font-family="ui-monospace,Consolas,monospace" fill="#a5f3fc">create_publisher</tspan> 要用父类建好的底座，<tspan fill="#fcd34d">先上户口，再办业务。</tspan></text>
+  <text x="362" y="302" fill="#94a3b8" font-size="12">还有个软坑：节点名不唯一时，ROS2 会<tspan fill="#fcd34d" font-weight="bold">自动改名</tspan></text>
+  <text x="362" y="321" fill="#94a3b8" font-size="12">成 <tspan font-family="ui-monospace,Consolas,monospace" fill="#a5f3fc">gas_sensor_node_1</tspan>，只给个 WARN，不报错。</text>
+  <text x="362" y="340" fill="#64748b" font-size="11">（指导书思考题 1 问的就是这件事）</text>
+
+  <line x1="170" y1="346" x2="170" y2="374" stroke="#22d3ee" stroke-width="2" marker-end="url(#ahL1)"/>
+
+  <!-- 3 运行 -->
+  <rect x="20" y="376" width="300" height="100" rx="12" fill="#171233" stroke="#a78bfa" stroke-width="1.8"/>
+  <rect x="20" y="376" width="5" height="100" rx="2.5" fill="#a78bfa"/>
+  <text x="40" y="400" fill="#c4b5fd" font-size="12.5" font-weight="bold">③ 站柜台营业　spin()</text>
+  <text x="40" y="421" fill="#cbd5e1" font-size="12">事件循环一直转：闹钟响 → 调 timer_cb</text>
+  <text x="40" y="440" fill="#94a3b8" font-size="11.3">→ 读 ADC → 发 <tspan font-family="ui-monospace,Consolas,monospace" fill="#a5f3fc">/gas_sensor</tspan> → 打一行日志</text>
+  <text x="40" y="461" fill="#64748b" font-size="11">每秒重复，直到你按 Ctrl+C</text>
+
+  <rect x="344" y="376" width="536" height="100" rx="10" fill="#111a26" stroke="#7f1d1d" stroke-width="1.2" stroke-dasharray="5 4"/>
+  <text x="362" y="400" fill="#fca5a5" font-size="12" font-weight="bold">漏了会怎样（最迷惑人的现象）</text>
+  <text x="362" y="422" fill="#94a3b8" font-size="12">没写 spin：程序<tspan fill="#fcd34d" font-weight="bold">立刻正常退出</tspan>、不报任何错，</text>
+  <text x="362" y="441" fill="#94a3b8" font-size="12">但 <tspan font-family="ui-monospace,Consolas,monospace" fill="#a5f3fc">timer_cb</tspan> 一次都没跑过 —— 没人按闹钟。</text>
+  <text x="362" y="462" fill="#fcd34d" font-size="12">现象：装好了、挂牌了、就是不出数据。05 节专门讲这个。</text>
+
+  <line x1="170" y1="476" x2="170" y2="504" stroke="#f87171" stroke-width="2" marker-end="url(#ahL2)"/>
+
+  <!-- 4 销毁 -->
+  <rect x="20" y="506" width="860" height="44" rx="12" fill="#251a06" stroke="#fbbf24" stroke-width="1.8"/>
+  <rect x="20" y="506" width="5" height="44" rx="2.5" fill="#fbbf24"/>
+  <text x="40" y="533" fill="#fcd34d" font-size="12.5" font-weight="bold">④ 打烊摘牌　destroy_node() + shutdown()</text>
+  <text x="330" y="533" fill="#94a3b8" font-size="11.8">端点从图里消失、句柄释放 —— 传感器驱动必须在这里关设备，否则下次启动报"设备忙"</text>
+</svg>
+</div>
+<p class="anim-cap">四个阶段里 <b>只有 ③ 是"活着"</b>：①②是开门前的准备，④是离场。图右那列红色文字全是真机上会碰到的报错——记住它们，排障能省一小时。</p>
+
+<h3>问题一：程序怎么知道自己"该是谁"</h3>
+<p>回到那行 <code>super().__init__('gas_sensor_node')</code>。<b>Node 这个名字，是租来的，不是天生的。</b></p>
+<p>你写个普通 Python 类，它就只是个对象，跑完就没了，谁也不知道它存在。只有继承 <code>Node</code> 并把这行 <code>super().__init__()</code> 跑完，这个对象才会向 ROS2 底层<b>报到</b>，从此有了全局身份、有了可被寻址的名字，出现在 <code>ros2 node list</code> 里。</p>
+<table>
+  <tr><th>如果你这样写</th><th>会发生什么</th><th>为什么</th></tr>
+  <tr><td><code>class Foo:</code>（不继承 Node）</td><td><code>ros2 node list</code> 里永远看不到它</td><td>没报到，ROS2 图里没有它这个"参与者"</td></tr>
+  <tr><td><code>class Foo(Node):</code> 但不调 <code>super().__init__()</code></td><td>创建时就报错，根本活不到运行</td><td>父类的底座没建，后续 API 全部不可用</td></tr>
+  <tr><td><code>class Foo(Node):</code> 且调了 <code>super().__init__('foo')</code></td><td>✅ 出现在图中，名字是 <code>/foo</code></td><td>正常报到</td></tr>
+</table>
+<div class="tip"><span class="lab">类比</span>继承 <code>Node</code> = <b>办了入职手续</b>；<code>super().__init__('名字')</code> = <b>领工牌</b>。手续没办，公司系统里查无此人；工牌没领，同事叫不出你。</div>
+
+<h3>问题二：节点到底"在哪"被观察到</h3>
+<p>报到完了，别人怎么看见它？靠两条命令——它们读的是同一张全局表（ROS2 图），所以只要节点在 spin，随时都能查到：</p>
+<pre data-copy="cmd"><span class="g">ros2</span> node list                  <span class="c"># 点名：现在都有谁在？→ /gas_sensor_node</span>
+<span class="g">ros2</span> node info /gas_sensor_node <span class="c"># 查户口：它发什么、收什么、提供哪些服务</span>
+<span class="c">#  Publishers: /gas_sensor [std_msgs/msg/Float32]   ← 构造函数第 ③ 步开的出口</span>
+<span class="c">#  Subscribers: /parameter_events, /rosout         ← ROS2 给每个节点自动挂的两个"系统话题"</span>
+<span class="c">#  Services: /gas_sensor_node/describe_parameters … ← 参数能力（EXP-10 细讲）</span></pre>
+<p>顺带解释一个新手常见疑惑：<b>我明明没订阅 <code>/parameter_events</code> 和 <code>/rosout</code>，它们哪来的？</b>——这是 ROS2 在创建节点时自动挂上的公共设施：前者让"改参数"这件事能广播出去，后者把日志汇聚到统一地方。所以每个节点天生就带参数与日志能力，不用你自己写。</p>
+
+<h3>问题三：spin 到底在转什么</h3>
+<p>这是本课<b>最难也最关键</b>的一步。看代码 <code>rclpy.spin(node)</code>，很容易以为它在"死循环占着不动"——恰恰相反，<b>它是唯一让活能干起来的东西</b>。</p>
+
+<div class="tip tealb"><span class="lab">💡 把 spin 想成"老板站在大堂"</span>
+节点已经开好了四个窗口：<b>点餐台</b>（定时器）、<b>外卖窗口</b>（话题回调）、<b>电话</b>（服务请求）、<b>意见簿</b>（参数变更）。<br>
+· <b>有 spin</b>：老板站在大堂，谁来了就招呼谁——闹钟响就去做采样，有消息就去处理。活有人接。<br>
+· <b>没 spin</b>：老板回后院睡觉了。外卖小哥照样把东西送到窗口，可<b>东西就一直堆着，没人接</b>。<br>
+这就是"程序明明在跑、log 却一行没有"的真实原因——<b>不是坏了，是没人接活</b>。</div>
+
+<div class="anim-box">
+<svg viewBox="0 0 760 356" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="system-ui,sans-serif">
+  <defs>
+    <marker id="ahSpinOn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#22d3ee"/></marker>
+    <marker id="ahSpinOff" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#f87171"/></marker>
+  </defs>
+
+  <rect x="22" y="14" width="716" height="156" rx="14" fill="#0b1220" stroke="#164e63" stroke-width="1.6"/>
+  <text x="44" y="40" fill="#4ade80" font-size="13" font-weight="bold">① 有 spin —— 店开着，老板站在大堂</text>
+  <text x="52" y="66" fill="#94a3b8" font-size="11.5">定时器到点了</text>
+  <text x="52" y="90" fill="#94a3b8" font-size="11.5">话题消息到了</text>
+  <text x="52" y="114" fill="#94a3b8" font-size="11.5">服务请求来了</text>
+  <text x="52" y="138" fill="#94a3b8" font-size="11.5">参数被改了</text>
+  <path class="comm-flow" d="M214,106 H276" stroke="#22d3ee" stroke-width="2.2" fill="none" marker-end="url(#ahSpinOn)"/>
+  <rect x="286" y="76" width="190" height="60" rx="12" fill="#1e293b" stroke="#22d3ee" stroke-width="2.4"/>
+  <text x="381" y="101" fill="#ffffff" font-size="13.5" font-weight="bold" text-anchor="middle">executor 事件循环</text>
+  <text x="381" y="121" fill="#67e8f9" font-size="11" text-anchor="middle">有活就派给对应的回调</text>
+  <path class="comm-flow" d="M480,106 H538" stroke="#22d3ee" stroke-width="2.2" fill="none" marker-end="url(#ahSpinOn)"/>
+  <text x="556" y="101" fill="#4ade80" font-size="12">timer_cb 被调用</text>
+  <text x="556" y="121" fill="#4ade80" font-size="12">日志一行行出来 ✓</text>
+  <circle r="4.5" fill="#22d3ee">
+    <animate attributeName="cx" values="218;272" dur="1.2s" repeatCount="indefinite"/>
+    <animate attributeName="cy" values="106;106" dur="1.2s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0;1;1;0" dur="1.2s" repeatCount="indefinite"/>
+  </circle>
+  <circle r="4.5" fill="#67e8f9">
+    <animate attributeName="cx" values="482;534" dur="1.2s" begin="0.45s" repeatCount="indefinite"/>
+    <animate attributeName="cy" values="106;106" dur="1.2s" begin="0.45s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0;1;1;0" dur="1.2s" begin="0.45s" repeatCount="indefinite"/>
+  </circle>
+
+  <rect x="22" y="186" width="716" height="156" rx="14" fill="#0b1220" stroke="#7f1d1d" stroke-width="1.6"/>
+  <text x="44" y="212" fill="#f87171" font-size="13" font-weight="bold">② 没 spin —— 老板回后院睡觉了</text>
+  <text x="52" y="238" fill="#94a3b8" font-size="11.5">定时器到点了</text>
+  <text x="52" y="262" fill="#94a3b8" font-size="11.5">话题消息到了</text>
+  <text x="52" y="286" fill="#94a3b8" font-size="11.5">服务请求来了</text>
+  <text x="52" y="310" fill="#94a3b8" font-size="11.5">参数被改了</text>
+  <path class="comm-flow" d="M214,278 H242" stroke="#f87171" stroke-width="2.2" fill="none" marker-end="url(#ahSpinOff)"/>
+  <line x1="250" y1="246" x2="250" y2="310" stroke="#f87171" stroke-width="3" stroke-dasharray="5 4"/>
+  <circle cx="234" cy="264" r="3.4" fill="#7f1d1d"/>
+  <circle cx="234" cy="282" r="3.4" fill="#7f1d1d"/>
+  <circle cx="234" cy="300" r="3.4" fill="#7f1d1d"/>
+  <text x="250" y="330" fill="#f87171" font-size="10.5" text-anchor="middle">活堆在这儿，没人接</text>
+  <rect x="286" y="248" width="190" height="60" rx="12" fill="#1e293b" stroke="#7f1d1d" stroke-width="2.2"/>
+  <text x="381" y="273" fill="#fca5a5" font-size="13.5" font-weight="bold" text-anchor="middle">executor 空转</text>
+  <text x="381" y="293" fill="#94a3b8" font-size="11" text-anchor="middle">💤 回调一次都没被调用</text>
+  <text x="512" y="286" fill="#f87171" font-size="24" font-weight="bold" text-anchor="middle">✗</text>
+  <text x="556" y="273" fill="#f87171" font-size="12">消息堆在队列里</text>
+  <text x="556" y="293" fill="#f87171" font-size="12">程序却已悄悄退出</text>
+  <circle r="4.5" fill="#f87171">
+    <animate attributeName="cx" values="218;246;246" keyTimes="0;0.5;1" dur="1.8s" repeatCount="indefinite"/>
+    <animate attributeName="cy" values="278;278;278" dur="1.8s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0;1;1;0" dur="1.8s" repeatCount="indefinite"/>
+  </circle>
+</svg>
+</div>
+<p class="anim-cap">同一家店、同样几个窗口——区别只在于"老板在不在大堂"。这就是 <code>spin</code> 的全部含义。<b>spin 不产生数据，它只负责"把已经到达的活派出去"。</b></p>
+
+<h3>问题四：谁在决定"先干哪个活"</h3>
+<p>到这儿有个新问题：如果同一时刻闹钟响了、消息也到了，谁先？这就引出第三个概念 <b>Executor（执行器）</b>。</p>
+<div class="kgrid">
+  <div class="kcard"><div class="kd">默认行为</div><div class="kt">单线程，排队一个个来</div><p><code>rclpy.spin(node)</code> 用的是 <code>SingleThreadedExecutor</code>：一次只执行一个回调，其他排队。行为可预测、不会有并发 bug，<b>绝大多数场景够用，也是本课用的</b>。</p></div>
+  <div class="kcard"><div class="kd">要并行时</div><div class="kt">多线程执行器</div><p><code>MultiThreadedExecutor(num_threads=N)</code> 让不同回调真正并行。代价是<b>你的回调必须自己保证线程安全</b>（加锁），否则数据会乱——初学阶段先别碰。</p></div>
+  <div class="kcard"><div class="kd">要更细的控制</div><div class="kt">回调组 CallbackGroup</div><p><code>MutuallyExclusiveCallbackGroup</code>（同组互斥，同一时刻只跑一个）/ <code>ReentrantCallbackGroup</code>（同组可重入，可并发）。用来"哪些回调允许并行、哪些必须排队"。</p></div>
+</div>
+
+<h3 style="font-size:15.5px;color:var(--theme-deep);margin:24px 0 0">代码怎么写：三种执行器的启动方式</h3>
+<p>上面三张卡片说的是"是什么"，这里给出"怎么写"。<b>三者是层层递进的关系</b>：默认单线程 → 换多线程 → 用回调组精细控制。<b>先看清 main() 里那几行差在哪。</b></p>
+
+<p style="margin:14px 0 6px;font-weight:700;font-size:13.5px;color:var(--theme-deep)">① 默认写法：<code>rclpy.spin(node)</code>（本课用这个）</p>
+<pre><span class="c"># 最短的 main()：rclpy.spin 内部就是用 SingleThreadedExecutor 帮你 spin</span>
+<span class="b">def</span> main():
+    rclpy.init()
+    node = GasSensorNode()
+    <span class="b">try</span>:
+        rclpy.spin(node)          <span class="c"># 单线程，一次一个回调，其余排队</span>
+    <span class="b">except</span> KeyboardInterrupt:
+        <span class="b">pass</span>
+    <span class="b">finally</span>:
+        node.destroy_node()
+        rclpy.shutdown()</pre>
+<p class="cs-see" style="font-size:12.5px;color:#0f766e;margin:8px 0 0;line-height:1.7">✔ <b>等价于</b>下面这段——理解这点很重要，<code>rclpy.spin()</code> 不是另一种机制，只是"帮你 new 了一个单线程执行器并 spin 它"：</p>
+<pre><span class="c"># 展开后的等价写法，看得更清楚</span>
+<span class="b">from</span> rclpy.executors <span class="b">import</span> SingleThreadedExecutor
+
+executor = SingleThreadedExecutor()
+executor.add_node(node)
+<span class="b">try</span>:
+    executor.spin()
+<span class="b">finally</span>:
+    executor.shutdown()
+    node.destroy_node()</pre>
+
+<p style="margin:20px 0 6px;font-weight:700;font-size:13.5px;color:var(--theme-deep)">② 多线程执行器：让不同回调真正并行</p>
+<p style="font-size:13.5px;color:#475569;line-height:1.8;margin:0 0 8px">把 <code>SingleThreadedExecutor</code> 换成 <code>MultiThreadedExecutor</code>，并指定线程数。<b>注意：必须自己加锁</b>，否则两个线程同时改一个变量就会出脏数据。</p>
+<pre><span class="c"># 多线程版：num_threads 决定最多几个回调同时跑</span>
+<span class="b">import</span> threading
+<span class="b">import</span> rclpy
+<span class="b">from</span> rclpy.node <span class="b">import</span> Node
+<span class="b">from</span> std_msgs.msg <span class="b">import</span> Float32
+<span class="b">from</span> rclpy.executors <span class="b">import</span> MultiThreadedExecutor
+
+<span class="b">class</span> GasSensorNode(Node):
+    <span class="b">def</span> __init__(self):
+        <span class="b">super</span>().__init__(<span class="s">'gas_sensor_node'</span>)
+        <span class="c"># 共享数据必须先配一把锁</span>
+        self._lock = threading.Lock()
+        self._last_ppm = 0.0
+        self.create_timer(1.0, self.timer_cb)
+        self.create_subscription(Float32, <span class="s">'/cmd'</span>, self.cmd_cb, 10)
+
+    <span class="b">def</span> timer_cb(self):
+        ppm = read_mq5_once()
+        <span class="b">with</span> self._lock:              <span class="c"># 加锁写</span>
+            self._last_ppm = ppm
+
+    <span class="b">def</span> cmd_cb(self, msg):
+        <span class="b">with</span> self._lock:              <span class="c"># 加锁读</span>
+            <span class="b">print</span>(<span class="s">f'当前 {self._last_ppm}'</span>)
+
+
+<span class="b">def</span> main():
+    rclpy.init()
+    node = GasSensorNode()
+
+    <span class="c"># 关键一行：换成多线程执行器，开 4 个线程</span>
+    executor = MultiThreadedExecutor(num_threads=<span class="b">4</span>)
+    executor.add_node(node)
+
+    <span class="b">try</span>:
+        executor.spin()             <span class="c"># 4 个线程同时从队列里取活干</span>
+    <span class="b">except</span> KeyboardInterrupt:
+        <span class="b">pass</span>
+    <span class="b">finally</span>:
+        executor.shutdown()
+        node.destroy_node()
+        rclpy.shutdown()</pre>
+
+<div class="tip amber" style="margin-top:10px">⚠️ <b>多线程的代价（别急着用）</b><br>
+· <b>必须自己保证线程安全</b>：所有被多个回调共享的变量都要加锁，漏一个就是"偶发"的数据错乱，极难查；<br>
+· <b>rclpy 不是完全线程安全的</b>：两个回调同时调 <code>create_publisher</code>/<code>destroy_node</code> 这类操作可能崩；<br>
+· <b>调试变难</b>：现象不再可复现（有时对有时不对）。<br>
+<b>结论</b>：先单线程跑通，确认瓶颈真的在"回调排队"上，再考虑换多线程。</div>
+
+<p style="margin:20px 0 6px;font-weight:700;font-size:13.5px;color:var(--theme-deep)">③ 回调组：精细控制"哪些能并行"</p>
+<p style="font-size:13.5px;color:#475569;line-height:1.8;margin:0 0 8px">多线程执行器是"整体放开"，回调组是"<b>按组放开</b>"——你要明确告诉 ROS2：这几个回调可以并行，那几个必须排队。<b>用法是在创建定时器/订阅时传入 <code>callback_group</code> 参数。</b></p>
+<pre><span class="c"># 回调组：给回调分组，决定组内是"互斥"还是"可重入"</span>
+<span class="b">import</span> time
+<span class="b">import</span> rclpy
+<span class="b">from</span> rclpy.node <span class="b">import</span> Node
+<span class="b">from</span> std_msgs.msg <span class="b">import</span> Float32
+<span class="b">from</span> rclpy.callback_groups <span class="b">import</span> (
+    MutuallyExclusiveCallbackGroup,   <span class="c"># 同组互斥：一次只跑一个</span>
+    ReentrantCallbackGroup,           <span class="c"># 同组可重入：可并发跑多个</span>
+)
+<span class="b">from</span> rclpy.executors <span class="b">import</span> MultiThreadedExecutor
+
+
+<span class="b">class</span> RobotNode(Node):
+    <span class="b">def</span> __init__(self):
+        <span class="b">super</span>().__init__(<span class="s">'robot_node'</span>)
+
+        <span class="c"># 组 A：慢活，互斥——同一时刻只允许一个在跑</span>
+        self.group_slow = MutuallyExclusiveCallbackGroup()
+
+        <span class="c"># 组 B：快活，可重入——多个可以同时跑</span>
+        self.group_fast = ReentrantCallbackGroup()
+
+        <span class="c"># 创建时把组传进去，这个回调就归到该组</span>
+        self.create_timer(5.0, self.slow_cb, callback_group=self.group_slow)
+        self.create_subscription(
+            Float32, <span class="s">'/cmd'</span>, self.fast_cb, 10,
+            callback_group=self.group_fast)      <span class="c"># ← 关键参数</span>
+
+    <span class="b">def</span> slow_cb(self):
+        time.sleep(3)               <span class="c"># 慢：即便多个触发，同组互斥也不会叠加</span>
+
+    <span class="b">def</span> fast_cb(self, msg):
+        <span class="b">print</span>(msg.data)            <span class="c"># 快：多条消息可并发处理</span>
+
+
+<span class="b">def</span> main():
+    rclpy.init()
+    node = RobotNode()
+
+    <span class="c"># 回调组必须配合多线程执行器才有多线程效果</span>
+    executor = MultiThreadedExecutor(num_threads=<span class="b">4</span>)
+    executor.add_node(node)
+    <span class="b">try</span>:
+        executor.spin()
+    <span class="b">except</span> KeyboardInterrupt:
+        <span class="b">pass</span>
+    <span class="b">finally</span>:
+        executor.shutdown()
+        node.destroy_node()
+        rclpy.shutdown()</pre>
+
+<table style="margin-top:10px">
+  <tr><th>回调组类型</th><th>同组内行为</th><th>典型用途</th></tr>
+  <tr><td><code>MutuallyExclusiveCallbackGroup</code></td><td><b>互斥</b>：同组同一时刻只跑一个，其余排队</td><td>操作共享硬件（如串口、GPIO）的回调，绝不能并发</td></tr>
+  <tr><td><code>ReentrantCallbackGroup</code></td><td><b>可重入</b>：同组可多个同时跑</td><td>纯计算、无共享状态的快回调</td></tr>
+  <tr><td>不传（默认）</td><td>归入节点的默认组，行为等同互斥</td><td>本课所有节点的写法</td></tr>
+</table>
+
+<div class="tip tealb" style="margin-top:10px">🔑 <b>三者的关系，一句话记住</b><br>
+<code>SingleThreadedExecutor</code> = 1 个窗口，所有活排队；<br>
+<code>MultiThreadedExecutor</code> = N 个窗口，但哪些活能同时办<b>由回调组决定</b>；<br>
+<b>回调组不换执行器就没用</b>——单线程下即便标了 <code>Reentrant</code>，也只有一个线程在跑。<b>先选执行器，再用回调组微调</b>。</div>
+
+<div class="tip amber"><span class="lab">⚠ 一条铁律：回调里别阻塞</span>
+单线程下只有一个回调在跑。如果 <code>timer_cb</code> 里写了 <code>sleep(5)</code> 或一个慢查询，<b>这 5 秒内所有别的回调都停在队列里动不了</b>，现象就是"节点卡住了"。<b>回调要短</b>；真要干重活，丢给独立线程或另一个节点。同理：服务回调里如果调用了还要等 spin 才能完成的东西（比如同步等待），会直接死锁——这就是 EXP-07 要讲的坑。</div>
+
+<h3>问题五：节点之间怎么"接上头"</h3>
+<p>现在 <code>gas_sensor_node</code> 已经能在柜台后正常干活了。可它发出的 <code>/gas_sensor</code>，怎么保证被 <code>gas_monitor</code> 收到？<b>代码里从来没写过对方的 IP 或端口</b>——这层事完全由 DDS 代办：</p>
+
+<div class="anim-box">
+<svg viewBox="0 0 760 328" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="system-ui,sans-serif">
+  <defs>
+    <marker id="ahDisc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#fbbf24"/>
+    </marker>
+  </defs>
+  <text x="28" y="26" fill="#fbbf24" font-size="14.5" font-weight="bold">发现与建连：没有 Master，两个节点怎么互相找到</text>
+  <text x="28" y="47" fill="#64748b" font-size="12">全程由 DDS 自己完成 —— 组播宣告身份 → 单播交换端点 → 三项匹配 → 建点对点通路</text>
+
+  <rect x="30" y="104" width="150" height="72" rx="12" fill="#1e293b" stroke="#0891b2" stroke-width="2.5"/>
+  <text x="105" y="134" fill="#ffffff" font-size="13.5" font-weight="bold" text-anchor="middle">gas_sensor_node</text>
+  <text x="105" y="154" fill="#67e8f9" font-size="11.5" text-anchor="middle">publisher</text>
+
+  <rect x="580" y="104" width="150" height="72" rx="12" fill="#1e293b" stroke="#0891b2" stroke-width="2.5"/>
+  <text x="655" y="134" fill="#ffffff" font-size="13.5" font-weight="bold" text-anchor="middle">gas_monitor</text>
+  <text x="655" y="154" fill="#67e8f9" font-size="11.5" text-anchor="middle">subscription</text>
+
+  <ellipse cx="380" cy="140" rx="98" ry="50" fill="#0b1220" stroke="#334155" stroke-width="2" stroke-dasharray="6 5"/>
+  <text x="380" y="128" fill="#cbd5e1" font-size="12.5" text-anchor="middle">DDS 发现层</text>
+  <text x="380" y="148" fill="#64748b" font-size="11" text-anchor="middle">交换端点：话题名 / 类型 / QoS</text>
+  <text x="380" y="166" fill="#64748b" font-size="11" text-anchor="middle">只牵线，不中转数据</text>
+
+  <path class="comm-flow slow" d="M182,128 H276" stroke="#fbbf24" stroke-width="2.4" fill="none" marker-end="url(#ahDisc)"/>
+  <path class="comm-flow slow" d="M578,128 H484" stroke="#fbbf24" stroke-width="2.4" fill="none" marker-end="url(#ahDisc)"/>
+  <text x="229" y="116" fill="#fcd34d" font-size="11" text-anchor="middle">① 我上线了</text>
+  <text x="531" y="116" fill="#fcd34d" font-size="11" text-anchor="middle">① 我也在</text>
+
+  <path d="M105,176 V232 H655 V176" stroke="#155e75" stroke-width="2.6" fill="none"/>
+  <path class="comm-flow" d="M105,176 V232 H655 V176" stroke="#22d3ee" stroke-width="2.6" fill="none"/>
+  <circle r="5.5" fill="#22d3ee">
+    <animate attributeName="cx" values="105;105;655;655" keyTimes="0;0.085;0.915;1" dur="2.4s" repeatCount="indefinite"/>
+    <animate attributeName="cy" values="176;232;232;176" keyTimes="0;0.085;0.915;1" dur="2.4s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0;1;1;1;0" keyTimes="0;0.04;0.5;0.94;1" dur="2.4s" repeatCount="indefinite"/>
+  </circle>
+  <text x="380" y="258" fill="#67e8f9" font-size="11.5" text-anchor="middle">④ 建连后数据点对点直传，不经任何中间服务器</text>
+
+  <text x="28" y="292" fill="#94a3b8" font-size="12">① 各自向组播地址宣告身份（SPDP，组播地址 239.255.0.1）　　② 单播交换彼此的端点：话题名 / 类型 / QoS（SEDP）</text>
+  <text x="28" y="314" fill="#94a3b8" font-size="12">③ 三项全部匹配才建立通路　　④ 之后数据直连 —— 发现层只牵线、不中转，所以没有单点故障</text>
+</svg>
+</div>
+<p class="anim-cap">注意图里最关键的一句：<b>"发现层只牵线、不中转"</b>。所以 ROS2 没有注册中心，也就不存在"注册中心一挂、全网瘫痪"的单点故障——这是 EXP-01 里 ROS1 vs ROS2 对比的底层原因。</p>
+
+<div class="tip amber"><span class="lab">⚠ 用词要准：这里是"组播"，不是"广播"</span>
+这两个词日常混着说没关系，但在网络层面是两回事，讲 DDS 发现时必须分清：<br>
+· <b>组播（Multicast／多播）</b>：发给一个<b>特定组</b>。DDS 用 <code>239.255.0.1</code> 这类组播地址，只有<b>加入了该组</b>（同 Domain、同 DDS 实现）的网卡才会收到。<br>
+· <b>广播（Broadcast）</b>：发给<b>同一网段内所有人</b>，不管你愿不愿意听，路由器默认还不转发。<br>
+所以准确说法是：<b>节点向组播地址宣告自己（SPDP），随后双方单播交换端点（SEDP）</b>。用"组播"不仅更准，也解释了为什么"同网段却互相发现不了"——多半是交换机/防火墙把组播拦了。</div>
+
+<div class="tip tealb"><span class="lab">🔍 记这一条，能省无数次排障</span>
+两个节点都起来了、却收不到数据，<b>90% 卡在这三项之一没对上</b>：<br>
+① <b>话题名</b>不一致（一个是 <code>/gas_sensor</code>、一个是 <code>/gas_sensor_data</code>）；<br>
+② <b>消息类型</b>不一致；<br>
+③ <b>QoS 不兼容</b>（订阅端要 RELIABLE，发布端只给 BEST_EFFORT → 压根连不上）。<br>
+第 ③ 条是 EXP-06 的重头戏。排查顺序就按 ①②③ 走，用 <code>ros2 topic info /gas_sensor --verbose</code> 一次看全。</div>
+
+<h3>问题六：三种"对话方式"怎么选</h3>
+<p>节点建好连上之后，说话的方式有三种。本课只需要建立"选型直觉"，细节留给后面三课：</p>
+<table>
+  <tr><th></th><th>话题 Topic</th><th>服务 Service</th><th>动作 Action</th></tr>
+  <tr><td>像什么</td><td>广播电台</td><td>打客服电话</td><td>点外卖看进度</td></tr>
+  <tr><td>方向</td><td>单向，发完就走</td><td>一问一答</td><td>派活 + 多次回报 + 结果</td></tr>
+  <tr><td>要不要等结果</td><td>不等</td><td>必须等</td><td>不干等，可中途取消</td></tr>
+  <tr><td>本课程例子</td><td><code>/gas_sensor</code>、<code>/cmd_vel</code></td><td><code>/verify_fingerprint</code></td><td><code>/read_card</code></td></tr>
+  <tr><td>在哪一课</td><td>EXP-06</td><td>EXP-07</td><td>EXP-08</td></tr>
+</table>
+<div class="tip"><span class="lab">怎么选：问三个问题</span>
+要不要知道结果？<b>不要</b> → 话题。<br>
+要结果、而且一瞬算完？<b>要，且快</b> → 服务。<br>
+要结果、但很慢、还想看进度、甚至想中途叫停？<b>要，且慢</b> → 动作。</div>
+
+<div class="anim-box">
+<svg viewBox="0 0 900 250" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="system-ui,-apple-system,'Noto Sans CJK SC',sans-serif">
+  <defs>
+    <marker id="ahFl" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#fbbf24"/></marker>
+  </defs>
+  <text x="450" y="24" fill="#e2e8f0" font-size="13.5" font-weight="bold" text-anchor="middle">选型只要一个决策链：先问"要不要结果"，再问"快不快"</text>
+
+  <rect x="24" y="96" width="150" height="60" rx="12" fill="#0f172a" stroke="#0891b2" stroke-width="2"/>
+  <text x="99" y="122" fill="#e2e8f0" font-size="12.5" font-weight="bold" text-anchor="middle">我要发一段数据</text>
+  <text x="99" y="141" fill="#64748b" font-size="11" text-anchor="middle">它的性质是什么</text>
+
+  <line x1="174" y1="126" x2="220" y2="60" stroke="#fbbf24" stroke-width="1.8" marker-end="url(#ahFl)"/>
+  <line x1="174" y1="126" x2="220" y2="196" stroke="#fbbf24" stroke-width="1.8" marker-end="url(#ahFl)"/>
+  <text x="186" y="76" fill="#94a3b8" font-size="11">不需要回话</text>
+  <text x="186" y="196" fill="#94a3b8" font-size="11">需要回话</text>
+
+  <rect x="226" y="30" width="150" height="60" rx="12" fill="#0c1e26" stroke="#22d3ee" stroke-width="2"/>
+  <text x="301" y="56" fill="#67e8f9" font-size="12.5" font-weight="bold" text-anchor="middle">话题 Topic</text>
+  <text x="301" y="75" fill="#94a3b8" font-size="10.8" text-anchor="middle">一直流，发完不管</text>
+
+  <rect x="226" y="166" width="150" height="60" rx="12" fill="#0a1f1a" stroke="#34d399" stroke-width="2"/>
+  <text x="301" y="192" fill="#6ee7b7" font-size="12.5" font-weight="bold" text-anchor="middle">要结果，快吗？</text>
+
+  <line x1="376" y1="180" x2="440" y2="120" stroke="#fbbf24" stroke-width="1.8" marker-end="url(#ahFl)"/>
+  <line x1="376" y1="212" x2="440" y2="228" stroke="#7f1d1d" stroke-width="1.8" marker-end="url(#ahFl)"/>
+  <text x="392" y="140" fill="#94a3b8" font-size="11">一瞬就完</text>
+  <text x="392" y="214" fill="#94a3b8" font-size="11">很慢 / 要进度</text>
+
+  <rect x="446" y="90" width="180" height="60" rx="12" fill="#0e2a25" stroke="#34d399" stroke-width="2"/>
+  <text x="536" y="116" fill="#6ee7b7" font-size="12.5" font-weight="bold" text-anchor="middle">服务 Service</text>
+  <text x="536" y="135" fill="#94a3b8" font-size="10.8" text-anchor="middle">问一句，等一句答</text>
+
+  <rect x="446" y="198" width="180" height="60" rx="12" fill="#171233" stroke="#a78bfa" stroke-width="2"/>
+  <text x="536" y="224" fill="#c4b5fd" font-size="12.5" font-weight="bold" text-anchor="middle">动作 Action</text>
+  <text x="536" y="243" fill="#94a3b8" font-size="10.8" text-anchor="middle">派活 + 进度 + 可取消</text>
+
+  <rect x="650" y="90" width="230" height="60" rx="10" fill="#111a26" stroke="#334155" stroke-dasharray="5 4"/>
+  <text x="665" y="112" fill="#94a3b8" font-size="11">例：<tspan font-family="ui-monospace,Consolas,monospace" fill="#a5f3fc">/gas_sensor</tspan> 每秒发浓度</text>
+  <text x="665" y="133" fill="#94a3b8" font-size="11">例：<tspan font-family="ui-monospace,Consolas,monospace" fill="#a5f3fc">/cmd_vel</tspan> 每秒发速度</text>
+  <rect x="650" y="166" width="230" height="60" rx="10" fill="#111a26" stroke="#334155" stroke-dasharray="5 4"/>
+  <text x="665" y="188" fill="#94a3b8" font-size="11">例：验证一根指纹</text>
+  <text x="665" y="209" fill="#94a3b8" font-size="11">例：让机械臂走一段轨迹</text>
+</svg>
+</div>
+<p class="anim-cap">这张图不用背，但要能自己画出来。EXP-06~08 会把每个分支掰开讲透。</p>
+</section>
+
+<section class="blk" id="s6">
+<h2><span class="no">03</span>节点 API 速查手册</h2>
+<p>这一节不是"讲解"，是<b>手册</b>。写节点时你会反复回来查：调用哪个、传什么参数、返回什么、写错了会怎样。<b>下面按"你在什么场景下要用"分组</b>，每条都给签名 + 参数 + 返回 + 最小示例。</p>
+<div class="tip tealb"><span class="lab">怎么用这节</span>第一遍通读，建立"有这么些能力"的印象；真写代码时按场景回来查表即可。<b>标 ★ 的是本课和后续实验一定会用到的</b>，其余是常见但可延后再看。</div>
+
+<h3>A. 程序入口：三件套（每个节点都必须有）</h3>
+<table>
+  <tr><th style="width:26%">接口</th><th>作用 / 参数</th><th>返回</th><th style="width:24%">最小示例</th></tr>
+  <tr><td><code>rclpy.init(args=None)</code> ★</td><td>初始化 ROS2 客户端库，<b>全局只需一次</b>。<code>args</code> 传 <code>sys.argv</code> 时能接收 <code>--ros-args</code> 类命令行参数</td><td><code>None</code></td><td><code>rclpy.init(args=args)</code></td></tr>
+  <tr><td><code>rclpy.spin(node)</code> ★</td><td>进入事件循环，<b>阻塞</b>直到 Ctrl+C 或 <code>shutdown()</code>。没有它回调永不执行</td><td><code>None</code></td><td><code>rclpy.spin(node)</code></td></tr>
+  <tr><td><code>rclpy.shutdown()</code> ★</td><td>关闭上下文，释放底层资源。<b>必须与 init 配对</b></td><td><code>None</code></td><td><code>rclpy.shutdown()</code></td></tr>
+  <tr><td><code>rclpy.ok()</code></td><td>查询上下文是否仍有效。想在回调里优雅退出时用它做循环条件</td><td><code>bool</code></td><td><code>while rclpy.ok(): rclpy.spin_once(node)</code></td></tr>
+  <tr><td><code>rclpy.spin_once(node, timeout_sec=None)</code></td><td>只处理一轮就返回，不阻塞。<b>需要自己在 Python 循环里干别的事</b>时用（如 GUI 刷新）</td><td><code>None</code></td><td><code>while rclpy.ok(): rclpy.spin_once(n, timeout_sec=0.1)</code></td></tr>
+</table>
+<div class="tip amber"><span class="lab">⚠ 最容易被忘的一对</span><code>init()</code> 必须配 <code>shutdown()</code>。<code>try/except KeyboardInterrupt</code> 包住 spin，再在 finally 里 shutdown，才能保证 Ctrl+C 时设备句柄被释放。</div>
+
+<h3>B. 创建节点：继承 vs 直接用</h3>
+<table>
+  <tr><th style="width:26%">接口</th><th>作用 / 参数</th><th>返回</th><th style="width:24%">最小示例</th></tr>
+  <tr><td><code>class XxxNode(Node)</code> ★</td><td><b>推荐写法</b>。继承后可在类里放回调、状态、资源句柄，是真实项目的标准形态</td><td>—</td><td><code>class GasSensorNode(Node):</code></td></tr>
+  <tr><td><code>super().__init__(node_name, *, context=None, namespace=None, use_global_arguments=True, cli_args=None)</code> ★</td><td>构造函数<b>第一行必须调用</b>。<br>· <code>node_name</code>：节点名（图内唯一）<br>· <code>namespace</code>：命名空间，默认 <code>/</code><br>· <code>use_global_arguments</code>：是否接收全局 <code>--ros-args</code></td><td>—</td><td><code>super().__init__('gas_sensor_node')</code></td></tr>
+  <tr><td><code>Node(name)</code> 直接实例化</td><td>不继承、直接 new 一个。适合写 10 行的验证脚本，<b>不适合正式节点</b>（回调只能挂 lambda，状态无处安放）</td><td><code>Node</code></td><td><code>n = Node('tester')</code></td></tr>
+</table>
+
+<h3>C. 通信：开出口 / 开入口</h3>
+<table>
+  <tr><th style="width:26%">接口</th><th>作用 / 参数</th><th>返回</th><th style="width:24%">最小示例</th></tr>
+  <tr><td><code>create_publisher(msg_type, topic, qos_profile)</code> ★</td><td>创建发布者。<code>qos_profile</code> 可传整数（表示队列深度）或 <code>QoSProfile</code> 对象</td><td><code>Publisher</code></td><td><code>self.create_publisher(Float32, '/gas_sensor', 10)</code></td></tr>
+  <tr><td><code>create_subscription(msg_type, topic, callback, qos_profile)</code> ★</td><td>创建订阅者。<code>callback(msg)</code> 在每条消息到达时被调用</td><td><code>Subscription</code></td><td><code>self.create_subscription(Float32, '/gas_sensor', self.on_gas, 10)</code></td></tr>
+  <tr><td><code>create_service(srv_type, name, callback)</code></td><td>提供服务。<code>callback(req, resp)</code> 需<b>返回 resp</b>（EXP-07）</td><td><code>Service</code></td><td><code>self.create_service(Verify, '/verify_fingerprint', self.on_verify)</code></td></tr>
+  <tr><td><code>create_client(srv_type, name)</code></td><td>请求服务。之后用 <code>call_async()</code> 发请求（EXP-07）</td><td><code>Client</code></td><td><code>self.cli = self.create_client(Verify, '/verify_fingerprint')</code></td></tr>
+  <tr><td><code>Publisher.publish(msg)</code> ★</td><td>发一条消息，<b>立即返回</b>，不等任何人</td><td><code>None</code></td><td><code>self.pub.publish(Float32(data=ppm))</code></td></tr>
+  <tr><td><code>create_timer(timer_period_sec, callback)</code> ★</td><td>周期定时器。<code>callback()</code> 无参；周期单位<b>秒</b>（可传 float）</td><td><code>Timer</code></td><td><code>self.create_timer(1.0, self.timer_cb)</code></td></tr>
+</table>
+<div class="tip"><span class="lab">命名参数的三种简写</span><code>qos_profile</code> 传整数 <code>10</code> 等价于 <code>QoSProfile(depth=10)</code>（默认 RELIABLE + KEEP_LAST）。想精细控制就显式构造：<code>QoSProfile(history=HistoryPolicy.KEEP_LAST, depth=10, reliability=ReliabilityPolicy.BEST_EFFORT)</code>——这是 EXP-06 的重点。</div>
+
+<h3>D. 参数：让节点"可调"</h3>
+<table>
+  <tr><th style="width:26%">接口</th><th>作用 / 参数</th><th>返回</th><th style="width:24%">最小示例</th></tr>
+  <tr><td><code>declare_parameter(name, value, descriptor=None)</code> ★</td><td>声明参数。<b>value 的类型决定参数类型</b>（<code>1.0</code>→double，<code>1</code>→int，<code>True</code>→bool）。不可重复声明</td><td>—</td><td><code>self.declare_parameter('publish_period', 1.0)</code></td></tr>
+  <tr><td><code>get_parameter(name)</code> ★</td><td>取参数对象，值在 <code>.value</code>。参数不存在会抛异常</td><td><code>Parameter</code></td><td><code>p = self.get_parameter('publish_period').value</code></td></tr>
+  <tr><td><code>set_parameters([Parameter(...)])</code></td><td>代码内部改参数，返回结果列表（<code>successful</code> 字段）</td><td><code>list</code></td><td><code>self.set_parameters([Parameter('x', Parameter.Type.DOUBLE, 2.0)])</code></td></tr>
+  <tr><td><code>add_on_set_parameters_callback(cb)</code></td><td>挂"改参前的闸门"：<code>cb(params)</code> 返回 <code>SetParametersResult(successful=bool)</code>，<b>校验不过就不让改</b>（EXP-10）</td><td><code>None</code></td><td><code>self.add_on_set_parameters_callback(self.on_set)</code></td></tr>
+  <tr><td><code>has_parameter(name)</code></td><td>判断是否已声明，避免重复 declare 报错</td><td><code>bool</code></td><td><code>if not self.has_parameter('x'): ...</code></td></tr>
+</table>
+
+<h3>E. 日志：别用 print</h3>
+<table>
+  <tr><th style="width:26%">接口</th><th>作用 / 参数</th><th>返回</th><th style="width:24%">最小示例</th></tr>
+  <tr><td><code>get_logger()</code> ★</td><td>取该节点的日志器。消息会同时进终端和 <code>/rosout</code>，能被 rqt_console、rosbag 收集</td><td><code>Logger</code></td><td><code>log = self.get_logger()</code></td></tr>
+  <tr><td><code>log.debug / info / warn / error / fatal(msg)</code> ★</td><td>五档级别。<b>只输出 ≥ 当前级别的消息</b>（默认 info，所以 debug 平时看不见）</td><td><code>None</code></td><td><code>self.get_logger().info(f'ppm={ppm:.2f}')</code></td></tr>
+  <tr><td><code>log.info(msg, throttle_duration_sec=1.0)</code></td><td><b>限流打印</b>。高频回调里必用，否则终端会被刷爆（EXP-06 的 200Hz 传感器就靠它）</td><td><code>None</code></td><td><code>log.info(f'v={v}', throttle_duration_sec=1.0)</code></td></tr>
+  <tr><td><code>log.set_level(LoggingSeverity.DEBUG)</code></td><td>运行时改本节点日志级别，用于现场排障</td><td><code>None</code></td><td><code>log.set_level(LoggingSeverity.DEBUG)</code></td></tr>
+</table>
+<div class="tip amber"><span class="lab">为什么别用 print</span><code>print</code> 只在终端可见、无级别、进不了 <code>/rosout</code>、录包录不到。<b>节点里一律用 <code>get_logger()</code></b>。</div>
+
+<h3>F. 自省：我是谁、我周围有谁</h3>
+<table>
+  <tr><th style="width:26%">接口</th><th>作用</th><th>返回</th><th style="width:24%">最小示例</th></tr>
+  <tr><td><code>get_name()</code></td><td>本节点的短名（不含命名空间）</td><td><code>str</code></td><td><code>'gas_sensor_node'</code></td></tr>
+  <tr><td><code>get_namespace()</code></td><td>本节点的命名空间</td><td><code>str</code></td><td><code>'/'</code></td></tr>
+  <tr><td><code>get_fully_qualified_name()</code> ★</td><td>完整路径，<b>和图里显示的名字一致</b></td><td><code>str</code></td><td><code>'/r1/gas_sensor_node'</code></td></tr>
+  <tr><td><code>get_node_names_and_namespaces()</code></td><td>返回 <code>[(name, ns), ...]</code>，图里所有节点（含自己）</td><td><code>list</code></td><td><code>[('gas_sensor_node','/'), ('talker','/')]</code></td></tr>
+  <tr><td><code>count_publishers(topic)</code> / <code>count_subscribers(topic)</code></td><td>某话题当前有几个发布端 / 订阅端。<b>排查"到底有没有人在听"</b>时很好用</td><td><code>int</code></td><td><code>self.count_subscribers('/gas_sensor')</code></td></tr>
+  <tr><td><code>destroy_node()</code> ★</td><td>销毁节点、注销端点、释放资源</td><td><code>None</code></td><td><code>node.destroy_node()</code></td></tr>
+</table>
+
+<h3>G. 命名规则：为什么你的话题"跑"到了别处</h3>
+<p>ROS2 的名字有三种写法，<b>写错一种，话题就会挂到你没预期的位置</b>——这是"代码没错、就是收不到数据"的第二大原因。</p>
+<table>
+  <tr><th>类型</th><th>写法</th><th>展开成什么</th><th>典型用途</th></tr>
+  <tr><td><b>全局名</b></td><td><code>/robot1/cmd_vel</code></td><td>原样，从根开始</td><td>跨命名空间引用，明确指定</td></tr>
+  <tr><td><b>相对名</b> ★</td><td><code>cmd_vel</code></td><td><code>/&lt;命名空间&gt;/cmd_vel</code></td><td><b>推荐</b>：代码里尽量写相对名</td></tr>
+  <tr><td><b>私有名</b></td><td><code>~/state</code></td><td><code>/&lt;ns&gt;/&lt;节点名&gt;/state</code></td><td>节点内部私有话题，不希望被别人抢</td></tr>
+  <tr><td><b>命名空间</b></td><td><code>namespace='r1'</code><br><code>--ros-args -r __ns:=/r1</code></td><td>给节点套前辍</td><td>多机器人同名功能隔离</td></tr>
+  <tr><td><b>重映射</b></td><td><code>--ros-args -r /gas:=/gas2</code></td><td>改名不改码</td><td>第三方包适配、临时替换</td></tr>
+</table>
+<pre data-copy="cmd"><span class="c"># 相对名 + 命名空间：同一份代码跑两台车，互不串台</span>
+<span class="g">ros2</span> run my_pkg my_node --ros-args -r __ns:=/r1   <span class="c"># 话题变 /r1/cmd_vel</span>
+<span class="g">ros2</span> run my_pkg my_node --ros-args -r __ns:=/r2   <span class="c"># 话题变 /r2/cmd_vel</span>
+<span class="c"># 若代码里写死全局名 /cmd_vel，上面这条就失效——两台车照样抢同一个话题</span></pre>
+<div class="tip tealb"><span class="lab">★ 一条硬规矩：代码里别写死全局名</span>
+所有话题/服务名都写成<b>相对名</b>（<code>'gas_sensor'</code> 而不是 <code>'/gas_sensor'</code>），代码就天生"可搬家"：进什么命名空间就挂哪。<b>这是多机器人系统的基础</b>，也是 EXP-13 分布式与 EXP-17 launch 编排的前提。</div>
+</section>
+
+<section class="blk" id="s7">
+<h2><span class="no">04</span>实操 A：编译并运行 gas_sensor_node</h2>
+<p>本实操<b>不自己写新节点</b>——直接跑现成的 <code>gas_sensor_node</code>，把 02 节讲的"构造 → spin → 销毁"在终端里一条条对上号。<b>四条命令一组、共四步</b>，一步步来。</p>
+
+<div class="tip tealb"><span class="lab">🎯 做完要看到什么（先记住这 5 个现象，跑完逐个打勾）</span>
+① 启动后终端<b>每秒刷一行</b> <code>raw=… voltage=…V ppm=…</code>；<br>
+② 另开终端 <code>ros2 node list</code> 能看到 <code>/gas_sensor_node</code>；<br>
+③ <code>ros2 node info /gas_sensor_node</code> 的 Publishers 里有 <code>/gas_sensor</code>；<br>
+④ <code>ros2 topic list</code> 里有 <code>/gas_sensor</code>、<code>/parameter_events</code>、<code>/rosout</code>；<br>
+⑤ <code>Ctrl+C</code> 后回到命令提示符，再次 <code>node list</code> 已无该节点。</div>
+
+<div class="termbar"><span class="tl">步骤 1</span><b>编译 ros_sensor 包</b><span class="note">（约 10 分钟 · 终端 1）</span></div>
+
+<div class="cmdstep">
+  <div class="cs-hd"><span class="cs-no">1.1</span><b>加载 ROS2 系统环境</b><span class="cs-where">终端 1</span></div>
+  <p class="cs-why">每个<b>新开</b>的终端都要先做这一步，否则连 <code>ros2</code> 命令都找不到。</p>
+  <pre data-copy="cmd"><span class="g">source</span> /opt/ros/humble/setup.bash
+<span class="g">echo</span> $ROS_DISTRO      <span class="c"># 打印 humble 才算加载成功</span></pre>
+</div>
+
+<div class="cmdstep">
+  <div class="cs-hd"><span class="cs-no">1.2</span><b>进工作空间编译</b><span class="cs-where">终端 1</span></div>
+  <p class="cs-why"><code>colcon build</code> 必须在工作空间<b>根目录</b>跑。这里一次编两个包——<code>ros_sensor</code> 是节点所在包，<code>ros_sensor_interfaces</code> 是它依赖的接口包（顺序由 colcon 自动排）。</p>
+  <pre data-copy="cmd"><span class="b">cd</span> ~/ros2_ws
+<span class="g">colcon build</span> --packages-select ros_sensor ros_sensor_interfaces</pre>
+  <table>
+    <tr><th>参数</th><th>含义</th></tr>
+    <tr><td><code>--packages-select A B</code></td><td>只编这两个包，工作空间里其它包一律不动，省时间</td></tr>
+  </table>
+  <p class="cs-see">✔ 结尾出现 <code>Summary: 2 packages finished</code></p>
+</div>
+
+<div class="cmdstep">
+  <div class="cs-hd"><span class="cs-no">1.3</span><b>编译后必须重新 source</b><span class="cs-where">终端 1</span></div>
+  <p class="cs-why"><b>忘这一步，是 <code>package not found</code> 的头号原因。</b>编译产物刚落到 <code>install/</code>，但当前终端的环境变量还是旧的，不认识这个新包。</p>
+  <pre data-copy="cmd"><span class="g">source</span> install/setup.bash
+<span class="g">ros2</span> pkg executables ros_sensor   <span class="c"># 应列出 gas_sensor_node 等可执行名</span></pre>
+  <p class="cs-see">✔ 看到 <code>gas_sensor_node</code> 说明包和入口都注册成功了</p>
+</div>
+
+<div class="termbar"><span class="tl">步骤 2</span><b>读一遍 gas_sensor_node 代码</b><span class="note">（约 30 分钟 · 对照 02 节的四个阶段）</span></div>
+
+<div class="cmdstep">
+  <div class="cs-hd"><span class="cs-no">2.1</span><b>打开源码文件</b><span class="cs-where">终端 1</span></div>
+  <p class="cs-why">节点源码在 <code>ros_sensor</code> 包里。用编辑器或 <code>cat</code> 打开即可。</p>
+  <pre data-copy="cmd"><span class="b">cd</span> ~/ros2_ws/src/xflz_eai_car1/driver/ros_sensor/ros_sensor/ros_sensor
+<span class="g">cat</span> gas_sensor_node.py</pre>
+</div>
+
+<div class="cmdstep">
+  <div class="cs-hd"><span class="cs-no">2.2</span><b>对着清单读，逐条打勾</b><span class="cs-where">纸上 / 笔记</span></div>
+  <p class="cs-why">不要通读，<b>带着这 6 个问题去找</b>——它们就是 02 节的六个知识点：</p>
+  <table>
+    <tr><th>找什么</th><th>在哪一行</th><th>对应原理</th></tr>
+    <tr><td>类继承了谁</td><td><code>class GasSensorNode(Node)</code></td><td>入场券：不继承 Node 就不进图</td></tr>
+    <tr><td>节点叫什么名</td><td><code>super().__init__('…')</code> 里的字符串</td><td>工牌：图里显示的就是它</td></tr>
+    <tr><td>声明了几个参数</td><td><code>declare_parameter(...)</code></td><td>旋钮：运行时可调（EXP-10）</td></tr>
+    <tr><td>开了哪些出口</td><td><code>create_publisher(...)</code></td><td>通信：话题名 + 类型 + QoS</td></tr>
+    <tr><td>闹钟周期是多少</td><td><code>create_timer(period, …)</code></td><td>节拍：<code>publish_period</code> 默认 1.0 秒</td></tr>
+    <tr><td>main 里哪几行在 spin</td><td><code>rclpy.spin(node)</code></td><td>活着：没有它回调一次都不跑</td></tr>
+  </table>
+  <p class="cs-see">✔ 能指着代码说出"这行对应 02 节哪个阶段"，这一步就算过了</p>
+</div>
+
+<div class="cmdstep">
+  <div class="cs-hd"><span class="cs-no">2.3</span><b>看入口是怎么注册的</b><span class="cs-where">终端 1</span></div>
+  <p class="cs-why"><code>ros2 run</code> 能找到这个节点，靠的是 <code>setup.py</code> 里的 <code>entry_points</code> 注册。</p>
+  <pre data-copy="cmd"><span class="g">grep</span> -A6 console_scripts setup.py</pre>
+  <pre data-copy="cmd">entry_points={
+    'console_scripts': [
+        'gas_sensor_node = ros_sensor.gas_sensor_node:main',
+    ],
+},</pre>
+  <p class="cs-see">✔ 读懂这行：<b>等号左边</b>是 <code>ros2 run</code> 用的可执行名，<b>右边</b>是"哪个文件里的哪个函数"。<b>没有这行，就是 <code>No executable found</code>。</b></p>
+</div>
+
+<div class="termbar"><span class="tl">步骤 3</span><b>运行节点并用 node 命令观察</b><span class="note">（约 30 分钟 · 终端 2 跑节点，终端 3 观察）</span></div>
+
+<div class="cmdstep">
+  <div class="cs-hd"><span class="cs-no">3.1</span><b>终端 2 启动节点</b><span class="cs-where">终端 2</span></div>
+  <p class="cs-why">新终端同样要"cd + source"走一遍，然后再 run。</p>
+  <pre data-copy="cmd"><span class="b">cd</span> ~/ros2_ws
+<span class="g">source</span> /opt/ros/humble/setup.bash
+<span class="g">source</span> ~/ros2_ws/install/setup.bash
+<span class="g">ros2</span> run ros_sensor gas_sensor_node</pre>
+  <p class="cs-see">✔ 每秒刷一行（这是<b>运行阶段</b>，spin 在驱动 <code>timer_cb</code>）：<br>
+  <code>[INFO] [gas_sensor_node]: raw=1234 voltage=1.201V ppm=312.45</code></p>
+</div>
+
+<div class="cmdstep">
+  <div class="cs-hd"><span class="cs-no">3.2</span><b>终端 3：它在图里吗</b><span class="cs-where">终端 3</span></div>
+  <p class="cs-why">新终端 cd + source 之后，用两条命令给节点"点名 + 查户口"。</p>
+  <pre data-copy="cmd"><span class="g">ros2</span> node list                     <span class="c"># 点名 → /gas_sensor_node</span>
+<span class="g">ros2</span> node info /gas_sensor_node    <span class="c"># 查户口：看 Publishers 段</span>
+<span class="g">ros2</span> topic list                    <span class="c"># → /gas_sensor、/parameter_events、/rosout</span></pre>
+  <p class="cs-see">✔ <code>node info</code> 的 Publishers 里应有 <code>/gas_sensor [std_msgs/msg/Float32]</code>——这正是构造函数第 ③ 步开的那个出口</p>
+</div>
+
+<div class="cmdstep">
+  <div class="cs-hd"><span class="cs-no">3.3</span><b>动手改：换掉节点名</b><span class="cs-where">终端 2 + 3</span></div>
+  <p class="cs-why">把源码里 <code>'gas_sensor_node'</code> 改成 <code>'my_gas_node'</code>，验证"名字就是工牌"。<b>改完源码必须重新编译一次</b>（默认安装方式是把文件复制到 install，不是软链接），再 source 才生效。</p>
+  <pre data-copy="cmd"><span class="c"># 终端 2：Ctrl+C 停掉节点，改完名字后重新编译 + source</span>
+<span class="b">cd</span> ~/ros2_ws
+<span class="g">colcon build</span> --packages-select ros_sensor
+<span class="b">source</span> install/setup.bash
+<span class="g">ros2</span> run ros_sensor gas_sensor_node
+<span class="c"># 终端 3：确认名字变了</span>
+<span class="g">ros2</span> node list        <span class="c"># → /my_gas_node</span></pre>
+  <p class="cs-see">✔ 名字跟着源码走。<b>没重新编译就看不到变化</b>——因为跑的是 install 里那份副本，不是 src 里的源码。</p>
+</div>
+
+<div class="cmdstep">
+  <div class="cs-hd"><span class="cs-no">3.4</span><b>体验"重名 + 命名空间"</b><span class="cs-where">终端 2 + 3</span></div>
+  <p class="cs-why">节点名在图内必须唯一。起两个同名节点，或给它套个命名空间，看看分别发生什么。</p>
+  <pre data-copy="cmd"><span class="c"># 再开一个终端起第二个实例：名字被自动改成 _1</span>
+<span class="g">ros2</span> run ros_sensor gas_sensor_node
+<span class="g">ros2</span> node list
+<span class="c"># → /gas_sensor_node 和 /gas_sensor_node_1   （只给 WARN，不报错）</span>
+
+<span class="c"># 换命名空间：名字带上前辍，互不串台</span>
+<span class="g">ros2</span> run ros_sensor gas_sensor_node --ros-args -r __ns:=/r1
+<span class="g">ros2</span> node list        <span class="c"># → /r1/gas_sensor_node</span></pre>
+  <p class="cs-see">✔ 记住这两个现象：<b>重名会自动加后缀（静默）</b>，<b>命名空间是隔离多机的关键</b></p>
+</div>
+
+<div class="termbar"><span class="tl">步骤 4</span><b>收尾：确认优雅退出</b><span class="note">（约 5 分钟）</span></div>
+
+<div class="cmdstep">
+  <div class="cs-hd"><span class="cs-no">4.1</span><b>Ctrl+C 并确认节点已消失</b><span class="cs-where">终端 2 + 3</span></div>
+  <p class="cs-why">按 <code>Ctrl+C</code> 触发 <code>KeyboardInterrupt</code>，代码里 <code>except</code> 捕获后执行 <code>destroy_node()</code> 与 <code>shutdown()</code>——这是<b>销毁阶段</b>。</p>
+  <pre data-copy="cmd"><span class="c"># 终端 2：按 Ctrl+C，应干净回到提示符（不该有红色 traceback）</span>
+<span class="c"># 终端 3：立刻再查一次</span>
+<span class="g">ros2</span> node list        <span class="c"># → 空（或已无 gas_sensor_node）</span></pre>
+  <p class="cs-see">✔ 节点已从图中摘牌。若残留几秒，是 DDS 租约超时，正常</p>
+</div>
+
+<div class="tip amber"><span class="lab">卡住了先看这里（按出现频率排序）</span>
+① <code>Package 'ros_sensor' not found</code> → 这个终端没 source，回到 <b>1.3</b> 重来。<br>
+② <code>No executable found</code> → 没编译，或 <code>entry_points</code> 没注册，回 <b>1.2 / 2.3</b>。<br>
+③ 节点启动后<b>立刻退出</b>、没有任何日志 → 代码里缺 <code>rclpy.spin(node)</code>，回 <b>02 节阶段 ③</b>。<br>
+④ <code>ros2 node list</code> 是空的 → 节点被 Ctrl+C 了，或启动即报错退出，看终端 2 的输出。<br>
+⑤ 每秒打印 <code>读取 ADC 失败</code> → 当前设备没接 MQ5（或 IIO 路径不同）。<b>不影响本课</b>——本课只关心节点结构，换到 B2 实验箱即可正常输出。</div>
+
+<div class="tip tealb"><span class="lab">💡 给学有余力的你</span>
+把本实操的 <code>ros_sensor</code> 换成自己建的包、把 <code>gas_sensor_node</code> 换成一个"每 2 秒打印一句你好"的节点，<b>其余步骤一字不改再走一遍</b>——这就是"迁移套用"，也是本课目标 ④。<b>能独立走通这一遍，EXP-05 才算真的过了。</b></div>
+</section>
+
+<section class="blk" id="s8">
+<h2><span class="no">05</span>实操 B：三节点组网与身份切换</h2>
+<pre data-copy="cmd"><span class="c"># 终端 1–2 各起一个节点：talker 与 listener</span>
+ros2 run demo_nodes_cpp talker
+ros2 run demo_nodes_cpp listener
+
+<span class="c"># 全景观察</span>
+ros2 node list
+ros2 node info /listener
+<span class="g">#  Subscriber /parameter_events: [rcl_interfaces/msg/ParameterEvent]</span>
+<span class="g">#  Service /listener/get_parameters: [rcl_interfaces/srv/GetParameters]</span>
+
+<span class="c"># 用命名空间再造一个"平行世界"</span>
+ros2 run demo_nodes_cpp talker --ros-args -r __ns:=/r2
+ros2 node list   <span class="g"># 共存：/talker 与 /r2/talker，互不串线</span></pre>
+<p>观察要点：<code>/parameter_events</code> 是每个节点都天然订阅的<b>系统话题</b>——这就是"节点天生带参数能力"的证据。</p>
+</section>
+
+<section class="blk" id="s9">
+<h2><span class="no">06</span>注意事项与验收清单</h2>
+<div class="check">
+  <ul>
+    <li>能说出"节点 = 一个继承 <code>Node</code> 的独立进程"，并解释为什么要拆成多节点（崩溃域 / 节奏 / 语言三重解耦）</li>
+    <li>能说清「岗位」类比的<b>三条边界</b>：① 职责内聚 ≠ 一事一节点（一个节点可同时有多个发布/订阅/服务）；② <b>进程 ≠ 节点</b>（一个可执行程序可创建多个 Node）；③ 节点的核心价值在"能通信"，不只是"被拆开"</li>
+    <li>能画出「构造 → spin → 销毁」三阶段，并说出每个阶段应放什么操作</li>
+    <li>能解释"为什么不继承 <code>Node</code> 就进不了图"、"为什么 <code>super().__init__()</code> 必须第一行"</li>
+    <li>能解释不调 <code>spin</code> 时节点"活着却毫无反应"的原因</li>
+    <li>能说出机器人「感知 / 定位 / 决策 / 执行」四层各有哪些节点，以及"上层不碰硬件、下层不做判断"的含义</li>
+    <li><code>node list</code> / <code>node info</code> / <code>topic list</code> 三件套操作熟练，能从输出里读出"它发什么、收什么"</li>
+    <li>能说出无 Master 时节点靠什么发现彼此（DDS 组播宣告身份 → 单播交换端点 → 三项匹配 → 直连）</li>
+    <li>能判断一个需求该用话题 / 服务 / 动作，并各举本课程一个真实例子</li>
+    <li>演示重名节点被自动改名、以及用命名空间隔离两台机器人的方法</li>
+    <li>能说出 <code>entry_points</code> 里"等号左边是什么、右边是什么"，并解释 <code>No executable found</code> 的成因</li>
+  </ul>
+</div>
+<table>
+  <tr><th>坑</th><th>症状</th><th>解法</th></tr>
+  <tr><td><b>忘了 spin</b></td><td>程序<b>正常退出</b>、无报错，但一行日志都没有</td><td>末尾加 <code>rclpy.spin(node)</code>；要刷 GUI 就用 <code>spin_once</code> 循环</td></tr>
+  <tr><td><b><code>super().__init__()</code> 没放第一行</b></td><td><code>AttributeError: … has no attribute '_clock'</code></td><td>先上户口再办业务：<code>super().__init__()</code> 必须在所有 <code>create_*</code> 之前</td></tr>
+  <tr><td><b>忘 source</b></td><td><code>Package not found</code> / <code>ImportError: Node</code></td><td>新终端先 <code>source /opt/ros/humble/setup.bash</code>，再 <code>source install/setup.bash</code></td></tr>
+  <tr><td><b>节点重名</b></td><td>只给 WARN，名字被自动改成 <code>xxx_1</code>，话题易串线</td><td>用 <code>node list</code> 核对真名；改 name 或加命名空间</td></tr>
+  <tr><td><b>代码写死全局名</b></td><td>加了命名空间，话题却没跟着变</td><td>话题名一律写相对名（<code>'gas_sensor'</code> 而非 <code>'/gas_sensor'</code>）</td></tr>
+  <tr><td><b>回调里做了耗时操作</b></td><td>整个节点"卡住"，其它回调全不响应</td><td>回调要短；重活丢独立线程或拆成另一个节点；高频日志加 <code>throttle_duration_sec</code></td></tr>
+  <tr><td><b>Ctrl+C 后节点残留</b></td><td>端点还在图里几秒</td><td>DDS 租约超时，短暂残留正常；常驻则查是否吞了 SIGINT</td></tr>
+</table>
+</section>
+
+<section class="blk" id="s10">
+<h2><span class="no">07</span>本课总结与思考题</h2>
+<div class="kgrid">
+  <div class="kcard"><div class="kd">定位</div><div class="kt">节点 = 一个独立岗位</div><p>继承 <code>Node</code> 才进图；拆多节点的意义是崩溃域、节奏、语言三重解耦。</p></div>
+  <div class="kcard"><div class="kd">生命周期</div><div class="kt">init → 构造 → spin → 销毁</div><p>顺序不可换。只有 spin 期间节点"活着"，回调才会被执行。</p></div>
+  <div class="kcard"><div class="kd">发现</div><div class="kt">组播宣告 → 单播交换端点 → 匹配 → 直连</div><p>无注册中心。三项（话题名 / 类型 / QoS）任一不匹配就不通。</p></div>
+  <div class="kcard"><div class="kd">身份</div><div class="kt">相对名 + 命名空间</div><p>代码里不写死全局名，一套代码就能多处部署，这是多机系统的地基。</p></div>
+</div>
+<div class="tip violet"><span class="lab">思考题</span>
+① 把 <code>super().__init__('gas_sensor_node')</code> 删掉，或挪到 <code>create_publisher()</code> 之后，程序分别会出现什么现象？请结合"注册顺序"解释原因。<br>
+② 本课里一个节点对应一个独立进程。如果机器人上有 5 个传感器，可以起 5 个进程，也可以在 1 个进程里放 5 个节点（配 <code>MultiThreadedExecutor</code>）。两种方式各有什么优缺点、分别适合什么场景？<br>
+③ 如果你写了一个节点，<code>ros2 node list</code> 能看到它，但把消息发出去后订阅端完全没反应。请按"spin / 节点名 / 话题名 / QoS"四个方向列出排查顺序和每一步要敲的命令。<br>
+④ 同一条 <code>/cmd_vel</code> 速度指令，如果改用<b>服务</b>下发会出什么问题？请从"可能有多个订阅者""每秒要发几十次""发布者不该等回执"三个角度说明它为什么天生该用话题。<br>
+⑤ 为什么说"发现层只牵线、不中转"就能避免 ROS1 那种单点故障？如果发现层自己挂了，已经在通信的两方还能继续发数据吗？</div>
+</section>
+
+<nav class="expnav">
+  <a href="../exp-04-package/index.html"><span class="lb">← 上一个实验</span>EXP-04 功能包与依赖管理</a>
+  <a class="next" href="../exp-06-topic/index.html"><span class="lb">下一个实验 →</span>EXP-06 话题通信 · MQ5 传感器</a>
+</nav>
+<footer><span>CORE-01 · 机器人 ROS2 应用与开发 · EXP-05 节点：ROS2 里的"一个岗位"</span><span>2 学时 · 验证性 · 基于 ros_practice 实验讲义改编</span></footer>
+</main>
+</div>
+<script>
+/* ===== s3 节点全景图鉴 Node Atlas ===== */
+var ATLAS=[
+{k:'sense',n:'感知层',c:'#22d3ee',items:[
+ {n:'camera_node',r:'深度相机彩色流',
+  w:'驱动小车上的结构光深度相机（安思疆 hp60c）的彩色通道，1920×1080@30fps，发布图像与相机内参。它不判断画面里有什么，只负责"把眼睛看到的东西送进计算图"。',
+  s:'无——USB Type-C 直连',
+  p:'<code>/camera/color/image_raw</code>（sensor_msgs/Image）、<code>/camera/color/camera_info</code>',
+  e:'EXP-15 用 rviz2 看图像'},
+ {n:'depth_node',r:'深度图采集',
+  w:'同一台深度相机的深度通道：640×480@20fps，量程 0.2–4m，精度 ≤2mm@1m。它是"离目标还有多远"的直接依据，抓取和避障都靠它。',
+  s:'无——与彩色流同一台设备',
+  p:'<code>/camera/depth/image_raw</code>、<code>/camera/depth/points</code>',
+  e:'EXP-15 rviz2 · 机械臂视觉引导抓取'},
+ {n:'lidar_node',r:'360° 激光雷达',
+  w:'把旋转测距的每一圈数据打包成 LaserScan（国科光芯 COIN-D6，360°、10Hz、0.05–12m、±10mm），是建图、定位、避障三者共同的输入源。',
+  s:'无——读串口或网口原始数据',
+  p:'<code>/scan</code>（sensor_msgs/LaserScan）',
+  e:'EXP-19 坐标变换 · 后续 SLAM 与 Nav'},
+ {n:'imu_node',r:'惯性测量',
+  w:'读 BMI088 的 3 轴加速度计与 3 轴陀螺仪（量程可编程，最高 ±24g / ±2000°/s），输出高频角速度与姿态。短时内它比里程计准，用来和里程计融合、抑制漂移。',
+  s:'无——I2C / SPI',
+  p:'<code>/imu/data</code>（sensor_msgs/Imu）',
+  e:'传感器交互实践 · IMU 校准'}
+]},
+{k:'locate',n:'定位与坐标层',c:'#34d399',items:[
+ {n:'odom_node',r:'里程计推算',
+  w:'读四个轮子的 1024 线 AB 相编码器脉冲，按运动学模型积分出"走了多远、转了多少"，发布里程计并广播 odom→base_link 的坐标变换。',
+  s:'编码器数据（由 base_driver 回读）、<code>/joint_states</code>',
+  p:'<code>/odom</code>、<code>/tf</code>（odom→base_link）',
+  e:'EXP-19 TF2 坐标系变换'},
+ {n:'robot_state_publisher',r:'关节坐标广播',
+  w:'读 <code>/joint_states</code> 与 URDF 模型，算出每根连杆此刻在哪，把整条关节链的 TF 广播出去——它是 URDF 与 TF 之间的翻译官。',
+  s:'<code>/joint_states</code>、URDF（启动参数）',
+  p:'<code>/tf</code>',
+  e:'EXP-19 TF2 · EXP-20 URDF 建模'},
+ {n:'static_transform_publisher',r:'固定外参广播',
+  w:'广播永远不变的坐标关系，比如"激光雷达装在底盘正上方 0.30m"。装一次、写进 launch 就行，不用再管。',
+  s:'无——启动参数即数据',
+  p:'<code>/tf_static</code>',
+  e:'EXP-19 TF2 坐标系变换'},
+ {n:'amcl_node',r:'全局定位',
+  w:'用激光雷达扫到的轮廓去跟地图比对（粒子滤波），随时修正里程计的累积漂移，给出 map→odom 的修正量。',
+  s:'<code>/scan</code>、<code>/map</code>、<code>/tf</code>',
+  p:'<code>/amcl_pose</code>、<code>/tf</code>（map→odom）',
+  e:'EXP-04 SLAM 与 Nav 先修'},
+ {n:'slam_toolbox',r:'边走边建图',
+  w:'一边移动一边把激光数据拼成栅格地图。机器人第一次进入陌生场地时用它的工作模式，建完图再切到 amcl 定位。',
+  s:'<code>/scan</code>、<code>/tf</code>、<code>/odom</code>',
+  p:'<code>/map</code>、<code>/tf</code>（map→odom）',
+  e:'EXP-04 SLAM 与 Nav'}
+]},
+{k:'plan',n:'决策规划层',c:'#a78bfa',items:[
+ {n:'nav2_planner',r:'全局路径规划',
+  w:'在栅格地图上算一条从当前位姿到目标点的全局路径（A* / Dijkstra），只关心"绕不绕得开静态障碍"，不关心怎么踩油门。',
+  s:'服务 <code>/compute_path_to_pose</code>、<code>/map</code>',
+  p:'<code>/plan</code>',
+  e:'EXP-04 SLAM 与 Nav'},
+ {n:'nav2_controller',r:'局部速度控制',
+  w:'把全局路径切成一小段一小段，结合实时激光数据生成速度指令——它是唯一有资格往 <code>/cmd_vel</code> 发速度的决策节点。',
+  s:'<code>/plan</code>、<code>/scan</code>、<code>/odom</code>',
+  p:'<code>/cmd_vel</code>（geometry_msgs/Twist）',
+  e:'EXP-06 话题通信（/cmd_vel 是经典话题）'},
+ {n:'move_group',r:'机械臂轨迹规划',
+  w:'MoveIt2 的核心节点：做带碰撞检测的关节轨迹规划，把"把夹爪移到这个位姿"翻译成一整串关节角度序列。',
+  s:'动作 <code>/move_action</code>、<code>/joint_states</code>、URDF',
+  p:'关节轨迹 <code>/arm/joint_trajectory</code>',
+  e:'EXP-05 机械臂应用开发实践'},
+ {n:'mission_node',r:'任务调度大脑',
+  w:'用行为树或状态机把"导航 → 对准 → 抓取 → 放置"串起来。它只调度、不控制——最怕的是把控制逻辑也塞进来。',
+  s:'各动作 / 服务的反馈',
+  p:'导航目标、抓取指令',
+  e:'课程综合项目'},
+ {n:'behavior_server',r:'失败自救行为',
+  w:'卡住、找不到路时自动后退一小段或原地旋转重新定位，是 Nav2 里的"自救"节点，失败几次后才向任务层报错。',
+  s:'由 navigation 层按需触发',
+  p:'<code>/cmd_vel</code>（限速执行）',
+  e:'EXP-04 SLAM 与 Nav'}
+]},
+{k:'act',n:'执行驱动层',c:'#fbbf24',items:[
+ {n:'base_driver',r:'底盘电机驱动',
+  w:'订阅速度指令，用麦克纳姆轮逆运动学解算出 4 个轮子各自的转速，再经 PID 变成 PWM 交给下位机 STM32 执行。它是全系统里<b>唯一</b>直接驱动电机的地方——换个底盘只需换它。',
+  s:'<code>/cmd_vel</code>',
+  p:'<code>/odom</code>、<code>/joint_states</code>（1024 线编码器回读）',
+  e:'运动控制线 · 电机速度校准实验'},
+ {n:'arm_driver',r:'6DOF 机械臂驱动',
+  w:'通过 TTL 半双工串口把关节轨迹下发（臂展 ≥435mm），并按时间点逐个关节驱动，再把实际角度回读成 <code>/joint_states</code>，供 robot_state_publisher 广播 TF。',
+  s:'<code>/arm/joint_trajectory</code>',
+  p:'<code>/joint_states</code>',
+  e:'EXP-05 机械臂应用开发实践'},
+ {n:'gripper_driver',r:'夹爪驱动',
+  w:'用动作方式控制夹爪开合：可设定目标开口与力度，执行中回报进度，失败还能取消——正是 EXP-08 讲的那套范式。',
+  s:'动作 <code>/gripper_cmd</code>',
+  p:'动作反馈与结果',
+  e:'EXP-08 动作通信'},
+ {n:'safety_node',r:'急停与安全边界',
+  w:'监听急停开关和激光雷达的最小距离，一旦超限立刻发零速度并置急停位。它的优先级高于所有规划节点——规划得再好也不许撞。',
+  s:'<code>/scan</code>、<code>/estop</code>',
+  p:'<code>/cmd_vel</code>（抢占式置 0）',
+  e:'培训包《安全与风险预案》'},
+ {n:'led_speaker_node',r:'声光状态反馈',
+  w:'用灯带和蜂鸣器把机器人的内部状态外化（待机 / 执行中 / 故障）。现场调试时，看一眼灯比翻日志快得多。',
+  s:'<code>/robot_state</code>',
+  p:'无——直接驱动灯带与蜂鸣器',
+  e:'调试实践'}
+]},
+{k:'sys',n:'系统与工具层',c:'#94a3b8',items:[
+ {n:'/rosout（每节点自带）',r:'日志聚合',
+  w:'每个节点天生就把日志发布到 <code>/rosout</code>，用 rqt_console 一处集中查看，不必给每个节点各接一个终端。',
+  s:'—',
+  p:'<code>/rosout</code>',
+  e:'EXP-14 rqt 可视化工具箱'},
+ {n:'/parameter_events（每节点自带）',r:'参数变更广播',
+  w:'每个节点都自动订阅这个系统话题，参数一被外部修改就广播全网。这正是"节点天生带参数能力"的证据，也是 EXP-10 的起点。',
+  s:'<code>/parameter_events</code>',
+  p:'—',
+  e:'EXP-10 参数服务'},
+ {n:'rosbag2_recorder',r:'数据录包',
+  w:'把现场几十个话题原样录成 db3 文件，事后可以无限次回放复现——把"现场"带回实验室。',
+  s:'全线话题',
+  p:'磁盘上的 <code>.db3</code> 文件',
+  e:'EXP-16 rosbag2'},
+ {n:'teleop_keyboard',r:'键盘遥控',
+  w:'直接把按键转成 <code>/cmd_vel</code>。调试底盘、验证方向正负号时最常用——它和 nav2_controller 打的是同一个话题，谁发谁生效。',
+  s:'键盘按键',
+  p:'<code>/cmd_vel</code>',
+  e:'调试实践'},
+ {n:'battery_monitor',r:'电量监控',
+  w:'读电池电压估算剩余电量，低电时发布告警，可进一步触发自动返航。',
+  s:'电池 ADC 采样',
+  p:'<code>/battery_state</code>',
+  e:'运维实践'},
+ {n:'diagnostic_aggregator',r:'整机健康诊断',
+  w:'汇总各节点自检上报的状态，形成一张"整机健康表"，用 rqt_runtime_monitor 可实时查看。',
+  s:'<code>/diagnostics</code>',
+  p:'<code>/diagnostics_agg</code>',
+  e:'EXP-14 rqt 可视化工具箱'}
+]}];
+var atlasCur={l:0,i:0};
+function atlasRender(){
+  var L=ATLAS[atlasCur.l];
+  document.getElementById('atlasLayers').innerHTML=ATLAS.map(function(x,i){
+    return '<button class="atlas-layer-btn'+(i===atlasCur.l?' on':'')+'" style="border-left-color:'+x.c+'" onclick="atlasPickLayer('+i+')">'+x.n+'<span class="cnt">'+x.items.length+'</span></button>';
+  }).join('');
+  document.getElementById('atlasNodes').innerHTML=L.items.map(function(it,i){
+    return '<button class="atlas-node'+(i===atlasCur.i?' on':'')+'" onclick="atlasPickNode('+i+')"><span class="nm">'+it.n+'</span><span class="rl">'+it.r+'</span></button>';
+  }).join('');
+  var it=L.items[atlasCur.i];
+  document.getElementById('atlasDetail').innerHTML=
+    '<h5>'+it.n+'</h5>'+
+    '<div class="sub">'+it.r+' · 属于 '+L.n+'</div>'+
+    '<dl><dt>作用</dt><dd>'+it.w+'</dd>'+
+    '<dt>输入（订阅 / 读取）</dt><dd>'+it.s+'</dd>'+
+    '<dt>输出（发布 / 响应）</dt><dd>'+it.p+'</dd></dl>'+
+    '<span class="pin">对应 '+it.e+'</span>';
+}
+function atlasPickLayer(i){atlasCur.l=i;atlasCur.i=0;atlasRender();}
+function atlasPickNode(i){atlasCur.i=i;atlasRender();}
+atlasRender();
+
+/* ===== s4 三范式通信对照 Comm Lab ===== */
+var commCur=0;
+var COMM=[
+{k:'topic',no:'①',n:'话题 Topic',s:'发布 / 订阅（Publisher · Subscription）',
+ rows:[
+  ['通信模型','一对多广播：一个话题上可以有 N 个发布者、M 个订阅者，彼此完全不知道对方是谁'],
+  ['数据流向','单向 —— 发布者只写、订阅者只读，没有回程'],
+  ['是否阻塞','不阻塞。publish() 把消息交给 DDS 就立刻返回'],
+  ['有无应答','没有。发布者发完就算完成，不关心有没有人在听'],
+  ['QoS 关键项','可靠性（best_effort / reliable）、历史深度、持久性 —— <b>两边 QoS 匹配不上就静默不通</b>'],
+  ['典型用途','持续产生的数据流：传感器读数、速度指令、状态广播'],
+  ['本课真实例子','<code>/cmd_vel</code>（nav2_controller → base_driver）、<code>/scan</code>、<code>/camera/color/image_raw</code>']
+ ],
+ pin:'对应 EXP-06 话题通信'},
+{k:'service',no:'②',n:'服务 Service',s:'客户端 / 服务端（Client · Server）',
+ rows:[
+  ['通信模型','一对一请求-响应：客户端发一次请求，服务端回一次响应，就一次'],
+  ['数据流向','双向，但严格一问一答：请求去、响应回'],
+  ['是否阻塞','可以同步等待 —— call 之后线程卡住，拿到响应才继续'],
+  ['有无应答','必有应答。这是它和话题最本质的区别'],
+  ['能否取消','不能。请求发出后只能等它返回'],
+  ['典型用途','短、且需要立刻拿到结果的查询或校验'],
+  ['本课真实例子','<code>/compute_path_to_pose</code>（算一条全局路径）、<code>/camera/color/camera_info</code>']
+ ],
+ pin:'对应 EXP-07 服务通信'},
+{k:'action',no:'③',n:'动作 Action',s:'目标 / 反馈 / 结果（Goal · Feedback · Result）',
+ rows:[
+  ['通信模型','长任务三段式：下目标 → 多次回报进度 → 最后给结果'],
+  ['数据流向','双向且多轮：一个 Goal 去，多个 Feedback 回，一个 Result 收尾'],
+  ['是否阻塞','不阻塞。下完目标客户端继续干别的，靠回调拿进度'],
+  ['有无应答','有，而且有中间态 —— 这是“知道做到哪一步了”的来源'],
+  ['能否取消','能，而且随时可以 Cancel / Abort'],
+  ['实现方式','动作 = 服务（Goal / Result）+ 话题（Feedback）的组合体'],
+  ['本课真实例子','Nav2 <code>/navigate_to_pose</code>、MoveIt2 <code>/move_action</code>']
+ ],
+ pin:'对应 EXP-08 动作通信'}
+];
+function commPick(i){
+  var keys=['topic','service','action'];
+  commCur=i;
+  var tabs=document.querySelectorAll('.comm-tab');
+  for(var t=0;t<tabs.length;t++) tabs[t].className='comm-tab'+(t===i?' on':'');
+  for(var k=0;k<keys.length;k++){
+    var box=document.getElementById('commSvg-'+keys[k]);
+    if(box) box.style.display=(k===i?'block':'none');
+  }
+  var d=COMM[i], rows='';
+  for(var r=0;r<d.rows.length;r++){
+    rows+='<div class="k">'+d.rows[r][0]+'</div><div class="v">'+d.rows[r][1]+'</div>';
+  }
+  document.getElementById('commDetail').innerHTML=
+    '<h5>'+d.no+' '+d.n+'</h5><div class="sub">'+d.s+'</div><div class="row">'+rows+'</div>'+
+    '<span class="pin">'+d.pin+'</span>';
+}
+commPick(0);
+</script>
+<script src="../shared/tutorial.js?v=20261027a" defer></script>
+</body>
+</html>

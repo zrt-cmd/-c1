@@ -1,0 +1,959 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp003-ros2-application/exp-12-dds/index.html
+TITLE: 实验 12 · DDS 通信中间件剖析（RMW · RTPS · 自动发现）
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+实验 12 · DDS 通信中间件剖析（RMW · RTPS · 自动发现）
+具身智能课程 · 教程首页
+☰ 目录
+ROS2 应用开发
+/
+实验 12 DDS 剖析
+本实验章节
+★ 课程目标
+01
+问题引入：没写一行连接代码，两个节点为什么就能通
+02
+先看现象：零连接代码的 0→1
+03
+原理讲解
+04
+实验步骤
+05
+注意事项与验收清单
+06
+本课总结与验证题
+本课程其它实验
+▷ 05 · 节点
+▷ 06 · 话题通讯（QoS 初见）
+▷ 13 · 分布式通讯
+EXP-12 · 2 学时 · 难度 ⭐⭐⭐
+DDS 通信中间件剖析：RMW · RTPS · 自动发现
+你已经会写 Publisher/Subscriber 了，但 "
+没写一行连接代码，两个节点为什么就能通？
+"——答案藏在 ROS2 的底座 DDS 里。本实验拆开这层黑盒：RMW 抽象层如何让 DDS 实现可热插拔，RTPS 协议的 Participant→Endpoint 域模型长什么样，SPDP+SEDP 两阶段自动发现如何让节点"开机即互通"。
+DDS / RTPS
+RMW
+Fast-DDS
+CycloneDDS
+SPDP / SEDP
+纯软件实验
+目标
+本课学完，你应该能做到
+① 说清分层
+RMW 为什么要存在
+能阐述 RMW 抽象层的设计原理——上层
+rcl
+API 不改一行就能切换底层 DDS 实现，并说清 RTPS 中 Participant、Endpoint、Writer/Reader 的层次关系。
+② 掌握操作
+切实现 / 配 QoS / 看发现
+能正确执行切换 DDS 实现（
+RMW_IMPLEMENTATION
+环境变量）、配置 QoS 策略，观察 DDS 两阶段发现（SPDP + SEDP）。
+③ 独立完成
+对比 QoS 行为差异
+独立编写使用非默认 QoS 的收发节点，对比
+RELIABLE
+vs
+BEST_EFFORT
+、
+KEEP_LAST(1)
+vs
+KEEP_LAST(100)
+的行为差异。
+④ 迁移应用
+按数据特性选 QoS
+能为不同话题选
+合理
+QoS：激光雷达允许丢帧但要低延迟；位姿估计不可丢帧但能忍较高延迟——说出取舍依据。
+本课的重点与难点
+重点
+：SPDP（找人）与 SEDP（找端点）两阶段发现的分工——它是"没写连接代码为什么能通"的完整答案。
+难点
+：四层域模型（Domain → Participant → Publisher/Subscriber → DataWriter/DataReader）容易记混，尤其"节点 ≠ Participant"。
+和前后的关系
+本课把
+EXP-01 的"去中心化"讲到了 byte 级
+。EXP-13 会接着讲"域"这一层的实际用法。
+01
+问题引入：没写一行连接代码，两个节点为什么就能通
+先回忆
+EXP-05 两个节点一启动就能"看见"彼此、EXP-06 QoS 合同、EXP-07/08 服务与动作的一问一答——
+前面课程里学的话题、服务、动作，它们底层通信的具体实现过程，全部由 DDS 完成
+。它相当于 ROS 机器人系统中的
+神经网络
+：上层器官（一个个节点）再复杂，信号传递都走这一套网络。
+要认识这套神经网络，先回答两个问题：
+它是什么？为什么是它？
+——能实现通信的模型和软件框架非常多，把常用的四种摆在一起看，DDS 的优势就清楚了：
+① 点对点
+② Broker 中转
+③ 广播
+④ DDS 数据中心
+服务端
+客户端1
+客户端2
+客户端3
+客户端都得背死服务端地址
+Broker / Master
+节点 A
+节点 B
+节点 C
+节点 D
+所有请求都过它（ROS1）
+节点
+节点
+节点
+节点
+一条通道 · 人人必须听
+DataBus 数据总线
+节点1
+节点2
+节点3
+只订绿的
+只订蓝的
+并行通路 · 各取所需
+→
+→
+→
+✗ 地址写死 · 连接数暴涨
+✗ 单点故障 · 性能瓶颈
+✗ 全部照收 · 噪音大
+✓ 各取所需 · 无中心
+图 12-1｜四种通信模型演进：点对点要背死地址、Broker 有单点故障（ROS1 的老路）、广播人人照收——DDS 用"数据总线 + 并行通路"一次解决三个问题。
+本图回答：为什么 ROS2 选 DDS，而不用 Broker 或广播？
+✅ 结论：数据总线 + 并行通路 = 各取所需、无中心
+⚠️ 风险：Broker 有单点故障，广播全员照收噪音大
+🔍 验证：02 节启动即通 + ss 端口 7400/7411 实测
+🍢
+旋转火锅的比喻
+：DataBus 就像旋转火锅的传送带，各种菜（数据）都在上面转——每个节点
+只拿自己想吃的
+（订阅感兴趣的话题），其他的与我没关系。这就是 DDS 与广播模型的本质区别：
+并行通路 + 按兴趣过滤
+。
+名字与出身
+DDS = Data Distribution Service
+（数据分发服务），OMG 组织的工业标准——航空、汽车、工业控制领域先用起来，ROS2 没有自己造轮子，直接站上成熟生态。
+以数据为中心
+通信双方
+互不认识
+：发布者只管把数据放上 DataBus，订阅者按"话题名 + 类型 + QoS"各取所需——这正是 EXP-05~08 三种通信共用的底座。
+去中心 P2P
+没有 Master 也没有 Broker，
+每个进程自带完整通信栈
+：自动发现、自动匹配、断线自愈——任何一个节点挂掉，别人照常工作。
+💡
+DDS 给 ROS2 带来了什么
+：①
+自动发现
+——无需任何注册服务器；②
+细粒度 QoS
+——可靠性/持久性/存活检测全部可配；③
+实时传输
+——RTPS 协议基于 UDP 组播，延迟可控；④
+厂商生态
+——Fast-DDS、CycloneDDS、Connext 多家实现可互换。
+02
+先看现象：零连接代码的 0→1
+两个终端、四步、约 2 分钟：先看"启动即通"，再当场拿到 DDS 底座的端口与隔离证据。
+终端 1
+起发布节点
+保持运行
+1
+启动 talker
+终端 1
+不写任何"连接代码"，启动即开始发布：
+ros2
+run demo_nodes_cpp talker
+$ ros2 run demo_nodes_cpp talker
+[INFO] [talker]: Publishing: 'Hello World: 1'
+[INFO] [talker]: Publishing: 'Hello World: 2'
+终端 2
+当场拿到端口证据
+新终端
+2
+ss：看见 DDS 在监听的两个发现端口
+终端 2
+话题还没人订阅，底层却发现端口已开——这就是"没写连接代码也能通"的物理入口：
+ss
+-unap |
+grep
+-E
+"7400|7411"
+$ ss -unap | grep -E "7400|7411"
+UNCONN 0 0
+0.0.0.0:7400
+0.0.0.0:* users:(("talker",pid=3121,fd=12))
+UNCONN 0 0
+0.0.0.0:7411
+0.0.0.0:* users:(("talker",pid=3121,fd=13))
+3
+沙盘推进：看后台四步建链
+本页互动 12-1
+回到下方 04 节的"互动 12-1"沙盘，连点 4 次
+推进一步
+：① 领 GUID → ② SPDP 进花名册 → ③ SEDP 交端点 → ④ 绿线亮起撮合成功——第 ② 步人已认识但无数据，第 ④ 步才开始送达。
+4
+换个域号：当场隔离
+终端 2
+域 7 的列表里消失的
+/chatter
+，就是"不同域互相看不见"的 0→1 证据：
+ROS_DOMAIN_ID
+=
+7
+ros2 topic list
+$ ROS_DOMAIN_ID=7 ros2 topic list
+/parameter_events
+/rosout
+# 没有 /chatter —— 域 0 的话题在这个域里绝对不可见
+✔ 四步走完：启动即通、端口可见、后台四步建链、换域即隔离——接下来拆开这些现象背后的原理。
+03
+原理讲解
+先看楼层表再进机房——EXP-01 的五层架构原图，本课聚焦被高亮的
+第 3 层（RMW 插座）与第 4 层（DDS 实现）
+：
+ROS2 五层架构 · 越往下越靠近硬件
+调用往下走 · 数据回程往上走
+1
+应用层
+你写的节点：talker · listener · turtlesim · 规划与控制程序
+2
+客户端库层
+rclpy（Python）· rclcpp（C++）· 共用 rcl 这个语言无关内核
+3
+DDS 接口层（RMW）
+标准插座：换插头不换电器，上层只认统一的发布 / 订阅 / 服务接口
+4
+DDS 实现层
+Fast DDS（默认）· Cyclone DDS · Connext DDS，组播发现 + 点对点传输
+5
+操作系统层
+Ubuntu 22.04（本课程）· 内核 / 网络栈 / 网卡驱动
+ROS2 客户端侧
+你和"母语窗口"打交道
+DDS 中间件世界
+标准插座 + 运输队
+操作系统与硬件
+网卡 · 网络 · 操作系统
+换语言只动第 2 层，换 DDS 实现只动第 4 层，上面的代码一个字不用改
+图 12-RMW · 五层定位（借自 EXP-01 图 1-4）｜右侧虚线已把第 3+4 层框成"DDS 中间件世界"——
+本图回答：RMW 站在哪一层，本课要拆开的是哪两层？
+RMW——DDS 的"万能适配器"
+对照上图：你的代码只碰上面两层，真正收发字节的是第 4 层——夹在中间的
+第 3 层 RMW 就是"插座"
+：一份接口说明书，各家 DDS 按它做成共享库，运行时一个环境变量插拔。
+rclpy / rclcpp
+开发者 API 层 —— Python / C++ 节点代码
+rcl（C API）
+统一逻辑层 —— 参数、命名空间、QoS 默认值
+rmw（抽象层）
+一张"接口说明书" —— 节点/发布/订阅/发现的标准 C 函数集
+rmw_fastrtps_cpp
+默认实现 · eProsima Fast-DDS
+rmw_cyclonedds_cpp
+备选 · Eclipse CycloneDDS
+rmw_connextdds
+商用 · RTI Connext
+RTPS over UDP
+网络线级协议 —— 序列化 · 寻址 · 组播传输
+可替换性
+export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+一行切换底层实现，
+代码零改动、无需重编译
+。课堂若离线，可课前用
+apt-get download ros-humble-rmw-cyclonedds-cpp ros-humble-cyclonedds
+取包，课上
+sudo dpkg -i ./*.deb
+安装。
+竞争促进
+厂商在延迟、吞吐、CPU 占用上互相竞争，ROS2 社区始终能用到"最优实现"。
+隔离变更
+DDS 库升级或打安全补丁，上层 rcl API 完全无感——改底层不动应用。
+红线约束
+同一
+ROS_DOMAIN_ID
+下必须使用
+同一种 RMW 实现
+——不同实现说的话彼此听不懂。
+🔧
+怎么设置 + 怎么验证（可照抄）
+：切换写法
+export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+（只需设在启动节点的环境里）；验证读法
+echo $RMW_IMPLEMENTATION
+为空即默认 Fast-DDS，
+ros2 doctor --report | grep -i middleware
+可确认当前生效实现。
+注意
+：A、B 两组实操
+不切换实现、不需要联网
+——全部用默认 Fast-DDS + ros2cli 自带命令即可完成。切换 RMW 属于"知道有这回事"的扩展认知，不作为本课动手项。
+RTPS 协议的四层嵌套
+RTPS 是 DDS 在网线上跑的"方言"。下图四层套娃：EXP-06 配的 QoS 就贴在最里层"快递员"身上：
+① Domain 通信域 · 一栋"大楼"
+按
+Domain ID
+分组，不同楼（域）的人互相看不见。EXP-13 里配置的
+ROS_DOMAIN_ID
+就是楼号——只有同楼的人才能通信，避免无用数据占带宽。
+② Participant 参与者 · 大楼里的一家公司 = 一个进程内的 DDS 上下文
+进程一启动就"开张"，领一张全球唯一的营业执照
+GUID
+。一家公司可以有多个部门。
+③ Publisher / Subscriber · 公司的发货部 / 收货部
+只管"
+方向
+"——往外发，还是往里收，不碰具体包裹。一个参与者可以同时有发货部和收货部。
+④ DataWriter / DataReader · 真正的快递员（Endpoint 端点）
+打包、拆包、真正收发数据的地方。
+QoS 合同就贴在这一层匹配
+——双方 QoS 对不上，快递员拒不接单。
+📦 HistoryCache 历史缓存 · 快递员手边的暂存货架
+KEEP_LAST(N)
+只留最近 N 件；
+KEEP_ALL
+全留。晚来的订阅者能不能拿到"历史包裹"，就看这张货架。
+💡
+对上号（这里最容易记混）
+：
+一个 Participant ≈ 一个进程
+，而
+ros2 node list
+数出来的是
+节点
+——同一进程里的多个节点通常共用一个 Participant（一家公司可以开好几个部门）。
+所以：节点数 ≠ 公司数。真正带工号的是
+ros2 topic info --verbose
+打出的 "GID"，那是
+DataWriter 的 GUID
+（快递员工号）。你在命令行看到的一切，都能在这套"楼→公司→部门→快递员"里找到位置。
+一条消息如何"穿过四层"到达对端
+你只写了
+publish(msg)
+一行，剩下全靠下图八步自动跑完：
+发送端 · 你的节点
+接收端 · 对端节点
+① rclpy · publish(msg)
+应用层：你写的就这一行
+② rcl（C API）
+统一逻辑：QoS / 命名空间
+③ rmw（适配器）
+翻译成厂商函数调用
+④ RTPS / UDP 组播
+序列化 · 寻址 · 239.255.0.1
+⑤ RTPS / UDP 接收
+反序列化 · GUID 匹配
+⑥ rmw / DataReader
+QoS 队列 HistoryCache
+⑦ rcl · Executor
+事件队列取出就绪回调
+⑧ callback(msg)
+你的订阅回调被调用
+UDP 组播
+239.255.0.1
+← ③ 是唯一"可换零件"（切 RMW 实现）
+⑥ 也是唯一"可换零件" →
+同一条消息走完 "左楼下 → 组播网络 → 右楼上" 八步旅程（3.6 秒循环）
+动画 12-1｜你只写了第 ① 步，剩下 ②~⑧ 全由中间件替你跑完——其中 ③ 和 ⑥ 是唯一能整体替换的"零件"（换 DDS 实现）。
+本图回答：一条 publish(msg) 要穿过哪些层才能到达对端回调？
+✅ 结论：应用只碰第①⑧步，中间的楼一层不用爬
+⚠️ 风险：③⑥ 可换，但同一域内必须同一种 RMW
+🔍 验证：02 节 ss 端口实测 + 03 节 RMW 切换入口
+🔧
+一句总结
+：rcl 管"逻辑统一"、rmw 管"翻译到具体 DDS"、RTPS 管"网线上怎么传"。你写的应用代码永远只碰 ① 和 ⑧，中间的楼一层都不用爬。
+为什么不用写"连接代码"
+答案全在下图两阶段协议里——零配置自动跑，
+怎么设：什么都不用设
+：
+图 12-2 · 两阶段发现｜本图回答：没写连接代码，两个节点后台分几步完成匹配？
+✅ 结论：SPDP 找人 → SEDP 找端点，零配置完成建链
+⚠️ 风险：任一门不过即无声失败
+🔍 验证：互动 12-1 四步 + B-2 count: 0
+1
+阶段一 · SPDP（找人）
+每个进程启动后，向组播（multicast）地址
+239.255.0.1
+周期发送"我来了"（带上自己的
+GUID
+和
+楼号 Domain
+）。收到的人把彼此记进
+花名册
+。这一步用
+Best Effort
+——丢一两条没关系，下个周期还会再喊。
+2
+阶段二 · SEDP（找端点）
+互相认识后，双方通过内置通道交换各自的
+DataWriter/DataReader 清单 + QoS
+。只有
+话题名相同 + 类型相同 + QoS 兼容
+的两端，才会正式"结对"，建立应用级数据链路。
+阶段
+解决什么
+生活类比
+SPDP
+网络里有
+谁
+、在哪个 Domain（楼）
+进工作群先看"群成员列表"
+SEDP
+每个人
+发/收什么话题
+、QoS 是否匹配
+群里发公告对暗号，对上了才私下加好友
+⚠️
+这是"订阅端没输出"的头号排查方向
+：三道门——① 同 Domain（同楼）吗？② 话题名/类型一致吗？③ QoS 请求 ≤ 提供吗（EXP-06 沙盒练过）？任何一道不通，SEDP 都不会撮合这对端点，于是"节点看得见、数据出不来"。
+QoS 决策表：按数据特性选策略
+QoS 是收发双方的"合约"——先看三推子档位图，再对照下表按数据特性直接选，场景列即取舍依据：
+QoS 三个维度各有两档，像调音台上的推子：越往右越"可靠、越贵"
+① Reliability 可靠性
+BEST_EFFORT 尽力而为
+丢了就丢，延迟最低
+RELIABLE 保证送达
+丢了会重传，延迟略高
+例：激光点云用左边，控制指令用右边；
+EXP-06 /gas_sensor 用 RELIABLE
+② Durability 持久性
+VOLATILE 不补发
+订阅者上线前的消息不管
+TRANSIENT_LOCAL 补发存量
+晚到的订阅者先收到"最后一条"
+例：地图、静态配置用右边——
+EXP-06 用 VOLATILE
+③ History 历史 + Depth 深度
+KEEP_LAST(N) 只留最近 N 条
+KEEP_ALL 全留
+N 越大越抗突发，也越占内存；
+EXP-06 depth=10
+图 12-QoS · 三推子档位（借自 EXP-06 图 6-3）｜每个话题都在这三个维度上各取一档，合起来就是它的"传输合同"——
+本图回答：三要素各自往哪边拨，分别换到什么？
+Reliability 可靠性
+RELIABLE
+：丢包会重传，保证送达（EXP-06 采用）。
+BEST_EFFORT
+：丢了不补，换取更低延迟——激光雷达点云、图像流常用。
+Durability 持久性
+VOLATILE
+：订阅者上线前的消息一律不管。
+TRANSIENT_LOCAL
+：为话题保留"最后一条"，晚到的订阅者一上线就补发。
+History + Depth 历史深度
+KEEP_LAST(N)
+：队列只留最近 N 条（EXP-06 用 N=10）。
+KEEP_ALL
+：一条不留地全排队——可能撑爆内存，慎用。
+QoS 策略
+可选值
+语义
+典型场景
+Deadline
+DEADLINE(时长)
+每次通信必须期限内完成
+200Hz IMU → 设 5ms：超期即报"断流"，第一时间发现节点卡死
+History
+KEEP_LAST(n)
+/
+KEEP_ALL
+历史数据的缓存大小
+状态量 → KEEP_LAST(1)；录制回放 → KEEP_LAST(1000)
+Reliability
+RELIABLE
+/
+BEST_EFFORT
+可信赖模式 vs 尽力传输
+RELIABLE 尽量保证完整性（重传）→ 控制指令；BEST_EFFORT 网络差也保流畅、可能丢 → 激光点云/图像
+Durability
+VOLATILE
+/
+TRANSIENT_LOCAL
+晚加入的节点收不收历史
+实时流 → VOLATILE；地图、机器人状态 → TRANSIENT_LOCAL（新节点快速跟上系统）
+Liveliness
+AUTOMATIC
+/
+MANUAL_BY_TOPIC
+谁负责证明"我还活着"
+安全关键节点 → MANUAL（代码显式心跳）
+# 查看任一话题当前生效的完整 QoS 档案
+ros2
+topic info /chatter --verbose
+# 输出含：Reliability: RELIABLE / Durability: VOLATILE / GID: 01.0f...
+# 你的 QoS 代码里对应的声明（EXP-06 复习）
+qos = QoSProfile(history=HistoryPolicy.KEEP_LAST, depth=
+10
+,
+                 reliability=ReliabilityPolicy.RELIABLE)
+04
+实验步骤
+工程化顺序：先看全景（图 12-3）→ 再进 A/B 两组实操 → 最后读真实 QoS 清单。
+图 12-3 · 工程全景｜本图回答：A 组 / B 组实操各自操作什么，证据落在 DDS 栈的哪一层？
+✅ 结论：所有证据都落在同一 DDS 栈的四层上
+⚠️ 风险：组播被拦 / 异域 → 发现层断，现象全空
+🔍 验证：A-1~A-4、B-1~B-3 验收表
+亲手推进两阶段发现
+点"推进一步"，按真实时序看 DDS 怎么在后台把三个节点连起来——你一行连接代码都不用写：
+239.255.0.1
+组播地址
+Node A
+pub /gas_sensor
+GUID 0x1a…
+↗ 发 /gas_sensor
+Node B
+sub /gas_sensor
+GUID 0x2b…
+↘ 收 /gas_sensor
+Node C
+sub /gas_sensor
+GUID 0x3c…
+↘ 收 /gas_sensor
+IDLE
+三个节点还没启动。点"推进一步"看 DDS 怎么在后台把大家连起来（无需你写任何连接代码）。
+▶ 推进一步
+↺ 重置
+互动 12-1｜亲手推进 SPDP（找人）→ SEDP（找端点）→ 撮合（建链）：注意第 ② 步只是"人被发现"，还没有数据流动
+💡
+观察点
+：第 ② 步三节点只是互相"进了群花名册"，还没有数据流动——这就是为什么两个节点都启动后
+ros2 topic list
+秒级可见，但
+echo
+出数据还要再等 SEDP 撮合完成。只有走到 ④，绿色连线亮起，消息才真正开始送达。
+域隔离——看得见的功能 + 摸得着的底层证据
+本节全部命令
+零安装
+、纯
+ros2cli
+，学生全程能自己敲出效果。先建立"域隔离"的直觉，再从
+ss
+端口号和共享内存文件名拿到底层证据链。
+A-1 · 域号 = UDP 端口偏移（最推荐，证据最硬）
+ROS_DOMAIN_ID
+直接映射到 DDS 发现端口
+7400 + 250 × 域号
+——域号不是"逻辑标签"，它物理上决定了节点监听哪个端口。这里只用前缀式临时给域号做对照实验；域号的三种给法、组网与防火墙排查的完整主场在
+EXP-13 分布式通讯
+，本课只取它的"端口证据"。
+终端 1
+默认域跑发布节点
+保持运行
+1
+启动一个 talker
+终端 1
+不设任何环境变量 → 落在默认域 0：
+ros2
+run demo_nodes_cpp talker
+$ ros2 run demo_nodes_cpp talker
+[INFO] [talker]: Publishing: 'Hello World: 1'
+[INFO] [talker]: Publishing: 'Hello World: 2'
+终端 2
+从端口看穿域号
+新终端
+2
+ss 列出 UDP 监听端口
+终端 2
+域 0 的发现端口应为
+7400
+（组播发现）与
+7411
+（单播发现）：
+ss
+-unap |
+grep
+-E
+"7400|7411"
+$ ss -unap | grep -E "7400|7411"
+UNCONN 0 0
+0.0.0.0:7400
+0.0.0.0:* users:(("talker",pid=3121,fd=12))
+UNCONN 0 0
+0.0.0.0:7411
+0.0.0.0:* users:(("talker",pid=3121,fd=13))
+# 7400 = 组播发现 · 7411 = 单播发现
+3
+换域跑，端口号凭空 +1750
+终端 3
+域 7 的预期端口 = 7400 + 250×7 =
+9150
+；同时
+ros2 topic list
+看不到
+域 0 的
+/chatter
+：
+ROS_DOMAIN_ID
+=
+7
+ros2 run demo_nodes_cpp talker
+ss
+-unap |
+grep
+-E
+"9150|9161"
+ROS_DOMAIN_ID
+=
+7
+ros2 topic list
+$ ss -unap | grep -E "9150|9161"
+UNCONN 0 0
+0.0.0.0:9150
+0.0.0.0:* users:(("talker",pid=4022,fd=12))
+UNCONN 0 0
+0.0.0.0:9161
+0.0.0.0:* users:(("talker",pid=4022,fd=13))
+$ ROS_DOMAIN_ID=7 ros2 topic list
+/parameter_events
+/rosout
+# 没有 /chatter —— 域 0 的话题在这个域里绝对不可见
+✔ 功能现象（不同域节点绝对互不可见）+ 底层证据（端口号恰好 7400 + 250×7 = 9150）同时到手，这条最有教学价值。
+A-2 · 组播发现通道本身（ros2 multicast）
+发现报文
+独立于话题数据
+，走的是 UDP 组播。
+ros2 multicast
+是 ros2cli 自带命令，可直接抓到这个通道：
+终端 A
+接收端
+ros2
+multicast receive
+终端 B
+发送端
+新终端
+ros2
+multicast send
+# 终端 A 输出：
+Received from
+10.1.134.9:57588
+: 'Hello World!'
+⚠️
+由此可解释一个经典现象
+：实验室把两台机器接在不同 VLAN、或交换机禁了
+IGMP Snooping 组播
+时，"节点互相看不见"——这不是 ROS 的 bug，是 DDS 的
+发现层被切断
+了。数据链路根本还没建立，自然收不到任何消息。
+排查顺序：先
+ping
+通（IP 可达）→ 再
+ros2 multicast send/receive
+（组播可达）→ 都通了才轮到查域号与 QoS。
+A-3 · 共享内存传输：同机通信不走网卡
+1
+起一个节点，看 /dev/shm 的变化
+终端 R
+Fast-DDS 同机通信默认走共享内存（SHM），段文件立刻出现在
+/dev/shm
+：
+ros2
+run demo_nodes_cpp talker &
+ls
+-l /dev/shm |
+grep
+fast
+df
+-h /dev/shm
+$ ls -l /dev/shm | grep fast
+-rw------- 1 user user   549408
+fastrtps_9b7fe034e58a9a57
+-rw------- 1 user user    52416
+fastrtps_port7411
+← 文件名就是发现端口号
+$ df -h /dev/shm
+Filesystem      Size  Used Avail Use% Mounted on
+tmpfs           3.9G   48M  3.8G   2% /dev/shm
+✔ 亮点是
+fastrtps_port7411
+这个文件名——学生能直接读出"同机通信走共享内存，不走网卡"，端口号与 A-1 的 7411 严丝合缝对上。
+🧹
+顺带解释一个常见故障
+：进程被
+kill -9
+强杀后，
+/dev/shm
+里的段文件可能残留，导致下次启动报错或行为异常。清理命令：
+fastdds shm clean
+（或手动删掉残留的
+fastrtps_*
+文件）。
+优雅退出（Ctrl+C）不会留残留
+——这也是为什么"杀进程"和"正常停"要用不同手段。
+A-4 · 实操验收
+#
+证据项
+记录方式
+合格标准
+1
+域号 → 端口映射
+ss -unap
+截图
+域 0 = 7400/7411，域 7 = 9150/9161，能说出 +250×7 的规律
+2
+域隔离功能现象
+ROS_DOMAIN_ID=7 ros2 topic list
+截图
+看不到域 0 的
+/chatter
+3
+组播通道存活
+ros2 multicast
+收发截图
+能收到对端 Hello World 与来源 IP:端口
+4
+共享内存证据
+ls -l /dev/shm
+截图
+指出
+fastrtps_port7411
+与发现端口的对应关系
+QoS 实验——DDS 最直观的两组反差
+QoS 最好的教学方式是
+让现象自己说话
+。下面两组实验都只用 CLI，反差强烈、结论确定，建议作为本节主力。动手前先看三门判定——改错任何一门都会"连不上"：
+图 12-4 · QoS 实验｜本图回答：改了哪个参数会导致"连不上"，报错为什么看不见？
+✅ 结论：同域 → 同话题类型 → QoS 兼容，三门全过才建链
+⚠️ 风险：门③失败无报错，只有 count: 0
+🔍 验证：B-1 收历史 + B-2 WARN/count: 0
+B-1 · Durability：后加入的订阅者能拿到历史数据
+这就是 ROS 1 时代的
+latching
+，在 DDS 里叫
+TRANSIENT_LOCAL
+durability。
+发布者先跑，订阅者后启动
+，照样立刻收到积压的消息：
+终端 1
+transient_local 发布者
+先跑 3 秒
+ros2
+topic pub -r 2 --qos-durability transient_local --qos-depth 5 \
+  /qos_tl std_msgs/msg/String
+"{data: retained}"
+终端 2
+等 3 秒后再启动订阅者
+新终端
+ros2
+topic echo --qos-durability transient_local /qos_tl
+$ ros2 topic echo --qos-durability transient_local /qos_tl
+data: retained
+data: retained
+data: retained
+# 一启动就吐出 5 条积压消息（--qos-depth 5）——历史被送到了新来者手里
+把两边都换成
+volatile
+（默认）再试 →
+一条都收不到
+。两个命令的差别只有 durability 一个参数，结果天差地别。
+B-2 · Reliability 不兼容 → 逻辑上根本没连上
+终端 1
+best_effort 发布者
+ros2
+topic pub -r 5 --qos-reliability best_effort /qos_be \
+  std_msgs/msg/String
+"{data: be}"
+终端 2
+reliable 订阅者
+新终端
+ros2
+topic echo --qos-reliability reliable /qos_be
+ros2
+topic info -v /qos_be
+$ ros2 topic echo --qos-reliability reliable /qos_be
+[WARN] New publisher discovered on topic '/qos_be', offering incompatible QoS.
+No messages will be received from it. Last incompatible policy: RELIABILITY
+（之后一直空，没有任何消息）
+$ ros2 topic info -v /qos_be
+Type: std_msgs/msg/String
+Publisher count: 1
+Subscription count:
+0
+关键教学点
+Subscription count: 0
+—— 订阅端不是"收到了空数据"，而是
+连接压根没建立
+。DDS 在匹配阶段就判定 QoS 不兼容（请求 ≥ 提供 才可匹配），直接拒绝撮合。这解释了为什么很多 QoS 问题表现为"没有任何反应、也没有报错"。
+B-3 · 顺带读一份真实 QoS 清单
+ros2 topic info -v
+会打印每个端点的
+完整 QoS
+——这份清单本身就是 DDS 的 QoS 策略表：
+ros2
+topic info -v /qos_tl
+$ ros2 topic info -v /qos_tl
+QoS profile:
+  Reliability:
+RELIABLE
+History (Depth):
+KEEP_LAST (5)
+Durability:
+TRANSIENT_LOCAL
+Lifespan: Infinite
+  Deadline: Infinite
+  Liveliness: AUTOMATIC
+# 六个策略一屏看完 —— 对照 03 节的 QoS 决策表逐项理解
+📌
+用真实激光话题再踩一次坑
+：
+ros2 topic echo /scan
+大概率什么都收不到——激光驱动用 BEST_EFFORT 发布，而 echo 默认 RELIABLE，QoS 不匹配。必须加
+--qos-profile sensor_data
+（BEST_EFFORT + KEEP_LAST(5)）或
+--qos-reliability best_effort
+。
+RViz2 看 LaserScan 也要设 Best Effort
+，这是新手最常卡的坑之一。
+#
+证据项
+记录方式
+合格标准
+1
+TRANSIENT_LOCAL 收历史
+后启动 echo 的截图
+立刻收到多条积压消息
+2
+VOLATILE 对照
+同实验换 volatile 的截图
+一条都收不到，能说出原因
+3
+RELIABILITY 不兼容
+WARN +
+topic info -v
+截图
+指出 Subscription count: 0 的含义
+4
+QoS 清单解读
+topic info -v
+输出
+逐项说出六个策略的实际取值
+05
+注意事项与验收清单
+⚠️ 注意项
+说明
+全程零安装
+本节实操全部使用 ros2cli 自带命令（
+ss
+/
+ros2 multicast
+/
+ls
+），不需要联网装任何 DDS 实现
+域号范围
+ROS_DOMAIN_ID 取值 0~232；端口映射公式
+7400 + 250 × 域号
+，域号过大可能超出系统端口范围
+组播依赖
+SPDP 依赖 UDP 组播——虚拟机/容器关闭组播、交换机禁 IGMP 时节点互相看不见；用
+ros2 multicast send/receive
+先验证通道
+共享内存残留
+进程被
+kill -9
+后
+/dev/shm
+可能留下
+fastrtps_*
+段文件导致下次启动异常，清理用
+fastdds shm clean
+QoS 不匹配无声
+不兼容时表现为"没有任何反应、没有报错"，只有
+topic info -v
+的 Subscription count: 0 能佐证
+Durability 三态
+VOLATILE / TRANSIENT_LOCAL / TRANSIENT，第三种需 DDS 持久化存储支持，课程默认前两者
+ss -unap | grep -E "7400|7411"
+能指出这是
+域 0
+的发现端口，并算出域 7 对应 9150/9161
+ROS_DOMAIN_ID=7 ros2 topic list
+看不到域 0 的
+/chatter
+——域隔离功能现象成立
+ros2 multicast receive / send
+能收到对端消息与来源 IP:端口，说清发现报文走 UDP 组播
+ls -l /dev/shm | grep fast
+能认出
+fastrtps_port7411
+，解释同机通信走共享内存
+TRANSIENT_LOCAL 订阅端
+晚启动
+仍能收到 5 条历史消息，换 VOLATILE 一条都收不到
+topic info -v
+看到
+Subscription count: 0
+时能解释"不兼容 = 连接未建立"而非"收到空数据"
+能对照解释 SPDP（找人）与 SEDP（找端点）各自职责
+能为"激光点云"与"导航指令"分别推荐合适的 QoS 组合并说明理由
+06
+本课总结与验证题
+✅ 完成成果
+能用一个域号 + 三条命令看出隔离效果；能从
+ss
+端口号和
+/dev/shm
+文件名拿到底层证据；跑通 durability 与 reliability 两组 QoS 反差实验。
+🧠 原理收获
+rcl→rmw→DDS 三层抽象的工程价值；RTPS 四层域模型；SPDP+SEDP 两阶段自动发现的完整因果链；域号与端口的物理映射。
+🛠 技能收获
+会用
+ss
+验证端口偏移、
+ros2 multicast
+验证组播通道、
+ls /dev/shm
+验证共享内存；能读懂
+topic info -v
+的六项 QoS。
+❓ 排障方法
+节点不通按四步排查：ping 通 IP →
+multicast
+通组播 → 同 Domain → QoS 请求 ≤ 提供。最后才怀疑 RMW 实现是否统一。
+验证题（改动型 · 每题先自己作答，再展开核对）
+1（目标①·改参数）
+域 7 的发现端口是 9150。把两台机器都改成
+ROS_DOMAIN_ID=12
+：组播地址、发现端口各变成多少？如果只改了一台，现象是什么？
+参考答案与得分点
+得分点：①组播地址 = 239.255.0.(N+1) →
+239.255.0.13
+②端口 = 7400 + 250×12 →
+10400
+（单播 10411） ③只改一台 → 两机不同域，互相不可见（域 12 的 topic list 无对端话题）。（①②各 40%，③ 20%）
+2（目标③·改参数）
+把 B-1 的发布、订阅两边的
+--qos-durability
+都改回默认
+volatile
+，其它参数不动。晚启动 3 秒的订阅者还能立刻收到积压消息吗？用哪条命令留下证据？
+参考答案与得分点
+得分点：①收不到——VOLATILE 不为晚到者保留历史 ②证据：
+ros2 topic info -v /qos_tl
+显示 Durability: VOLATILE，且 echo 长时间无输出 ③对照：TRANSIENT_LOCAL 下同条件可收 5 条。（①③各 40%，② 20%）
+3（目标③·改方向）
+把 B-2 反过来：发布端
+reliable
+、订阅端
+best_effort
+。这次能收到消息吗？
+Subscription count
+是多少？
+参考答案与得分点
+得分点：①能收到——兼容规则是
+订阅请求 ≤ 发布提供
+，RELIABLE（提供）≥ BEST_EFFORT（请求）成立 ②count: 1，撮合成功 ③原 B-2 方向相反（请求 RELIABLE > 提供 BEST_EFFORT）才拒绝。（①②各 40%，③ 20%）
+4（目标①②·改环境）
+启动前
+export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+再跑本课命令：域号→端口公式还成立吗？A-3 的
+/dev/shm
+证据还会出现吗？要守住哪条红线？
+参考答案与得分点
+得分点：①7400 + 250×域号 是 RTPS 标准端口映射，换实现仍成立 ②
+fastrtps_*
+段文件消失——共享内存是 Fast-DDS 专有 ③红线：同域内所有进程必须用同一种 RMW，否则彼此听不懂 ④SPDP/SEDP 与 B-1/B-2 的 QoS 现象不变。（①②各 30%，③④各 20%）
+5（目标④·改选型）
+新手把"导航速度指令"配成 BEST_EFFORT + KEEP_LAST(1)、把"激光点云"配成 RELIABLE + KEEP_LAST(1000)。按 03 节决策表，这两处各错在哪、怎么改？
+参考答案与得分点
+得分点：①指令可能丢包 → 关键控制数据必须 RELIABLE（可容忍偶发超时但不能丢指令） ②点云重传 + 1000 条缓存 → 网络差时拥塞堆积、延迟飙升 → 应 BEST_EFFORT + KEEP_LAST(小 depth) ③选型口诀：控制类保可靠，传感流保流畅。（各 33%）
+CORE-01 · 机器人 ROS2 应用与开发 · 实验 12 DDS 通信中间件剖析 · 2 学时

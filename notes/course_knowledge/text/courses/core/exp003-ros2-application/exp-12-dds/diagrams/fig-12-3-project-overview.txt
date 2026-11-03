@@ -1,0 +1,46 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp003-ros2-application/exp-12-dds/diagrams/fig-12-3-project-overview.html
+TITLE: 图 12-3 · 工程全景
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+图 12-3 · 工程全景
+图 12-3 · 工程全景：本课实操动了哪些命令与底层设施
+本图回答的问题：A 组 / B 组实操各自操作什么，证据落在 DDS 栈的哪一层？
+入口层 · 终端命令
+处理层 · DDS 发现与匹配
+消息与传输层 · 组播 / 共享内存
+外部 · 依赖条件
+talker 进程
+ros2 run demo_nodes_cpp
+组网诊断台
+ss / multicast / ls
+ROS_DOMAIN_ID=7
+前缀式切域 · topic list
+QoS 实验
+topic pub / echo --qos-*
+SPDP 发现 · 同域互播
+GUID + 楼号 → 花名册
+SEDP 撮合
+话题+类型+QoS
+QoS 合同生效
+Durability · Reliability
+组播发现通道
+UDP 239.255.0.8 / .1 · 7400+250N
+共享内存 /dev/shm
+fastrtps_* 段文件
+话题数据链路
+/chatter · /qos_*
+A 组证据：端口 / 隔离 / 组播
+B 组证据：收历史 / count:0
+启动/发现
+pub/echo
+发 SPDP
+同机 SHM
+QoS 收发
+交换机 · 防火墙 · IGMP 组播开关
+Fast-DDS（默认 RMW）
+同域 ROS_DOMAIN_ID
+实操顺序：A-1 域端口 → A-2 组播 → A-3 共享内存 → B-1/B-2/B-3 QoS
+✅ 结论：所有证据都落在同一 DDS 栈的四层上
+⚠️ 风险：组播被拦 / 异域 → 发现层断，现象全空
+🔍 验证：04 节 A-1~A-4、B-1~B-3 验收表
+EXP-12 · DDS 通信中间件剖析

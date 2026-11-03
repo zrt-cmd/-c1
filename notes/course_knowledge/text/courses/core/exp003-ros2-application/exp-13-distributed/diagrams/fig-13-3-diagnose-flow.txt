@@ -1,0 +1,36 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp003-ros2-application/exp-13-distributed/diagrams/fig-13-3-diagnose-flow.html
+TITLE: 图 13-3 · 组网诊断台：四步判定
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+图 13-3 · 组网诊断台：四步判定
+图 13-3 · 组网诊断台：两台设备看不见时的四步判定
+本图回答的问题：按什么顺序排查"节点互相看不见"，每步用哪条命令？
+现象：两台设备节点互相看不见
+步①
+两端 ROS_DOMAIN_ID 一致?
+echo $ROS_DOMAIN_ID
+否
+修：改回同域
+export / 前缀 / bashrc
+是
+同网段 · ping 通 ?
+前提① · IP 可达
+否
+修：查网段/NAT
+虚拟机改桥接模式
+通
+组播通? send / receive
+前提③ · ros2 multicast
+否 · 防火墙/IGMP 拦
+修：放行组播
+ufw allow 7400:8399
+通
+查 QoS · 组播仍禁用换服务
+请求 ≤ 提供 · DISCOVERY_SERVER
+组播被禁的兜底方案
+fastdds discovery + export 服务器
+顺序不能倒着来：先 ID，再 ping，后组播——否则会把配置问题当网络问题查
+✅ 结论：ID → ping → 组播 → QoS，四步按序排查
+⚠️ 风险：组播通仍可被禁组播网阻断 → 换 DISCOVERY_SERVER
+🔍 验证：诊断台六场景（fw / vm / server）逐一复现
+EXP-13 · ROS2 分布式通讯

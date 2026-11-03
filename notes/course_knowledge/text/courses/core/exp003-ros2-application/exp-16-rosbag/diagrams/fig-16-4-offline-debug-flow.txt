@@ -1,0 +1,44 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp003-ros2-application/exp-16-rosbag/diagrams/fig-16-4-offline-debug-flow.html
+TITLE: 图 16-4 · 离线联调数据流
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+图 16-4 · 离线联调数据流
+图 16-4 · 离线联调数据流：带钟回放的四小步
+本图回答的问题：要让 rviz2 看着"历史三维场景"，play、/clock、rviz、Time 面板怎么串起来？
+1
+带钟回放
+play --clock --loop
+~40Hz /clock
+2
+视图认钟
+rviz2 -p use_sim_time:=true
+3
+Time 面板
+Panels→Add→Time
+4
+加图层
+LaserScan·TF·Image
+rviz2 订阅的历史话题（与 /clock 同处回放时间轴）
+/scan · LaserScan 面板
+/tf · 变换树面板
+/path · 轨迹面板
+图像话题 · Image
+rviz 按 Display 绘制
+stamp 走 /clock
+原时序重建
+Topic 按包内容选
+再生发布
+ros2 topic delay /scan
+必须是带 header 的话题
+抽样回放流验证
+正值且很小
+✅ 时钟对齐
+Time 面板随回放增长
+负值 / 无 header
+❌ 时间错位
+/chatter 报 no header · 换 /scan /odom
+漏开关的另一症状：TF LookupException 满屏（now=今天 · stamp=昨天）
+✅ 结论：play --clock ＋ use_sim_time 两开关都开，rviz 才进入"历史时空"
+⚠️ 风险：漏开关 TF LookupException · delay 别用无 header 的 /chatter
+🔍 验证：04 节 4 双开关 + Time 面板 + topic delay /scan
+EXP-16 · rosbag2 数据录制与回放

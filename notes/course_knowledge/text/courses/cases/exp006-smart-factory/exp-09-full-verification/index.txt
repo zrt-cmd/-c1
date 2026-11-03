@@ -1,0 +1,312 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/cases/exp006-smart-factory/exp-09-full-verification/index.html
+TITLE: EXP-09 · 全功能快速验证 — 智慧工厂装货分拣码垛综合项目
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+EXP-09 · 全功能快速验证 — 智慧工厂装货分拣码垛综合项目
+🧠 具身智能课程 ·
+教程首页
+综合项目
+/
+智慧工厂装货分拣码垛
+/ EXP-09
+本页目录
+01 问题引入
+02 原理通俗讲解
+03 关联知识点
+04 实验目标
+05 实验环境与准备
+06 动画讲解
+07 互动讲解
+08 实操步骤
+09 重点与易错点
+10 总结与思考
+CASE-01 · 智慧工厂
+EXP-01 需求分析
+EXP-02 五节点架构
+EXP-03 接口设计
+EXP-04 语音交互集成
+EXP-05 视觉自适应装货
+EXP-06 智能分拣
+EXP-07 自主码垛
+EXP-08 危险检测与急停
+EXP-09 全功能快速验证
+EXP-09 · 第 3 章 · 综合性 · 8 学时
+全功能快速验证：一条命令启动 · 四链路闭环 · 干净停止
+收官实验：ros2 launch 一键拉起 bringup→arm_controller→peripherals→eai_factory 全系统，
+    用 7 个模块开关按需裁剪；以"语音触发 + 服务触发"双通道验证装货/分拣/码垛/急停四条全链路闭环
+    （含"任务完成"播报反馈），最后用 stop_eai_factory.sh 清理并排查残留——对应需求 R10 工程化验收。
+🚀 一键启动编排
+7 开关模块化
+四链路闭环验证
+语音+服务双通道
+stop 脚本清理排查
+01
+问题引入：零件都好，整机呢？
+前八个实验分别验证了需求、架构、接口、语音、视觉、分拣、码垛、急停——每个单件都合格，
+    但把它们拼成一台"智慧工厂"整机时，问题往往出在
+接缝
+处：启动顺序乱了谁先谁后？
+    内存不够要关哪些模块？任务完成了谁说话？下次启动报"串口被占用"是谁没扫干净？
+    本实验就是出厂前的
+整机路试
+：一条命令启动、四条链路跑通、一个脚本收工。
+源讲义对"完成"给了明确定义：不会出现"抓完了没人说话"的断头链路——
+    grasp 发
+task|done
+→ 调度器映射中文话术 → /eai_factory/speak → TTS 播报，
+    这个闭环是 R1/R7 在系统级的最终验收面。
+02
+原理通俗讲解：剧组开机与收工清单
+场记打板
+分阶段有序开机
+拍戏要先架灯、再通电、后开摄影机——launch 也分阶段：
+底层系统
+（car1_bringup 底盘+控制器
+        → car1_arm_controller → car1_peripherals 雷达+相机，经 IncludeLaunchDescription 在
+start_base:=true
+时包含）→
+eai_factory 节点
+。后者因依赖不同分两类：
+        voice/vision/grasp/conveyor 要 venv 里的 sherpa_onnx、cv2 4.11，用 ExecuteProcess 以
+/home/iflytek/ros2_venv/bin/python3
+直跑 .py；scheduler/safety 依赖干净，用标准 Node 入口点。
+        最后
+start_viz:=true
+延时 5s 拉起 rqt_image_view。
+七个开关
+按需裁剪省资源
+start_base / start_viz / start_voice / start_vision / start_grasp / start_conveyor / start_radar
+        （前六默认 true，
+radar 默认 false
+）。语义实例：
+start_voice:=false
+省下 LLM ~500MB；
+start_base:=false + start_radar:=true
+只测安全节点；
+start_viz:=false
+无头服务器不报 rqt 错。
+像行李打包：长途全带，出门买菜只带钥匙
+。
+四条对讲
+双通道闭环验证
+装货（视觉抓取）/ 分拣（固定八步）/ 码垛（送料+抓取编排）/ 急停（雷达联锁）四链路，
+        每条都可
+语音与服务二选一
+触发（同走 _run_task，等价），完成播报由
+        _grasp_status_cb 映射 load→装货完成 / sort→分拣完成 / palletize→码垛完成。
+        验证法：入口双通道 + 中间看状态话题 + 出口听播报，三段都对齐才算闭环。
+扫尾
+停得干净才算完
+异常退出会残留节点、底层进程与 flask_server（LLM 服务 8080），继续占着总线舵机/串口/麦——
+        下次启动必然"地址被占用"。
+stop_eai_factory.sh
+五段清理：杀 launch 主进程 →
+        7 个 eai_factory 节点（按文件名精确 pkill）→ flask_server → 底层系统 → 兜底清 8080 端口 →
+        自查输出
+"已全部清理干净"
+。用完电的插头要拔——这就是 R10 的工程纪律。
+03
+关联知识点
+LLM 就绪
+Qwen3.5-0.8B · 8080
+模型文件
+Qwen3.5-0.8B_w4a16_g128_rk3576.rkllm
+，
+        llm_server.auto_start=true 自动拉起；启动后等
+ss -tlnp | grep 8080
+就绪，
+        语音链路才可用（加载约几十秒，别当成卡死）。
+混编启动源
+74-94 / L99-146 / L149-160
+launch 文件三段：7 个 DeclareLaunchArgument 开关（L73-86）、底座三包 include 与雷达独立拉（L89-94）、
+        五节点编排与 rqt 延时（L99-160）。
+资源账
+500MB + 显示器依赖
+语音/LLM 约 500MB 常驻；rqt GUI 需显示器；全功能启动（底盘+臂+雷达+相机+语音+视觉+流水线）
+        要确认内存/供电充足，不够就开关裁剪。
+排查三板斧
+进程 → 接口 → 日志
+stop 自查残留 →
+ros2 node/topic/service list
+看接口在不在 → 分节点日志定位。
+        典型：语音无响应先查 8080 与麦克风占用。
+04
+实验目标
+掌握一键启动与 bringup→arm_controller→peripherals→eai_factory 分阶段启动顺序，能读懂启动日志时序。
+掌握 7 开关语义，能按场景给出省内存/低内存/全功能三种启动组合。
+完成装货/分拣/码垛/急停四链路闭环验证（语音+服务双通道），核对"装货完成/分拣完成/码垛完成"播报。
+掌握 stop_eai_factory.sh 停止清理与残留排查（进程、8080 端口、node list 三验收）。
+05
+实验环境与准备
+全硬件就位：麦克纳姆底盘 + 5DOF 机械臂 + 夹爪 + 激光雷达 + RGB-D 相机 + 语音阵列 +
+      流水线电机 M1 + 光电 GPIO17 + AprilTag（id=3, tag36h11, 0.025m）。
+先验自查（任一缺失先回对应实验补课）：
+ls /home/iflytek/models/rkllm/Qwen3.5-0.8B_w4a16_g128_rk3576.rkllm
+/home/iflytek/ros2_venv/bin/python3 --version
+# 3.10
+sudo bash scripts/setup_conveyor_gpio.sh
+# GPIO 幂等导出
+环境已 source 且构建过：
+source /opt/ros/humble/setup.bash
+source /home/iflytek/ros2_ws/install/setup.bash
+# 若报找不到包：colcon build --packages-select eai_factory
+物料就位：装货区贴码货物、分拣取料点物品（与打点一致）、流水线起始端物品、雷达前方空旷。
+内存/供电确认充足；实机抓取纪律：手离抓取区域。
+06
+动画讲解：启动编排与四链路全景
+一键启动编排（分阶段时序）
+① bringup 底盘+控制器
+② arm_controller
+③ peripherals 雷达+相机
+④ voice(LLM 几十秒)
+⑤ scheduler 入口点
+⑥ safety 入口点
+⑦ vision/grasp/conveyor (venv) → 5s 后 rqt
+四链路闭环：入口（语音/服务）→ 中间状态 → 出口播报/联锁
+装货：语音&"装货"/start_load → vision 检测 → 抓放 → "装货完成"
+分拣：语音&"分拣"/start_sort → 固定八步 → "分拣完成"
+码垛：语音&"码垛"/start_palletize → 送料→sensor→抓取 → "码垛完成"
+急停：雷达 60°/20cm/0.5s → danger → 停臂停带 → 移开回 work
+收工：bash scripts/stop_eai_factory.sh → 节点/8080/底层逐段清理 → "已全部清理干净"
+图 9-1　上：launch 分阶段开机时序（光点走一遍 = 一次系统启动，橙框为有等待点的阶段）；中：四条链路各有"双通道入口 + 状态中继 + 播报/联锁出口"的同构结构；下：收工清理是验收的最后一环。
+07
+互动讲解：验证 checklist 进度台
+按实验六步走，逐步点亮验收项；每步含预期输出与失败时的排查线索：
+🎛️ 全功能验证 checklist
+下一步 ▸
+全部完成 ⏩
+复位
+共 6 步：启动 → 装货 → 分拣 → 码垛 → 急停 → 清理。点击"下一步"逐项验收……
+判据
+每条链路的通过判据都是三段对齐：
+入口有响应（回话/返回 success）＋中间状态话题按序出现＋出口有播报或联锁动作
+。
+      任何一段缺失都算链路断，不要只听了播报就打勾。
+08
+实操步骤
+1
+全功能一键启动
+source /opt/ros/humble/setup.bash
+source /home/iflytek/ros2_ws/install/setup.bash
+ros2 launch eai_factory eai_factory.launch.py
+# 观察：bringup → arm_controller → peripherals → voice(LLM) →
+#      scheduler/safety/vision/grasp/conveyor → 约5s 后 rqt 画面
+ros2 node list | grep eai_factory
+ros2 service list | grep -E "start_(load|sort|palletize)"
+2
+装货链路（视觉）
+：装货区放贴码（tag id=3）货物，
+      rqt 画面见检测框 →
+ros2 service call /eai_factory/start_load std_srvs/srv/Trigger
+（或语音"小飞小飞 → 装货"）→ 观察观察位→检测→抓→放→回 work→播报"装货完成"，
+      终端
+[SCHEDULER] task load done — announce "装货完成"
+，status
+load|done
+。
+3
+分拣链路（固定点位）
+：按打点位置摆物品 →
+start_sort
+或语音"分拣" → 开爪→到位→闭爪→抬 0.03→放置→抬 0.05→回 work→"分拣完成"；
+      连续 2 次验证稳定性。
+4
+码垛链路（编排）
+：物品备在流水线起始端 →
+start_palletize
+或语音"码垛"（听到指令后
+立即
+放货，防 30s 超时）
+      → 送料 running → 光电遮挡 sensor_blocked → 固定抓取 →
+palletize|done
+→ "码垛完成"。
+5
+急停联动
+：任务执行中在雷达正前方 20cm 内放障碍 ≥0.5s →
+      grasp 日志
+SAFETY DANGER — stopping grasp
+、conveyor
+belt + arm stopped
+、
+enable_torque: [0,0,0,0,0,0]
+→ 移开 → recover + [1,1,1,1,1,1] + go_work →
+      重新触发任务验证可用；顺手做一次"任务中语音打断 vs 雷达危险"的优先级对照。
+6
+停止清理与残留排查
+bash scripts/stop_eai_factory.sh
+# 结尾应显示"已全部清理干净"
+ros2 node list
+# 无 eai_factory 节点
+ss -tlnp | grep 8080
+# 无输出
+ps aux | grep -E "voice_node|flask_server|eai_factory" | grep -v grep
+再人为制造一例故障（如
+start_voice:=false
+启动后下发语音指令），按
+      进程→接口→日志三板斧定位并记录排查过程。
+09
+重点与易错点
+诊断
+"启动不起来"先三问：source 了吗（找不到包）？
+    build 了吗？上次清干净了吗（8080/串口/麦克风被占）？"链路不通"先看
+哪个环节的状态话题先断的
+。
+现象
+根因
+处理
+报 ament/找不到包
+未 source 或未 build
+两个 source；
+colcon build --packages-select eai_factory
+语音无响应
+LLM 8080 未就绪 / 麦克风被残留占用
+ss -tlnp | grep 8080
+等就绪；先跑 stop 脚本清残留
+启动"卡住"几十秒
+LLM 模型加载属正常耗时
+等 8080；或
+start_voice:=false
+跳过验证其他链路
+无显示器环境 rqt 报错
+start_viz 默认 true
+start_viz:=false
+视觉装货检测不到
+光照/距离/角度或 tag id 不符
+rqt 校准；确认 yaml tag_id: 3；查 detected 话题
+分拣/码垛抓偏
+物品偏离打点 or 堆叠高度变化
+重摆物品或重新打点更新 observe_pose（yaml L85/L89）
+任务中危险不触发
+障碍不在雷达正前方 ±30°
+对准雷达 0° 中心，10-20cm 保持 ≥0.5s
+下次启动串口被占
+只 Ctrl+C 没跑 stop 脚本
+bash scripts/stop_eai_factory.sh
+后重启
+评分自测（源讲义 15/30/35/10/10）：原理 15、步骤与命令日志 30、四链路现象 35、清理排查记录 10、思考题 10。
+三种启动组合要都能复现：全功能（默认）/ 省内存（voice+viz off）/ 低内存雷达（base off + radar on）。
+全程安全纪律：手离抓取区、急停验证前机械臂安全位、恢复时手不扶臂、码垛物料与打点一致。
+10
+总结与思考
+启动
+分阶段 + 7 开关
+两套依赖两套启动方式，开关即资源预算旋钮。
+验证
+四链路 · 双通道 · 三段对齐
+入口响应、中继状态、出口播报/联锁缺一不可。
+安全
+danger 贯穿全场
+急停不只在 EXP-08——任何链路都要在任务中触发一次联锁。
+收工
+stop 脚本三验收
+进程无残留、8080 空闲、node list 干净，才叫实验结束。
+思考 1
+start_radar 默认 false 而 start_base 默认 true，这两个默认值分别服务什么使用场景？
+      (提示：完整系统开箱即用 vs 低内存单测安全模块，从"谁最常被单独调试"倒推。)
+思考 2
+四条链路里"完成播报"都由调度器基于 grasp/status 的 done 触发——如果某次抓取以
+task|failed
+结束（而非 done），现在的闭环会怎样？用户会察觉吗？
+      这暴露了 R7"完成必须播报"的哪个盲区，你会补什么？
+CASE-01 · 智慧工厂装货分拣码垛 · EXP-09 全功能快速验证
+8 学时 · 综合性 · 基于 llm_practice 实验讲义改编

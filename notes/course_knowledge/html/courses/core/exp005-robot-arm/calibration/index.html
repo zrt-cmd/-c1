@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>标定专题 · CORE-05</title>
+<style>
+:root{
+  --bg-base:#f8fafc; --bg-surface:#ffffff; --bg-muted:#f1f5f9;
+  --text-primary:#0f172a; --text-secondary:#475569; --text-muted:#94a3b8;
+  --rose:#e11d48; --blue:#2563eb; --teal:#0d9488; --amber:#d97706; --violet:#7c3aed;
+  --ok:#059669; --bad:#dc2626; --border:#e2e8f0;
+  --font:'Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif;
+  --mono:'Cascadia Code','JetBrains Mono',Consolas,monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:var(--font);background:var(--bg-base);color:var(--text-primary);line-height:1.7}
+a{text-decoration:none;color:inherit}
+.topbar{position:sticky;top:0;z-index:50;background:rgba(248,250,252,.94);backdrop-filter:blur(8px);border-bottom:1px solid var(--border)}
+.topbar-in{max-width:1160px;margin:0 auto;padding:.65rem 1.4rem;display:flex;justify-content:space-between;align-items:center}
+.logo{font-weight:800;font-size:.92rem}
+.logo span{color:var(--rose)}
+.crumb{font-size:.84rem;color:var(--text-secondary)}
+.crumb a:hover{color:var(--rose)}
+.wrap{max-width:1160px;margin:0 auto;padding:1.6rem 1.4rem}
+.hero{background:linear-gradient(130deg,#0f172a 0%,#4a2c06 50%,#b45309 100%);color:#fff;border-radius:18px;padding:2rem 1.8rem;margin-bottom:1.6rem}
+.hero .eyebrow{font-size:.75rem;letter-spacing:.26em;opacity:.75}
+.hero h1{font-size:clamp(1.4rem,3vw,2rem);font-weight:900;margin:.5rem 0 .6rem}
+.hero p{opacity:.9;font-size:.95rem;max-width:880px}
+.hero .bades{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.9rem}
+.hero .bade{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.3);padding:.22rem .8rem;border-radius:999px;font-size:.8rem}
+.mod{background:var(--bg-surface);border:1px solid var(--border);border-radius:16px;margin-bottom:1.6rem;overflow:hidden;scroll-margin-top:70px}
+.mod-head{padding:1.1rem 1.4rem .9rem;border-bottom:1px dashed var(--border);background:linear-gradient(180deg,#fff,#fdfcf9)}
+.mod-head .k{font-size:.7rem;letter-spacing:.22em;font-weight:800}
+.mod-head h2{font-size:1.22rem;font-weight:800;margin:.2rem 0 .35rem}
+.mod-head .goal{font-size:.88rem;color:var(--text-secondary)}
+.mod-head .goal b{color:var(--rose)}
+.mod-body{padding:1.1rem 1.4rem 1.4rem}
+.case{background:#fff7ed;border:1px solid #fed7aa;border-left:4px solid var(--amber);border-radius:10px;padding:.7rem .95rem;font-size:.86rem;margin-bottom:1rem}
+.case b{color:#b45309}
+.case .src{display:block;margin-top:.25rem;font-size:.76rem;color:#9a6c2c}
+.grid2{display:grid;grid-template-columns:1.1fr .9fr;gap:1rem}
+@media(max-width:900px){.grid2{grid-template-columns:1fr}}
+.panel{background:var(--bg-muted);border:1px solid var(--border);border-radius:12px;padding:.85rem .95rem}
+.panel h4{font-size:.85rem;font-weight:800;margin-bottom:.5rem;display:flex;align-items:center;gap:.4rem}
+.panel h4::before{content:"";width:.5rem;height:.5rem;border-radius:50%;background:var(--rose)}
+.ctl-row{display:flex;flex-wrap:wrap;gap:.55rem .9rem;align-items:center;margin:.5rem 0}
+.ctl{font-size:.78rem;color:var(--text-secondary);display:flex;align-items:center;gap:.4rem;white-space:nowrap}
+.ctl input[type=range]{width:130px;accent-color:var(--rose)}
+.ctl output{font-family:var(--mono);font-size:.76rem;color:var(--rose);min-width:3.4em}
+.btn{border:none;border-radius:8px;padding:.4rem .85rem;font-size:.8rem;font-weight:700;cursor:pointer;background:var(--rose);color:#fff;transition:.15s}
+.btn:hover{filter:brightness(1.08);transform:translateY(-1px)}
+.btn.ghost{background:#fff;color:var(--text-secondary);border:1px solid var(--border)}
+.btn.ghost:hover{border-color:var(--rose);color:var(--rose)}
+.btn.teal{background:var(--teal)}
+canvas{background:#fff;border:1px solid var(--border);border-radius:10px;display:block;max-width:100%}
+.io{font-family:var(--mono);font-size:.76rem;background:#111827;color:#d1fae5;border-radius:10px;padding:.65rem .8rem;white-space:pre-wrap;line-height:1.75;overflow-x:auto}
+.io .k{color:#fda4af}.io .warn{color:#fcd34d}.io .bad{color:#fca5a5}.io .num{color:#93c5fd}
+.math{background:#0f172a;color:#cbd5e1;font-family:var(--mono);font-size:.78rem;border-radius:10px;padding:.7rem .85rem;line-height:1.9;overflow-x:auto}
+.math .hl{color:#fda4af}.math .hlb{color:#93c5fd}
+.tip{font-size:.8rem;color:var(--text-secondary);background:var(--bg-muted);border:1px dashed var(--border);border-radius:10px;padding:.6rem .8rem;margin-top:.8rem}
+.tip b{color:var(--rose)}
+.ordered{list-style:none;counter-reset:st}
+.ordered li{counter-increment:st;position:relative;padding:.42rem 0 .42rem 2.5rem;font-size:.84rem;color:var(--text-secondary);border-bottom:1px dashed var(--border)}
+.ordered li:last-child{border-bottom:none}
+.ordered li::before{content:counter(st,decimal-leading-zero);position:absolute;left:.3rem;top:.45rem;font-family:var(--mono);font-size:.72rem;font-weight:700;color:#fff;background:var(--amber);border-radius:6px;padding:.05rem .38rem}
+.ordered li b{color:var(--text-primary)}
+table.tx{width:100%;border-collapse:collapse;font-size:.8rem;background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden}
+table.tx th{background:var(--bg-muted);color:var(--text-secondary);font-size:.72rem;text-align:left;padding:.45rem .6rem;border-bottom:1px solid var(--border)}
+table.tx td{padding:.45rem .6rem;border-bottom:1px dashed var(--border);color:var(--text-secondary);vertical-align:top}
+table.tx tr:last-child td{border-bottom:none}
+table.tx .mono{font-family:var(--mono);font-size:.76rem;color:var(--rose);font-weight:700;white-space:nowrap}
+.checks{list-style:none}
+.checks li{display:flex;gap:.6rem;align-items:flex-start;padding:.55rem .6rem;border:1px solid var(--border);border-radius:10px;background:#fff;margin-bottom:.5rem;cursor:pointer;transition:.15s}
+.checks li:hover{border-color:var(--teal)}
+.checks li.on{border-color:#a7f3d0;background:#f0fdf4}
+.checks .bx{width:1.1rem;height:1.1rem;border:2px solid var(--border);border-radius:5px;flex:0 0 auto;margin-top:.18rem;position:relative;background:#fff}
+.checks li.on .bx{border-color:var(--ok);background:var(--ok)}
+.checks li.on .bx::after{content:"✓";position:absolute;inset:0;color:#fff;font-size:.75rem;text-align:center;line-height:1.05}
+.checks .txt{font-size:.83rem;color:var(--text-secondary)}
+.checks .txt b{color:var(--text-primary)}
+.checks .txt .num{font-family:var(--mono);color:var(--rose);font-weight:700}
+.prog{height:10px;background:var(--bg-muted);border:1px solid var(--border);border-radius:999px;overflow:hidden;margin:.5rem 0}
+.prog i{display:block;height:100%;width:0;background:linear-gradient(90deg,#0d9488,#059669);transition:.3s}
+.linkrow{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.9rem;padding-top:.8rem;border-top:1px dashed var(--border)}
+.lbtn{font-size:.78rem;background:#fff;border:1px solid var(--border);border-radius:999px;padding:.28rem .8rem;color:var(--blue);transition:.15s}
+.lbtn:hover{border-color:var(--blue);background:#eff6ff}
+.tbl{width:100%;border-collapse:collapse;font-size:.82rem;background:var(--bg-surface)}
+.tbl th{background:var(--bg-muted);color:var(--text-secondary);font-size:.72rem;letter-spacing:.05em;text-align:left;padding:.55rem .7rem;border-bottom:1px solid var(--border);white-space:nowrap}
+.tbl td{padding:.55rem .7rem;border-bottom:1px dashed var(--border);color:var(--text-secondary);vertical-align:top}
+.tbl tr:last-child td{border-bottom:none}
+.tbl .m{font-family:var(--mono);font-weight:800;color:var(--rose);white-space:nowrap}
+.tbl a{color:var(--blue)}
+footer{border-top:1px solid var(--border);background:var(--bg-surface);margin-top:2rem}
+.foot-in{max-width:1160px;margin:0 auto;padding:1.1rem 1.4rem;display:flex;justify-content:space-between;font-size:.8rem;color:var(--text-secondary);flex-wrap:wrap;gap:.5rem}
+.reveal{opacity:0;transform:translateY(18px);transition:.5s ease}
+.reveal.show{opacity:1;transform:none}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-in">
+    <a class="logo" href="../index.html">🎓 具身智能课程 · <span>标定专题</span></a>
+    <div class="crumb"><a href="../index.html">← 返回机械臂课程首页</a> · <a href="../principles/index.html">原理实验室</a></div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<section class="hero reveal">
+  <div class="eyebrow">CORE-05 · CALIBRATION TRACK · 综合专题（第 4 块 · 课程收尾）</div>
+  <h1>标定专题：五个部分，让机械臂「对齐世界」</h1>
+  <p>模型、协议、运动学都对了，抓取为什么还会差几毫米到几厘米？因为从"电"到"眼"的每一层都有<b>出厂偏置</b>。本专题按五步走：<b>① 机械臂零位标定 → ② TCP 标定（四点法）→ ③ 相机内参标定 → ④ 手眼标定 → ⑤ 抓取验证</b>——全部对应本仓库 <code>ros2_ws</code> 里现成的工具、配置与讲义步骤，每部分配一个可调交互，最后把 5mm、&gt;85% 这些散落数字串成一条合格链。</p>
+  <div class="bades">
+    <span class="bade">① 零位</span><span class="bade">② TCP 四点法</span><span class="bade">③ 相机内参</span><span class="bade">④ 手眼 AX=XB</span><span class="bade">⑤ 抓取验证</span><span class="bade">2~4 学时 · 设计性</span>
+  </div>
+</section>
+
+<!-- ============ 导言 + 五部分大纲 ============ -->
+<section class="mod reveal" id="outline">
+  <div class="mod-head">
+    <div class="k" style="color:var(--teal)">INTRO & OUTLINE · 为什么标 / 五个部分</div>
+    <h2>误差四象限与五部分总览</h2>
+    <p class="goal"><b>教学目标：</b>拿到"抓偏了"的反馈时，能先分类再动手——是零点漂了、工具点没算对、尺子错了，还是"眼"装的位置想错了。</p>
+  </div>
+  <div class="mod-body">
+    <table class="tx" style="margin-bottom:.9rem">
+      <thead><tr><th>症状</th><th>像什么</th><th>归属象限</th><th>对应部分</th></tr></thead>
+      <tbody>
+        <tr><td>发"全零"指令臂不笔直/不水平</td><td>整臂系统性歪一个固定角</td><td class="mono">① 电零位</td><td><a href="#s1">第 1 部分 · 机械臂零位标定</a></td></tr>
+        <tr><td>换个姿态抓，落点方向跟着绕圈偏</td><td>固定方向准、换姿态就画圆</td><td class="mono">② 工具点（TCP）</td><td><a href="#s2">第 2 部分 · TCP 标定（四点法）</a></td></tr>
+        <tr><td>视觉算出的目标随距离越远越偏</td><td>近处还行、远处越抓越歪</td><td class="mono">③ 光学内参</td><td><a href="#s3">第 3 部分 · 相机内参标定</a></td></tr>
+        <tr><td>不同观察姿态下整片区域平移偏</td><td>换个姿势看，偏移方向跟着变</td><td class="mono">④ 空间外参（手眼）</td><td><a href="#s4">第 4 部分 · 手眼标定</a></td></tr>
+        <tr><td>单项都"应该"好了，真机还是抓不稳</td><td>流程/时序/统计层面的问题</td><td class="mono">— 系统级</td><td><a href="#s5">第 5 部分 · 抓取验证</a></td></tr>
+      </tbody>
+    </table>
+    <div class="tip" style="margin-top:0"><b>范围声明：</b>杆长/装配级的运动学几何标定（link1/link2 微米级复测）依赖精密量具，本专题<b>只在第 5 部分以闭环复核的形式把关，不展开标定流程</b>；深度的 scale·d+offset 校正是手眼标定同一次会话的<b>免费副产物</b>，在第 4 部分顺带介绍（无需额外设备）。TCP 采用<b>四点法</b>——一支尖笔 + 纸即可完成，无需精密量具。</div>
+    <div style="overflow-x:auto;border:1px solid var(--border);border-radius:12px;margin-top:.9rem">
+    <table class="tbl">
+      <thead><tr><th>部分</th><th>教学目标</th><th>案例（工具/出处）</th><th>可视化 / 交互方案</th><th>衔接</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="m"><a href="#s1">1 机械臂零位标定</a></td>
+          <td>理解"电中位≠机械中位"，会跑 servo_calib 五步并解释 offset 生效边界</td>
+          <td><code>calibration/servo_calib_gui.py</code> + <code>servo_offsets.yaml</code>（PWM−1500）；讲义实验3 步骤3c</td>
+          <td>J2/J3 零位偏移滑块 → 侧视连杆"指令目标 vs 实际姿态"对比，Apply 校准一键对齐</td>
+          <td><a href="../exp-05-action-replay/index.html#s8">EXP-05 §08</a> · <a href="../exp-05-action-replay/index.html#s10">§10</a></td>
+        </tr>
+        <tr>
+          <td class="m"><a href="#s2">2 TCP 标定（四点法）</a></td>
+          <td>明白 TCP 是"法兰之后的等效工具点"；会用四姿态顶同一尖点解出偏移；解释 FINGERTIP 0.033 的来历</td>
+          <td><code>kinematics/config.py</code>+<code>transform.py</code>：FINGERTIP_OFFSET_Z=0.033 / Y_TCP=0.215mm / TCP_OFFSET_Z=0.0762；讲义实验5 标定工具清单</td>
+          <td>四姿态法兰位姿示意 + Δ 偏移滑块 → 尖点弥散圈实时 mm 读数；"四点法求解"最小二乘一键塌缩到同一点</td>
+          <td><a href="../exp-06-fixed-grasp/index.html#s7">EXP-06 §07</a> · <a href="../principles/index.html#m5">原理 M5</a></td>
+        </tr>
+        <tr>
+          <td class="m"><a href="#s3">3 相机内参标定</a></td>
+          <td>读懂 K 矩阵每个数的物理含义；会评估"内参错了多少、抓取点偏多少"</td>
+          <td>HP60C 出厂 K（fx=fy=614, cx=320, cy=240）+ PLUMB_BOB（<code>CameraPublisher.cpp</code>）；讲义实验7 7.2.2</td>
+          <td>针孔俯视图 + Δfx 误差注入滑块 → 同一像素在 0.3/0.6/1.0m 处的落点偏差直读（mm）</td>
+          <td><a href="../exp-07-visual-grasp/index.html#s7">EXP-07 §07</a> · <a href="../principles/index.html#m6">原理 M6</a></td>
+        </tr>
+        <tr>
+          <td class="m"><a href="#s4">4 手眼标定</a></td>
+          <td>说清 eye-in-hand 要解的 X 是什么；懂 14 姿态怎么设计；会跑 采集→求解→验证→接入 四步</td>
+          <td><code>eye_hand_calibration</code> 全流程（AprilTag/PnP、Tsai-Lenz、14 姿态 yaml、验收 5mm）；讲义实验7 步骤4"未接入"警告</td>
+          <td>位姿配对变换链示意；旋转多样性/姿态数滑块 → n(n−1)/2 配对数与条件评分；深度 scale·d+offset 拟合台；接入两条路</td>
+          <td><a href="../exp-07-visual-grasp/index.html#s8">EXP-07 §08</a> · <a href="../principles/index.html#m1">原理 M1</a></td>
+        </tr>
+        <tr>
+          <td class="m"><a href="#s5">5 抓取验证</a></td>
+          <td>把零位→TCP→内参→手眼→真机成功率串成一次可执行的验收流程；知道何时该重标哪一层</td>
+          <td>joint_command 归零 / 尖点重合 / camera_info+卷尺 / verify(5mm) / EXP-07 基线(&gt;85%)</td>
+          <td>五步验收清单（勾选推进度条）→ 全绿输出结论卡 + "何时重标"事件速查表</td>
+          <td><a href="../exp-04-ik-solver/index.html#s8">EXP-04 §08</a> · <a href="../exp-07-visual-grasp/index.html#s8">EXP-07 §08</a></td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 1 机械臂零位标定 ============ -->
+<section class="mod reveal" id="s1">
+  <div class="mod-head">
+    <div class="k" style="color:var(--amber)">PART 1 · 机械臂零位标定</div>
+    <h2>1 · 机械臂零位标定：机械中位不等于信号 1500</h2>
+    <p class="goal"><b>教学目标：</b>① 解释装配后"电零点"系统性偏移的成因与症状；② 跑通 servo_calib 五步流程；③ 明白 offset 写进 yaml 后的<b>生效边界</b>；④ 掌握"粗调→精调"迭代与回滚。</p>
+  </div>
+  <div class="mod-body">
+    <div class="case">
+      <b>🎯 案例（代码 · calibration 包 + 讲义实验3 步骤3c）：</b><code>ros2 launch calibration servo_calib.launch.py</code> 打开 5 关节面板 → 拖 PWM 滑块找到关节"机械中位"（如大臂真水平时 PWM=1585，而非 1500）→ Save 把 <b>当前 PWM − 1500 = offset</b> 写入 <code>servo_offsets.yaml</code> → 发全零 <code>joint_command</code> 验证归零笔直。讲义口径：校准是<b>渐进</b>的，先粗后精多轮；改前备份 <code>cp servo_offsets.yaml servo_offsets.yaml.bak</code>。
+      <span class="src">出处：ros2_ws/.../calibration/calibration/servo_calib_gui.py（"保存偏移：当前 PWM 与中心 1500 的偏差"）+ 讲义实验3 · 步骤3c（含坑表：SSH 无显示、Apply 需 arm_controller 在线）。</span>
+    </div>
+
+    <div class="grid2">
+      <div class="panel">
+        <h4>交互 · 不校准 vs 已校准（侧视姿态对比）</h4>
+        <div class="ctl-row">
+          <label class="ctl">J2 零位偏移 δ <input type="range" id="z2" min="-120" max="120" step="5" value="70"><output id="z2o">+70μs</output></label>
+          <label class="ctl">J3 零位偏移 δ <input type="range" id="z3" min="-120" max="120" step="5" value="-50"><output id="z3o">-50μs</output></label>
+        </div>
+        <div class="ctl-row">
+          <button class="btn teal" id="zApply">⚙ Apply 校准（发送时减去 δ）</button>
+          <button class="btn ghost" id="zReset">↺ 还原未校准</button>
+          <label class="ctl">指令目标 <select id="zTgt"><option value="45">大臂 +45°（演示）</option><option value="0">全零归零位 0°</option></select></label>
+        </div>
+        <canvas id="zCv" width="640" height="300"></canvas>
+        <div class="io" id="zIo"></div>
+      </div>
+      <div class="panel">
+        <h4>流程与边界（代码事实）</h4>
+        <ol class="ordered">
+          <li><b>选关节</b>：joint1~joint5 标签页，面板读 <code>joint_states</code> 实时显示。</li>
+          <li><b>拖滑块找机械中位</b>：肉眼 + 水平仪（讲义标定工具清单）判"真水平/真笔直"，慢速逼近——多轮"粗调→精调"。</li>
+          <li><b>Save</b>：offset = 当前 PWM − 1500，写 <code>config/servo_offsets.yaml</code>（src 与 install 两份）。</li>
+          <li><b>归零验证</b>：发 <code>/arm_controller/joint_command</code> 全零，看臂是否笔直（讲义明确：用 joint_command 而不是 target_pose）。</li>
+          <li><b>回滚</b>：<code>cp servo_offsets.yaml.bak servo_offsets.yaml</code> 恢复。</li>
+        </ol>
+        <div class="math" style="margin-top:.6rem">
+δ (μs) → 角度偏差 = δ × <span class="hl">0.002356</span> rad/μs &nbsp;例：+70μs ≈ <span class="num" id="zDeg">+9.4°</span><br>
+校准后发送：<span class="hlb">PWM_send = PWM_target(rad 转来) − δ</span>&nbsp;<span style="color:#64748b">// δ = 实际中位 PWM − 1500，所以发送时要把它减掉</span>
+        </div>
+        <div class="tip"><b>为什么"±9.4°"在指尖会放大成几厘米：</b>J2 的偏差会把整条大臂+小臂+工具（0.126+0.126+0.151 ≈ 0.40 m）一起转过去，臂越远放大越多——顶端 9.4° 的角误差 ≈ 0.40 × 0.164 rad ≈ <b>6.6 cm</b>；J3 只影响小臂+工具（≈0.28 m），同样 9.4° 也有 ≈4.5 cm。<b>这就是"手臂看着只歪一点点、抓取却偏一大截"的原因</b>：角误差在关节处很小，在末端被连杆长度放大。<br>反过来给一个现场口径：想让末端控制在 5 mm 内，J2 允许角误差 ≈ 5 mm ÷ 403 mm ≈ <b>0.0124 rad ≈ 0.71°≈ 5 μs</b>——5 μs 只有 1 个 PWM 刻度（舵机理论分辨率约 2.4 μs）的两倍，所以校准"再来一轮精调"不是吹毛求疵，而是被几何放大的必然要求。</div>
+        <div class="tip"><b>生效边界（读码发现，务必讲到）：</b>全仓库 <code>servo_offsets.yaml</code> 只被 calibration 包的 GUI/服务读写，<b>arm 控制链（arm_controller / kinematics）并不自动加载它</b>——所以① GUI 里的 Apply 是"会话内补偿"；② 长期生效要回到第 4 步"归零验证 + 各链路各自偏置"；③ 这正是讲义坑表"校准后仍不齐 → 多轮迭代"的深层原因。</div>
+        <div class="tip"><b>和第 4 部分（手眼）的顺序：</b>零位管"每个关节从哪算 0"，手眼管"相机装在哪"。零位没校，手眼标定时采的每个 T_ee 都带着同样的歪——AX=XB 会把一部分歪悄悄吸收进 X 里，<b>换个位姿又露馅</b>。所以顺序永远是：先第 1 部分，再第 4 部分。</div>
+      </div>
+    </div>
+
+    <div class="linkrow">
+      <a class="lbtn" href="../exp-05-action-replay/index.html#s8">→ EXP-05 §08 bringup → action_player 回放（归零验证同背景）</a>
+      <a class="lbtn" href="../exp-05-action-replay/index.html#s10">→ EXP-05 §10 总结与思考</a>
+      <a class="lbtn" href="#s2">→ 下一部分 2 · TCP 标定（四点法）</a>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 2 TCP 标定（四点法） ============ -->
+<section class="mod reveal" id="s2">
+  <div class="mod-head">
+    <div class="k" style="color:var(--rose)">PART 2 · TCP 标定（四点法）</div>
+    <h2>2 · TCP 标定（四点法）：工具尖端在哪，落点就该在哪</h2>
+    <p class="goal"><b>教学目标：</b>① 理解 TCP（Tool Center Point）= 法兰坐标系之后的等效工具点，不标 = 换姿态就画圆；② 掌握<b>四点法</b>原理与最少条件（≥4 组不同姿态、同一尖点）；③ 会做四点法的最小二乘解算与弥散验收；④ 看懂仓库里 0.033 / 0.215 这些 TCP 常数从哪来。</p>
+  </div>
+  <div class="mod-body">
+    <div class="case">
+      <b>🎯 案例（代码 · kinematics/config.py + 讲义实验5 工具清单）：</b>仓库里的 TCP 不是理论值而是<b>标定产物</b>：<code>FINGERTIP_OFFSET_Z = 0.033</code>（<b>实测值</b>：指尖在 tcp_link 下方 33 mm）、<code>TCP_OFFSET_Z = 0.0762</code>（实测 76.25 mm）、<code>Y_TCP = 0.215 mm</code>（IK 里那个 asin 补偿的真身）。<b>注意别把它们和 <code>gripper_depth</code> 混为一谈</b>：33 mm 是"指尖比 tcp_link 低多少"的<b>几何常数</b>；<code>gripper_depth</code> 是"抓取点相对检测面再挪多少"的<b>运行参数</b>（yaml 实配 −0.040 是抬高 40 mm）。两者单位都是米，含义完全不同——很多同学会以为 −0.033 就是来自这 33 mm，那是巧合，不是因果。讲义实验5 的标定工具清单：<b>刻度标定尺、水平仪</b>——四点法只需再加<b>一支可固定的尖笔/锥销</b>，把它顶在同一纸上小孔里转四个姿态即可。
+      <span class="src">出处：ros2_ws/.../arm/kinematics/kinematics/config.py（LEVEL3_SUMMARY 称其 "Robot Calibration Parameters"）+ TESTING_GUIDE.md"指尖位于 tcp_link 下方 33mm"；讲义实验5·1.3 实验环境标定工具行。</span>
+    </div>
+
+    <ol class="ordered" style="margin-bottom:1rem">
+      <li><b>装尖点</b>：把尖笔（或锥销）固定在夹爪中央，代替正常工件——现在"工具尖"就是待标定的 TCP。</li>
+      <li><b>顶四个姿态</b>：控制机械臂从 <b>≥4 个明显不同的姿态</b>（俯仰至少差 30°+）让尖端触到<b>同一个</b>图钉孔/纸上小点，每到位一次记录关节角。</li>
+      <li><b>FK 算法兰</b>：每个姿态用正运动学得到法兰原点 p_i 与姿态 R_i（这就是 demo 里点 P₁~P₄ 的由来）。</li>
+      <li><b>解四点方程</b>：四组 <code>p_i + R_i·t = c</code>（c 未知、是同一个尖点）——两两相减消 c，最小二乘解工具偏移 <b>t = (t_x, t_z, t_y)</b>，写回 config 的 TCP 常数。</li>
+      <li><b>弥散验收</b>：再换任意姿态重复顶点，若计算出的尖端都落在同一点（弥散 ≤ 纸上一点），TCP 标定通过。</li>
+    </ol>
+
+    <div class="grid2">
+      <div class="panel">
+        <h4>交互 · 四点法台：姿态一换，未标的偏移就"画圆"</h4>
+        <div class="math">
+每个姿态 i：已知 <span class="hlb">p_i, R_i</span>（FK），求 <span class="hl">t（TCP 偏移）</span> 使下式对所有 i 成立：<br>
+&nbsp;&nbsp;&nbsp;p_i + R_i · t = <span class="hl">c</span>（同一个尖点，未知）<br>
+≥4 组 → 两两相减消 c → 线性方程组最小二乘解 t（本台 2D 简化：平面 p+t）
+        </div>
+        <div class="ctl-row">
+          <label class="ctl">真实 TCP Δx <input type="range" id="tX" min="-30" max="30" step="1" value="8"><output id="tXo">+8mm</output></label>
+          <label class="ctl">真实 TCP Δz <input type="range" id="tZ" min="-40" max="60" step="1" value="33"><output id="tZo">+33mm</output></label>
+          <label class="ctl">你"以为"的 Δz′ <input type="range" id="tU" min="-40" max="60" step="1" value="0"><output id="tUo">+0mm</output></label>
+        </div>
+        <div class="ctl-row">
+          <button class="btn teal" id="tSolve">∫ 四点法求解（对齐 Δz′）</button>
+          <button class="btn ghost" id="tReset">↺ 回到未标定</button>
+        </div>
+        <canvas id="tCv" width="640" height="270"></canvas>
+        <div class="io" id="tIo"></div>
+      </div>
+      <div class="panel">
+        <h4>读图与判定</h4>
+        <div class="tip"><b>怎么看：</b>灰色小方块 = 四个姿态下的<b>法兰原点</b>（FK 得到、彼此不同）；红叉 = 用"你以为的 TCP"推算出的四个尖端位置——只要 <b>Δz′ ≠ 真实 Δz</b>（或 Δx 不为 0 时算错），四个红叉就摆成一个<b>圆</b>（画圆半径 ≈ 偏移误差）。点"四点法求解"后四个红叉塌缩到黑点（同一尖点），弥散读数归零——这就是标定完成的判据。</div>
+        <div class="tip"><b>为什么恰好能解：</b>n 组位姿给 n 个向量方程，未知量只有 t（和 c）。两两相减把 c 消掉后，未知数个数不再随 n 增长——数据越多，最小二乘越抗单次 FK 误差。<b>姿态差异越大</b>（俯仰换着来），方程组越"硬"，条件数越好——这和第 4 部分手眼标定要"旋转多样性"是同一个道理。</div>
+        <div class="tip"><b>接回仓库：</b>解出 Δz 写进 <code>FINGERTIP_OFFSET_Z</code> 这类常数后，EXP-06 下探 <code>z−gripper_depth</code> 才真正落到物体表面；不标 TCP，六阶段里"下探"深度全靠运气。gripper_depth 滑块在 <a href="../exp-06-fixed-grasp/index.html#s7" style="color:#2563eb">EXP-06 §07 参数调优台</a>。</div>
+        <div class="tip"><b>现场器材再降：</b>没锥销就用图钉 + 硬纸板；工厂级四点法同理，只是位姿由示教器记录。本方法<b>只依赖 FK 已准</b>——所以做完第 1 部分零位、并且闭环（test_fk_ik）没有大偏差，四点法的结果才可信。</div>
+      </div>
+    </div>
+
+    <div class="linkrow">
+      <a class="lbtn" href="../exp-06-fixed-grasp/index.html#s7">→ EXP-06 §07 抓取参数调优台（gripper_depth 与 0.033）</a>
+      <a class="lbtn" href="../principles/index.html#m5">→ 原理 M5 · 3D 抓取台（TCP 在视口里=腕上原点）</a>
+      <a class="lbtn" href="../principles/index.html#m3">→ 原理 M3 · FK/IK（p_i、R_i 的来源）</a>
+      <a class="lbtn" href="#s1">← 前一部分 1 · 零位（先做）</a>
+      <a class="lbtn" href="#s3">→ 下一部分 3 · 相机内参标定</a>
+    </div>
+  </div>
+</section>
+
+<!-- S1+S2 scripts -->
+<script>
+/* ---- Part 1 零位 ---- */
+var Z={calibrated:false};
+function zDraw(){
+  var d2=parseFloat(document.getElementById('z2').value),
+      d3=parseFloat(document.getElementById('z3').value),
+      tgt=parseFloat(document.getElementById('zTgt').value);
+  document.getElementById('z2o').value=(d2>=0?'+':'')+d2+'μs';
+  document.getElementById('z3o').value=(d3>=0?'+':'')+d3+'μs';
+  var K=0.002356*180/Math.PI;
+  var e2=z.calibrated?0:d2*K, e3=z.calibrated?0:d3*K;
+  document.getElementById('zDeg').textContent=(d2>=0?'+':'')+(d2*K).toFixed(1)+'°';
+  var cv=document.getElementById('zCv'),c=cv.getContext('2d'),W=cv.width,H=cv.height;
+  c.clearRect(0,0,W,H);c.font='11px Consolas,monospace';
+  var ox=110,oy=H-56;
+  c.strokeStyle='#475569';c.lineWidth=1.6;c.beginPath();c.moveTo(30,oy);c.lineTo(W-20,oy);c.stroke();
+  c.fillStyle='#94a3b8';c.fillText('桌面 / 水平基准',32,oy+14);
+  c.fillStyle='#334155';c.fillRect(ox-18,oy-16,36,16);
+  var shx=ox,shy=oy-40;
+  c.strokeStyle='#94a3b8';c.setLineDash([4,4]);c.beginPath();c.moveTo(shx,shy);c.lineTo(shx+120,shy);c.stroke();c.setLineDash([]);
+  c.fillStyle='#94a3b8';c.fillText('水平参考线',shx+126,shy-4);
+  function arm(baseX,baseY,a1,a2,col,dash,lw,label){
+    var L1=90,L2=110;
+    var x1=baseX+L1*Math.cos(a1*Math.PI/180), y1=baseY-L1*Math.sin(a1*Math.PI/180);
+    var aabs=a1+a2;
+    var x2=x1+L2*Math.cos(aabs*Math.PI/180), y2=y1-L2*Math.sin(aabs*Math.PI/180);
+    c.save();c.strokeStyle=col;c.lineWidth=lw;c.lineCap='round';
+    if(dash)c.setLineDash([6,5]);
+    c.beginPath();c.moveTo(baseX,baseY);c.lineTo(x1,y1);c.stroke();
+    c.beginPath();c.moveTo(x1,y1);c.lineTo(x2,y2);c.stroke();
+    c.setLineDash([]);
+    c.fillStyle=col;c.beginPath();c.arc(x1,y1,4,0,7);c.fill();
+    c.beginPath();c.arc(x2,y2,5,0,7);c.fill();
+    if(label){c.font='11px Consolas,monospace';c.fillText(label,x2+7,y2-4);}
+    c.restore();
+    return [x2,y2];
+  }
+  arm(shx,shy,tgt,-30,'#2563eb',true,2.4);
+  var end=arm(shx,shy,tgt+e2,-30+e3,'#dc2626',false,4);
+  var ref=arm;
+  c.fillStyle='#2563eb';c.fillText('蓝虚线 = 指令目标姿态（期望）',30,20);
+  c.fillStyle='#dc2626';c.fillText('红实线 = 实际姿态（含零位偏移）',30,36);
+  // tip distance between desired end (compute) vs actual end
+  var L1=90,L2=110;
+  var ex_1=shx+L1*Math.cos(tgt*Math.PI/180), ey_1=shy-L1*Math.sin(tgt*Math.PI/180);
+  var ea=tgt-30;
+  var ex0=ex_1+L2*Math.cos(ea*Math.PI/180), ey0=ey_1-L2*Math.sin(ea*Math.PI/180);
+  var dev=Math.hypot(end[0]-ex0,end[1]-ey0);
+  var io=document.getElementById('zIo');
+  var align=Math.abs(e2)<1.2&&Math.abs(e3)<1.2;
+  io.innerHTML=
+    '未施加校准：J2 角偏差 '+(z.calibrated?'0.0':(d2*K).toFixed(1))+'°　J3 角偏差 '+(z.calibrated?'0.0':(d3*K).toFixed(1))+'°\n'
+    +'δ=('+d2+', '+d3+')μs '+(z.calibrated?'→ 发送时已减掉，实际出力 = 目标':'→ 直接发，末端落点系统偏 ≈'+dev.toFixed(0)+'px 屏幕距')+'\n'
+    +(align?'<span class="k">✓ 已对齐——这就是"全零归零笔直"应看到的结果</span>'
+          :(!z.calibrated?'<span class="bad">✗ 固定偏 δ：换哪个目标角都歪同样角度（系统误差，非随机）</span>'
+                        :'<span class="warn">残余 '+(Math.max(Math.abs(d2),Math.abs(d3))*K).toFixed(1)+'° ≥1.2°——讲义口径：再来一轮精调</span>'))
+    +'\n<span class="warn">// servo_offsets.yaml 只进 calibration 包，控制链不加载——以 joint_command 归零验证为准</span>';
+}
+document.getElementById('z2').addEventListener('input',zDraw);
+document.getElementById('z3').addEventListener('input',zDraw);
+document.getElementById('zTgt').addEventListener('input',zDraw);
+document.getElementById('zApply').addEventListener('click',function(){Z.calibrated=true;zDraw();});
+document.getElementById('zReset').addEventListener('click',function(){Z.calibrated=false;zDraw();});
+zDraw();
+
+/* ---- Part 2 TCP 四点法（2D 简化） ---- */
+var TC={solved:false};
+function tUpd(){
+  var dX=parseFloat(document.getElementById('tX').value),
+      dZ=parseFloat(document.getElementById('tZ').value),
+      uZ=parseFloat(document.getElementById('tU').value);
+  document.getElementById('tXo').value=(dX>=0?'+':'')+dX+'mm';
+  document.getElementById('tZo').value=(dZ>=0?'+':'')+dZ+'mm';
+  document.getElementById('tUo').value=(uZ>=0?'+':'')+uZ+'mm';
+  var errZ=Math.abs(uZ-dZ); // mm
+  var cv=document.getElementById('tCv'),c=cv.getContext('2d'),W=cv.width,H=cv.height;
+  c.clearRect(0,0,W,H);c.font='11px Consolas,monospace';
+  // scene: 4 flange squares, tip circle radius = err
+  var cx=W/2, cy=H/2+6, S=3.2; // px per mm
+  // frame: flange positions at 4 angles radius Rfpx
+  var Rf=42;
+  var angs=[-140,-40,40,140];
+  var tips=[];
+  c.strokeStyle='#e2e8f0';
+  c.beginPath();c.arc(cx,cy,Rf,0,7);c.stroke();
+  // true tip mark (black ×) at center = actual TCP hit point
+  c.strokeStyle='#0f172a';c.lineWidth=2;
+  c.beginPath();c.moveTo(cx-7,cy-7);c.lineTo(cx+7,cy+7);c.moveTo(cx+7,cy-7);c.lineTo(cx-7,cy+7);c.stroke();
+  c.fillStyle='#0f172a';c.fillText('尖点 c（图钉孔）',cx-40,cy+26);
+  angs.forEach(function(a){
+    var rad=a*Math.PI/180;
+    var fx=cx+Rf*Math.cos(rad), fy=cy+Rf*Math.sin(rad);
+    // flange square
+    c.fillStyle='#94a3b8';c.fillRect(fx-5,fy-5,10,10);
+    // 工具轴线（灰虚线，指向真实尖点 c）
+    c.strokeStyle='#cbd5e1';c.lineWidth=1.6;c.setLineDash([4,3]);
+    c.beginPath();c.moveTo(fx,fy);c.lineTo(cx,cy);c.stroke();c.setLineDash([]);
+    // 用"你标定用的 Δz′"推算的尖端：误差方向随姿态旋转 → 绕 c 画圆，半径 = |Δz′−Δz|
+    var R=S*Math.abs(uZ-dZ);
+    var tx=cx+R*Math.cos(rad), ty=cy+R*Math.sin(rad);
+    tips.push([tx,ty]);
+    c.strokeStyle='#dc2626';c.lineWidth=1.8;
+    c.beginPath();c.moveTo(fx,fy);c.lineTo(tx,ty);c.stroke();
+    c.lineWidth=1.6;
+    c.beginPath();c.moveTo(tx-4,ty-4);c.lineTo(tx+4,ty+4);c.moveTo(tx+4,ty-4);c.lineTo(tx-4,ty+4);c.stroke();
+  });
+  if(Math.abs(uZ-dZ)>0.6){
+    c.strokeStyle='rgba(220,38,38,.4)';c.lineWidth=1.4;c.setLineDash([5,4]);
+    c.beginPath();c.arc(cx,cy,S*Math.abs(uZ-dZ),0,7);c.stroke();c.setLineDash([]);
+  }
+  // legend
+  c.fillStyle='#94a3b8';c.fillText('灰块 = 四个姿态下的法兰位姿 p_i（FK 记录）',16,20);
+  c.fillStyle='#dc2626';c.fillText('红× = 用 Δz′='+(uZ>=0?'+':'')+uZ+'mm 推算的四个尖端',16,36);
+  // io
+  var io=document.getElementById('tIo');
+  var e=Math.abs(uZ-dZ);
+  if(e>0.6){
+    io.innerHTML=
+      '四点弥散半径 ≈ <span class="bad">'+e.toFixed(1)+' mm</span>（在画圆！）\n'
+      +'你的 Δz′='+(uZ>=0?'+':'')+uZ+'mm  ≠  真实 Δz='+(dZ>=0?'+':'')+dZ+'mm\n'
+      +'<span class="bad">✗ 症状复现：固定姿态抓得准，换姿态落点绕圈偏——就是因为把工具点当错了</span>'
+      +'\n<span class="warn">// |p_i + R_i·t_used − c| = |t_used − t_true| 恒为常数、方向随姿态转 —— 所以是圆，不是乱点</span>';
+  }else{
+    io.innerHTML=
+      '弥散半径 ≈ <span class="k">0 mm —— 四点重合 ✓</span>（Δz′='+(uZ>=0?'+':'')+uZ+'mm 对齐真值）\n'
+      +'四点法本质：≥4 组位姿写出 p_i + R_i·t = c，消去未知 c 后最小二乘解 t；姿态差异越大、点数越多越抗噪\n'
+      +'<span class="k">// 解出的 t 写回 FINGERTIP_OFFSET_Z 等常数后，六阶段里"下探 z−gripper_depth"才真正落在表面</span>';
+  }
+}
+document.getElementById('tX').addEventListener('input',tUpd);
+document.getElementById('tZ').addEventListener('input',tUpd);
+document.getElementById('tU').addEventListener('input',tUpd);
+document.getElementById('tSolve').addEventListener('click',function(){
+  var dZ=parseFloat(document.getElementById('tZ').value);
+  document.getElementById('tU').value=dZ;
+  TC.solved=true;tUpd();
+});
+document.getElementById('tReset').addEventListener('click',function(){
+  document.getElementById('tU').value=0;TC.solved=false;tUpd();
+});
+tUpd();
+</script>
+
+<!-- ============ 3 相机内参标定 ============ -->
+<section class="mod reveal" id="s3">
+  <div class="mod-head">
+    <div class="k" style="color:var(--blue)">PART 3 · 相机内参标定</div>
+    <h2>3 · 相机内参标定：把像素换算成毫米的那把"尺子"</h2>
+    <p class="goal"><b>教学目标：</b>① 读懂 <code>K</code> 矩阵每个数的物理含义（fx/fy 焦距、cx/cy 光心）；② 明白出厂标定的边界（何时必须重标）；③ 能算"内参偏了 Δ，抓取点偏多少"——把抽象误差变成毫米。</p>
+  </div>
+  <div class="mod-body">
+    <div class="case">
+      <b>🎯 案例（代码 · HP60C 驱动 + 讲义实验7 7.2.2）：</b>相机驱动 <code>CameraPublisher.cpp</code> 出厂即发布 <code>camera_info</code>：<b>K = [614, 0, 320; 0, 614, 240]</b>（640×480、PLUMB_BOB 五畸变系数）；抓取链读它做反投影，AprilTag 检测还用<b>畸变系数</b>做 PnP（第 4 部分手眼的前置）。验证读法：<code>ros2 topic echo /camera/color/camera_info --once</code>。
+      <span class="src">出处：ros2_ws/.../examples/camera/HP60C/src/ascamera/src/CameraPublisher.cpp（distortion_model=PLUMB_BOB）；讲义实验7 步骤3 反投影公式与"内参从 camera_info 的 K 矩阵获得"。</span>
+    </div>
+
+    <div class="grid2">
+      <div class="panel">
+        <h4>交互 · 内参误差注入：Δfx 一动，落点立刻偏</h4>
+        <div class="ctl-row">
+          <label class="ctl">注入 Δfx <input type="range" id="fxe" min="-90" max="90" step="1" value="0"><output id="fxeo">0</output></label>
+          <label class="ctl">目标距离 d <input type="range" id="fdd" min="0.2" max="1.2" step="0.01" value="0.5"><output id="fddo">0.50m</output></label>
+          <label class="ctl">像素偏心 (u−cx) <input type="range" id="fuc" min="40" max="300" step="10" value="200"><output id="fuco">200px</output></label>
+        </div>
+        <canvas id="fCv" width="640" height="280"></canvas>
+        <div class="math" style="margin-top:.6rem">
+真值：X = (u−cx)·d / <span class="hl">614</span> = <span class="hlb" id="fXt">—</span> m<br>
+误用内参：X′ = (u−cx)·d / <span class="hl" id="fFxu">614</span> = <span class="hlb" id="fXu">—</span> m &nbsp;→&nbsp; 落点偏差 |X′−X| = <span class="hl" id="fErr">0.0 mm</span>
+        </div>
+        <div class="io" id="fIo"></div>
+      </div>
+      <div class="panel">
+        <h4>三档距离直读 + 判定</h4>
+        <table class="tx" style="margin-bottom:.6rem">
+          <thead><tr><th>距离</th><th>真值 X</th><th>误用后 X′</th><th>偏差</th></tr></thead>
+          <tbody id="fRows"></tbody>
+        </table>
+        <div class="tip"><b>规律：</b>Δfx 固定时，偏差随距离 <b>线性变大</b>——所以"近处能抓、一放远就歪"第一嫌疑人就是 <b>fx 相对真实焦距偏了</b>（对焦变了、镜头摔过、驱动 K 没对上实际出图分辨率）。现场判定就用这招：同一点位移近/中/远三次，远端先偏 → 怀疑内参。</div>
+        <div class="tip"><b>什么时候必须重标：</b>跌落/撞击后、更换或松动镜头、相机出图分辨率或 ROI 改变。方法论（概念层）：打印棋盘格/AprilTag 板，多张不同位姿照片 → ROS <code>camera_calibration</code> 包最小二乘解 K+畸变 → 写回驱动或 camera_info。本车 <b>K 为出厂值</b>，日常只做"读取 + 距离合理性复核"（第 5 部分卷尺抽查互为印证）。</div>
+        <div class="tip"><b>连带概念——畸变：</b>PLUMB_BOB 用 k1/k2/p1/p2/k3 五系数描述镜筒"枕形/桶形"弯曲。边缘像素先<b>去畸变</b>再套针孔公式；AprilTag 的 PnP 就是这么算位姿的。内参错 = 尺子弯了——长度和弯都要说对。</div>
+      </div>
+    </div>
+
+    <div class="linkrow">
+      <a class="lbtn" href="../principles/index.html#m6">→ 原理 M6 · HSV+反投影三件套（正常流程）</a>
+      <a class="lbtn" href="../exp-07-visual-grasp/index.html#s7">→ EXP-07 §07 HSV 掩膜调参台</a>
+      <a class="lbtn" href="#s2">← 前一部分 2 · TCP 标定</a>
+      <a class="lbtn" href="#s4">→ 下一部分 4 · 手眼标定</a>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 4 手眼标定 ============ -->
+<section class="mod reveal" id="s4">
+  <div class="mod-head">
+    <div class="k" style="color:var(--violet)">PART 4 · 手眼标定</div>
+    <h2>4 · 手眼标定 AX=XB：解"相机装在哪"</h2>
+    <p class="goal"><b>教学目标：</b>① 说清 eye-in-hand 下待求的 X = T_cam_ee 是什么、方程怎么成立；② 理解 14 个采集姿态为什么那样设计（旋转多样性）；③ 跑通 采集→求解→验证→接入 全流程，并知道讲义"未接入"的坑怎么填。</p>
+  </div>
+  <div class="mod-body">
+    <div class="case">
+      <b>🎯 案例（代码 · eye_hand_calibration 包全流程 + 讲义实验7 步骤4）：</b>桌面中央贴 AprilTag（臂前 ~25cm）→ 14 个位姿逐个到位（<code>calibration_poses.yaml</code>：pitch 3.14/2.80/2.44 三档、左右 ±6cm、高低错落；注释原话"AX=XB 需要足够的旋转多样性 &gt;60°，相邻 &gt;15°"，ALL_PAIRS 全配对、最小旋转 8°、有效位姿 ≥10）→ <code>compute_hand_eye_transform</code> 解方程（<b>Tsai-Lenz 默认 / Horaud</b>，顺带拟合深度 scale·d+offset）→ <code>verify_calibration</code> 换个位置放板报 3D 误差，<b>合格阈值默认 5.0mm</b>。⚠ 讲义原话：标定会话与深度校正<b>"当前未接入抓取链路"</b>，visual_grasp 默认仍走 URDF 固定外参。
+      <span class="src">出处：eye_hand_calibration 的 hand_eye_solver.py（AX=XB 定义与算法）、calibration_poses.yaml（姿态设计）、verify_calibration.launch.py（pass_threshold_mm=5.0）、apply_correction.launch.py；讲义实验7 步骤4 第 5 条。</span>
+    </div>
+
+    <ol class="ordered" style="margin-bottom:1rem">
+      <li><b>前置</b>：第 1 部分零位已校、第 3 部分 K 读取正常（AprilTag PnP 依赖内参+畸变）。Tag 平整贴于桌面中央。</li>
+      <li><b>采集</b>：<code>ros2 launch eye_hand_calibration collect_data.launch.py</code>——臂按 14 姿态逐个到位（settle 2s），每位姿记录 <b>T_ee_base</b>（TF/关节正解）与 <b>T_tag_cam</b>（AprilTag PnP），存会话 <code>~/.ros/eye_hand_calib/calibration_*</code>。</li>
+      <li><b>求解</b>：<code>ros2 run eye_hand_calibration compute_hand_eye_transform</code>——位姿两两配对构 A、B，解 <b>A·X = X·B</b> 得 X = T_cam_ee；同会话顺带拟合深度线性校正（免费副产物）。</li>
+      <li><b>验证</b>：<code>ros2 launch eye_hand_calibration verify_calibration.launch.py</code>——<b>换新位置</b>放 tag，<code>/eye_hand_calib/verify/report</code> 出 3D 误差，&lt;5mm 合格。</li>
+      <li><b>接入</b>（讲义标记的缺口）：① X 发布成 ROS 静态 TF，替换 URDF 相机 joint 近似值；② 深度校正 <code>apply_correction.launch.py</code> 重发布话题并把 visual_grasp remap 过去。不接入 = 白标。</li>
+    </ol>
+
+    <div class="grid2">
+      <div class="panel">
+        <h4>交互① · 姿态设计台：多样性与配对数怎么算</h4>
+        <div class="math">
+<span class="hlb">A_i</span> = T_ee(i+1)·T_ee(i)⁻¹ &nbsp;<span style="color:#64748b">// 臂末端换姿态——相对运动自己门儿清</span><br>
+<span class="hlb">B_i</span> = T_tag(i+1)·T_tag(i)⁻¹ &nbsp;<span style="color:#64748b">// 同一幕在相机眼里的变化</span><br>
+<span class="hl">A·X = X·B</span> ，X = T_cam_ee（常量——相机没换地方装就该处处成立）<br>
+多次配对 ⇢ 解出唯一 X：旋转越"花"、位姿越多，方程越"过约束"越稳
+        </div>
+        <div class="ctl-row">
+          <label class="ctl">采集位姿数 n <input type="range" id="hn" min="2" max="14" step="1" value="14"><output id="hno">14</output></label>
+          <label class="ctl">末端旋转覆盖 <input type="range" id="hr" min="5" max="90" step="5" value="70"><output id="hro">70°</output></label>
+        </div>
+        <div class="io" id="hIo"></div>
+        <canvas id="hCv" width="640" height="200" style="margin-top:.6rem"></canvas>
+        <div class="ctl-row" style="margin-top:.5rem">
+          <button class="btn" id="hPlay">▶ 播放配对示意（位姿 i → i+1）</button>
+          <span class="ctl">第 <output id="hI">1</output> 对</span>
+        </div>
+      </div>
+      <div class="panel">
+        <h4>交互② · 深度校正（同一会话的免费副产物）</h4>
+        <div class="math">深度原始读数：<span class="hl" id="dRawLab">—</span>　校正模型：<span class="hlb">d_corr = scale·d_raw + offset</span>（线性模型，有效区间 0.10~1.50m）</div>
+        <div class="ctl-row">
+          <label class="ctl">scale <input type="range" id="dS" min="0.96" max="1.04" step="0.005" value="1"><output id="dSo">1.000</output></label>
+          <label class="ctl">offset (m) <input type="range" id="dO" min="-0.05" max="0.05" step="0.005" value="0"><output id="dOo">0.000</output></label>
+          <label class="ctl">raw <input type="range" id="dR" min="0.15" max="1.4" step="0.01" value="0.5"><output id="dRo">0.50</output></label>
+        </div>
+        <canvas id="dCv" width="360" height="170"></canvas>
+        <table class="tx" style="margin-top:.5rem">
+          <thead><tr><th>真值（卷尺）</th><th>raw 读数</th><th>校正后</th><th>残差</th></tr></thead>
+          <tbody id="dRows"></tbody>
+        </table>
+        <div class="tip"><b>为什么不用单独练：</b>求解器拟合 X 时用同一批 tag 深度观测顺手解出 scale/offset——现场只需卷尺三点（0.3/0.5/1.0m）复核，正好是讲义实验7 步骤3 的验收法（基线 ±2~3cm@1m）。</div>
+        <div class="tip"><b>接入警示（讲义原话转述）：</b>visual_grasp 默认用<b>原始深度 + URDF 固定外参</b>；要吃到标定成果需手动 launch <code>apply_correction</code> 并把深度话题 remap 到校正输出。标完不接 = 第 4 部分只完成一半。</div>
+      </div>
+    </div>
+
+    <div class="linkrow">
+      <a class="lbtn" href="../principles/index.html#m1">→ 原理 M1 · 变换矩阵与外参误差机理</a>
+      <a class="lbtn" href="../exp-07-visual-grasp/index.html#s8">→ EXP-07 §08 分阶段启动与服务触发</a>
+      <a class="lbtn" href="#s1">← 前置 · 部分 1 零位必须先校</a>
+      <a class="lbtn" href="#s5">→ 下一部分 5 · 抓取验证</a>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 5 抓取验证 ============ -->
+<section class="mod reveal" id="s5">
+  <div class="mod-head">
+    <div class="k" style="color:var(--ok)">PART 5 · 抓取验证</div>
+    <h2>5 · 抓取验证：五项绿勾才算标定闭环</h2>
+    <p class="goal"><b>教学目标：</b>把前四部分与全课散落的数字（残余&lt;1°、尖点重合、K=614、5mm、&gt;85%）按依赖顺序串成一次可执行的验收——任何一环不过，后面的数字都不可信；并会用"何时重标"表应对日后变动。</p>
+  </div>
+  <div class="mod-body">
+    <div class="grid2">
+      <div class="panel">
+        <h4>交互 · 点击逐项验收（进度条全绿出结论）</h4>
+        <div class="prog"><i id="cProg"></i></div>
+        <div class="io" id="cIo" style="margin-bottom:.6rem">进度 0/5 —— 从第 1 项开始</div>
+        <ul class="checks" id="cList">
+          <li data-i="0"><span class="bx"></span><span class="txt"><b>① 零位复核</b>（部分 1）— 发 <code>joint_command</code> 全零，五关节笔直/水平（水平仪，残余 &lt;1° ≈ δ&lt;42μs）。不过 → 回部分 1 再精调一轮。</span></li>
+          <li data-i="1"><span class="bx"></span><span class="txt"><b>② TCP 复验</b>（部分 2）— 换任意大姿态让尖笔再顶<b>同一个</b>图钉孔：计算尖端弥散肉眼重合于一点（纸上一个孔痕）。同时顺手跑 <code>test_fk_ik</code> 记录闭环残差（几何把关，不在此标定）。</span></li>
+          <li data-i="2"><span class="bx"></span><span class="txt"><b>③ 内参 + 深度抽查</b>（部分 3）— <code>camera_info</code> 确认 K=614 与分辨率一致；近/中/远三点（0.3/0.5/1.0m）看落点与深度——<b>远端先偏</b>即回部分 3。</span></li>
+          <li data-i="3"><span class="bx"></span><span class="txt"><b>④ 手眼验证</b>（部分 4）— <code>verify_calibration</code> 换位放 AprilTag，报告 <span class="num">&lt; 5mm</span>（pass_threshold_mm=5.0）；并确认接入生效（静态 TF / 深度 remap 已切换）。</span></li>
+          <li data-i="4"><span class="bx"></span><span class="txt"><b>⑤ 真机抓取验证</b> — EXP-07 性能基线：<span class="num">OBSERVE&lt;1s · PICK&lt;8s · 成功率&gt;85%</span>（100 次统计，失败按 视觉/IK/抓取 三类归因）。到这一步，标定链才算闭环。</span></li>
+        </ul>
+        <div class="io" id="cDone" style="display:none">✅ 五项全绿：标定态有效，可开跑课程综合复测。任一环境变动（换舵机/换夹爪工具/摔碰相机/搬动底座）后，按右侧"何时重标"回到对应部分。</div>
+      </div>
+      <div class="panel">
+        <h4>何时重标哪一部分（速查）</h4>
+        <table class="tx">
+          <thead><tr><th>变动事件</th><th>重标</th><th>只需复核</th></tr></thead>
+          <tbody>
+            <tr><td>舵机拆装/更换、撞后不齐</td><td class="mono">部分 1 零位</td><td>② 闭环</td></tr>
+            <tr><td>更换夹爪/工具/尖笔位置变了</td><td class="mono">部分 2 TCP 四点</td><td>⑤ 抽测一次</td></tr>
+            <tr><td>相机跌落、镜头松动/对焦变、出图分辨率改</td><td class="mono">部分 3 内参（厂家/棋盘格）</td><td>③ 远端三点</td></tr>
+            <tr><td>相机支架/腕部拆装、换相机安装位</td><td class="mono">部分 4 手眼全流程</td><td>⑤ 真机复测</td></tr>
+            <tr><td>只搬动底座位置（安装关系没变）</td><td>—</td><td>① 全零 + ⑤ 抽测</td></tr>
+            <tr><td>换机械臂杆件（几何变）</td><td class="mono">超出本专题 → 几何标定</td><td>（需毫米级量具）</td></tr>
+          </tbody>
+        </table>
+        <div class="tip"><b>频率建议：</b>常规教学周只做 ①+⑤ 抽测；学期初/设备动过再跑 ②③④ 全链。出厂 K 平时读不坏——把"echo K + 卷尺看远端"养成例行两眼。</div>
+        <div class="tip"><b>归因纪律：</b>⑤ 失败先回看 ①~④ 哪个绿勾是"勉强过的"，再分视觉/IK/抓取三类——顺序反了就是浪费 100 次抓取。</div>
+      </div>
+    </div>
+
+    <div class="linkrow">
+      <a class="lbtn" href="../exp-04-ik-solver/index.html#s8">→ EXP-04 §08 实机闭环验证（② 的 test_fk_ik 执行处）</a>
+      <a class="lbtn" href="../exp-07-visual-grasp/index.html#s8">→ EXP-07 §08 端到端（⑤ 执行处）</a>
+      <a class="lbtn" href="../index.html">→ 回课程首页</a>
+    </div>
+  </div>
+</section>
+
+<!-- Part3+4 scripts -->
+<script>
+function fUpd(){
+  var dfx=parseFloat(document.getElementById('fxe').value),
+      d=parseFloat(document.getElementById('fdd').value),
+      uc=parseFloat(document.getElementById('fuc').value);
+  document.getElementById('fxeo').value=(dfx>=0?'+':'')+dfx;
+  document.getElementById('fddo').value=d.toFixed(2)+'m';
+  document.getElementById('fuco').value=uc+'px';
+  var f0=614, f1=Math.max(100,f0+dfx);
+  document.getElementById('fFxu').textContent=f1;
+  var Xt=uc*d/f0, Xu=uc*d/f1, err=Math.abs(Xu-Xt)*1000;
+  document.getElementById('fXt').textContent=Xt.toFixed(4);
+  document.getElementById('fXu').textContent=Xu.toFixed(4);
+  document.getElementById('fErr').textContent=err.toFixed(1)+' mm';
+  var rows=[0.30,0.60,1.00].map(function(dd){
+    var a=uc*dd/f0, b=uc*dd/f1, e=Math.abs(b-a)*1000;
+    var bad=e>15?'color:#dc2626;font-weight:700':'';
+    return '<tr><td class="mono">'+dd.toFixed(2)+' m</td><td>'+a.toFixed(3)+' m</td><td>'+b.toFixed(3)+' m</td><td style="'+bad+'">'+e.toFixed(1)+' mm</td></tr>';
+  }).join('');
+  document.getElementById('fRows').innerHTML=rows;
+  var pct=(dfx/f0*100);
+  document.getElementById('fIo').innerHTML=
+    'Δfx = '+(dfx>=0?'+':'')+dfx+'（'+(pct>=0?'+':'')+pct.toFixed(1)+'% 相对误差）　像素偏心 '+uc+'px\n'
+    +(Math.abs(dfx)<2
+      ? '<span class="k">✓ 内参准确：当前距离落点无偏——出厂 K 正常工作</span>'
+      : '<span class="bad">✗ 尺子偏 '+(pct>=0?'+':'')+pct.toFixed(1)+'%：目标平面落点已偏 '+err.toFixed(1)+' mm，且随距离线性放大</span>')
+    +'\n<span class="warn">// 同一像素、同一深度，偏的是解释公式里的分母——真机不会报错，只会默默抓偏</span>';
+  fDraw(Xt,Xu,d);
+}
+function fDraw(Xt,Xu,d){
+  var cv=document.getElementById('fCv'),c=cv.getContext('2d'),W=cv.width,H=cv.height;
+  c.clearRect(0,0,W,H);c.font='11px Consolas,monospace';
+  var cx0=56,cy0=H/2, S=(W-90)/1.4;
+  c.strokeStyle='#475569';c.lineWidth=1.4;
+  c.beginPath();c.moveTo(cx0,30);c.lineTo(cx0,H-30);c.stroke();
+  c.beginPath();c.moveTo(cx0,cy0);c.lineTo(W-20,cy0);c.stroke();
+  c.fillStyle='#475569';c.fillText('Z（深度向前）',W-96,cy0-8);
+  c.save();c.translate(cx0+10,44);c.rotate(-Math.PI/2);c.fillText('X（横向）',0,0);c.restore();
+  c.fillStyle='#0f172a';
+  c.beginPath();c.moveTo(cx0-16,cy0-12);c.lineTo(cx0,cy0-5);c.lineTo(cx0,cy0+5);c.lineTo(cx0-16,cy0+12);c.closePath();c.fill();
+  c.fillText('针孔相机',cx0-44,cy0+26);
+  var uc=parseFloat(document.getElementById('fuc').value),f0=614,f1=Math.max(100,f0+parseFloat(document.getElementById('fxe').value));
+  var Xtrue=uc*d/f0, Xused=uc*d/f1;
+  var scale=(cy0-40)/Math.max(0.4, Xtrue*1.6||0.4);
+  function px(z,x){return [cx0+z*S, cy0 - x*scale];}
+  var Pt=px(d,Xtrue),Pu=px(d,Xused);
+  c.strokeStyle='#2563eb';c.lineWidth=2;c.setLineDash([6,4]);
+  c.beginPath();c.moveTo(cx0,cy0);c.lineTo(Pt[0],Pt[1]);c.stroke();c.setLineDash([]);
+  c.strokeStyle='#dc2626';c.lineWidth=2;
+  c.beginPath();c.moveTo(cx0,cy0);c.lineTo(Pu[0],Pu[1]);c.stroke();
+  c.strokeStyle='#94a3b8';c.setLineDash([3,4]);
+  c.beginPath();c.moveTo(Pt[0],36);c.lineTo(Pt[0],H-36);c.stroke();c.setLineDash([]);
+  c.fillStyle='#94a3b8';c.fillText('d='+d.toFixed(2)+'m 平面',Pt[0]-30,H-22);
+  c.fillStyle='#2563eb';c.beginPath();c.arc(Pt[0],Pt[1],6,0,7);c.fill();
+  c.fillText('真值 X='+Xtrue.toFixed(3),Pt[0]+9,Pt[1]-4);
+  c.fillStyle='#dc2626';c.beginPath();c.arc(Pu[0],Pu[1],6,0,7);c.fill();
+  c.fillText('误判 X′='+Xused.toFixed(3),Pu[0]+9,Pu[1]+14);
+  if(Math.abs(Pt[1]-Pu[1])>3){
+    c.strokeStyle='#e11d48';c.lineWidth=1.5;
+    c.beginPath();c.moveTo(Pt[0]-14,Pt[1]);c.lineTo(Pt[0]-14,Pu[1]);c.stroke();
+    c.fillStyle='#e11d48';
+    c.fillText('Δ'+Math.abs(Xused-Xtrue).toFixed(3)+' m',Pt[0]-72,(Pt[1]+Pu[1])/2+4);
+  }
+}
+['fxe','fdd','fuc'].forEach(function(id){document.getElementById(id).addEventListener('input',fUpd);});
+fUpd();
+</script>
+
+<script>
+var HST={i:1,timer:null,playing:false};
+function hUpd(){
+  var n=parseInt(document.getElementById('hn').value),
+      rot=parseInt(document.getElementById('hr').value);
+  document.getElementById('hno').value=n;
+  document.getElementById('hro').value=rot+'°';
+  var pairs=n*(n-1)/2;
+  var q=Math.min(rot,60)/60*Math.min(n,10)/10*100;
+  var verdict= q>=80?'<span class="k">✓ 条件评 '+q.toFixed(0)+' 分：满足"覆盖>60° + 有效≥10"的 yaml 注释设计线，解算可信</span>'
+    : q>=50?'<span class="warn">⚠ 条件评 '+q.toFixed(0)+' 分：勉强可用，残差可能偏大——补拍些大 pitch 差异位姿</span>'
+    : '<span class="bad">✗ 条件评 '+q.toFixed(0)+' 分：旋转多样性/位姿数不足——AX=XB 会病态（相机平移分量尤其解不准）</span>';
+  document.getElementById('hIo').innerHTML=
+    '位姿数 n='+n+'　ALL_PAIRS 配对总数 = n(n−1)/2 = <span class="num">'+pairs+'</span> 对\n'
+    +'旋转覆盖 '+rot+'°（yaml 设计线 >60°，相邻位姿 >15°，配对最小旋转 8° 截断）\n'
+    +verdict
+    +'\n<span class="warn">// 真实质量看 session 报告的残差 RMSE；这里是"数据够不够"的条件预评</span>';
+  hDraw(Math.min(1,rot/90),n);
+}
+function hDraw(rotFrac,n){
+  var cv=document.getElementById('hCv'),c=cv.getContext('2d'),W=cv.width,H=cv.height;
+  c.clearRect(0,0,W,H);c.font='11px Consolas,monospace';
+  var shy=H-46;
+  function scene(ox,ang,label){
+    var L1=54,L2=64;
+    c.fillStyle='#b09678';c.fillRect(ox-6,shy+8,180,10);
+    c.fillStyle='#0f172a';c.fillRect(ox+120,shy-4,26,18);
+    c.fillStyle='#fff';c.font='9px monospace';c.fillText('TAG',ox+125,shy+9);c.font='11px Consolas,monospace';
+    c.strokeStyle='#334155';c.lineWidth=6;c.beginPath();c.moveTo(ox,shy+8);c.lineTo(ox,shy-8);c.stroke();
+    var x1=ox+L1*Math.cos(ang),y1=shy-L1*Math.sin(ang);
+    var a2=ang-Math.PI/9;
+    var x2=x1+L2*Math.cos(a2),y2=y1-L2*Math.sin(a2);
+    c.strokeStyle='#dc2626';c.lineWidth=4;c.lineCap='round';
+    c.beginPath();c.moveTo(ox,shy);c.lineTo(x1,y1);c.stroke();
+    c.strokeStyle='#2563eb';c.lineWidth=3.5;
+    c.beginPath();c.moveTo(x1,y1);c.lineTo(x2,y2);c.stroke();
+    c.fillStyle='#0ea5e9';c.beginPath();c.arc(x2,y2,5,0,7);c.fill();
+    var tx=ox+133,ty=shy-6;
+    c.strokeStyle='rgba(14,165,233,.75)';c.setLineDash([4,3]);c.lineWidth=1.6;
+    c.beginPath();c.moveTo(x2,y2);c.lineTo(tx,ty);c.stroke();c.setLineDash([]);
+    c.fillStyle='#475569';c.fillText(label,ox+4,20);
+    return [x2,y2];
+  }
+  var i=HST.i;
+  var angA=0.55+0.55*Math.sin(i*1.1);
+  var angB=0.55+0.55*Math.sin((i+1)*1.1);
+  var pa=scene(30,angA,'位姿 i='+i);
+  var pb=scene(350,angB,'位姿 i+1='+(i+1));
+  c.strokeStyle='#059669';c.lineWidth=2;
+  c.beginPath();c.moveTo(pa[0]+10,pa[1]-14);c.quadraticCurveTo(320,26,pb[0]-10,pb[1]-14);c.stroke();
+  c.fillStyle='#059669';c.font='bold 12px Consolas,monospace';c.fillText('A = 相对末端运动',240,40);
+  c.fillStyle='#7c3aed';c.fillText('B = tag 在相机里的相对变化 → 解 X（腕→相机，蓝关节处）',150,H-8);
+}
+document.getElementById('hn').addEventListener('input',hUpd);
+document.getElementById('hr').addEventListener('input',hUpd);
+document.getElementById('hPlay').addEventListener('click',function(){
+  if(HST.playing){clearInterval(HST.timer);HST.playing=false;this.textContent='▶ 播放配对示意（位姿 i → i+1）';return;}
+  HST.playing=true;var self=this;self.textContent='⏸ 停止';
+  HST.timer=setInterval(function(){
+    var n=parseInt(document.getElementById('hn').value);
+    HST.i=HST.i>=Math.max(2,n-1)?1:HST.i+1;
+    document.getElementById('hI').value=HST.i;
+    hDraw(Math.min(1,parseInt(document.getElementById('hr').value)/90),n);
+  },900);
+});
+hUpd();
+
+/* 深度拟合台 */
+function dUpd(){
+  var s=parseFloat(document.getElementById('dS').value),
+      o=parseFloat(document.getElementById('dO').value),
+      r=parseFloat(document.getElementById('dR').value);
+  document.getElementById('dSo').value=s.toFixed(3);
+  document.getElementById('dOo').value=(o>=0?' ':'')+o.toFixed(3);
+  document.getElementById('dRo').value=r.toFixed(2);
+  document.getElementById('dRawLab').textContent='d_raw='+r.toFixed(3)+'m';
+  var rows=[0.30,0.50,1.00].map(function(t){
+    var got=s*t+o, res=(got-t)*1000;
+    var bad=Math.abs(res)>10?'color:#dc2626;font-weight:700':'color:#059669;font-weight:700';
+    return '<tr><td class="mono">'+t.toFixed(2)+' m</td><td>'+t.toFixed(2)+' m</td><td>'+got.toFixed(3)+' m</td><td style="'+bad+'">'+res.toFixed(1)+' mm</td></tr>';
+  }).join('');
+  document.getElementById('dRows').innerHTML=rows;
+  var cv=document.getElementById('dCv'),c=cv.getContext('2d'),W=cv.width,H=cv.height;
+  c.clearRect(0,0,W,H);c.font='11px Consolas,monospace';
+  var bx=40,by=H-30,sw=W-70,sh=H-64;
+  c.strokeStyle='#475569';c.lineWidth=1.4;c.strokeRect(bx,by-sh,sw,sh);
+  c.fillStyle='#94a3b8';
+  for(var k=0;k<=4;k++){var yy=by-k/4*sh;c.fillText((k*0.4).toFixed(1)+'m',4,yy+4);}
+  c.strokeStyle='#dc2626';c.lineWidth=2;c.beginPath();
+  for(var j=0;j<=40;j++){var rr=0.15+j/40*1.25;var res=Math.abs((s*rr+o)-rr);var X=bx+(rr-0.15)/1.25*sw;var Y=by-Math.min(sh,res/0.10*sh);if(j===0)c.moveTo(X,Y);else c.lineTo(X,Y);}
+  c.stroke();
+  c.fillStyle='#475569';c.fillText('校正残差 |d_corr−真值| 随距离（红线越贴底越好）',bx+6,16);
+  [0.3,0.5,1.0].forEach(function(t){var X=bx+(t-0.15)/1.25*sw;var res=(s*t+o)-t;var Y=by-Math.min(sh,Math.abs(res)/0.10*sh);
+    c.fillStyle='#2563eb';c.beginPath();c.arc(X,Y,4,0,7);c.fill();});
+}
+['dS','dO','dR'].forEach(function(id){document.getElementById(id).addEventListener('input',dUpd);});
+dUpd();
+</script>
+
+<!-- Part5 script -->
+<script>
+(function(){
+  var list=document.getElementById('cList'),items=list.querySelectorAll('li');
+  var done=0;
+  items.forEach(function(li){
+    li.addEventListener('click',function(){
+      li.classList.toggle('on');
+      done=list.querySelectorAll('li.on').length;
+      document.getElementById('cProg').style.width=(done/5*100)+'%';
+      var names=['①','②','③','④','⑤'];
+      var io=document.getElementById('cIo');
+      if(done===0)io.textContent='进度 0/5 —— 从第 1 项开始';
+      else if(done<5)io.innerHTML='进度 <span class="num">'+done+'/5</span> —— 已过：'+
+        Array.from(list.querySelectorAll('li.on')).map(function(x){return names[parseInt(x.dataset.i)];}).join(' ')+
+        '　按依赖顺序推进（①→⑤ 不可跳）';
+      else io.innerHTML='<span class="k">进度 5/5 —— 全链通过</span>';
+      document.getElementById('cDone').style.display=done===5?'':'none';
+    });
+  });
+})();
+</script>
+
+</div>
+
+<footer>
+  <div class="foot-in">
+    <span>🎓 CORE-05 · 标定专题 · 五部分（零位 → TCP 四点法 → 内参 → 手眼 → 抓取验证）</span>
+    <span><a href="../index.html">课程首页</a> · <a href="../principles/index.html">原理实验室</a> · 工具链出自 ros2_ws 实仓</span>
+  </div>
+</footer>
+
+<script>
+var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('show');io.unobserve(e.target);}});},{threshold:.08});
+document.querySelectorAll('.reveal').forEach(function(el){io.observe(el);});
+</script>
+</body>
+</html>

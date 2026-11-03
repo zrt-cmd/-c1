@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-06 多模态语音情绪感知 · CORE-03 教程</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+:root{
+  --theme:#7c3aed;
+  --theme-deep:#6d28d9;
+  --theme-bg:#ede9fe;
+  --theme-bd:#ddd6fe;
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <a class="logo" href="../index.html">📘 CORE-03</a>
+  <nav class="crumb">
+    <a href="../../../index.html#core">核心课程</a> / <a href="../index.html">自然语言交互应用</a> / EXP-06
+  </nav>
+</header>
+
+<div class="wrap">
+
+  <aside class="side">
+    <h4>本页目录</h4>
+    <a href="#s1" class="now">01 问题引入：听懂"字面"还要听懂"语气"</a>
+    <a href="#s2">02 原理通俗讲解：品酒师的两条舌头</a>
+    <a href="#s3">03 关联知识点</a>
+    <a href="#s4">04 实验目标</a>
+    <a href="#s5">05 实验环境与准备</a>
+    <a href="#s6">06 动画讲解：双模态情绪融合</a>
+    <a href="#s7">07 互动讲解：情绪融合权重台</a>
+    <a href="#s8">08 实操步骤</a>
+    <a href="#s9">09 重点与易错点</a>
+    <a href="#s10">10 总结与思考</a>
+
+    <h4>CORE-03 · 自然语言交互</h4>
+    <a href="../exp-01-mic-array-wakeup/index.html">EXP-01 六麦阵列串口唤醒</a>
+    <a href="../exp-02-asr/index.html">EXP-02 声学模型 ASR 语音识别</a>
+    <a href="../exp-03-tts/index.html">EXP-03 TTS 语音合成</a>
+    <a href="../exp-04-voice-dialog/index.html">EXP-04 端到端语音对话</a>
+    <a href="../exp-05-llm-understanding/index.html">EXP-05 大模型语义理解</a>
+    <a href="../exp-06-emotion-perception/index.html">EXP-06 多模态语音情绪感知</a>
+  </aside>
+
+  <main class="content">
+
+    <div class="exp-head">
+      <span class="code">EXP-06 · 第 2 章 · 综合性 · 4 学时</span>
+      <h1>多模态语音情绪感知</h1>
+      <p class="desc">EXP-05 让机器人听懂了"你说什么"，本实验补上最后一块拼图——"你是怎么说的"：文本情绪与语音韵律双通道并行分析、融合判情，让助手与客服应用具备情绪感知能力。</p>
+      <div class="meta">
+        <span class="tag">文本六分类情绪</span>
+        <span class="tag">韵律 · 音量 · 语速</span>
+        <span class="tag">双模态融合</span>
+        <span class="tag hl">情感助手 · 客服场景</span>
+      </div>
+    </div>
+
+    <section class="blk" id="s1">
+      <h2><span class="no">01</span>问题引入：听懂"字面"还要听懂"语气"</h2>
+      <p>设想客服机器人收到这句话——ASR 识别正确、意图分类正确，但场景翻车了：</p>
+      <div class="flow">
+        <div class="step"><span class="n">1</span><div><b>"呵呵，你们可真行。"</b><br>字面：中性偏夸；语气：愤怒讽刺。</div></div>
+        <div class="arr">→</div>
+        <div class="step"><span class="n">2</span><div><b>机器人："谢谢夸奖！"</b><br>火上浇油，用户挂断投诉。</div></div>
+        <div class="arr">→</div>
+        <div class="step"><span class="n">3</span><div><b>缺的是情绪感知</b><br>人听话时，字面与语气同时解码。</div></div>
+      </div>
+      <p>再看三个只有"单通道"会翻车的例子：</p>
+      <table>
+        <thead><tr><th>用户表现</th><th>只看文本</th><th>加上语音韵律</th></tr></thead>
+        <tbody>
+          <tr><td>"我没事"（哽咽、低音量、慢语速）</td><td>判定：没事</td><td>判定：悲伤，需安抚</td></tr>
+          <tr><td>"好的好的，快点吧！"（语速急、音量高）</td><td>判定：配合</td><td>判定：不耐烦/愤怒前兆</td></tr>
+          <tr><td>"太棒了……"（拖长、降调、无起伏）</td><td>判定：开心</td><td>判定：无奈/失望（反讽）</td></tr>
+        </tbody>
+      </table>
+      <div class="tip amber"><span class="lab">💡 本节要点</span>情绪 ≠ 关键词命中。情绪分布在<b>两个通道</b>：文本说"内容情感"，语音说"当下状态"。两条通道都到齐，才能接近人类的"听话听音"。</div>
+      <p>这套"多通道并行、汇入统一大脑"的思路在多模态模型里已经落地——下图是视觉语言模型（VLM）的两条输入路线：纯文字直接进语言模型，图片则先经预处理与视觉编码器提取特征，再与文本一起汇入语言模型生成回答。本实验把同样的架构换成"文本 + 语音韵律"双通道：</p>
+      <div class="anim-box">
+        <img src="assets/vlm-flow-diagram.png" alt="VLM 流程图解：纯文字路线与上传图片路线汇入语言模型" style="display:block;margin:0 auto;max-width:100%;height:auto;border-radius:8px">
+        <div class="anim-cap">图 1-1：多模态输入的两条路线 —— 路线① 纯文字 prompt 直接进入语言模型（rkllm · NPU）；路线② 上传图片先经预处理（补边到 448²）与视觉编码器（rknn · NPU）提取 196×2048 图像特征，再与文本汇合生成回答。与本实验同理：多一条通道，就多一份"言外之意"的证据。</div>
+      </div>
+    </section>
+
+    <section class="blk" id="s2">
+      <h2><span class="no">02</span>原理通俗讲解：品酒师的两条舌头</h2>
+      <p>把情绪识别想成<b>品酒</b>：好品酒师同时用两条线索——看酒标（<b>成分表：文字</b>）与品味（<b>单宁、酸度、回甘：韵律</b>）。只看酒标会把"干红"当成"干"，只凭味觉又抓不住年份品种。对应到技术：</p>
+      <table>
+        <thead><tr><th>生活比喻</th><th>技术模块</th><th>通俗解释</th></tr></thead>
+        <tbody>
+          <tr><td><b>看酒标成分表</b></td><td>文本情绪通道</td><td>对 ASR 文本做六分类：积极 / 消极 / 中性 / 愤怒 / 开心 / 悲伤。入门用情感词典（"太棒了"+2、"烦死"-2），进阶交给 NLP 分类器。</td></tr>
+          <tr><td><b>品味：酸度高=尖锐</b></td><td>语音韵律通道</td><td><b>音高 F0</b> 高而抖→激动或紧张；<b>音量（能量）</b>大→愤怒/兴奋；<b>语速</b>快→焦虑不耐烦，慢且停顿多→低落。</td></tr>
+          <tr><td><b>调酒师按比例勾兑</b></td><td>双模态融合</td><td>两条通道各出一个分数，加权合并：置信度高的通道话语权更大；或决策级——两通道投票一致才输出。</td></tr>
+          <tr><td><b>最终给酒打的星级</b></td><td>情绪标签 + 坐标</td><td>输出六分类标签，同时落到"效价-唤醒度"二维坐标：开心=正效价高唤醒，悲伤=负效价低唤醒。</td></tr>
+        </tbody>
+      </table>
+      <p><b>回到整条语音管线（最后一站）：</b></p>
+      <div class="flow">
+        <div class="step"><span class="n">1</span><div>拾音<br><small>16kHz 波形（韵律就藏在这里）</small></div></div>
+        <div class="arr">→</div>
+        <div class="step"><span class="n">2</span><div>唤醒<br><small>会话起点</small></div></div>
+        <div class="arr">→</div>
+        <div class="step"><span class="n">3</span><div>识别<br><small>ASR 文本 → 文本通道 ★</small></div></div>
+        <div class="arr">→</div>
+        <div class="step"><span class="n">4</span><div>理解+回复<br><small>EXP-05 意图/槽位 + 情绪标签一起进上下文 ★</small></div></div>
+        <div class="arr">→</div>
+        <div class="step"><span class="n">5</span><div>合成<br><small>TTS 按情绪调语速音高（呼应 EXP-03 参数）</small></div></div>
+      </div>
+      <p>语音通道的三个特征怎么算（都是"每句话一段统计量"）：</p>
+      <table>
+        <thead><tr><th>特征</th><th>生活读法</th><th>典型信号</th></tr></thead>
+        <tbody>
+          <tr><td>基频 F0（音高）</td><td>嗓音"往上翘"还是"沉下去"</td><td>均值升高 + 起伏大 → 激动/愤怒；压低变平 → 悲伤/压抑</td></tr>
+          <tr><td>音量 RMS（能量）</td><td>说话"多大声"</td><td>持续偏高 → 愤怒/兴奋；骤降 → 失落</td></tr>
+          <tr><td>语速（字率/停顿）</td><td>说得多急、停多久</td><td>字率高停顿短 → 焦急；字率低长停顿 → 低落或迟疑</td></tr>
+        </tbody>
+      </table>
+      <div class="tip tealb"><span class="lab">🎯 核心直觉</span>文本通道擅长"判类别"（哪个词刺痛了人），语音通道擅长"判强度"（此刻有多上头）。融合 = 用文本定性、用韵律定量。</div>
+    </section>
+
+    <section class="blk" id="s3">
+      <h2><span class="no">03</span>关联知识点</h2>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">📝</div><div class="kt">文本六分类</div><p>积极 / 消极 / 中性 / 愤怒 / 开心 / 悲伤。可用情感词典+规则打分入门，也可接 NLP 分类器或让 LLM 按标签白名单输出。</p></div>
+        <div class="kcard"><div class="kd">🎵</div><div class="kt">韵律三件套</div><p>基频 F0、音量 RMS、语速/停顿——从波形直接统计，不依赖语义；对录音增益与麦克风距离敏感，需归一化。</p></div>
+        <div class="kcard"><div class="kd">📐</div><div class="kt">效价-唤醒度坐标</div><p>横轴效价（负→正），纵轴唤醒（低→高）：开心=(+,高)、愤怒=(−,高)、悲伤=(−,低)、平静=(中,低)，把离散标签连成连续空间。</p></div>
+        <div class="kcard"><div class="kd">🔗</div><div class="kt">双模态融合策略</div><p>分数级加权（w·text+(1−w)·voice）或决策级投票；冲突时（反话、反讽）可提高语音通道权重或标"低置信"交给人。</p></div>
+        <div class="kcard"><div class="kd">🗣</div><div class="kt">情绪感知的下游</div><p>情绪标签随 context 进 LLM，让回复语气随之调整；TTS 端呼应 EXP-03 的 --speed/音高参数改变播报风格。</p></div>
+        <div class="kcard"><div class="kd">💼</div><div class="kt">应用场景</div><p>情感助手（陪伴、提醒时察言观色）、智能客服（升级投诉预警、安抚话术切换）——情绪是服务类机器人的核心 KPI。</p></div>
+      </div>
+    </section>
+
+    <section class="blk" id="s4">
+      <h2><span class="no">04</span>实验目标</h2>
+      <ul class="check">
+        <li>掌握<b>文本情绪分析</b>：基于情感词典/规则对 ASR 文本输出积极/消极/中性/愤怒/开心/悲伤六类标签（分类实操）</li>
+        <li>理解<b>文本分类与实体抽取</b>同源——都属于把自然语言映射到受控词表（概念关联）</li>
+        <li>掌握<b>语音情绪分析</b>：从波形提取韵律、音量、语速特征并给出通道判情（特征实操）</li>
+        <li>实现<b>双模态情绪融合</b>：分数级加权可调，能演示文本/语音冲突样例的融合差异（融合实操）</li>
+        <li>能把情绪标签接入 EXP-05 的对话上下文，设计"情绪感知的助手/客服"应答策略（集成应用）</li>
+        <li>理解情绪输出与 TTS 播报风格的联动（衔接 EXP-03），完成闭环设计（迁移应用）</li>
+      </ul>
+    </section>
+
+    <section class="blk" id="s5">
+      <h2><span class="no">05</span>实验环境与准备</h2>
+      <table>
+        <thead><tr><th>类别</th><th>配置</th></tr></thead>
+        <tbody>
+          <tr><td>硬件</td><td>具身智能实验箱 B2（RK3576）+ 讯飞六麦阵列（复用 EXP-01~02 录音链路）</td></tr>
+          <tr><td>复用模块</td><td>sherpa-onnx ASR（EXP-02 出文本）、llm_server/llm_test（EXP-05 出语义与标签）、Matcha-TTS（EXP-03 调风格）</td></tr>
+          <tr><td>文本通道</td><td>情感词典（中文程度词/否定词/标点权重）+ 六分类白名单，Python 纯实现起步</td></tr>
+          <tr><td>语音通道</td><td>16kHz 单声道波形窗口（约 2~4s/句），统计 F0 近似、RMS 能量、字率与静音比</td></tr>
+          <tr><td>素材</td><td><code>courses/sheet1/speech_practice/</code> 下实验讲义与样例（exp06 为设计性素材，需按课堂场景修改）</td></tr>
+        </tbody>
+      </table>
+      <pre><span class="c"># 0) 前置就绪检查（三站分别是 EXP-02 / EXP-05 主命令）</span>
+<span class="g">python3 asr_test.py --mic-array</span>   <span class="y"># 文本通道原料：ASR 文本</span>
+<span class="g">python3 llm_test.py --prompt "你好"</span>  <span class="y"># LLM 连通（可承担 text 分类器）</span>
+<span class="c"># 1) 录一段情绪样本（平静/愤怒/悲伤/开心 各 1 条）</span>
+<span class="g">arecord -D plughw:4,0 -r 16000 -f S16_LE -c 1 -d 3 angry.wav</span></pre>
+      <div class="tip"><span class="lab">✅ 准备检查</span>语音通道统一在同一增益下录音——后续"音量"特征是相对比较，增益变了绝对 RMS 全变。先用 <code>amixer</code>（audio_utils.py 已有工具）固定采集增益再采样本。</div>
+    </section>
+
+    <section class="blk" id="s6">
+      <h2><span class="no">06</span>动画讲解：双模态情绪融合</h2>
+      <p>观察一句话的两条命运线：文本通道连到词典/分类器，语音通道抽出韵律三特征，两路分数在融合器按权重合并，最终落点在右侧"效价-唤醒度"情绪坐标上（4 秒循环，看紫色融合点的迁移轨迹）：</p>
+      <div class="anim-box">
+        <svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" font-family="Consolas,monospace" font-size="12">
+          <rect x="0" y="0" width="720" height="300" fill="#111827"/>
+          <!-- 输入 -->
+          <rect x="16" y="122" width="96" height="52" rx="8" fill="#1f2937" stroke="#4b5563"/>
+          <text x="64" y="144" fill="#e5e7eb" text-anchor="middle">同一句</text>
+          <text x="64" y="162" text-anchor="middle" font-size="10" fill="#9ca3af">"我没事"</text>
+          <!-- 文本通道 -->
+          <rect x="150" y="34" width="150" height="60" rx="8" fill="#1f2937" stroke="#2563eb"/>
+          <text x="225" y="56" fill="#93c5fd" text-anchor="middle">文本通道</text>
+          <text x="225" y="74" fill="#9ca3af" text-anchor="middle" font-size="10">情感词典 + 六分类</text>
+          <text x="225" y="88" fill="#60a5fa" text-anchor="middle" font-size="10">→ 中性/积极 (+0.2)</text>
+          <path d="M112 138 C 130 100, 132 76, 148 64" stroke="#2563eb" stroke-width="2" fill="none" stroke-dasharray="6,5">
+            <animate attributeName="stroke-dashoffset" values="11;0" dur="1s" repeatCount="indefinite"/>
+          </path>
+          <!-- 语音通道 -->
+          <rect x="150" y="188" width="150" height="72" rx="8" fill="#1f2937" stroke="#0d9488"/>
+          <text x="225" y="210" fill="#5eead4" text-anchor="middle">语音通道</text>
+          <text x="225" y="227" fill="#9ca3af" text-anchor="middle" font-size="10">F0↓  RMS↓  语速↓</text>
+          <text x="225" y="243" fill="#2dd4bf" text-anchor="middle" font-size="10">→ 悲伤/低落 (−0.6)</text>
+          <path d="M112 160 C 130 186, 132 204, 148 216" stroke="#0d9488" stroke-width="2" fill="none" stroke-dasharray="6,5">
+            <animate attributeName="stroke-dashoffset" values="11;0" dur="1s" begin="0.4s" repeatCount="indefinite"/>
+          </path>
+          <!-- 波形小图 -->
+          <path d="M158 252 q6 -12 12 0 t12 0 t12 0 t12 0" stroke="#2dd4bf" stroke-width="1.5" fill="none" opacity="0.7">
+            <animate attributeName="opacity" values="0.3;1;0.3" dur="1.4s" repeatCount="indefinite"/>
+          </path>
+          <!-- 融合器 -->
+          <rect x="340" y="112" width="140" height="72" rx="8" fill="#1f2937" stroke="#7c3aed" stroke-width="2">
+            <animate attributeName="stroke" values="#4b5563;#7c3aed;#4b5563" keyTimes="0;0.4;1" dur="4s" repeatCount="indefinite"/>
+          </rect>
+          <text x="410" y="136" fill="#c4b5fd" text-anchor="middle">双模态融合器</text>
+          <text x="410" y="154" fill="#9ca3af" text-anchor="middle" font-size="10">w·text + (1−w)·voice</text>
+          <text x="410" y="170" fill="#a78bfa" text-anchor="middle" font-size="10">w=0.5 冲突则降置信</text>
+          <path d="M300 66 C 322 78, 328 118, 338 132" stroke="#2563eb" stroke-width="2" fill="none" stroke-dasharray="6,5">
+            <animate attributeName="stroke-dashoffset" values="11;0" dur="1s" begin="0.8s" repeatCount="indefinite"/>
+          </path>
+          <path d="M300 222 C 322 206, 328 178, 338 164" stroke="#0d9488" stroke-width="2" fill="none" stroke-dasharray="6,5">
+            <animate attributeName="stroke-dashoffset" values="11;0" dur="1s" begin="1.2s" repeatCount="indefinite"/>
+          </path>
+          <!-- 情绪坐标 -->
+          <rect x="520" y="30" width="184" height="230" rx="8" fill="#0b1120" stroke="#4b5563"/>
+          <line x1="540" y1="145" x2="688" y2="145" stroke="#374151" stroke-width="1.5"/>
+          <line x1="614" y1="50" x2="614" y2="240" stroke="#374151" stroke-width="1.5"/>
+          <text x="686" y="138" fill="#6b7280" font-size="10" text-anchor="end">效价 +</text>
+          <text x="618" y="44" fill="#6b7280" font-size="10">唤醒 +</text>
+          <text x="566" y="80" fill="#f87171" font-size="11">愤怒</text>
+          <text x="648" y="80" fill="#fbbf24" font-size="11">开心</text>
+          <text x="560" y="226" fill="#93c5fd" font-size="11">悲伤</text>
+          <text x="644" y="226" fill="#6ee7b7" font-size="11">平静</text>
+          <!-- 融合点移动 -->
+          <circle cx="656" cy="74" r="7" fill="#7c3aed" opacity="0.9">
+            <animate attributeName="cx" values="656;572;646;656" keyTimes="0;0.4;0.75;1" dur="4s" repeatCount="indefinite"/>
+            <animate attributeName="cy" values="74;78;216;74" keyTimes="0;0.4;0.75;1" dur="4s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="0.4;1;1;0.4" dur="4s" repeatCount="indefinite"/>
+          </circle>
+          <text x="410" y="288" fill="#6b7280" text-anchor="middle" font-size="10">冲突时输出"悲伤(低置信)"并将标签写入 LLM 上下文，回复语气随之下沉</text>
+          <path d="M480 148 L518 148" stroke="#7c3aed" stroke-width="2" stroke-dasharray="6,5" fill="none">
+            <animate attributeName="stroke-dashoffset" values="11;0" dur="1s" begin="1.6s" repeatCount="indefinite"/>
+          </path>
+        </svg>
+        <div class="anim-cap">动画 6-1：双模态情绪融合与效价-唤醒度落点（4 秒循环）——同一句"我没事"，文本通道判中性偏正、语音通道判低落，融合器按权重合并后，紫色点从"开心/平静"象限滑向"悲伤"象限：韵律揭穿了字面的逞强。随后该情绪标签进入 LLM 上下文，决定回答的语气与 TTS 风格。</div>
+      </div>
+    </section>
+
+    <section class="blk" id="s7">
+      <h2><span class="no">07</span>互动讲解：情绪融合权重台</h2>
+      <p>三个样例 + 两组权重，亲手复现"字面 vs 语气"冲突时融合结果如何翻转：</p>
+      <div class="ix-panel">
+        <div class="ix-title">情绪融合权重台 · Fusion Mixer</div>
+        <div class="ctl-row">
+          <button class="btn" onclick="emoCase('fine',0.5)">"我没事" · w=0.5</button>
+          <button class="btn" onclick="emoCase('fine',0.2)">"我没事" · 文本权重 0.2</button>
+          <button class="btn" onclick="emoCase('great',0.5)">"太棒了……" · w=0.5</button>
+          <button class="btn" onclick="emoCase('rush',0.5)">"快点吧！" · w=0.5</button>
+          <button class="btn ghost" onclick="emoReset()">↺ 复位</button>
+        </div>
+        <div class="io" id="emoIo">$ 就绪：选择样例与文本通道权重 w（0=全听语气，1=全看字面）…</div>
+      </div>
+      <div class="tip violet"><span class="lab">🔍 观察点</span>同一句"我没事"，w=0.5 时两通道拉锯输出"中性(低置信)"；降到 w=0.2（更信语气）则翻转为"悲伤"。真实系统的自适应融合正是按<b>通道置信度</b>动态调 w——文本含明确情绪词时信文本，文本空泛（"哦""嗯"）时信韵律。</div>
+    </section>
+
+    <section class="blk" id="s8">
+      <h2><span class="no">08</span>实操步骤</h2>
+      <div class="flow">
+        <div class="step"><span class="n">1</span><div>采情绪样本 + 固定录音增益</div></div>
+        <div class="arr">→</div>
+        <div class="step"><span class="n">2</span><div>实现文本六分类（词典打分起步）</div></div>
+        <div class="arr">→</div>
+        <div class="step"><span class="n">3</span><div>实现韵律三特征与语音通道判情</div></div>
+        <div class="arr">→</div>
+        <div class="step"><span class="n">4</span><div>融合输出 + 接入对话/TTS 闭环</div></div>
+      </div>
+      <p><b>步骤 1：采集四类样本</b>（每类 3 条起，安静环境 + 远近各一条）：</p>
+      <pre><span class="g">arecord -D plughw:4,0 -r 16000 -f S16_LE -c 1 -d 3 samples/angry_01.wav</span>
+<span class="g">arecord -D plughw:4,0 -r 16000 -f S16_LE -c 1 -d 3 samples/sad_01.wav</span>
+<span class="y"># 真实语料优先用 EXP-02 链路边说边存：唤醒 → 朗读情绪句 → 得 (wav, text) 对</span></pre>
+      <p><b>步骤 2：文本通道</b>——程度词/否定词加权的情感词典打分（课堂实现骨架）：</p>
+      <pre><span class="g">LEX = {"棒": +2, "喜欢": +1.5, "烦": -2, "太": 1.5, "不": -1}</span>
+<span class="g">def text_score(s):</span>
+<span class="g">    # 遍历命中词 → 前置程度词加倍、前置否定词取反 → clip 到 [-3, +3]</span>
+<span class="g">    # 分数段映射六类: &gt;1.5 开心, &gt;0.3 积极, &gt;-0.3 中性, &gt;-1.5 消极, &gt;=愤怒词 愤怒, 否则 悲伤</span>
+
+<span class="c"># 或直接委托 LLM（白名单约束，承接 EXP-05 的 system prompt 手法）：</span>
+<span class="g">"你是情绪标注员，只输出: 开心|悲伤|愤怒|积极|消极|中性"</span></pre>
+      <p><b>步骤 3：语音通道</b>——对样本波形统计三特征并归一化打分：</p>
+      <pre><span class="y"># F0 均值/方差（基频轨迹近似）、RMS 平均能量、字率与静音占比</span>
+<span class="y"># 归一化到该说话人基线后映射: 高能量+高语速 → 愤怒(+强度)</span>
+<span class="y">#                             低能量+慢语速+F0平 → 悲伤; 温和起伏 → 开心</span></pre>
+      <p><b>步骤 4：融合与闭环</b>——分数级加权后与 EXP-05/03 打通：</p>
+      <pre><span class="g">final = w*text + (1-w)*voice</span>   <span class="y"># 冲突(异号)则 confidence *= 0.5</span>
+<span class="c"># 标签写入 LLM 上下文 → 回复语气调整：</span>
+<span class="g">"用户当前情绪:悲伤。回复更温和简短,先安抚再解决。"</span>
+<span class="c"># 播报风格呼应 EXP-03 参数（稍慢、降增益）：</span>
+<span class="g">python3 tts_test.py --text "别急，我们马上帮您处理。" --gain 1.5</span></pre>
+      <div class="tip tealb"><span class="lab">⏱ 预期效果</span>四类样本通道准确率各 ≥ 70%（词典起步水平）；冲突样例（反话/逞强）在 w 调整后输出翻转；助手场景中情绪标签可见于 LLM 请求 messages[0]。</div>
+    </section>
+
+    <section class="blk" id="s9">
+      <h2><span class="no">09</span>重点与易错点</h2>
+      <div class="tip amber"><span class="lab">⚠️ 高频故障</span>情绪是最"软"的任务，坑不在报错而在<b>悄悄出错</b>：增益没固定、基线没归一、标签不平衡——四条通道全绿但主观准确率很差时，先查下面这张表。</div>
+      <table>
+        <thead><tr><th>现象</th><th>原因</th><th>解决</th></tr></thead>
+        <tbody>
+          <tr><td>音量特征全部偏高，区分不出愤怒</td><td>录音增益/AGC 每次不同</td><td>固定 amixer 增益采样；RMS 用相对说话人基线而非绝对值</td></tr>
+          <tr><td>"我没事"类逞强句全判中性</td><td>只用文本通道</td><td>文本空泛时提高语音权重；冲突即降置信并按韵律裁决</td></tr>
+          <tr><td>反讽"太棒了……"判成开心</td><td>词典无语气感知</td><td>结合降调/拖长（F0 下滑、语速↓）触发反讽规则或交给 LLM 综合裁决</td></tr>
+          <tr><td>否定句情感翻转错误（"不喜欢"）</td><td>词典未处理否定窗口</td><td>否定词作用域覆盖其后 2-3 个词；双重否定取反后再取反</td></tr>
+          <tr><td>愤怒/开心召回极低</td><td>样本六类不平衡（中性占多数）</td><td>每类等量采样；评测用 per-class 召回而非整体准确率</td></tr>
+          <tr><td>远近说话人分数不可比</td><td>F0/能量未归一</td><td>按说话人做 z-score 归一，或会话首轮先"校准 5 秒"采基线</td></tr>
+          <tr><td>标签接进 LLM 后回复更怪了</td><td>system prompt 冲突或标签写错位置</td><td>情绪标签放 messages[0] 人设之后，限定语气指引而非硬性台词</td></tr>
+        </tbody>
+      </table>
+      <ul class="check">
+        <li>先做<b>单通道各自可信</b>的评测，再谈融合——融合救不了两个都不准的通道。</li>
+        <li>每个测试句固定"文本 + 波形"成对存档，回归测试时两通道一起复跑。</li>
+        <li>输出永远带<b>置信度</b>；低置信交由澄清话术（"听起来您有点着急，是吗？"）比硬猜更稳。</li>
+        <li>别忘了闭环：情绪的最终消费方是回复语气与 TTS 风格，而不是一张打印的表格。</li>
+      </ul>
+    </section>
+
+    <section class="blk" id="s10">
+      <h2><span class="no">10</span>总结与思考</h2>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">🏁</div><div class="kt">完成成果</div><p>四类情绪样本库；文本六分类 + 韵律三特征双通道流水线；可调权重的分数级融合器；情绪标签接入 LLM 上下文的助手/客服 demo。</p></div>
+        <div class="kcard"><div class="kd">🧠</div><div class="kt">原理收获</div><p>文本定类别、韵律定强度的互补关系；效价-唤醒度二维模型如何统一六标签；冲突降置信的融合安全观。</p></div>
+        <div class="kcard"><div class="kd">🛠</div><div class="kt">技能收获</div><p>情感词典构建与否定/程度处理、声学特征归一化评测、按说话人基线校准、低置信澄清式交互设计。</p></div>
+        <div class="kcard"><div class="kd">🎓</div><div class="kt">课程收官</div><p>至此 拾音→唤醒→识别→理解→回复→合成 六站全部点亮：机器人不仅听懂字面，还能听出语气、答得合时。</p></div>
+      </div>
+      <div class="tip violet"><span class="lab">💭 思考题</span>
+        <p><b>1.</b> 双模态"分数级加权"与"决策级投票"两种融合策略各有何代价？当文本与韵律结论冲突（反讽/逞强）时，你的融合器应该输出什么而不仅仅是一个标签？</p>
+        <p><b>2.</b> 若把情绪标签注入 system prompt 让 LLM 改变回复语气，可能引入哪些新问题（如过度讨好、误判放大）？如何用置信度门槛与澄清话术缓解？结合作感助手/客服场景说明。</p>
+      </div>
+    </section>
+
+    <nav class="expnav">
+      <a href="../exp-05-llm-understanding/index.html">← EXP-05 大模型语义理解</a>
+      <a href="../index.html">返回课程目录 · 6 实验 →</a>
+    </nav>
+
+    <footer>
+      <span>CORE-03 · 机器人自然语言交互应用 · EXP-06 多模态语音情绪感知</span>
+      <span>4 学时 · 综合性 · 基于 speech_practice 实验讲义改编</span>
+    </footer>
+
+  </main>
+</div>
+
+<script>
+(function(){
+  var io = document.getElementById('emoIo');
+  function emit(s, cls){
+    io.innerHTML += '\n<span class="' + (cls||'dim') + '">' + s + '</span>';
+    io.scrollTop = io.scrollHeight;
+  }
+  var cases = {
+    fine: { text: 0.2, voice: -0.6, tlab: '中性/偏积极', vlab: '悲伤(低能量·慢语速·F0平)', txt: '"我没事"' },
+    great: { text: 1.6, voice: -0.4, tlab: '开心', vlab: '失望(降调·拖长·无起伏)', txt: '"太棒了……"' },
+    rush: { text: 0.4, voice: 1.4, tlab: '配合/积极', vlab: '愤怒(高能量·语速快·音量大)', txt: '"好的好的，快点吧！"' }
+  };
+  window.emoCase = function(kind, w){
+    var c = cases[kind];
+    emit('$ ' + c.txt + '   文本权重 w=' + w.toFixed(2), 'dim');
+    emit('  文本通道: ' + c.tlab + ' → ' + c.text.toFixed(1), 'dim');
+    emit('  语音通道: ' + c.vlab + ' → ' + c.voice.toFixed(1), 'dim');
+    var f = w * c.text + (1 - w) * c.voice;
+    var conflict = (c.text > 0.3 && c.voice < -0.3) || (c.text < -0.3 && c.voice > 0.3);
+    var conf = conflict ? 0.48 : 0.86;
+    var label;
+    if(conflict) label = (c.voice < 0) ? '悲伤（低置信，按韵律裁决）' : '愤怒（低置信，按韵律裁决）';
+    else if(f > 1.0) label = '开心';
+    else if(f > 0.3) label = '积极';
+    else if(f > -0.3) label = '中性';
+    else label = (c.voice < -0.4) ? '悲伤' : '消极';
+    if(conflict){
+      emit('  融合: ' + f.toFixed(2) + ' → ' + label + '  置信度×0.5=' + conf.toFixed(2), 'warn');
+      emit('   ⚠ 两通道异号冲突：建议澄清话术"听起来您不是太顺利，对吗？"', 'bad');
+    } else {
+      emit('  融合: ' + f.toFixed(2) + ' → ' + label + '  置信度=' + conf.toFixed(2), 'ok');
+      emit('   ✓ 写入 LLM 上下文 → 回复语气与 TTS 风格随之调整', 'ok');
+    }
+  };
+  window.emoReset = function(){
+    io.innerHTML = '$ 就绪：选择样例与文本通道权重 w（0=全听语气，1=全看字面）…';
+  };
+})();
+</script>
+<script src="../shared/tutorial.js" defer></script>
+</body>
+</html>

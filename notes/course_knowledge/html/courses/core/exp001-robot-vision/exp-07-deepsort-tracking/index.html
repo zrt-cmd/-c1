@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-07 · 多目标跟踪（DeepSORT）— 机器人视觉入门课</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<link rel="stylesheet" href="../shared/beginner.css">
+<style>:root{--theme:#e11d48;--theme-deep:#be123c;--theme-bg:#ffe4e6;--theme-bd:#fecdd3}</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit">🧠 具身智能课程 · <i>机器人视觉入门</i></a>
+  <div class="crumb"><a href="../../../index.html#core">核心课程</a> / <a href="../index.html">视觉入门课</a> / EXP-07</div>
+</div>
+
+<div class="wrap">
+
+<aside class="side">
+  <h4>本页步骤</h4>
+  <a href="#s1" class="now">01 这个实验解决什么问题</a>
+  <a href="#s2">02 三分钟讲懂：怎么给同一个人一直贴同一个号</a>
+  <a href="#s3">03 先认识 4 个词</a>
+  <a href="#s4">04 它吃什么、吐什么</a>
+  <a href="#s5">05 三步跑起来</a>
+  <a href="#s6">06 你该看到的画面</a>
+  <a href="#s7">07 改一个参数看变化</a>
+  <a href="#s8">08 踩坑速查</a>
+  <a href="#s9">09 进阶（可选）</a>
+  <a href="#s10">10 随堂小测</a>
+  <h4>本课程实验</h4>
+  <a href="../exp-01-color-hsv/index.html">EXP-01 颜色识别</a>
+  <a href="../exp-02-qrcode/index.html">EXP-02 二维码</a>
+  <a href="../exp-03-contour-polygon/index.html">EXP-03 多边形轮廓</a>
+  <a href="../exp-04-industrial-defect/index.html">EXP-04 工业缺陷检测</a>
+  <a href="../exp-05-garbage-classification/index.html">EXP-05 垃圾分类</a>
+  <a href="../exp-06-semantic-segmentation/index.html">EXP-06 语义分割</a>
+  <a href="../exp-07-deepsort-tracking/index.html" style="color:#0f766e;font-weight:700">EXP-07 多目标跟踪</a>
+  <a href="../exp-08-face-landmarks/index.html">EXP-08 人脸关键点</a>
+  <a href="../exp-09-pose-landmark/index.html">EXP-09 骨骼关键点</a>
+  <a href="../exp-10-depth-3d/index.html">EXP-10 深度 3D</a>
+  <a href="../exp-11-pose-control/index.html">EXP-11 体感控制</a>
+  <a href="../exp-12-hand-control/index.html">EXP-12 手势识别</a>
+</aside>
+
+<main class="content">
+
+<div class="exp-head">
+  <span class="code">EXP-07 · 第 3 阶段 · 多目标跟踪 · 综合性 · 4 学时 · 本课程最难</span>
+  <h1>多目标跟踪：让"同一个人"在视频里一直是 3 号</h1>
+  <p class="desc">检测每帧都在跑，但每帧都是独立的 —— 这一帧的 3 号，下一帧可能变成 7 号。跟踪要解决的就是这件事：<b>把跨帧的框串成"轨迹"</b>，让每个人从头到尾一个 ID。更难的是：人被挡住几秒再出现，还得认出是同一个。</p>
+  <div class="meta">
+    <span class="tag hl">难度 ⭐⭐⭐ · 4 学时</span>
+    <span class="tag">Kalman 预测</span><span class="tag">匈牙利匹配</span>
+    <span class="tag">ReID 外观</span><span class="tag">12~15 FPS</span>
+  </div>
+</div>
+
+<div class="pathline">
+  <span>01 颜色</span><span>02 二维码</span><span>03 轮廓</span><span>04 检测</span><span>05 分类</span><span>06 分割</span><span class="cur">07 跟踪</span><span>08 人脸</span><span>09 骨骼</span><span>10 3D</span><span>11 体感</span><span>12 手势</span>
+</div>
+
+<section class="blk" id="s1">
+  <h2><span class="no">01</span>这个实验解决什么问题</h2>
+
+  <div class="idea">
+    <span class="tag1">CORE IDEA · 一句话原理</span>
+    <p class="big">每一帧都做一道<b>"连线题"</b>：把这一帧的框，接到上一帧的哪条轨迹上？</p>
+    <p class="analogy"><b>打个比方：</b>就像看球赛时盯着一个球员。球跑得再快、被别的球员挡住一下，你还是知道"那个人"是谁 —— 因为你<b>记得他刚才在哪、也记得他长什么样</b>。DeepSORT 用的就是这两条线索。</p>
+  </div>
+
+  <p>先看清问题：如果没有跟踪，会怎样？</p>
+
+  <table>
+    <thead><tr><th style="width:16%">帧</th><th style="width:28%">检测结果</th><th>问题</th></tr></thead>
+    <tbody>
+      <tr><td>第 1 帧</td><td>框 A 在人身上</td><td>还行</td></tr>
+      <tr><td>第 2 帧</td><td>框 B 在人身上</td><td>这是同一个人的框吗？不知道</td></tr>
+      <tr><td>第 3 帧</td><td>框 C 在人身上</td><td>完全不知道这 3 个框是不是一个人</td></tr>
+    </tbody>
+  </table>
+  <p>下游任务全都依赖"ID 稳定"：<br>
+  <b>人流统计</b>要数"经过了几个人"，ID 一跳就多算一个人；<br>
+  <b>行为分析</b>要判断"这个人停了多久"，ID 变了就断了；<br>
+  <b>跟人走</b>要一直跟同一个目标，ID 变了就跟丢了。</p>
+
+  <div class="oneline"><span>本实验的目标：<b>画面里三个人各有一个固定编号，来回走动、互相交叉、短暂遮挡之后，编号都不变。</b></span></div>
+</section>
+
+<section class="blk" id="s2">
+  <h2><span class="no">02</span>三分钟讲懂：怎么给同一个人一直贴同一个号</h2>
+
+  <p class="lead">DeepSORT 每帧只做四件事。理解了这四件事的<b>顺序</b>，你就理解了这个算法。</p>
+
+  <div class="anim-box">
+    <svg viewBox="0 0 760 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="DeepSORT四步：卡尔曼预测位置 计算外观和位置代价 匈牙利算法匹配 更新轨迹并分配ID">
+      <rect x="6" y="6" width="748" height="268" rx="12" fill="#111827" stroke="#334155"/>
+      <text x="380" y="28" text-anchor="middle" font-size="13" font-weight="700" fill="#fda4af" font-family="sans-serif">每一帧都在重复这四步</text>
+
+      <!-- ① 预测 -->
+      <rect x="20" y="44" width="172" height="150" rx="8" fill="#111c34" stroke="#334155"/>
+      <text x="106" y="66" text-anchor="middle" font-size="11.5" font-weight="700" fill="#93c5fd" font-family="sans-serif">① 猜"它现在在哪"</text>
+      <rect x="46" y="80" width="120" height="70" rx="4" fill="#1e293b"/>
+      <rect x="70" y="96" width="34" height="40" fill="none" stroke="#475569" stroke-width="1.6" stroke-dasharray="3 3"/>
+      <rect x="100" y="102" width="34" height="40" fill="none" stroke="#60a5fa" stroke-width="2"/>
+      <path d="M88,116 L98,118" stroke="#60a5fa" stroke-width="1.6" stroke-dasharray="2 2"/>
+      <text x="106" y="166" text-anchor="middle" font-size="9.5" fill="#64748b" font-family="sans-serif">按上一帧的速度外推</text>
+      <text x="106" y="182" text-anchor="middle" font-size="9" fill="#60a5fa" font-family="monospace">Kalman filter</text>
+
+      <path d="M196 118 L218 118" stroke="#475569" stroke-width="2" marker-end="url(#a1)" fill="none"/>
+      <defs><marker id="a1" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L7,4 L0,8 z" fill="#64748b"/></marker></defs>
+
+      <!-- ② 代价 -->
+      <rect x="222" y="44" width="180" height="150" rx="8" fill="#111c34" stroke="#334155"/>
+      <text x="312" y="66" text-anchor="middle" font-size="11.5" font-weight="700" fill="#6ee7b7" font-family="sans-serif">② 算"配得上吗"</text>
+      <g font-size="9" font-family="monospace">
+        <text x="238" y="88" fill="#94a3b8">轨迹\检测</text>
+        <text x="300" y="88" fill="#94a3b8">A    B    C</text>
+        <text x="238" y="106" fill="#c4b5fd">T1</text>
+        <text x="300" y="106" fill="#4ade80">0.1  0.8  0.9</text>
+        <text x="238" y="124" fill="#c4b5fd">T2</text>
+        <text x="300" y="124" fill="#fbbf24">0.7  0.2  0.6</text>
+        <text x="238" y="142" fill="#c4b5fd">T3</text>
+        <text x="300" y="142" fill="#f87171">0.9  0.7  0.3</text>
+      </g>
+      <text x="312" y="164" text-anchor="middle" font-size="9.5" fill="#64748b" font-family="sans-serif">数字越小 = 越像同一个人</text>
+      <text x="312" y="180" text-anchor="middle" font-size="9" fill="#6ee7b7" font-family="monospace">外观 + 位置</text>
+
+      <path d="M406 118 L428 118" stroke="#475569" stroke-width="2" marker-end="url(#a1)" fill="none"/>
+
+      <!-- ③ 匹配 -->
+      <rect x="432" y="44" width="164" height="150" rx="8" fill="#111c34" stroke="#334155"/>
+      <text x="514" y="66" text-anchor="middle" font-size="11.5" font-weight="700" fill="#fbbf24" font-family="sans-serif">③ 挑"最划算的配法"</text>
+      <g stroke="#fbbf24" stroke-width="2" fill="none">
+        <path d="M452,102 q30,-10 58,-2"/>
+        <path d="M452,120 q30,4 58,-2"/>
+        <path d="M452,138 q30,10 58,-4" stroke="#94a3b8" stroke-dasharray="3 3"/>
+      </g>
+      <text x="514" y="164" text-anchor="middle" font-size="9.5" fill="#64748b" font-family="sans-serif">整体代价最小的方案</text>
+      <text x="514" y="180" text-anchor="middle" font-size="9" fill="#fbbf24" font-family="monospace">匈牙利算法</text>
+
+      <path d="M600 118 L622 118" stroke="#475569" stroke-width="2" marker-end="url(#a1)" fill="none"/>
+
+      <!-- ④ 更新 -->
+      <rect x="626" y="44" width="112" height="150" rx="8" fill="#111c34" stroke="#334155"/>
+      <text x="682" y="66" text-anchor="middle" font-size="11.5" font-weight="700" fill="#fda4af" font-family="sans-serif">④ 贴新号</text>
+      <rect x="648" y="80" width="68" height="20" rx="4" fill="#be123c"/>
+      <text x="682" y="94" text-anchor="middle" font-size="10" fill="#fecdd3" font-family="monospace">ID 3</text>
+      <rect x="648" y="108" width="68" height="20" rx="4" fill="#be123c"/>
+      <text x="682" y="122" text-anchor="middle" font-size="10" fill="#fecdd3" font-family="monospace">ID 7</text>
+      <rect x="648" y="136" width="68" height="20" rx="4" fill="#475569"/>
+      <text x="682" y="150" text-anchor="middle" font-size="10" fill="#cbd5e1" font-family="monospace">未匹配</text>
+      <text x="682" y="176" text-anchor="middle" font-size="9.5" fill="#64748b" font-family="sans-serif">匹配上的沿用旧号</text>
+
+      <!-- 底部解释 -->
+      <rect x="20" y="206" width="718" height="54" rx="8" fill="#0b1220" stroke="#1e293b"/>
+      <text x="36" y="226" font-size="11" fill="#fbbf24" font-family="sans-serif">两条线索缺一不可：</text>
+      <text x="36" y="246" font-size="10.5" fill="#94a3b8" font-family="sans-serif">· 只看位置 → 两个人一交叉就换号（这叫 sort，配置里可以切换对照）。　· 只看外观 → 穿同款衣服的两个人会混。</text>
+    </svg>
+  </div>
+  <div class="cap">图 7-1｜四步循环。其中第②步同时用位置和外观两条线索 —— 这是 DeepSORT 里的 "Deep"。</div>
+
+  <h3>两条线索分别是什么</h3>
+
+  <div class="io2">
+    <div class="cellbox in" style="border-color:#93c5fd;background:#eff6ff">
+      <span class="lb">线索一 · 位置</span>
+      <div class="v">他刚才往哪个方向走、多快</div>
+      <p class="d">用 <b>Kalman 滤波</b>推算"这一帧他应该在哪个位置"。人在画面里是连续移动的，所以这个猜测通常八九不离十。</p>
+    </div>
+    <div class="arw">+</div>
+    <div class="cellbox in" style="border-color:#6ee7b7;background:#f0fdf4">
+      <span class="lb">线索二 · 外观</span>
+      <div class="v">他穿什么衣服、体型什么样</div>
+      <p class="d">用 <b>ReID 模型</b>把每个人的框压缩成一个 512 维的"指纹向量"。同一个人的指纹很接近，不同的人差得远。</p>
+    </div>
+  </div>
+
+  <p style="font-size:14px;color:#64748b">把两条线索合成一个"代价"（越小越像），再交给匈牙利算法找全局最优配对：</p>
+  <pre><span class="c"># 概念示意，不是真实代码</span>
+代价 = 0.2 × 位置距离  +  0.8 × 外观距离
+<span class="c">#     ↑ 权重小，因为人会突然转弯   ↑ 权重大，因为衣服不会突然换</span></pre>
+
+  <h3>被挡住了怎么办</h3>
+  <table>
+    <thead><tr><th style="width:16%">情况</th><th style="width:26%">程序怎么处理</th><th>靠的是哪个参数</th></tr></thead>
+    <tbody>
+      <tr><td>人走进树后，看不见了</td><td>轨迹<b>不删除</b>，继续用 Kalman 猜位置，编号保留</td><td><code>max_age: 70</code>（最多等 70 帧）</td></tr>
+      <tr><td>人从树后出来</td><td>凭外观指纹认出是同一个，恢复原 ID</td><td>ReID + <code>max_dist: 0.2</code></td></tr>
+      <tr><td>等太久没出现</td><td>超过 70 帧就删掉这条轨迹</td><td><code>max_age</code></td></tr>
+      <tr><td>刚出现的新目标</td><td>先观察 3 帧，稳定才给正式编号</td><td><code>n_init: 3</code></td></tr>
+    </tbody>
+  </table>
+
+  <div class="oneline"><span><b>一句话记住：</b>先猜位置（Kalman），再看长相（ReID），然后整体配对（匈牙利）。<b>猜错位置时靠长相救回来，长相相似时靠位置区分开</b> —— 这就是两条线索的意义。</span></div>
+</section>
+
+<section class="blk" id="s3">
+  <h2><span class="no">03</span>先认识 4 个词</h2>
+  <div class="terms">
+    <div class="term"><div class="w">轨迹 <em>track</em></div><p class="m">一条"命的记录" —— 包含一个 ID、一串历史位置、一个外观指纹。匹配上就更新，太久没匹配上就删除。</p></div>
+    <div class="term"><div class="w">Kalman 滤波</div><p class="m">一套"用历史推测现在"的数学方法。不神秘：<b>用上一帧的位置 + 速度，推这一帧的位置</b>。</p></div>
+    <div class="term"><div class="w">匈牙利算法</div><p class="m">解决"怎么配对总代价最小"的经典算法。3 条轨迹配 3 个检测，有 6 种配法，它负责挑最优那一种。</p></div>
+    <div class="term"><div class="w">ReID</div><p class="m">Re-Identification，重识别。把一个人的图像压成一个特征向量（指纹），用来判断"是不是同一个人"。</p></div>
+  </div>
+
+  <details class="deep">
+    <summary>为什么叫"级联"匹配（cascade）？<em>选读 50 秒</em></summary>
+    <div class="deep-body">
+      <p>因为匹配是<b>分批做</b>的，不是一次性做完：</p>
+      <p>先让"最近一帧刚出现过的轨迹"去匹配（它们最可靠），匹配完剩下的检测，再让"已经丢失 1 帧的"去匹配，然后是丢失 2 帧的……<b>按"新鲜度"从新到旧一轮一轮来。</b></p>
+      <p><b>为什么这么设计？</b>假设有两条轨迹同时竞争一个检测：一条是刚刚还在的目标，一条是丢了 30 帧的。<b>应该优先给刚出现的那个</b> —— 因为丢太久的那个可能早就离开画面了。级联匹配就是这个优先级的体现。</p>
+    </div>
+  </details>
+</section>
+
+<section class="blk" id="s4">
+  <h2><span class="no">04</span>它吃什么、吐什么</h2>
+
+  <div class="io2">
+    <div class="cellbox in">
+      <span class="lb">INPUT · 喂进去</span>
+      <div class="v">视频 / 相机流</div>
+      <p class="d">配置里 <code>classes: [2]</code>，只跟踪 COCO 第 2 类（car 车）。改成 0 就是跟踪人。</p>
+    </div>
+    <div class="arw">→</div>
+    <div class="cellbox out">
+      <span class="lb">OUTPUT · 吐出来</span>
+      <div class="v">带 ID 的框 + 轨迹线</div>
+      <p class="d">每个框标着 <code>ID:3</code>，后面拖一条尾巴（历史轨迹）。<code>--save</code> 还能存成标注视频。</p>
+    </div>
+  </div>
+
+  <p style="font-size:14px;color:#64748b">两个模型缺一不可：</p>
+  <table>
+    <thead><tr><th style="width:28%">模型文件</th><th style="width:18%">大小</th><th>干什么</th></tr></thead>
+    <tbody>
+      <tr><td><code>yolov8n.rknn</code></td><td>约 6MB</td><td>检测：每帧找出所有目标的框（COCO 80 类）</td></tr>
+      <tr><td><code>deepsort.rknn</code></td><td>约 11MB</td><td>ReID：把每个框压成 512 维指纹，用来认"是不是同一个人"</td></tr>
+    </tbody>
+  </table>
+
+  <pre><span class="c"># 关键配置（config/track_config.yaml）</span>
+<span class="b">detect:</span>
+  <span class="y">classes: [2]</span>          <span class="c"># 2=car；改成 [0] 就跟踪人；[] = 全部</span>
+  score_thr: 0.25
+
+<span class="b">tracker:</span>
+  mode: <span class="y">deepsort</span>         <span class="c"># deepsort | sort（切 sort 可对照体验差异）</span>
+  max_dist: 0.2          <span class="c"># 外观差异门限，越小越严格</span>
+  <span class="y">max_age: 70</span>            <span class="c"># 丢多久之内还保留编号</span>
+  <span class="y">n_init: 3</span>              <span class="c"># 连续命中几帧才给正式编号</span>
+  min_confidence: 0.6    <span class="c"># 低于这个分数的检测不进跟踪</span></pre>
+</section>
+
+<section class="blk" id="s5">
+  <h2><span class="no">05</span>三步跑起来</h2>
+
+  <ol class="steps3">
+    <li>
+      <span class="st">先确认两个模型都在<em>约 1 分钟</em></span>
+      <pre><span class="g">cd</span> ~/ros2_ws/src/xflz_eai_car1/vision/07_multi_object_tracking
+<span class="g">ls</span> -lh models/</pre>
+      <div class="expect">yolov8n.rknn        <i>约 6MB   ← 检测</i>
+deepsort.rknn      <i>约 11MB  ← 外观指纹（ReID）</i>
+coco_classes.json  <i>80 个类名</i></div>
+      <p><b>两个缺一个就跑不起来。</b>缺 deepsort.rknn 时程序会自动退回 <code>sort</code> 模式（只用位置线索），效果会明显变差 —— 这个对比正好是下面的关键练习。</p>
+    </li>
+
+    <li>
+      <span class="st">实时跟踪，看 ID 稳不稳<em>约 5 分钟</em></span>
+      <p>终端 1 起相机：</p>
+      <pre><span class="g">source</span> /opt/ros/humble/setup.bash &amp;&amp; <span class="g">source</span> ~/ros2_ws/install/setup.bash
+<span class="g">export</span> ROS_DOMAIN_ID=2
+<span class="g">ros2</span> launch ascamera hp60c.launch.py</pre>
+      <p>终端 2 跑跟踪：</p>
+      <pre><span class="g">cd</span> ~/ros2_ws/src/xflz_eai_car1/vision/07_multi_object_tracking
+<span class="g">python</span> src/app.py --ros</pre>
+      <div class="expect">frame 30  tracks=2  ids=[1, 2]   avg_fps=14.2
+frame 60  tracks=2  ids=[1, 2]   avg_fps=13.8</div>
+      <p><b>看 <code>ids=[1,2]</code> 这一段：</b>只要人没有离开画面，这个列表就应该一直是同样的数字。如果变成 <code>[1,2] → [3,4] → [1,2]</code>，说明 ID 在跳，跟踪出问题了。</p>
+      <p>浏览器：<code>http://&lt;板子IP&gt;:8080/track.mjpg</code></p>
+    </li>
+
+    <li>
+      <span class="st">做遮挡实验：这是本实验的核心<em>约 8 分钟</em></span>
+      <p>这一步必须做，因为它才对得起"DeepSORT"这个名字。</p>
+      <p><b>操作：</b>先确认配置里是 <code>mode: deepsort</code>。让一个目标在画面里走动，然后<b>用手或纸板把它整个挡住 2~3 秒</b>，再拿开。</p>
+      <div class="expect"><i>挡住期间：</i>框消失，但 ID 还"记着"（等它回来）
+<i>拿开后：  </i>ID 恢复原来的数字  ✅ deepsort 正常
+<i>拿开后：  </i>ID 变成了一个新数字  ✗ 需要检查</div>
+      <p>现在改成 <code>mode: sort</code> 再重复一次同样的动作：</p>
+      <pre><span class="g">nano</span> config/track_config.yaml
+<span class="c"># tracker.mode: deepsort → sort</span></pre>
+      <div class="expect"><i>sort 模式：</i>挡住再出现 → ID 几乎必然变成新号码 ❌</div>
+      <p><b>为什么？</b>因为 sort 只有位置线索。人消失了几秒，位置完全没法推测（可能从任何方向出来），只能当新目标处理。<b>而 deepsort 记得他的外观指纹，所以能认出来。</b></p>
+      <p>这个对比实验做一次，比读十遍文字说明都管用。</p>
+    </li>
+  </ol>
+
+  <div class="oneline"><span>三步跑完你不仅跑通了跟踪，还<b>亲手验证了"外观特征"到底解决了什么问题</b>。这是本实验最有价值的收获。</span></div>
+</section>
+
+<section class="blk" id="s6">
+  <h2><span class="no">06</span>你该看到的画面</h2>
+
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">画面 A · 正常</div><div class="kt">框 + ID + 轨迹尾巴</div><p>每个目标一个框，角上标 <code>ID:3</code>，框后拖着一条彩色细线（它走过的路径）。ID 颜色通常固定，方便追踪。</p></div>
+    <div class="kcard"><div class="kd">画面 B · 新目标</div><div class="kt">先"观察"再给号</div><p>刚出现的目标前几帧可能没编号（<code>n_init: 3</code> 在观察）。稳定 3 帧后才出现正式 ID —— 这是防误报的设计。</p></div>
+    <div class="kcard"><div class="kd">画面 C · ID 跳变</div><div class="kt">同一个人的号变了</div><p>说明匹配失败。常见原因：目标太快（<code>max_iou_distance</code> 太小）、遮挡太久（<code>max_age</code> 不够）、或两个人穿得太像。</p></div>
+  </div>
+
+  <div class="tip tealb"><span class="lab">🔍 为什么配置里默认跟踪"车"而不是"人"？</span><code>classes: [2]</code> 对应 COCO 的 car 类。实验室里最容易找到的移动目标是玩具车，而且在桌面上移动轨迹稳定，比人更好演示。<b>改成 <code>[0]</code> 就跟踪人</b>，你可以两种都试。</div>
+</section>
+
+<section class="blk" id="s7">
+  <h2><span class="no">07</span>改一个参数看变化</h2>
+  <p class="lead"><code>max_age</code> 是最直观的一个：它就是"丢失之后还等你多久"。拖一拖，看遮挡恢复能力怎么变。</p>
+
+  <div class="lab2">
+    <div class="lh">⚡ 参数实验台 · max_age 与遮挡恢复</div>
+    <div class="lr">
+      <label>max_age（帧）</label>
+      <input id="ma" type="range" min="5" max="120" step="5" value="70">
+      <output id="ma_o">70</output>
+    </div>
+    <div class="vis">
+      <svg viewBox="0 0 420 160" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="max_age变化时轨迹在遮挡期间能坚持多少帧">
+        <rect x="0" y="0" width="420" height="160" rx="8" fill="#0b1220"/>
+        <text x="20" y="24" font-size="10" fill="#64748b" font-family="sans-serif">目标被遮挡 → 轨迹还能"记住"多久</text>
+        <!-- 时间轴 -->
+        <line x1="24" y1="70" x2="400" y2="70" stroke="#334155" stroke-width="2"/>
+        <g font-size="9" fill="#475569" font-family="monospace">
+          <text x="24" y="88">第0帧</text><text x="150" y="88">遮挡开始</text><text x="330" y="88">第120帧</text>
+        </g>
+        <!-- 可见段 -->
+        <rect x="24" y="58" width="126" height="24" rx="4" fill="#be123c" opacity=".8"/>
+        <text x="87" y="74" text-anchor="middle" font-size="9.5" fill="#fecdd3" font-family="monospace">可见 · ID 3</text>
+        <!-- 遮挡段 -->
+        <rect x="150" y="58" width="180" height="24" rx="4" fill="#1e293b" stroke="#334155" stroke-dasharray="3 3"/>
+        <text x="240" y="74" text-anchor="middle" font-size="9.5" fill="#64748b" font-family="monospace">遮挡中 · 猜位置</text>
+        <!-- 存活线 -->
+        <rect id="keep" x="150" y="48" width="108" height="6" rx="3" fill="#4ade80" opacity=".85"/>
+        <text id="keept" x="160" y="42" font-size="9" fill="#4ade80" font-family="monospace">能记住 70 帧</text>
+        <!-- 恢复点 -->
+        <g id="drop">
+          <circle cx="258" cy="70" r="5" fill="#f87171"/>
+          <text x="258" y="106" text-anchor="middle" font-size="9" fill="#f87171" font-family="monospace">超过 max_age → 删轨迹</text>
+        </g>
+        <!-- 重现 -->
+        <rect x="330" y="58" width="70" height="24" rx="4" fill="#0f766e" opacity=".8"/>
+        <text x="365" y="74" text-anchor="middle" font-size="9.5" fill="#ccfbf1" font-family="monospace">重现</text>
+        <text x="210" y="136" text-anchor="middle" font-size="11" fill="#5eead4" font-family="monospace" id="rst">70 帧 ≈ 5 秒 → 能恢复 ID 3 ✅</text>
+      </svg>
+    </div>
+    <div class="say" id="say"></div>
+  </div>
+
+  <h3>三个参数各管什么</h3>
+  <table>
+    <thead><tr><th style="width:26%">参数</th><th style="width:20%">调大</th><th style="width:20%">调小</th><th>什么时候改</th></tr></thead>
+    <tbody>
+      <tr><td><code>max_age</code><br>默认 70</td><td>更能抗长时间遮挡</td><td>很快删掉旧轨迹</td><td>遮挡多（货架后、人群里）就调大；画面干净就调小</td></tr>
+      <tr><td><code>n_init</code><br>默认 3</td><td>更不容易误报（要观察更久）</td><td>新目标更快给编号</td><td>画面噪声多就调大；要快速响应就调小</td></tr>
+      <tr><td><code>max_dist</code><br>默认 0.2</td><td>外观匹配更宽松（容易认错人）</td><td>更严格（可能认不出同一个人）</td><td>一般不动。0.2 是 DeepSORT 论文的推荐值</td></tr>
+    </tbody>
+  </table>
+
+  <div class="oneline"><span><b>调参的取舍永远是同一个形状：</b>放宽 = 更宽容但容易认错，收紧 = 更严格但容易跟丢。<b>没有正确答案，只有适合你场景的答案。</b></span></div>
+</section>
+
+<section class="blk" id="s8">
+  <h2><span class="no">08</span>踩坑速查</h2>
+
+  <table class="pit2">
+    <thead><tr><th>现象</th><th>原因</th><th>怎么办</th></tr></thead>
+    <tbody>
+      <tr><td>同一个人的 ID 一直在跳</td><td>去重/匹配失败 —— 常见于目标移动太快或遮挡频繁</td><td>确认 <code>mode: deepsort</code> 且 <code>deepsort.rknn</code> 存在；调大 <code>max_age</code></td></tr>
+      <tr><td>遮挡后不恢复原 ID</td><td>遮挡时间超过 <code>max_age</code>，轨迹被删了</td><td>把 <code>max_age</code> 从 70 提到 100 以上</td></tr>
+      <tr><td>画面里明明没人却有一堆 ID</td><td><code>n_init</code> 太小 / <code>min_confidence</code> 太低</td><td><code>n_init</code> 设 3，<code>min_confidence</code> 保持 0.6</td></tr>
+      <tr><td>框变小 / 框在飘</td><td><code>min_confidence</code> 设太低，弱检测进了跟踪</td><td>保持 0.6 以上；配置注释里明确说 0.3 会乱飘</td></tr>
+      <tr><td>车被识别成别的类别</td><td><code>classes</code> 只写了想要的类，但模型带 80 类</td><td>确认 <code>classes: [2]</code> 符合你要跟的目标；跟踪人改 <code>[0]</code></td></tr>
+      <tr><td>帧率只有个位数</td><td>ReID 计算开销大（每个框都要算一次指纹）</td><td>配置里 <code>workers</code> 设 3；减少画面里同时跟踪的目标数</td></tr>
+      <tr><td>没有 deepsort.rknn 也能跑</td><td>程序自动回退到了 sort 模式</td><td>这是容错设计，不是 bug。但效果会差 —— 补齐模型文件</td></tr>
+    </tbody>
+  </table>
+
+  <div class="tip amber"><span class="lab">💡 排查口诀</span><b>先看 ID 稳不稳，再看目标有没有跟丢。</b>ID 频繁变 = 匹配问题（外观/位置门限）；目标整个消失 = 检测问题（<code>min_confidence</code> 或 <code>score_thr</code>）。<b>这两类问题查的方向完全不同</b>，先分清楚。</div>
+</section>
+
+<section class="blk" id="s9">
+  <h2><span class="no">09</span>进阶（可选）</h2>
+
+  <details class="deep">
+    <summary>进阶 1 · 做一次人流统计<em>约 40 分钟</em></summary>
+    <div class="deep-body">
+      <p>在人流统计里，"经过"的定义是：<b>某个 ID 的框中心，从画面左侧穿过中线到了右侧</b>。</p>
+      <pre>维护一个集合 seen = set()
+每帧遍历所有 track：
+    如果 track.id 不在 seen 里，且 中心x > 中线x：
+        count += 1
+        seen.add(track.id)</pre>
+      <p><b>关键在于那个 <code>seen</code> 集合</b> —— 它保证同一个 ID 只被数一次。这就是"ID 稳定"为什么这么重要的最直接例子：ID 一跳，同一个人就被数成两个。</p>
+    </div>
+  </details>
+
+  <details class="deep">
+    <summary>进阶 2 · 把轨迹存成 CSV 做分析<em>约 30 分钟</em></summary>
+    <div class="deep-body">
+      <p>每帧把 <code>(帧号, ID, 中心x, 中心y)</code> 写一行到文件，就得到一份轨迹数据。之后可以画轨迹热力图、算平均速度、看停留时间。</p>
+      <p>注意：这是<b>离线分析</b>的典型做法。板上算力紧张，一般不实时做这些 —— 先存下来，回头慢慢算。</p>
+    </div>
+  </details>
+
+  <details class="deep">
+    <summary>进阶 3 · 为什么不能只用一个更强的检测器解决 ID 问题<em>选读 1 分钟</em></summary>
+    <div class="deep-body">
+      <p>初学者常有的困惑：如果把检测器做得特别准，是不是就不需要跟踪了？</p>
+      <p><b>不能。</b>因为检测器天生是"无记忆"的 —— 它每次只看一帧，输出的是"这一帧有什么"。它<b>没有</b>"上一帧有什么"这个概念，所以根本无从知道"这个框是不是上次那个"。</p>
+      <p>跟踪提供的正是这种<b>跨帧记忆</b>。这不只是精度问题，而是<b>能力维度的缺失</b> —— 就像一个人视力再好，如果没有记忆，也认不出"刚才见过的那个人"。</p>
+      <p>所以跟踪的价值不在"更准"，而在"能维持身份"。这也解释了为什么跟踪是一个独立的研究方向，而不是检测的附属功能。</p>
+    </div>
+  </details>
+</section>
+
+<section class="blk" id="s10">
+  <h2><span class="no">10</span>随堂小测</h2>
+
+  <div class="quiz2">
+    <div class="qq"><span class="qn">Q1</span>目标被挡住 2 秒后重新出现，deepsort 能恢复原 ID，sort 不能。为什么？</div>
+    <div class="opt" data-right="0">因为 sort 跑得更慢</div>
+    <div class="opt" data-right="1">因为 deepsort 有外观指纹，能认出"还是那个人"；sort 只有位置线索，遮挡后位置无从推测</div>
+    <div class="opt" data-right="0">因为 sort 的模型参数少</div>
+    <div class="fb"><b>对。</b>遮挡期间位置完全不可知（可以从任何方向出来），所以位置线索失效。这时唯一能依靠的就是"他长什么样"—— 也就是 ReID 的外观向量。</div>
+  </div>
+
+  <div class="quiz2">
+    <div class="qq"><span class="qn">Q2</span><code>n_init: 3</code> 是什么意思？</div>
+    <div class="opt" data-right="0">最多跟踪 3 个目标</div>
+    <div class="opt" data-right="1">连续 3 帧都检测到，才确认为正式轨迹并给编号</div>
+    <div class="opt" data-right="0">初始化要花 3 秒</div>
+    <div class="fb"><b>对。</b>这是防误报的设计。如果某一帧闪了一下误检，程序不会马上给它编号 —— 要连续稳定 3 帧才认。</div>
+  </div>
+
+  <div class="quiz2">
+    <div class="qq"><span class="qn">Q3</span>画面里两个人穿一模一样的黑衣服并排走，跟踪容易出错。主要该调什么？</div>
+    <div class="opt" data-right="0">把 max_age 调到 200</div>
+    <div class="opt" data-right="1">这时外观线索变弱，要更依赖位置 —— 检查 max_iou_distance 是否够用，必要时收紧外观门限</div>
+    <div class="opt" data-right="0">换一个更大的检测模型</div>
+    <div class="fb"><b>对。</b>这是 DeepSORT 的经典弱点：外观相似时指纹区分不开，只能靠位置。所以配置里 <code>max_iou_distance</code> 的注释特意提到"0.7 移动中易丢轨迹" —— 位置门限太紧，移动快时就匹配不上了。<b>两条线索的权重需要按场景权衡。</b></div>
+  </div>
+</section>
+
+<nav class="expnav">
+  <a href="../exp-06-semantic-segmentation/index.html"><span class="lb">← 上一个</span>EXP-06 语义分割</a>
+  <a class="next" href="../exp-08-face-landmarks/index.html"><span class="lb">下一个实验 →</span>EXP-08 人脸关键点</a>
+</nav>
+
+<footer>
+  <span>机器人视觉入门 · EXP-07 多目标跟踪</span>
+  <span>4 学时 · 12~15 FPS · 基于 vision/07_multi_object_tracking 源码</span>
+</footer>
+
+</main>
+</div>
+
+<script src="../shared/tutorial.js" defer></script>
+<script src="../shared/beginner.js" defer></script>
+<script>
+(function(){
+  var ma=document.getElementById('ma'); if(!ma) return;
+  var keep=document.getElementById('keep'), keept=document.getElementById('keept');
+  var drop=document.getElementById('drop'), rst=document.getElementById('rst'), say=document.getElementById('say');
+  var X0=150, W=180, TOTAL=120;
+  function upd(){
+    var v=parseInt(ma.value,10);
+    document.getElementById('ma_o').textContent=v;
+    var px=Math.min(W, v/TOTAL*W);
+    keep.setAttribute('width', px);
+    keept.textContent='能记住 '+v+' 帧';
+    keep.setAttribute('x', X0);
+    keept.setAttribute('x', X0+4);
+    drop.setAttribute('transform','translate('+(X0+px-258)+',0)');
+    var sec=(v/13).toFixed(1);
+    var ok=v>=100;
+    rst.textContent = v+' 帧 ≈ '+sec+' 秒 → '+(ok?'能恢复 ✅':'可能跟丢 ❌');
+    rst.setAttribute('fill', ok?'#5eead4':'#f87171');
+    var m='';
+    if(v<20) m='<b>max_age = '+v+'</b>：只等 '+sec+' 秒。目标稍微被挡一下就当作"消失了"，会分到新 ID。<b>画面干净、目标不遮挡时才这么设。</b>';
+    else if(v<60) m='<b>max_age = '+v+'</b>：等 '+sec+' 秒左右。适合目标少、遮挡不多的一般场景。';
+    else if(v<100) m='<b>max_age = '+v+'</b>：等 '+sec+' 秒。默认 70 就在这个区间 —— 能扛住常见的短暂遮挡。';
+    else m='<b>max_age = '+v+'</b>：等 '+sec+' 秒。抗遮挡很强，但代价是：<b>目标真的离开画面后，轨迹还要占内存等很久</b>，而且可能把新出现的相似目标误配到旧轨迹上。';
+    say.innerHTML=m;
+  }
+  ma.addEventListener('input',upd); upd();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>驱动板演示：目标减实际，误差驱电机</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:transparent;
+  font-family:'Noto Sans CJK SC','Microsoft YaHei',sans-serif;color:#334155;-webkit-font-smoothing:antialiased}
+.wrap{padding:8px 6px 6px;display:flex;flex-direction:column;align-items:center;gap:6px}
+.hint{font-size:12.5px;color:#64748b;line-height:1.55;text-align:center;max-width:400px}
+.hint b{color:#0f766e}
+svg.dial{display:block;width:100%;max-width:400px;cursor:crosshair}
+.readout{width:100%;max-width:400px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;
+  padding:6px 10px;font-family:Consolas,'Courier New',monospace;font-size:13px;line-height:1.6;color:#334155}
+.readout .t{color:#b91c1c;font-weight:700}
+.readout .a{color:#1d4ed8;font-weight:700}
+.readout .e{color:#b45309;font-weight:700}
+.bar{width:100%;max-width:400px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:7px 10px}
+.brow{display:flex;align-items:center;gap:8px;font-size:12px}
+.brow .bl{width:120px;color:#475569;font-weight:700;flex-shrink:0}
+.btrack{flex:1;height:14px;background:#e2e8f0;border-radius:7px;overflow:hidden}
+.bfill{height:100%;border-radius:7px;background:#f59e0b;width:0%}
+.brow .bv{width:104px;font-family:Consolas,monospace;font-weight:700;text-align:right;flex-shrink:0;font-size:11.5px}
+.ctrl{display:flex;gap:8px}
+button{font-family:inherit;font-size:12.5px;font-weight:700;border-radius:8px;padding:6px 16px;cursor:pointer;border:1px solid transparent;line-height:1.5}
+#rst{background:#fff;color:#475569;border-color:#cbd5e1}
+#rst:hover{background:#f1f5f9}
+.verdict{font-size:12.5px;min-height:44px;display:flex;align-items:center;justify-content:center;
+  text-align:center;line-height:1.55;background:#fff;border:1px dashed #cbd5e1;border-radius:8px;
+  padding:7px 10px;width:100%;max-width:400px;color:#475569}
+.verdict.ok{border-color:#16a34a;color:#15803d;font-weight:700}
+.lesson{font-size:12.5px;font-weight:700;color:#0f172a;text-align:center;line-height:1.5}
+.sep{width:100%;max-width:400px;border:none;border-top:1px dashed #cbd5e1;margin:2px 0}
+.pid-head{font-size:13px;font-weight:800;color:#0f172a;text-align:center}
+.pid-desc{font-size:12px;color:#64748b;line-height:1.6;text-align:center;max-width:400px}
+.pid-desc b{color:#0f766e}
+.pid-row{display:flex;align-items:center;gap:7px;width:100%;max-width:400px;font-size:12px;color:#475569}
+.pid-row label{width:18px;font-weight:800;flex-shrink:0;text-align:center}
+.pid-row input[type=range]{flex:1;accent-color:#0f766e}
+.pid-row .pv{font-family:Consolas,monospace;font-weight:700;min-width:44px;text-align:right}
+.pid-row .pn{font-size:10.5px;color:#94a3b8;width:74px;flex-shrink:0}
+svg.pid-plot{display:block;width:100%;max-width:400px}
+.pid-status{font-size:12px;font-family:Consolas,monospace;color:#334155;text-align:center;line-height:1.4;min-height:18px}
+.pid-status .ok{color:#15803d;font-weight:700}
+.pid-status .warn{color:#b45309;font-weight:700}
+.pid-tip{font-size:12px;font-weight:700;color:#0f766e;text-align:center;line-height:1.55;max-width:400px}
+.pid-tip span{color:#64748b;font-weight:400}
+
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hint">拖<b>红色目标</b>换个角度，盯<b>蓝色实际</b>怎么追上来、<b>误差</b>怎么越变越小——误差没了，电机就停</div>
+
+  <svg class="dial" id="dialSvg" viewBox="0 0 400 260" aria-label="闭环刻度盘：红色目标、蓝色实际、误差">
+    <circle cx="150" cy="130" r="90" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
+    <circle cx="150" cy="130" r="4" fill="#334155"/>
+    <g id="ticks"></g>
+    <!-- 实际指针（蓝，自动追） -->
+    <line id="needle" x1="150" y1="130" x2="150" y2="46" stroke="#1d4ed8" stroke-width="3" stroke-linecap="round"/>
+    <!-- 目标标记（红，可拖，尖端朝内） -->
+    <polygon id="targetPoly" points="150,62 140,92 160,92" fill="#dc2626"/>
+    <text id="centerErr" x="150" y="160" text-anchor="middle" font-size="14" font-weight="800" fill="#b45309">误差 90°</text>
+    <text x="150" y="176" text-anchor="middle" font-size="10.5" fill="#64748b">目标 − 实际 = 误差</text>
+  </svg>
+
+  <div class="readout" id="rd">目标 <span class="t">90°</span>　−　实际 <span class="a">0°</span>　=　误差 <span class="e">90°</span></div>
+
+  <div class="bar">
+    <div class="brow"><span class="bl">电机出力（电流）</span><div class="btrack"><div class="bfill" id="bfill"></div></div><span class="bv" id="bv">正转 · 追得最猛</span></div>
+  </div>
+
+  <div class="ctrl"><button id="rst">↺ 复位</button></div>
+
+  <div class="verdict" id="verdict">误差 90°，电机还在出力追——误差越大，出力越猛。</div>
+  <div class="lesson">大脑就一条公式：目标 − 实际 = 误差，误差大就使劲追，误差没了就停。</div>
+
+  <hr class="sep">
+  <div class="pid-head">🧠 思考与提升：从"比例"到 PID</div>
+  <div class="pid-desc">上面只用了<b>比例 P</b>（差多少、补多少）。真实舵机还会再加 <b>I</b>（积分）和 <b>D</b>（微分）。拖三个滑杆，看下面这条<b>响应曲线</b>：目标让红线又快又稳地追到虚线（1.0），别来回晃、别停在半路。</div>
+
+  <div class="pid-row"><label>P</label><input type="range" id="pidP" min="0.5" max="4" step="0.1" value="1.5"><span class="pv" id="pidPv">1.5</span><span class="pn">定快慢</span></div>
+  <div class="pid-row"><label>I</label><input type="range" id="pidI" min="0" max="2" step="0.1" value="0.3"><span class="pv" id="pidIv">0.3</span><span class="pn">消残差</span></div>
+  <div class="pid-row"><label>D</label><input type="range" id="pidD" min="0" max="3" step="0.1" value="0.5"><span class="pv" id="pidDv">0.5</span><span class="pn">压抖动</span></div>
+
+  <svg class="pid-plot" viewBox="0 0 400 140" aria-label="PID 阶跃响应曲线">
+    <line x1="40" y1="125" x2="390" y2="125" stroke="#cbd5e1" stroke-width="1"/>
+    <line x1="40" y1="14" x2="40" y2="125" stroke="#cbd5e1" stroke-width="1"/>
+    <line x1="40" y1="70" x2="390" y2="70" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="5 4"/>
+    <text x="384" y="64" font-size="10" fill="#dc2626" text-anchor="end">目标 1.0</text>
+    <polyline id="pidCurve" points="" fill="none" stroke="#0f766e" stroke-width="2"/>
+    <text x="32" y="18" font-size="9" fill="#94a3b8" text-anchor="end">2.0</text>
+    <text x="32" y="74" font-size="9" fill="#94a3b8" text-anchor="end">1.0</text>
+    <text x="32" y="128" font-size="9" fill="#94a3b8" text-anchor="end">0</text>
+    <text x="388" y="138" font-size="9" fill="#94a3b8" text-anchor="end">8s</text>
+  </svg>
+
+  <div class="pid-status" id="pidStatus">就绪：拖滑杆看曲线</div>
+  <div class="ctrl"><button id="pidRst">↺ 重新阶跃</button></div>
+  <div class="pid-tip">P 定快慢<span>（越大越快，太大就来回震荡）</span> · I 消残差<span>（把最后差的一点补上）</span> · D 压抖动<span>（让曲线别晃）</span></div>
+</div>
+
+<script>
+(function(){
+'use strict';
+var CX = 150, CY = 130, R = 84;
+var targetDeg = 90, actualDeg = 0;
+var dragging = false;
+
+var dialSvg = document.getElementById('dialSvg');
+var needle = document.getElementById('needle');
+var targetPoly = document.getElementById('targetPoly');
+var centerErr = document.getElementById('centerErr');
+var rd = document.getElementById('rd');
+var bfill = document.getElementById('bfill');
+var bv = document.getElementById('bv');
+var verdict = document.getElementById('verdict');
+
+/* 数学角 → 屏幕点：0° 朝右，逆时针为正（y 朝下，故取 -sin） */
+function pt(a, r){ return [CX + r * Math.cos(a * Math.PI / 180), CY - r * Math.sin(a * Math.PI / 180)]; }
+
+/* 刻度 */
+(function ticks(){
+  var g = document.getElementById('ticks'), i, deg, major, len;
+  for(i = 0; i < 24; i++){
+    deg = i * 15; major = (deg % 30 === 0); len = major ? 10 : 5;
+    var p1 = pt(deg, 90), p2 = pt(deg, 90 - len);
+    var ln = document.createElementNS('http://www.w3.org/2000/svg','line');
+    ln.setAttribute('x1', p1[0]); ln.setAttribute('y1', p1[1]);
+    ln.setAttribute('x2', p2[0]); ln.setAttribute('y2', p2[1]);
+    ln.setAttribute('stroke', major ? '#64748b' : '#cbd5e1');
+    ln.setAttribute('stroke-width', major ? 1.6 : 1);
+    g.appendChild(ln);
+  }
+  [[0,'0°'],[90,'90°'],[180,'180°'],[270,'270°']].forEach(function(t){
+    var p = pt(t[0], 112);
+    var tx = document.createElementNS('http://www.w3.org/2000/svg','text');
+    tx.setAttribute('x', p[0]); tx.setAttribute('y', p[1] + 4);
+    tx.setAttribute('text-anchor','middle');
+    tx.setAttribute('font-size','12'); tx.setAttribute('fill','#64748b');
+    tx.textContent = t[1];
+    g.appendChild(tx);
+  });
+})();
+
+function shortest(d){ return ((d + 540) % 360) - 180; }
+
+function render(err){
+  var tip = pt(actualDeg, R);
+  needle.setAttribute('x2', tip[0]); needle.setAttribute('y2', tip[1]);
+  /* 目标三角：尖端朝盘心（内侧），底边贴外圈 */
+  var pIn = pt(targetDeg, 70);
+  var pL  = pt(targetDeg + 11, 94);
+  var pR  = pt(targetDeg - 11, 94);
+  targetPoly.setAttribute('points', pIn[0] + ',' + pIn[1] + ' ' + pL[0] + ',' + pL[1] + ' ' + pR[0] + ',' + pR[1]);
+  centerErr.textContent = '误差 ' + Math.round(err) + '\u00B0';
+  rd.innerHTML = '目标 <span class="t">' + Math.round(targetDeg) + '\u00B0</span>\u2003−\u2003实际 <span class="a">' +
+    Math.round(actualDeg) + '\u00B0</span>\u2003=\u2003误差 <span class="e">' + Math.round(err) + '\u00B0</span>';
+  var mag = Math.min(Math.abs(err) / 90, 1);
+  bfill.style.width = (mag * 100) + '%';
+  if(Math.abs(err) < 1){
+    bv.textContent = '停（到位）';
+    verdict.className = 'verdict ok';
+    verdict.innerHTML = '误差 ≈ 0，电机停了 —— 这就是\u201C到位\u201D。';
+  }else{
+    bv.textContent = (err > 0 ? '正转 · 追上去' : '反转 · 退回来');
+    verdict.className = 'verdict';
+    verdict.innerHTML = '误差 ' + Math.round(err) + '\u00B0，电机还在出力追——误差越大，出力越猛。';
+  }
+}
+
+/* 拖刻度盘设目标 */
+function setTarget(e){
+  var r = dialSvg.getBoundingClientRect();
+  var scale = 400 / r.width;
+  var x = (e.clientX - r.left) * scale;
+  var y = (e.clientY - r.top) * scale;
+  targetDeg = (Math.atan2(CY - y, x - CX) * 180 / Math.PI + 360) % 360;
+}
+dialSvg.addEventListener('pointerdown', function(e){ dragging = true; setTarget(e); });
+dialSvg.addEventListener('pointermove', function(e){ if(dragging) setTarget(e); });
+window.addEventListener('pointerup', function(){ dragging = false; });
+
+document.getElementById('rst').addEventListener('click', function(){
+  targetDeg = 90; actualDeg = 0; render(shortest(targetDeg - actualDeg));
+});
+
+/* ---- PID 提升仿真（二阶系统 + 恒定负载，模拟"重力/阻力"） ---- */
+var PID_TARGET = 1, PID_C = 1.5, PID_LOAD = 0.4, PID_DT = 0.02, PID_TMAX = 8;
+var pid = { t:0, x:0, v:0, integ:0, prevErr:0 };
+var P = 1.5, I = 0.3, D = 0.5;
+var pidRunning = false, pidPoints = [];
+
+var pidCurve = document.getElementById('pidCurve');
+var pidStatus = document.getElementById('pidStatus');
+
+function sx(t){ return 40 + t / PID_TMAX * 350; }
+function sy(v){ return 125 - v / 2.0 * 110; }
+
+function pidReset(){
+  pid = { t:0, x:0, v:0, integ:0, prevErr:0 };
+  pidPoints = [];
+  pidRunning = true;
+  pidCurve.setAttribute('points', '');
+  pidStatus.innerHTML = '跑起来了…';
+}
+
+function pidStep(dt){
+  var e = PID_TARGET - pid.x;
+  pid.integ += e * dt;
+  var de = dt > 0 ? (e - pid.prevErr) / dt : 0;
+  pid.prevErr = e;
+  var u = P * e + I * pid.integ + D * de;          /* PID 输出 */
+  var a = u - PID_C * pid.v - PID_LOAD;             /* 惯性 + 阻尼 + 恒定阻力 */
+  pid.v += a * dt;
+  pid.x += pid.v * dt;
+  pid.t += dt;
+}
+
+function renderPid(){
+  var pts = [], i;
+  for(i = 0; i < pidPoints.length; i++){
+    pts.push(sx(pidPoints[i][0]).toFixed(1) + ',' + sy(pidPoints[i][1]).toFixed(1));
+  }
+  pidCurve.setAttribute('points', pts.join(' '));
+  if(pidRunning){
+    pidStatus.innerHTML = '跟踪中… 当前误差 <span class="warn">' + (PID_TARGET - pid.x).toFixed(2) + '</span>';
+  }else{
+    var e = PID_TARGET - pid.x;
+    if(Math.abs(e) < 0.02){
+      pidStatus.innerHTML = '稳态误差 <span class="ok">' + e.toFixed(3) + '</span>（追到了）';
+    }else{
+      pidStatus.innerHTML = '稳态误差 <span class="warn">' + e.toFixed(3) + '</span>（停在半路——试试把 I 调大）';
+    }
+  }
+}
+
+function bindPid(slider, valEl, key){
+  slider.addEventListener('input', function(){
+    var v = parseFloat(slider.value);
+    valEl.textContent = v.toFixed(1);
+    if(key === 'P') P = v; else if(key === 'I') I = v; else D = v;
+    pidReset();
+  });
+}
+bindPid(document.getElementById('pidP'), document.getElementById('pidPv'), 'P');
+bindPid(document.getElementById('pidI'), document.getElementById('pidIv'), 'I');
+bindPid(document.getElementById('pidD'), document.getElementById('pidDv'), 'D');
+document.getElementById('pidRst').addEventListener('click', pidReset);
+
+var last = performance.now();
+function loop(now){
+  var dt = Math.min((now - last) / 1000, 0.05); last = now;
+  var err = shortest(targetDeg - actualDeg);
+  var spd = Math.max(-260, Math.min(260, err * 2.2));   /* 误差越大出力越大（比例控制） */
+  actualDeg = (actualDeg + spd * dt + 360) % 360;
+  render(err);
+  /* PID 阶跃推进 */
+  if(pidRunning){
+    var step;
+    for(step = 0; step < 4; step++){
+      if(pid.t >= PID_TMAX){ pidRunning = false; break; }
+      pidStep(PID_DT);
+      pidPoints.push([pid.t, pid.x]);
+    }
+    renderPid();
+  }
+  requestAnimationFrame(loop);
+}
+render(shortest(targetDeg - actualDeg));
+pidReset();
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

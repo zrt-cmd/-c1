@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>机器人视觉应用与开发 · 教程首页</title>
+<style>
+:root{
+  --bg-base:#f8fafc; --bg-surface:#ffffff; --bg-muted:#f1f5f9;
+  --text-primary:#0f172a; --text-secondary:#475569; --text-muted:#94a3b8;
+  --accent-teal:#0d9488; --accent-blue:#2563eb; --accent-amber:#d97706; --accent-violet:#7c3aed; --accent-rose:#e11d48; --accent-cyan:#0891b2;
+  --border:#e2e8f0;
+  --font-body:'Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif;
+  --font-mono:'Cascadia Code','JetBrains Mono',Consolas,monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:var(--font-body);background:var(--bg-base);color:var(--text-primary);line-height:1.7}
+a{text-decoration:none;color:inherit}
+.topbar{position:sticky;top:0;z-index:50;background:rgba(248,250,252,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--border)}
+.topbar-in{max-width:1200px;margin:0 auto;padding:.7rem 1.5rem;display:flex;align-items:center;justify-content:space-between}
+.logo{font-weight:800;font-size:.95rem}
+.logo span{color:var(--accent-teal)}
+.crumb{font-size:.85rem;color:var(--text-secondary)}
+.crumb a:hover{color:var(--accent-teal)}
+.hero{background:linear-gradient(135deg,#0f172a 0%,#134e4a 55%,#0d9488 100%);color:#fff;padding:3.5rem 1.5rem 3rem;text-align:center}
+.eyebrow{font-size:.8rem;letter-spacing:.28em;opacity:.75;margin-bottom:.8rem}
+.hero h1{font-size:clamp(1.7rem,4vw,2.6rem);font-weight:900;margin-bottom:.9rem}
+.hero h1 .grad{background:linear-gradient(90deg,#5eead4,#93c5fd);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.hero p{max-width:780px;margin:0 auto 1.4rem;opacity:.85;font-size:1rem}
+.bades{display:flex;gap:.6rem;justify-content:center;flex-wrap:wrap}
+.bade{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.28);padding:.3rem .85rem;border-radius:999px;font-size:.85rem}
+.wrap{max-width:1200px;margin:0 auto;padding:2.5rem 1.5rem}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:2.5rem}
+.stat{background:var(--bg-surface);border:1px solid var(--border);border-radius:14px;padding:1rem 1.2rem;text-align:center}
+.stat b{display:block;font-size:1.5rem;color:var(--accent-teal)}
+.stat span{font-size:.8rem;color:var(--text-secondary)}
+.sec-head{margin:2.4rem 0 1.2rem}
+.sec-head .k{font-size:.75rem;letter-spacing:.24em;color:var(--accent-teal);font-weight:700}
+.sec-head h2{font-size:1.45rem;font-weight:800;margin-top:.25rem}
+.sec-head p{color:var(--text-secondary);font-size:.92rem;margin-top:.3rem}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:1.1rem}
+.card{background:var(--bg-surface);border:1px solid var(--border);border-radius:16px;padding:1.2rem 1.3rem;transition:box-shadow .25s,transform .25s;display:flex;flex-direction:column}
+.card:hover{box-shadow:0 10px 30px rgba(13,148,136,.12);transform:translateY(-3px)}
+.card .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:.6rem}
+.card .code{font-family:var(--font-mono);font-size:.72rem;background:#ccfbf1;color:#0f766e;padding:.15rem .55rem;border-radius:6px;font-weight:700}
+.card h3{font-size:1.05rem;font-weight:800;margin-bottom:.35rem}
+.card>p{font-size:.86rem;color:var(--text-secondary);margin-bottom:.7rem}
+.card .meta{display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.6rem}
+.tag{font-size:.7rem;background:var(--bg-muted);color:var(--text-secondary);padding:.14rem .55rem;border-radius:999px;border:1px solid var(--border)}
+.kv{font-size:.78rem;color:var(--text-secondary);background:var(--bg-muted);border:1px solid var(--border);border-radius:8px;padding:.42rem .65rem;margin-bottom:.65rem;line-height:1.6}
+.kv b{color:var(--accent-teal);font-weight:700}
+.explist{list-style:none;max-height:1400px;overflow:hidden;margin-bottom:.7rem}
+.explist li{display:flex;align-items:center;gap:.5rem;font-size:.82rem;padding:.42rem 0;border-top:1px dashed var(--border);color:var(--text-secondary)}
+.explist .no{font-family:var(--font-mono);font-size:.7rem;color:var(--text-muted);min-width:2.1em}
+.explist a.ttl{flex:1;min-width:0;color:var(--text-secondary);border-radius:4px;transition:color .2s}
+.explist a.ttl:hover{color:var(--accent-teal);text-decoration:underline}
+.explist a.dur{margin-left:auto;font-size:.7rem;color:var(--accent-blue);background:#eff6ff;border:1px solid #bfdbfe;border-radius:999px;padding:.05rem .55rem;transition:background .2s}
+.explist a.dur:hover{background:#dbeafe}
+.hint{font-size:.75rem;color:var(--accent-teal);margin-top:auto;padding-top:.55rem;display:flex;justify-content:space-between;align-items:center}
+.pills{display:flex;flex-wrap:wrap;gap:.65rem}
+.pill{display:inline-flex;align-items:center;gap:.45rem;background:var(--bg-surface);border:1px solid var(--border);border-radius:999px;padding:.4rem .95rem;font-size:.83rem;color:var(--text-secondary);transition:.2s}
+.pill:hover{border-color:var(--accent-teal);color:var(--accent-teal);transform:translateY(-2px)}
+.pill i{width:.55rem;height:.55rem;border-radius:50%;display:inline-block}
+.kgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:1rem}
+.kcard{background:var(--bg-surface);border:1px solid var(--border);border-radius:14px;padding:1.1rem 1.2rem}
+.kcard h4{font-size:.95rem;margin-bottom:.45rem;display:flex;align-items:center;gap:.5rem}
+.kcard p{font-size:.84rem;color:var(--text-secondary)}
+.dot{width:.5rem;height:.5rem;border-radius:50%;display:inline-block}
+.tbl{background:var(--bg-surface);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+.tbl table{width:100%;border-collapse:collapse;font-size:.86rem}
+.tbl th{background:var(--bg-muted);color:var(--text-secondary);font-size:.75rem;letter-spacing:.05em;text-align:left;padding:.6rem .9rem;border-bottom:1px solid var(--border);white-space:nowrap}
+.tbl td{padding:.58rem .9rem;border-bottom:1px dashed var(--border);color:var(--text-secondary);vertical-align:top}
+.tbl tr:last-child td{border-bottom:none}
+.tbl .k2{font-family:var(--font-mono);font-size:.78rem;font-weight:700;color:var(--accent-teal);white-space:nowrap}
+ol.rules{list-style:none;counter-reset:rt}
+ol.rules li{counter-increment:rt;position:relative;padding:.5rem 0 .5rem 2.7rem;border-bottom:1px dashed var(--border);font-size:.86rem;color:var(--text-secondary)}
+ol.rules li:last-child{border-bottom:none}
+ol.rules li::before{content:counter(rt,decimal-leading-zero);position:absolute;left:.4rem;top:.5rem;font-family:var(--font-mono);font-size:.72rem;font-weight:700;color:var(--accent-teal);background:var(--bg-muted);border:1px solid var(--border);border-radius:6px;padding:.05rem .35rem}
+ol.rules li b{color:var(--text-primary)}
+footer{border-top:1px solid var(--border);background:var(--bg-surface);margin-top:3rem}
+.foot-in{max-width:1200px;margin:0 auto;padding:1.4rem 1.5rem;display:flex;justify-content:space-between;align-items:center;font-size:.82rem;color:var(--text-secondary);flex-wrap:wrap;gap:.5rem}
+.reveal{opacity:1;transform:none}
+/* 仅在支持且用户未偏好减少动效时，才启用入场动画 */
+@media (prefers-reduced-motion: no-preference){
+  .js .reveal{opacity:0;transform:translateY(22px);transition:opacity .55s ease,transform .55s ease}
+  .js .reveal.show{opacity:1;transform:none}
+}
+@media(max-width:760px){.stats{grid-template-columns:repeat(2,1fr)}}
+.gtoggle{display:flex;align-items:center;gap:.8rem;width:100%;text-align:left;cursor:pointer;margin:.4rem 0 1rem;padding:1rem 1.2rem;font:inherit;color:inherit;background:linear-gradient(135deg,#f0fdfa,#eff6ff);border:1.5px dashed #14b8a6;border-radius:14px;transition:.25s}
+.gtoggle:hover{box-shadow:0 8px 22px rgba(20,184,166,.16);transform:translateY(-2px);border-style:solid}
+.gtoggle .gi{font-size:1.5rem;flex:none}
+.gtoggle .gt{flex:1;min-width:0}
+.gtoggle .gt b{display:block;font-size:1.02rem;letter-spacing:.02em}
+.gtoggle .gt span{display:block;font-size:.78rem;color:var(--text-secondary,#64748b);margin-top:.22rem;line-height:1.6}
+.gtoggle .gh{flex:none;font-size:.78rem;font-weight:700;color:#0d9488;background:#fff;border:1px solid #99f6e4;border-radius:999px;padding:.32rem .8rem;transition:.25s}
+.gtoggle[aria-expanded="true"] .gh{background:#0d9488;color:#fff;border-color:#0d9488}
+.gtoggle[aria-expanded="true"] .gh::after{content:" 收起"}
+.gtoggle[aria-expanded="false"] .gh::after{content:" 展开"}
+#gbox[hidden]{display:none}
+#gbox.open .reveal{opacity:1;transform:none}
+@media (max-width:640px){.gtoggle{flex-wrap:wrap}}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-in">
+    <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit" title="返回课程首页">🎓 具身智能课程 · <span>机器人视觉</span></a>
+    <div class="crumb"><a href="../../../index.html">← 返回总首页</a> ／ 核心课程 · 机器人视觉应用与开发</div>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="eyebrow">核心课程 · 机器人视觉应用与开发</div>
+  <h1>机器人 <span class="grad">视觉应用与开发</span></h1>
+  <p>12 个实验按由易到难排好：先用免训练的 OpenCV 传统视觉打地基，再进 YOLO 家族学检测、分类与分割，接着做多目标跟踪，最后用 MediaPipe 做人体感知并驱动小车。每个实验都是「先跑通看效果，再回头讲清原理」。</p>
+  <div class="bades">
+    <span class="bade">📚 12 个实验</span>
+    <span class="bade">⏱️ 48 学时（每实验 4h）</span>
+    <span class="bade">🔧 实验箱 B2 / 小车 C1 通用</span>
+    <span class="bade">🎯 前置：Python 基础 · Linux 常用命令</span>
+  </div>
+</section>
+
+<div class="wrap">
+
+  <div class="stats reveal">
+    <div class="stat"><b>12</b><span>递进实验</span></div>
+    <div class="stat"><b>6</b><span>技术阶段</span></div>
+    <div class="stat"><b>3</b><span>免训练实验（入门）</span></div>
+    <div class="stat"><b>⭐1→3</b><span>难度坡度</span></div>
+  </div>
+
+  <div class="kv reveal" style="margin-bottom:1.4rem">
+    <b>平台说明</b> · 实验箱 B2（XFLZ_EAI_B2_PRO）与机器人小车 C1（XFLZ_EAI_CAR1）<b>共用同一套 RK3576 + 6TOPS NPU + HP60C 深度相机</b>，12 个实验的视觉代码与配置完全一致。差异只有底盘：C1 多了麦克纳姆轮全向底盘，涉及小车运动的实验（实验11 体感控制）在 C1 上可直接驱动底盘，在 B2 上用 turtlesim 海龟替代验证。
+  </div>
+
+  <button class="gtoggle" id="gtg" aria-expanded="false" aria-controls="gbox" onclick="gToggle()">
+    <span class="gi">🗺️</span>
+    <span class="gt"><b>课程路线图 &amp; 课前指引 — 点击展开</b><span>为什么这样排 · 六阶段技术递进 · 视觉能力链 · 课前环境三件事 · 通用故障速查 · 开课前常见疑问</span></span>
+    <span class="gh">课程指引</span>
+  </button>
+  <div id="gbox" hidden>
+
+  <div class="sec-head reveal">
+    <div class="k">WHY THIS ORDER</div>
+    <h2>为什么把 OpenCV 放在最前面</h2>
+    <p>原顺序按「检测→分类→分割→跟踪→3D→人体」的技术版图排，但对初学者不友好：第一个实验就要碰 int8 量化和 NPU 部署。新顺序改成按学习坡度排 —— 从<strong>不用训练、立等见效</strong>的 OpenCV 开始。</p>
+  </div>
+  <div class="tbl reveal" style="margin-bottom:1rem">
+    <table>
+      <thead><tr><th>阶段</th><th>实验</th><th>技术栈</th><th>板端帧率</th><th>为什么放这个位置</th></tr></thead>
+      <tbody>
+        <tr><td class="k2">① 传统视觉</td><td>实验1~3</td><td>OpenCV：HSV 阈值 / QRCode / 轮廓拟合</td><td>20~50 FPS</td><td><b>免训练、免模型、当天出效果</b>。还能逐行解释「为什么选中这块」，建立信心和「可解释」直觉</td></tr>
+        <tr><td class="k2">② 检测与分类</td><td>实验4~5</td><td>YOLOv8 / YOLOv5 检测头 + RKNN</td><td>13~18 FPS</td><td>第一次接触神经网络和 NPU。<b>有了阶段①的「阈值思维」打底</b>，更容易理解「置信度」和「调参取舍」</td></tr>
+        <tr><td class="k2">③ 语义分割</td><td>实验6</td><td>yolov8n-seg + 多线程推理池</td><td>40~60 FPS</td><td>检测的进阶版：从「一个框」到「每个像素」。承接检测，又为跟踪做铺垫</td></tr>
+        <tr><td class="k2">④ 多目标跟踪</td><td>实验7</td><td>YOLOv8 + DeepSORT + ReID</td><td>12~15 FPS</td><td>全课最难。需要检测（阶段②）作为输入，所以必须排在后面</td></tr>
+        <tr><td class="k2">⑤ 人体感知</td><td>实验8~10</td><td>MediaPipe Blaze 系列 + 深度相机</td><td>10~28 FPS</td><td>换一套模型家族（Blaze 而非 YOLO）。人脸→骨骼是同一套级联思路的递进；<b>深度相机放在骨骼之后</b>，因为此时已熟悉坐标和像素，正好补上「距离」这一维</td></tr>
+        <tr><td class="k2">⑥ 视觉控制闭环</td><td>实验11~12</td><td>关键点 + cmd_vel / 手势分类</td><td>10~12 FPS</td><td>收官。需要骨骼（实验9）的坐标才能做动作判断，所以必须最后</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="kv reveal"><b>一句话</b> · 先用<b>没有模型</b>的实验把「看图→出数字」这件事做熟，再用<b>有模型</b>的实验把同一件事做得更强，最后让结果<b>驱动动作</b>。三个阶段分别 3 / 2 / 7 个实验，坡度由缓到陡。</div>
+  <div class="kv reveal" style="margin-top:.8rem"><b>关于目录编号</b> · 源码目录里的数字（<code>03_lab_color_recognition</code>、<code>01_industrial_defect_detection</code>…）是<b>仓库交付号</b>，不是学习顺序。例如实验 4 对应 <code>01_industrial_defect_detection</code>。<b>以本页的实验编号为准</b>，进目录时按各实验页里给的完整路径走。</div>
+
+  <div class="sec-head reveal">
+    <div class="k">KNOWLEDGE MAP</div>
+    <h2>12 个实验串起一条视觉能力链</h2>
+    <p>从「块的像素」到「点的坐标」再到「动的指令」—— 每一层都建立在上一层之上。这张图是全课的骨架，卡住时可以回来定位自己在哪一层。</p>
+  </div>
+  <div class="tbl reveal" style="margin-bottom:1rem">
+    <table>
+      <thead><tr><th style="width:22%">能力层</th><th style="width:16%">输出形式</th><th style="width:16%">对应实验</th><th>核心问题</th></tr></thead>
+      <tbody>
+        <tr><td class="k2">① 像素 → 掩膜</td><td>黑白图</td><td>实验1 / 3</td><td>哪些像素属于目标？靠颜色或灰度阈值判断，不需要模型</td></tr>
+        <tr><td class="k2">② 掩膜 → 形状</td><td>圆 / 多边形</td><td>实验1 / 3</td><td>这块区域是什么形状？最小外接圆、凸包、多边形逼近</td></tr>
+        <tr><td class="k2">③ 图像 → 符号</td><td>字符串</td><td>实验2</td><td>图里编码了什么信息？二维码把解码规则写进图形本身</td></tr>
+        <tr><td class="k2">④ 图像 → 类别框</td><td>框 + 类别 + 分数</td><td>实验4 / 5</td><td>有什么、在哪、像不像？神经网络输出置信度，NMS 去重</td></tr>
+        <tr><td class="k2">⑤ 图像 → 逐像素类别</td><td>掩膜 + 类别</td><td>实验6</td><td>每个像素各属于什么？从「一框」细化到「每像素」</td></tr>
+        <tr><td class="k2">⑥ 帧 → 带 ID 的轨迹</td><td>ID + 历史路径</td><td>实验7</td><td>跨帧还是同一个吗？位置预测 + 外观指纹 + 全局匹配</td></tr>
+        <tr><td class="k2">⑦ 图像 → 关键点</td><td>点坐标 + 可见度</td><td>实验8 / 9 / 12</td><td>结构在哪？用固定拓扑的点描述人脸、骨架、手</td></tr>
+        <tr><td class="k2">⑧ 像素 → 三维坐标</td><td>(X, Y, Z) 米</td><td>实验10</td><td>离我多远？深度测量 + 相机内参反投影</td></tr>
+        <tr><td class="k2">⑨ 关键点 → 动作</td><td>速度指令</td><td>实验11 / 12</td><td>他在做什么、我该怎么动？几何规则判定 + cmd_vel</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="kv reveal"><b>怎么看这张表</b> · ①~③ 是<b>规则驱动</b>（人写判断条件），④~⑨ 是<b>数据驱动</b>（模型从数据里学判断条件）。分界线在实验 4 —— 从这里开始，你要和「权重文件」「置信度」「量化误差」打交道，也要开始接受「结果不是 100% 可解释」。</div>
+
+  <div class="sec-head reveal">
+    <div class="k">SETUP</div>
+    <h2>开课前要配好的三件事</h2>
+  </div>
+  <div class="kgrid reveal">
+    <div class="kcard"><h4><span class="dot" style="background:#0d9488"></span>① 每个新终端都要 source 两下</h4><p>每开一个新终端，先跑 <code>source /opt/ros/humble/setup.bash</code> 和 <code>source ~/ros2_ws/install/setup.bash</code>。只 source 第一个会找不到 <code>ascamera</code> 等自建包 —— 这是最高频的卡点。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#2563eb"></span>② 所有终端用同一个域号</h4><p>实时实验要先起相机 <code>ros2 launch ascamera hp60c.launch.py</code>，然后每个终端都 <code>export ROS_DOMAIN_ID=2</code>。<b>域号不一致 = 相机在发、程序在等</b>，症状是 <code>ros2 topic list</code> 一片空白。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#7c3aed"></span>③ 用浏览器看画面</h4><p>板子没有显示器也能看结果：<code>http://&lt;板IP&gt;:8080/xxx.mjpg</code>。端口分配：实验 1~7 共用 8080（不要同时开），实验 8=8081、9=8082、10=8083、11=8084、12=8085。</p></div>
+  </div>
+
+  <div class="sec-head reveal">
+    <div class="k">TROUBLESHOOTING</div>
+    <h2>六个「名场面」，先认个脸</h2>
+  </div>
+  <div class="tbl reveal">
+    <table>
+      <thead><tr><th>你看到的</th><th>多半是什么</th><th>去哪看</th></tr></thead>
+      <tbody>
+        <tr><td>检测框全没了 / 分数全是 1e-9</td><td><b>输入契约错了</b>。该喂 uint8 的喂了 float，或 RGB/BGR 送反了</td><td>实验4 / 8 / 9 的踩坑速查第一条</td></tr>
+        <tr><td>框形状对、但整体往一个方向偏</td><td><b>letterbox 的 pad 没对上</b>。预处理与后处理必须互逆</td><td>实验4 · 8 · 9</td></tr>
+        <tr><td><code>ModuleNotFoundError: rknnlite</code></td><td>NPU 推理只能在板子上跑。PC 上请改用 <code>.onnx</code> 后端验流程</td><td>实验4 进阶</td></tr>
+        <tr><td><code>ros2 topic list</code> 是空的</td><td><b>终端之间域号不一致</b>，各说各话</td><td>各实验第 05 节</td></tr>
+        <tr><td>浏览器打不开 MJPEG</td><td>三件事：IP 是不是板子的真实地址、端口对不对、进程还在不在</td><td>各实验踩坑速查</td></tr>
+        <tr><td>窗口里的汉字变成问号</td><td>OpenCV <code>putText</code> 画不了中文。<b>不是 bug</b>，画面内文字一律用英文</td><td>实验11 / 12</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="sec-head reveal">
+    <div class="k">FAQ</div>
+    <h2>开课前的三个常见疑问</h2>
+  </div>
+  <div class="kgrid reveal">
+    <div class="kcard"><h4><span class="dot" style="background:#d97706"></span>完全零基础，能跟上吗？</h4><p>能，而且开头比想象中容易。<b>前三个实验（颜色 / 二维码 / 轮廓）不需要任何深度学习基础</b>，也不碰模型文件。第一个实验跑通只要五分钟。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#7c3aed"></span>必须按顺序学吗？</h4><p>建议按顺序。<b>实验4 的检测是实验6、7 的输入</b>；<b>实验9 的骨骼点是实验11 的输入</b>；实验12 又用上了实验9、11 的全部思路。想跳着学，至少先把目标实验的前置做完。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#0891b2"></span>没有板子能学完吗？</h4><p>实验1~3 的原理和参数可以在 PC 上跑通（<code>--image</code> / <code>--camera</code> 模式）。<b>实验4 之后涉及 NPU 推理，只能在板子上验证</b>；PC 上可用 <code>.onnx</code> 后端验流程，但帧率和量化效果都不同。有硬件体验差别很大。</p></div>
+  </div>
+
+  </div>
+
+  <div class="sec-head reveal">
+    <div class="k">STAGE 1 · OPENCV</div>
+    <h2>第 1 阶段 · 传统视觉（免训练，先跑起来）</h2>
+    <p>三个实验都不需要模型文件，也不用 NPU。目的是先把「看图 → 出坐标」这件事做熟，同时建立「每一步都能解释」的直觉。</p>
+  </div>
+  <div class="grid">
+
+    <article class="card reveal">
+      <div class="top"><span class="code">EXP-01</span><span class="tag">⭐ · 4 学时 · 全课起点</span></div>
+      <h3>颜色识别（HSV 阈值）</h3>
+      <p>整个实验一行 AI 代码都没有。把颜色换算成一个角度，落在范围内就留下，再用最小外接圆框住它。跑完你会明白很多任务根本不用上深度学习。</p>
+      <div class="kv"><b>关键参数</b> · H∈0~179（<b>不是 360</b>）· 红色要写 <code>h</code> + <code>h2</code> 两段 · <code>open_kernel 5</code> / <code>close_kernel 9</code> · <code>min_area 500</code> · 实测约 33 FPS</div>
+      <div class="meta"><span class="tag">HSV</span><span class="tag">cv2.inRange</span><span class="tag">形态学开闭</span><span class="tag">最小外接圆</span></div>
+      <ul class="explist">
+        <li><a class="ttl" href="exp-01-color-hsv/index.html#s1">① 找一块红色，真用得着神经网络吗</a><span class="no">01</span><a class="dur" href="exp-01-color-hsv/index.html#s1">开始</a></li>
+        <li><a class="ttl" href="exp-01-color-hsv/index.html#s2">② 为什么换了 HSV 就认得出（四步动画）</a><span class="no">02</span><a class="dur" href="exp-01-color-hsv/index.html#s2">原理</a></li>
+        <li><a class="ttl" href="exp-01-color-hsv/index.html#s5">③ 三条命令：实时 / 双栏 / 滑块调参</a><span class="no">05</span><a class="dur" href="exp-01-color-hsv/index.html#s5">实操</a></li>
+        <li><a class="ttl" href="exp-01-color-hsv/index.html#s7">④ 拖 H 范围，看掩膜怎么碎又怎么糊</a><span class="no">07</span><a class="dur" href="exp-01-color-hsv/index.html#s7">互动</a></li>
+        <li><a class="ttl" href="exp-01-color-hsv/index.html#s10">⑤ 三道小测</a><span class="no">10</span><a class="dur" href="exp-01-color-hsv/index.html#s10">验证</a></li>
+      </ul>
+      <div class="hint"><span>👆 点小节标题直达对应章节</span><span>约 33 FPS</span></div>
+    </article>
+
+    <article class="card reveal">
+      <div class="top"><span class="code">EXP-02</span><span class="tag">⭐ · 4 学时</span></div>
+      <h3>二维码：生成 + 识别</h3>
+      <p>自己造一张码，再让相机把它读回来。全课唯一一个「一写一读」闭环的实验，也不需要任何模型训练。</p>
+      <div class="kv"><b>关键参数</b> · <code>error_correction: M</code>（<b>板上实测 H+中文读不出</b>）· <code>box_size 5</code> · <code>border 4</code> · <code>detect.scale 0.5</code></div>
+      <div class="meta"><span class="tag">qrcode 库</span><span class="tag">QRCodeDetector</span><span class="tag">纠错码</span><span class="tag">多码循环</span></div>
+      <ul class="explist">
+        <li><a class="ttl" href="exp-02-qrcode/index.html#s1">① 二维码凭什么到今天还没被取代</a><span class="no">01</span><a class="dur" href="exp-02-qrcode/index.html#s1">开始</a></li>
+        <li><a class="ttl" href="exp-02-qrcode/index.html#s2">② 三个「回」字角标在干什么（结构解剖）</a><span class="no">02</span><a class="dur" href="exp-02-qrcode/index.html#s2">原理</a></li>
+        <li><a class="ttl" href="exp-02-qrcode/index.html#s5">③ 三条命令：生成 / 图片读回 / 实时扫</a><span class="no">05</span><a class="dur" href="exp-02-qrcode/index.html#s5">实操</a></li>
+        <li><a class="ttl" href="exp-02-qrcode/index.html#s7">④ 拖纠错等级，看抗遮挡换密度</a><span class="no">07</span><a class="dur" href="exp-02-qrcode/index.html#s7">互动</a></li>
+        <li><a class="ttl" href="exp-02-qrcode/index.html#s10">⑤ 三道小测</a><span class="no">10</span><a class="dur" href="exp-02-qrcode/index.html#s10">验证</a></li>
+      </ul>
+      <div class="hint"><span>👆 点小节标题直达对应章节</span><span>一写一读</span></div>
+    </article>
+
+    <article class="card reveal">
+      <div class="top"><span class="code">EXP-03</span><span class="tag">⭐⭐ · 4 学时</span></div>
+      <h3>多边形轮廓拟合</h3>
+      <p>一堆白色像素没法用。用一条「松紧带」勒紧，几千个点就变成几个顶点 —— 机器人才能算出往哪走。</p>
+      <div class="kv"><b>关键参数</b> · <code>threshold_mode: adaptive</code> · <code>invert: false</code>（<b>换背景必须改</b>）· <code>approx_epsilon 0.02</code> · <code>use_hull true</code></div>
+      <div class="meta"><span class="tag">二值化</span><span class="tag">findContours</span><span class="tag">convexHull</span><span class="tag">approxPolyDP</span></div>
+      <ul class="explist">
+        <li><a class="ttl" href="exp-03-contour-polygon/index.html#s1">① 一堆白点，机器人拿它没法用</a><span class="no">01</span><a class="dur" href="exp-03-contour-polygon/index.html#s1">开始</a></li>
+        <li><a class="ttl" href="exp-03-contour-polygon/index.html#s2">② 四步瘦身：像素→边界→凸包→顶点</a><span class="no">02</span><a class="dur" href="exp-03-contour-polygon/index.html#s2">原理</a></li>
+        <li><a class="ttl" href="exp-03-contour-polygon/index.html#s5">③ 三条命令 + 亲手换一次背景</a><span class="no">05</span><a class="dur" href="exp-03-contour-polygon/index.html#s5">实操</a></li>
+        <li><a class="ttl" href="exp-03-contour-polygon/index.html#s7">④ 拖 epsilon，看顶点数从 16 掉到 3</a><span class="no">07</span><a class="dur" href="exp-03-contour-polygon/index.html#s7">互动</a></li>
+        <li><a class="ttl" href="exp-03-contour-polygon/index.html#s10">⑤ 三道小测</a><span class="no">10</span><a class="dur" href="exp-03-contour-polygon/index.html#s10">验证</a></li>
+      </ul>
+      <div class="hint"><span>👆 点小节标题直达对应章节</span><span>形状识别</span></div>
+    </article>
+
+  </div>
+
+  <div class="sec-head reveal">
+    <div class="k">STAGE 2 · YOLO</div>
+    <h2>第 2 阶段 · 目标检测与分类（第一次用神经网络）</h2>
+    <p>从这里开始要碰模型文件和 NPU 了。先学「圈框并说清是什么」，再学「细类怎么翻译成业务大桶」。</p>
+  </div>
+  <div class="grid">
+
+    <article class="card reveal">
+      <div class="top"><span class="code">EXP-04</span><span class="tag">⭐⭐ · 4 学时</span></div>
+      <h3>工业表面缺陷检测</h3>
+      <p>钢板上的裂纹、夹杂、划痕，让 AI 替你圈出来。第一次把模型装进 NPU 跑实时。学完它，后面所有 AI 实验都是同一套路。</p>
+      <div class="kv"><b>关键参数</b> · yolov8n · 输入 640 · <code>score_thr 0.25</code> / <code>iou_thr 0.45</code> · int8 量化 · 板端约 13 FPS · mAP50 0.732</div>
+      <div class="meta"><span class="tag">YOLOv8</span><span class="tag">RKNN int8</span><span class="tag">NMS</span><span class="tag">letterbox</span></div>
+      <ul class="explist">
+        <li><a class="ttl" href="exp-04-industrial-defect/index.html#s1">① 钢板上的六种缺陷，人眼盯不住</a><span class="no">01</span><a class="dur" href="exp-04-industrial-defect/index.html#s1">开始</a></li>
+        <li><a class="ttl" href="exp-04-industrial-defect/index.html#s2">② 检测器是怎么「看图圈框」的（四步）</a><span class="no">02</span><a class="dur" href="exp-04-industrial-defect/index.html#s2">原理</a></li>
+        <li><a class="ttl" href="exp-04-industrial-defect/index.html#s5">③ 三条命令：单图 / 实时 / 调参</a><span class="no">05</span><a class="dur" href="exp-04-industrial-defect/index.html#s5">实操</a></li>
+        <li><a class="ttl" href="exp-04-industrial-defect/index.html#s7">④ 拖 score_thr，看漏检误检怎么拉扯</a><span class="no">07</span><a class="dur" href="exp-04-industrial-defect/index.html#s7">互动</a></li>
+        <li><a class="ttl" href="exp-04-industrial-defect/index.html#s10">⑤ 三道小测</a><span class="no">10</span><a class="dur" href="exp-04-industrial-defect/index.html#s10">验证</a></li>
+      </ul>
+      <div class="hint"><span>👆 点小节标题直达对应章节</span><span>约 13 FPS</span></div>
+    </article>
+
+    <article class="card reveal">
+      <div class="top"><span class="code">EXP-05</span><span class="tag">⭐⭐ · 4 学时</span></div>
+      <h3>垃圾分类：20 类变 4 桶</h3>
+      <p>模型认出「矿泉水瓶」，一张映射表把它翻成「可回收物」。工程上最重要的一课：哪些该交给模型，哪些该写成代码。</p>
+      <div class="kv"><b>关键参数</b> · <code>garbage_yolov5_20cls.rknn</code> 约 9MB · 3 尺度 × 3 锚 × 25 通道 = 75 · 26 图 → 20 类 → 4 桶 · <code>workers 3</code> 推理线程数</div>
+      <div class="meta"><span class="tag">YOLOv5 检测头</span><span class="tag">锚框解码</span><span class="tag">映射表</span><span class="tag">推理池</span></div>
+      <ul class="explist">
+        <li><a class="ttl" href="exp-05-garbage-classification/index.html#s1">① 模型认得出瓶子，可它不知道该扔哪个桶</a><span class="no">01</span><a class="dur" href="exp-05-garbage-classification/index.html#s1">开始</a></li>
+        <li><a class="ttl" href="exp-05-garbage-classification/index.html#s2">② 认出细类 + 查表归类（四步图）</a><span class="no">02</span><a class="dur" href="exp-05-garbage-classification/index.html#s2">原理</a></li>
+        <li><a class="ttl" href="exp-05-garbage-classification/index.html#s5">③ 三条命令：单图 / 单线程 / 三线程</a><span class="no">05</span><a class="dur" href="exp-05-garbage-classification/index.html#s5">实操</a></li>
+        <li><a class="ttl" href="exp-05-garbage-classification/index.html#s7">④ 线程数 1→3，帧率为什么涨又为什么跌</a><span class="no">07</span><a class="dur" href="exp-05-garbage-classification/index.html#s7">互动</a></li>
+        <li><a class="ttl" href="exp-05-garbage-classification/index.html#s10">⑤ 三道小测</a><span class="no">10</span><a class="dur" href="exp-05-garbage-classification/index.html#s10">验证</a></li>
+      </ul>
+      <div class="hint"><span>👆 点小节标题直达对应章节</span><span>多核并行</span></div>
+    </article>
+
+  </div>
+
+  <div class="sec-head reveal">
+    <div class="k">STAGE 3 · SEG & TRACK</div>
+    <h2>第 3 阶段 · 语义分割与多目标跟踪</h2>
+    <p>分割是检测的「像素级进阶」；跟踪是全课最难的一个，必须踩在检测的肩膀上。</p>
+  </div>
+  <div class="grid">
+
+    <article class="card reveal">
+      <div class="top"><span class="code">EXP-06</span><span class="tag">⭐⭐ · 4 学时</span></div>
+      <h3>语义分割与背景替换</h3>
+      <p>视频会议的虚拟背景是怎么做的？不是套个方框，是精确到每个像素地判断「这点算不算人」。</p>
+      <div class="kv"><b>关键参数</b> · <code>yolov8n-seg.rknn</code> 约 7MB · <code>classes: [0]</code> 只留人 · <code>mask_thr 0.5</code> · <code>workers 3</code> · 端口 8080</div>
+      <div class="meta"><span class="tag">yolov8n-seg</span><span class="tag">proto-mask</span><span class="tag">Alpha 合成</span><span class="tag">多线程池</span></div>
+      <ul class="explist">
+        <li><a class="ttl" href="exp-06-semantic-segmentation/index.html#s1">① 虚拟背景不是「套框」，是「抠图」</a><span class="no">01</span><a class="dur" href="exp-06-semantic-segmentation/index.html#s1">开始</a></li>
+        <li><a class="ttl" href="exp-06-semantic-segmentation/index.html#s2">② 32 个系数怎么拼出一个人（proto-mask）</a><span class="no">02</span><a class="dur" href="exp-06-semantic-segmentation/index.html#s2">原理</a></li>
+        <li><a class="ttl" href="exp-06-semantic-segmentation/index.html#s5">③ 三条命令：单图 / 三种背景 / 三线程</a><span class="no">05</span><a class="dur" href="exp-06-semantic-segmentation/index.html#s5">实操</a></li>
+        <li><a class="ttl" href="exp-06-semantic-segmentation/index.html#s7">④ 拖 mask_thr，看边缘是糊出去还是缩回来</a><span class="no">07</span><a class="dur" href="exp-06-semantic-segmentation/index.html#s7">互动</a></li>
+        <li><a class="ttl" href="exp-06-semantic-segmentation/index.html#s10">⑤ 三道小测</a><span class="no">10</span><a class="dur" href="exp-06-semantic-segmentation/index.html#s10">验证</a></li>
+      </ul>
+      <div class="hint"><span>👆 点小节标题直达对应章节</span><span>抠图</span></div>
+    </article>
+
+    <article class="card reveal">
+      <div class="top"><span class="code">EXP-07</span><span class="tag">⭐⭐⭐ · 4 学时 · 全课最难</span></div>
+      <h3>多目标跟踪（DeepSORT）</h3>
+      <p>每一帧的检测都是独立的，怎么让「同一个人」一直是 3 号？被挡住几秒再出来，还得认出是他。</p>
+      <div class="kv"><b>关键参数</b> · <code>yolov8n.rknn</code> + <code>deepsort.rknn</code> 两个模型 · <code>max_age 70</code> · <code>n_init 3</code> · <code>max_dist 0.2</code> · 约 14 FPS</div>
+      <div class="meta"><span class="tag">Kalman 预测</span><span class="tag">匈牙利匹配</span><span class="tag">ReID 外观</span><span class="tag">级联匹配</span></div>
+      <ul class="explist">
+        <li><a class="ttl" href="exp-07-deepsort-tracking/index.html#s1">① 没有跟踪，人流统计就没法做</a><span class="no">01</span><a class="dur" href="exp-07-deepsort-tracking/index.html#s1">开始</a></li>
+        <li><a class="ttl" href="exp-07-deepsort-tracking/index.html#s2">② 每帧一道连线题：位置 + 长相（四步）</a><span class="no">02</span><a class="dur" href="exp-07-deepsort-tracking/index.html#s2">原理</a></li>
+        <li><a class="ttl" href="exp-07-deepsort-tracking/index.html#s5">③ 三条命令 + 遮挡实验（deepsort vs sort）</a><span class="no">05</span><a class="dur" href="exp-07-deepsort-tracking/index.html#s5">实操</a></li>
+        <li><a class="ttl" href="exp-07-deepsort-tracking/index.html#s7">④ 拖 max_age，看「愿意等多久」</a><span class="no">07</span><a class="dur" href="exp-07-deepsort-tracking/index.html#s7">互动</a></li>
+        <li><a class="ttl" href="exp-07-deepsort-tracking/index.html#s10">⑤ 三道小测</a><span class="no">10</span><a class="dur" href="exp-07-deepsort-tracking/index.html#s10">验证</a></li>
+      </ul>
+      <div class="hint"><span>👆 点小节标题直达对应章节</span><span>约 14 FPS</span></div>
+    </article>
+
+  </div>
+
+  <div class="sec-head reveal">
+    <div class="k">STAGE 4 · MEDIAPIPE</div>
+    <h2>第 4 阶段 · 人体感知（换一套模型家族）</h2>
+    <p>从 YOLO 换到 MediaPipe Blaze 系列。人脸 → 骨骼是同一套「级联 + 逆映射」思路的递进；深度相机补上「距离」那一维。</p>
+  </div>
+  <div class="grid">
+
+    <article class="card reveal">
+      <div class="top"><span class="code">EXP-08</span><span class="tag">⭐⭐ · 4 学时</span></div>
+      <h3>人脸关键点（478 拓扑 / 468 点）</h3>
+      <p>美颜相机怎么知道该往哪儿瘦脸？因为它先在脸上找到了 468 个固定位置的点。第一次接触「两段式级联」。</p>
+      <div class="kv"><b>关键参数</b> · <code>face_detection_short_range.rknn</code> 584KB + <code>face_landmark.rknn</code> 1.6MB · <code>num_faces 2</code> · <b>检测喂 uint8、关键点喂 float32 [0,1]</b> · 端口 8081</div>
+      <div class="meta"><span class="tag">BlazeFace</span><span class="tag">双模型级联</span><span class="tag">ROI 逆映射</span><span class="tag">468 点</span></div>
+      <ul class="explist">
+        <li><a class="ttl" href="exp-08-face-landmarks/index.html#s1">① 光有「人脸框」做不了美颜</a><span class="no">01</span><a class="dur" href="exp-08-face-landmarks/index.html#s1">开始</a></li>
+        <li><a class="ttl" href="exp-08-face-landmarks/index.html#s2">② 两个模型接力：先找脸，再放大看脸</a><span class="no">02</span><a class="dur" href="exp-08-face-landmarks/index.html#s2">原理</a></li>
+        <li><a class="ttl" href="exp-08-face-landmarks/index.html#s5">③ 三条命令 + 转头 / 遮挡 / 两个人</a><span class="no">05</span><a class="dur" href="exp-08-face-landmarks/index.html#s5">实操</a></li>
+        <li><a class="ttl" href="exp-08-face-landmarks/index.html#s7">④ 拖检测门限，看哪几张脸还算数</a><span class="no">07</span><a class="dur" href="exp-08-face-landmarks/index.html#s7">互动</a></li>
+        <li><a class="ttl" href="exp-08-face-landmarks/index.html#s10">⑤ 三道小测</a><span class="no">10</span><a class="dur" href="exp-08-face-landmarks/index.html#s10">验证</a></li>
+      </ul>
+      <div class="hint"><span>👆 点小节标题直达对应章节</span><span>实时网格</span></div>
+    </article>
+
+    <article class="card reveal">
+      <div class="top"><span class="code">EXP-09</span><span class="tag">⭐⭐ · 4 学时</span></div>
+      <h3>骨骼关键点（33 点）</h3>
+      <p>把一个人压缩成 33 个关节点，画成一具跟着你动的火柴人。判断「举手」其实只要比两个 y 坐标。</p>
+      <div class="kv"><b>关键参数</b> · <code>pose_landmark_full.rknn</code> 约 7MB · 256×256 整图单模型 · <b>uint8 直喂</b>（内部 mean 127.5 / std 128）· 33 点 × (x,y,z,vis) · 端口 8082</div>
+      <div class="meta"><span class="tag">BlazePose</span><span class="tag">骨架拓扑</span><span class="tag">vis 过滤</span><span class="tag">单人整图</span></div>
+      <ul class="explist">
+        <li><a class="ttl" href="exp-09-pose-landmark/index.html#s1">① 判断「举手」，其实不需要看清人</a><span class="no">01</span><a class="dur" href="exp-09-pose-landmark/index.html#s1">开始</a></li>
+        <li><a class="ttl" href="exp-09-pose-landmark/index.html#s2">② 33 个点连成一根火柴人（编号图）</a><span class="no">02</span><a class="dur" href="exp-09-pose-landmark/index.html#s2">原理</a></li>
+        <li><a class="ttl" href="exp-09-pose-landmark/index.html#s5">③ 三条命令 + 站远 / 只露上半身 / 手放背后</a><span class="no">05</span><a class="dur" href="exp-09-pose-landmark/index.html#s5">实操</a></li>
+        <li><a class="ttl" href="exp-09-pose-landmark/index.html#s7">④ 拖 vis 阈值，看骨架是残缺还是乱飞</a><span class="no">07</span><a class="dur" href="exp-09-pose-landmark/index.html#s7">互动</a></li>
+        <li><a class="ttl" href="exp-09-pose-landmark/index.html#s10">⑤ 三道小测</a><span class="no">10</span><a class="dur" href="exp-09-pose-landmark/index.html#s10">验证</a></li>
+      </ul>
+      <div class="hint"><span>👆 点小节标题直达对应章节</span><span>火柴人</span></div>
+    </article>
+
+    <article class="card reveal">
+      <div class="top"><span class="code">EXP-10</span><span class="tag">⭐⭐ · 4 学时</span></div>
+      <h3>深度相机与 3D 定位</h3>
+      <p>点一下画面上的任意像素，程序告诉你「这点离你 0.48 米」，还能算出它在空间里的三维坐标。补上缺失的距离那一维。</p>
+      <div class="kv"><b>关键参数</b> · fx=608.40 / fy=611.21 / cx=328.30 / cy=226.46 · 深度 uint16 mm ÷1000 · <code>invalid_value 0</code> · <code>display_scale 0.666</code> · 端口 8083</div>
+      <div class="meta"><span class="tag">HP60C</span><span class="tag">深度伪彩</span><span class="tag">反投影公式</span><span class="tag">点云</span></div>
+      <ul class="explist">
+        <li><a class="ttl" href="exp-10-depth-3d/index.html#s1">① 只知道「在哪」，不知道「多远」</a><span class="no">01</span><a class="dur" href="exp-10-depth-3d/index.html#s1">开始</a></li>
+        <li><a class="ttl" href="exp-10-depth-3d/index.html#s2">② 针孔相机 + 三个反投影公式（含手算）</a><span class="no">02</span><a class="dur" href="exp-10-depth-3d/index.html#s2">原理</a></li>
+        <li><a class="ttl" href="exp-10-depth-3d/index.html#s5">③ 三条命令：双栏 / 点击读深度 / 手算对照</a><span class="no">05</span><a class="dur" href="exp-10-depth-3d/index.html#s5">实操</a></li>
+        <li><a class="ttl" href="exp-10-depth-3d/index.html#s7">④ 故意改错 fx，看坐标怎么一起偏</a><span class="no">07</span><a class="dur" href="exp-10-depth-3d/index.html#s7">互动</a></li>
+        <li><a class="ttl" href="exp-10-depth-3d/index.html#s10">⑤ 三道小测</a><span class="no">10</span><a class="dur" href="exp-10-depth-3d/index.html#s10">验证</a></li>
+      </ul>
+      <div class="hint"><span>👆 点小节标题直达对应章节</span><span>点一下测距</span></div>
+    </article>
+
+  </div>
+
+  <div class="sec-head reveal">
+    <div class="k">STAGE 6 · CONTROL</div>
+    <h2>第 6 阶段 · 视觉驱动动作（收官）</h2>
+    <p>前面 10 个实验都只是「看懂」，最后这两个让结果真的动起来 —— 视觉第一次闭环到执行器。</p>
+  </div>
+  <div class="grid">
+
+    <article class="card reveal">
+      <div class="top"><span class="code">EXP-11</span><span class="tag">⭐⭐⭐ · 4 学时</span></div>
+      <h3>体感控制：举左手就左转</h3>
+      <p>33 个关节坐标 → 几条 if 规则 → 两个速度数 → 车真的动了。整门课第一次让视觉驱动动作。</p>
+      <div class="kv"><b>关键参数</b> · <code>publish_cmd_vel: false</code>（<b>默认关，要手动开</b>）· <code>linear 0.2</code> / <code>angular 0.8</code> · 举手阈值约 0.72 · 端口 8084<br><b>平台</b>：C1 直接驱动底盘（底盘侧 clamp ±0.3 m/s / ±1.0 rad/s）；B2 用 turtlesim 海龟替代验证</div>
+      <div class="meta"><span class="tag">动作规则</span><span class="tag">优先级</span><span class="tag">身长归一化</span><span class="tag">cmd_vel</span></div>
+      <ul class="explist">
+        <li><a class="ttl" href="exp-11-pose-control/index.html#s1">① 从「你抬左手」到「车左转」，中间有五段</a><span class="no">01</span><a class="dur" href="exp-11-pose-control/index.html#s1">开始</a></li>
+        <li><a class="ttl" href="exp-11-pose-control/index.html#s2">② 归一化 / 速度映射 / 优先级（三关）</a><span class="no">02</span><a class="dur" href="exp-11-pose-control/index.html#s2">原理</a></li>
+        <li><a class="ttl" href="exp-11-pose-control/index.html#s5">③ 三条命令：先看准 → 海龟验方向 → 改规则</a><span class="no">05</span><a class="dur" href="exp-11-pose-control/index.html#s5">实操</a></li>
+        <li><a class="ttl" href="exp-11-pose-control/index.html#s7">④ 拖举手阈值，看几个姿势算「举手」</a><span class="no">07</span><a class="dur" href="exp-11-pose-control/index.html#s7">互动</a></li>
+        <li><a class="ttl" href="exp-11-pose-control/index.html#s10">⑤ 三道小测</a><span class="no">10</span><a class="dur" href="exp-11-pose-control/index.html#s10">验证</a></li>
+      </ul>
+      <div class="hint"><span>👆 点小节标题直达对应章节</span><span>车动起来</span></div>
+    </article>
+
+    <article class="card reveal">
+      <div class="top"><span class="code">EXP-12</span><span class="tag">⭐⭐ · 4 学时 · 收官</span></div>
+      <h3>手势识别：4 模型接力</h3>
+      <p>比个「耶」，机器就知道你在比「耶」。链路最长的一个实验：找手 → 21 点 → 128 维指纹 → 8 类分类。</p>
+      <div class="kv"><b>关键参数</b> · 4 个模型共约 10MB · 21 点 × (x,y,z) · embedder 输出 128 维 · softmax 8 类 · <code>max_hands 2</code> · 端口 8085</div>
+      <div class="meta"><span class="tag">手掌检测</span><span class="tag">21 关键点</span><span class="tag">Embedding</span><span class="tag">检测-跟踪状态机</span></div>
+      <ul class="explist">
+        <li><a class="ttl" href="exp-12-hand-control/index.html#s1">① 手这么小、姿势这么多，怎么认</a><span class="no">01</span><a class="dur" href="exp-12-hand-control/index.html#s1">开始</a></li>
+        <li><a class="ttl" href="exp-12-hand-control/index.html#s2">② 四个模型各管一段（含状态机优化）</a><span class="no">02</span><a class="dur" href="exp-12-hand-control/index.html#s2">原理</a></li>
+        <li><a class="ttl" href="exp-12-hand-control/index.html#s5">③ 三条命令：单图 / 8 种手势 / 夹角控制</a><span class="no">05</span><a class="dur" href="exp-12-hand-control/index.html#s5">实操</a></li>
+        <li><a class="ttl" href="exp-12-hand-control/index.html#s7">④ 拖 presence 阈值，看状态机怎么切换</a><span class="no">07</span><a class="dur" href="exp-12-hand-control/index.html#s7">互动</a></li>
+        <li><a class="ttl" href="exp-12-hand-control/index.html#s10">⑤ 三道小测</a><span class="no">10</span><a class="dur" href="exp-12-hand-control/index.html#s10">验证</a></li>
+      </ul>
+      <div class="hint"><span>👆 点小节标题直达对应章节</span><span>8 种手势</span></div>
+    </article>
+
+  </div>
+
+  <div class="sec-head reveal">
+    <div class="k">TECH STACK</div>
+    <h2>技术栈与硬件平台</h2>
+    <p>全课程围绕 RK3576 展开，B2 与 C1 共用同一套计算与相机。改的是「学什么算法」，不变的是「跑在什么上」。</p>
+  </div>
+  <div class="pills reveal">
+    <span class="pill"><i style="background:#0d9488"></i>OpenCV</span>
+    <span class="pill"><i style="background:#0891b2"></i>HSV / 轮廓 / QRCode</span>
+    <span class="pill"><i style="background:#7c3aed"></i>YOLOv8 / YOLOv5 检测头</span>
+    <span class="pill"><i style="background:#d97706"></i>yolov8n-seg 语义分割</span>
+    <span class="pill"><i style="background:#e11d48"></i>DeepSORT + ReID</span>
+    <span class="pill"><i style="background:#059669"></i>MediaPipe Blaze 系列</span>
+    <span class="pill"><i style="background:#4f46e5"></i>RKNN int8 / fp16 量化</span>
+    <span class="pill"><i style="background:#be185d"></i>ROS2 Humble · cmd_vel</span>
+    <span class="pill"><i style="background:#b45309"></i>HP60C 深度相机</span>
+    <span class="pill"><i style="background:#334155"></i>B2 实验箱 / C1 小车 · RK3576 · 6TOPS NPU</span>
+  </div>
+
+  <div class="sec-head reveal">
+    <div class="k">BEFORE YOU START</div>
+    <h2>三条通用约定，先记住</h2>
+  </div>
+  <ol class="rules reveal">
+    <li><b>命令一律在实验目录下执行。</b>每个实验页第 05 节第一条命令都是 <code>cd ~/ros2_ws/src/xflz_eai_car1/vision/&lt;目录&gt;</code>，因为配置文件和模型都按相对路径引用。<b>忘了 cd 是最常见的「找不到文件」</b>。</li>
+    <li><b>先起相机，再跑程序。</b>实时模式（<code>--ros</code>）依赖相机话题存在。顺序反了程序会一直等首帧然后超时，看着像「卡住」。</li>
+    <li><b>先看画面，再查数值。</b>每个实验都给了「你该看到的画面」一节。画面不对是采集/预处理问题，画面对但数值不对才是算法问题 —— <b>先分清楚这两类，排查效率差十倍</b>。</li>
+  </ol>
+
+</div>
+
+<footer>
+  <div class="foot-in">
+    <span>🎓 具身智能课程 · 核心课程 · 机器人视觉应用与开发（12 实验 · 48 学时）</span>
+    <span><a href="../../../index.html">总首页</a> · 内容依据 robot_vision 实验指导书与 <code>vision/</code> 源码核对</span>
+  </div>
+</footer>
+
+<script>
+/* 入场动画：只有脚本正常执行时才启用（.js 类），
+   并加兜底——2 秒后无论如何全部显示，避免内容"看不见"。 */
+document.documentElement.classList.add('js');
+(function(){
+  var els=document.querySelectorAll('.reveal');
+  if(!('IntersectionObserver' in window)){
+    els.forEach(function(el){el.classList.add('show');});
+    return;
+  }
+  var io=new IntersectionObserver(function(es){
+    es.forEach(function(e){
+      if(e.isIntersecting){e.target.classList.add('show');io.unobserve(e.target);}
+    });
+  },{threshold:0.12, rootMargin:'0px 0px -40px 0px'});
+  els.forEach(function(el){io.observe(el);});
+  /* 兜底：无论如何 1.5 秒后全部可见 */
+  setTimeout(function(){
+    els.forEach(function(el){el.classList.add('show');});
+  },1500);
+})();
+function gToggle(){
+  var b=document.getElementById('gbox'),t=document.getElementById('gtg');
+  if(!b||!t)return;
+  var open=b.hasAttribute('hidden');
+  if(open){
+    b.removeAttribute('hidden');b.classList.add('open');
+    t.setAttribute('aria-expanded','true');
+    b.querySelectorAll('.reveal').forEach(function(el){el.classList.add('show');});
+  }else{
+    b.setAttribute('hidden','');b.classList.remove('open');
+    t.setAttribute('aria-expanded','false');
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-02 · 机械臂硬件组装与串口识别 — IND-01 具身智能端到端平台与基础</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+:root{--theme:#0d9488;--theme-deep:#0f766e;--theme-bg:#f0fdfa;--theme-bd:#99f6e4}
+.vgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:15px;margin-top:14px}
+.vitem{background:#fff;border:1px solid #e2ece9;border-radius:14px;padding:13px}
+.vitem video{width:100%;border-radius:9px;background:#000;aspect-ratio:16/9}
+.vitem h4{font-size:14.5px;font-weight:800;margin:9px 0 5px;color:var(--theme-deep)}
+.vitem p{font-size:12.5px;color:#5b6b78;line-height:1.6}
+.img-pair{display:grid;gap:16px}
+.img-block{margin:14px 0;text-align:center}
+.img-block img{max-width:100%;height:auto;border:1px solid var(--border,#e2e8f0);border-radius:10px;background:#fff;box-shadow:0 4px 14px rgba(15,23,42,.07)}
+.img-block figcaption{margin-top:8px;font-size:12.5px;color:#5b6b78}
+@media (max-width:900px){.img-pair{grid-template-columns:1fr !important}}
+/* ── 五星学习法 · 课程分段 ── */
+.fivestar-note{font-size:13px;color:#5b6b78;margin-top:12px}
+.fs-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:14px}
+.fs-cell{border:1px solid var(--theme-bd);border-radius:12px;padding:10px 8px;text-align:center;background:var(--theme-bg)}
+.fs-cell .st{font-size:12.5px;font-weight:800;color:var(--theme-deep)}
+.fs-cell .tm{font-family:var(--font-mono,monospace);font-size:11px;color:#0f766e;margin-top:3px;font-weight:700}
+.fs-cell .ds{font-size:11.5px;color:#5b6b78;margin-top:4px;line-height:1.5}
+.seg{display:inline-block;font-size:11px;font-weight:700;font-family:var(--font-mono,monospace);background:var(--theme-bg);color:var(--theme-deep);border:1px solid var(--theme-bd);border-radius:99px;padding:2px 10px;margin-left:8px;vertical-align:middle;white-space:nowrap}
+.tl{width:100%;border-collapse:collapse;font-size:13px;margin-top:14px;background:#fff}
+.tl th,.tl td{border:1px solid #e2ece9;padding:7px 10px;text-align:left;vertical-align:top}
+.tl th{background:var(--theme-bg);color:var(--theme-deep);font-size:12.5px;white-space:nowrap}
+.tl .m{font-family:var(--font-mono,monospace);color:var(--theme-deep);font-weight:700;white-space:nowrap}
+@media(max-width:900px){.fs-grid{grid-template-columns:repeat(2,1fr)}}
+/* ── 3D 模型 ── */
+.anim3d-block{margin:30px 0;text-align:center}
+.anim3d-canvas{width:100%;border:1px solid var(--theme-bd,#e2e8f0);border-radius:14px;overflow:hidden;background:#111827;box-shadow:0 8px 28px rgba(15,23,42,.12);cursor:grab;position:relative}
+.anim3d-hint{font-size:12.5px;color:#5b6b78;margin-top:8px}
+.anim3d-caption{font-size:13.5px;color:#5b6b78;margin-top:4px}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">🦾 IND-01 · <i>端到端平台与基础</i></div>
+  <div class="crumb"><a href="../../../index.html">总首页</a> / <a href="../../../index.html#ind">行业应用</a> / <a href="../index.html">IND-01</a> / EXP-02</div>
+</div>
+
+<div class="wrap">
+
+<aside class="side">
+  <h4>本页目录 · 五星学习法</h4>
+  <a href="#s0">00 课程节奏 · 8 段微课</a>
+  <a href="#s1" class="now">01 学习目标 ①聚焦问题</a>
+  <a href="#s2">02 原理讲解 ①聚焦 ②激活</a>
+  <a href="#s3">03 硬件与材料 ③示证新知</a>
+  <a href="#s4">04 步骤实践 ④应用新知</a>
+  <a href="#s5">05 关键命令 ④应用新知</a>
+  <a href="#s6">06 动画讲解 ③示证新知</a>
+  <a href="#s7">07 互动练习 ④应用新知</a>
+  <a href="#s8">08 常见问题 ⑤融会贯通</a>
+  <a href="#s9">09 拓展挑战 ⑤融会贯通</a>
+  <a href="#s10">10 思考题 ⑤融会贯通</a>
+  <h4>IND-01 · 四个实验</h4>
+  <a href="../exp-01-platform-setup/index.html">EXP-01 平台搭建</a>
+  <a href="../exp-02-arm-assembly/index.html">EXP-02 硬件组装</a>
+  <a href="../exp-03-arm-calibration/index.html">EXP-03 摄像头校准</a>
+  <a href="../exp-04-teleop-checkout/index.html">EXP-04 遥操作排查</a>
+</aside>
+
+<main class="content">
+
+<div class="exp-head">
+  <span class="code">EXP-02 · 第 02/03 章 · 操作性 · 8 学时</span>
+  <h1>机械臂硬件组装与串口识别</h1>
+  <p class="desc">本课是全课的<b>视频重点课</b>：9 段指导视频覆盖主臂安装、从臂安装、设置电机编号、Gripper 与 Joint1~Joint5 逐关节上臂全过程。你将把主臂卡钳夹紧桌面、从臂卡上小推车，接对 5V/12V 两路电源与串口线，再用 <code>lerobot-find-port</code> 找到每条臂的端口并落成永久别名——这是"从零件到能被软件认出来的机械臂"最关键的一步。</p>
+  <div class="meta">
+    <span class="tag hl">难度 ⭐⭐ · 8 学时</span>
+    <span class="tag">9 段装配视频</span><span class="tag">5V 2A / 12V 8A</span>
+    <span class="tag">lerobot-find-port</span><span class="tag">四臂别名</span>
+  </div>
+</div>
+
+<!-- 00 -->
+<section class="blk" id="s0">
+  <h2><span class="no">00</span>课程节奏：五星学习法 · 8 段微课（每段 ≤ 15 min）</h2>
+  <p>本实验按<b>五星学习法</b>组织：先用一个真实装配故障<b>聚焦问题</b>，再<b>激活旧知</b>（串口通信与电源极性），接着<b>示证新知</b>（六关节结构 + 爆炸图），然后跟着 9 段视频<b>应用新知</b>完成逐关节装配与 find-port 找口，最后借排障与拓展<b>融会贯通</b>。全程切成 <b>8 段微课、每段不超过 15 分钟</b>，段间停顿 1~2 分钟消化；纯讲授合计约 100 分钟，其余课时用于动手实操装配与个别辅导。</p>
+  <div class="fs-grid">
+    <div class="fs-cell"><div class="st">① 聚焦问题</div><div class="tm">课段 1 · 12 min</div><div class="ds">"通电冒烟 / 编号错位致手臂反向动"故障引入</div></div>
+    <div class="fs-cell"><div class="st">② 激活旧知</div><div class="tm">课段 2 · 8 min</div><div class="ds">串口通信 · 电源极性 · USB 枚举与 EXP-01 udev 别名</div></div>
+    <div class="fs-cell"><div class="st">③ 示证新知</div><div class="tm">课段 3~4 · 27 min</div><div class="ds">硬件三大件实物 + 六关节爆炸图动画</div></div>
+    <div class="fs-cell"><div class="st">④ 应用新知</div><div class="tm">课段 5~7 · 40 min</div><div class="ds">9 段装配视频实操 + find-port + 装配顺序自测</div></div>
+    <div class="fs-cell"><div class="st">⑤ 融会贯通</div><div class="tm">课段 8 · 13 min</div><div class="ds">排障口诀 · 拓展挑战 · 思考题</div></div>
+  </div>
+  <table class="tl">
+    <tr><th>课段</th><th>五星阶段</th><th>时长</th><th>对应章节</th><th>本段任务</th></tr>
+    <tr><td class="m">课段 1</td><td>聚焦问题</td><td class="m">12 min</td><td>§01 + §02 前半</td><td>抛出"通电冒烟"与"编号错位致反向动"两个现场故障，明确装配纪律</td></tr>
+    <tr><td class="m">课段 2</td><td>激活旧知</td><td class="m">8 min</td><td>§02 后半</td><td>串口通信·电源极性·USB 枚举旧知，衔接 EXP-01 的 udev 别名</td></tr>
+    <tr><td class="m">课段 3</td><td>示证新知</td><td class="m">15 min</td><td>§03</td><td>对照实物认识主臂/从臂/摄像头，区分 5V 与 12V 供电</td></tr>
+    <tr><td class="m">课段 4</td><td>示证新知</td><td class="m">12 min</td><td>§06</td><td>六关节爆炸图动画，理解 shoulder→gripper 逐级装配逻辑</td></tr>
+    <tr><td class="m">课段 5</td><td>应用新知</td><td class="m">15 min</td><td>§04 步骤1~3 + 视频①②③</td><td>主臂上桌、从臂上车、设置电机编号（边看视频边动手）</td></tr>
+    <tr><td class="m">课段 6</td><td>应用新知</td><td class="m">15 min</td><td>§04 步骤4~5 + 视频④~⑨ + §05</td><td>Gripper→Joint5 逐关节上臂，find-port 找口核对别名</td></tr>
+    <tr><td class="m">课段 7</td><td>应用新知</td><td class="m">10 min</td><td>§07</td><td>装配顺序点击排序自测，全对方可进入下一实验</td></tr>
+    <tr><td class="m">课段 8</td><td>融会贯通</td><td class="m">13 min</td><td>§08~§10</td><td>排障口诀收口，挑战题与思考题拔高迁移</td></tr>
+  </table>
+  <p class="fivestar-note">讲课提示：课段 1/2 以讲授 + 提问为主；课段 3~4 用实物 + 动画；课段 5~6 边看视频边装配（每段视频后暂停让学员动手）；课段 7 学员独立完成；课段 8 答疑拔高。段间停顿 1~2 分钟。</p>
+</section>
+
+<!-- 01 -->
+<section class="blk" id="s1">
+  <h2><span class="no">01</span>学习目标<span class="seg">课段 1 · 聚焦问题 · 12 min</span></h2>
+  <ul class="check">
+    <li>能区分主臂与从臂的安装方式与供电规格：<span class="ok">主臂 5V 2A 固定桌面、从臂 12V 8A 卡小推车</span></li>
+    <li>能按 9 段视频独立完成 <span class="ok">设置电机编号 → Joint1~5 / Gripper 逐关节装配</span></li>
+    <li>能说出六关节的英文名与中文含义：<span class="ok">shoulder_pan / shoulder_lift / elbow_flex / wrist_flex / wrist_roll / gripper</span></li>
+    <li>能执行"<span class="ok">先接电源、后插 USB</span>"的正确插拔顺序与 <code>lerobot-find-port</code> 找口流程</li>
+    <li>能用 <code>udevadm info</code> 核对 <span class="ok">ID_SERIAL_SHORT 并确认四条别名</span>已生效</li>
+  </ul>
+</section>
+
+<!-- 02 -->
+<section class="blk" id="s2">
+  <h2><span class="no">02</span>原理讲解：串口是"对讲机"，供电是"两路电"<span class="seg">课段 1 收尾 + 课段 2 · 激活旧知 · 8 min</span></h2>
+  <div class="tip amber"><span class="lab">❓ 聚焦问题（课段 1）</span>学员装配时最常踩的两个坑：<b>① 5V/12V 电源插反——通电即冒烟</b>；<b>② 电机编号设错一个——遥操作时手臂"往东施力往西动"</b>。带着这两个故障看完全课——到课段 6 你会亲手让每条臂正确通电、编号归位。</div>
+  <p>把机械臂想成住在楼里的住户，串口（USB 串口，/dev/ttyACM*）就是<b>住户与物业之间的对讲线</b>：主机发角度指令、臂回传位置反馈，全走这一根线。两个要点：</p>
+  <div class="flow">
+    <div class="step"><span class="n">1</span><b>供电分两路</b>：主臂是示范端，吃电少（<b>5V 2A</b>）；从臂要真正举东西，吃电大（<b>12V 8A</b>）——插错电源轻则不工作，重则烧板</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span><b>先电后 USB</b>：先给臂通电、再插 USB 到电脑，顺序颠倒可能导致枚举失败（第 03 章明确警告"顺序不要颠倒"）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span><b>端口会变、序列号不变</b>：重启后 ttyACM0/2/3 顺序可能重排，但每块板的序列号（如 5B79018622）是出厂烧死的——所以找口后要写 udev 别名</div>
+  </div>
+  <p>再看"六关节"：SO100 系列每条臂有 6 个受控自由度——底座水平旋转（shoulder_pan）、肩俯仰（shoulder_lift）、肘俯仰（elbow_flex）、腕俯仰（wrist_flex）、腕滚转（wrist_roll）、夹爪开合（gripper）。<b>设电机编号就是告诉每个关节里的电机"你是几号"</b>，编号错一个，未来遥操作时手臂就会"往东施力往西动"。</p>
+  <div class="tip teal"><span class="lab">↺ 激活旧知（课段 2）</span>回忆 EXP-01 的三条旧知：① 串口设备挂在 <code>/dev/ttyACM*</code> 名下；② USB 热插拔导致端口号重排；③ udev 规则用序列号"贴标签"给出永久别名。本课把这些别名<b>从软件层落到物理层</b>——你得先把臂装好、通对电、设好编号，别名才有意义。</div>
+  <p style="margin:14px 0 0;font-size:13px;color:#5b6b78">▍实物对照：机械臂摄像头（防呆口）、左电源右串口的接线规则与主机端口分配</p>
+  <div class="img-pair" style="grid-template-columns:repeat(4,1fr)">
+    <figure class="img-block" style="margin:10px 0 0">
+      <img src="./images/photo-camera-fangdai.png" alt="机械臂摄像头实物：注意防呆口方向" loading="lazy" decoding="async">
+      <figcaption>(a) 机械臂摄像头 · <b>注意防呆口</b>——装臂/插线时按防呆方向对位，反了会插不进（LZ-XL01 §3.1）</figcaption>
+    </figure>
+    <figure class="img-block" style="margin:10px 0 0">
+      <img src="./images/photo-wiring-power-serial.png" alt="机械臂电机控制板接线特写：左侧电源线、右侧串口线" loading="lazy" decoding="async">
+      <figcaption>(b) 电机控制板接线特写 · 左为<b>电源线</b>（5V 或 12V）、右为<b>串口线</b>（USB）——"先通电再插 USB"顺序不可颠倒</figcaption>
+    </figure>
+    <figure class="img-block" style="margin:10px 0 0">
+      <img src="./images/photo-rear-ports.png" alt="主机背面 USB 端口标注：左手相机 / 右手相机 / 头部相机" loading="lazy" decoding="async">
+      <figcaption>(c) 主机背面端口分配 · <b>左手相机 / 右手相机 / 头部相机</b>各占固定 USB 口——端口位置即身份，重启不变</figcaption>
+    </figure>
+    <figure class="img-block" style="margin:10px 0 0">
+      <img src="./images/photo-serial-hub.jpg" alt="电脑插线：摄像头线插背面、串口线经拓展坞接机箱前面" loading="lazy" decoding="async">
+      <figcaption>(d) 电脑插线 · <b>摄像头线</b>插电脑背面按顺序；<b>串口线</b>经拓展坞接机箱前面，插口与顺序无要求（LZ-XL01 §4.1/§4.2）</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- 03 -->
+<section class="blk" id="s3">
+  <h2><span class="no">03</span>硬件与材料<span class="seg">课段 3 · 示证新知 · 15 min</span></h2>
+  <table>
+    <thead><tr><th>部件</th><th>数量/规格</th><th>安装要点</th></tr></thead>
+    <tbody>
+      <tr><td>主臂（leader）</td><td>×2 · 电源 5V 2A</td><td>卡钳旋转夹紧固定桌面；接线<b>左电源、右串口</b></td></tr>
+      <tr><td>从臂（follower）连底座</td><td>×2 · 电源 12V 8A</td><td>连同底座一起卡到小推车上；同样<b>左电源、右串口</b></td></tr>
+      <tr><td>机械臂摄像头</td><td>装于臂上</td><td>注意<b>防呆口</b>方向，插反插不进</td></tr>
+      <tr><td>从臂摄像头</td><td>装于从臂顶部</td><td>按防呆口卡入</td></tr>
+      <tr><td>摄像头线</td><td>×3 接主机</td><td>插<b>电脑背面</b>，且必须按指导顺序插入</td></tr>
+      <tr><td>串口线</td><td>经拓展坞</td><td>接机箱前面的拓展坞，<b>插口和顺序无要求</b></td></tr>
+    </tbody>
+  </table>
+  <p style="margin-top:12px">口诀：摄像头线要"按顺序插背面"，串口线可"随便插拓展坞"——两者约束完全不同，别混。</p>
+  <p style="margin:14px 0 0;font-size:13px;color:#5b6b78">▍实物对照：机械臂摄像头（防呆口）、主臂上桌、从臂上车、全系统组装完成态、电脑插线</p>
+  <div class="img-pair" style="grid-template-columns:repeat(5,1fr)">
+    <figure class="img-block" style="margin:10px 0 0">
+      <img src="./images/photo-camera-fangdai.png" alt="机械臂摄像头实物：注意防呆口方向" loading="lazy" decoding="async">
+      <figcaption>(a) 机械臂摄像头 · <b>注意防呆口</b>——装臂时按防呆方向对位，插反插不进（LZ-XL01 §3.1/§3.2）</figcaption>
+    </figure>
+    <figure class="img-block" style="margin:10px 0 0">
+      <img src="./images/photo-master-clamp-desk.jpeg" alt="主臂 C 型卡钳夹紧桌面边缘实物图" loading="lazy" decoding="async">
+      <figcaption>(b) 主臂上桌 · C 型卡钳旋转夹紧固定桌面边缘，5V 2A 供电</figcaption>
+    </figure>
+    <figure class="img-block" style="margin:10px 0 0">
+      <img src="./images/photo-full-system-cart.png" alt="双臂+摄像头全系统组装在小推车上实物图" loading="lazy" decoding="async">
+      <figcaption>(c) 全系统组装完成 · 双臂 + 中柱摄像头 + 底座卡到小推车上</figcaption>
+    </figure>
+    <figure class="img-block" style="margin:10px 0 0">
+      <img src="./images/photo-wiring-detail.png" alt="从臂接线特写：左侧电源线右侧串口线" loading="lazy" decoding="async">
+      <figcaption>(d) 从臂接线特写 · 左电源（12V 8A）、右串口——与主臂同规则</figcaption>
+    </figure>
+    <figure class="img-block" style="margin:10px 0 0">
+      <img src="./images/photo-serial-hub.jpg" alt="电脑插线：摄像头线插背面、串口线经拓展坞接机箱前面" loading="lazy" decoding="async">
+      <figcaption>(e) 电脑插线 · <b>摄像头线</b>插电脑背面按顺序；<b>串口线</b>经拓展坞接机箱前面，插口与顺序无要求（LZ-XL01 §4.1/§4.2）</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- 04 -->
+<section class="blk" id="s4">
+  <h2><span class="no">04</span>步骤实践：跟着 9 段视频完成装配<span class="seg">课段 5~6 · 应用新知 · 2×15 min</span></h2>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>主臂上桌：卡钳旋转夹紧，按"左电源右串口"接线（看主臂安装.mp4）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>从臂上车：连底座卡到小推车，接 12V 8A 电源（看从臂安装.mp4）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>设置电机编号（设置电机编号.mp4），再按 Joint1→5、Gripper 顺序逐个上臂</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span>摄像头装臂（防呆口）→ 三路摄像头按顺序插电脑背面 → 串口线接拓展坞</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">5</span>先接臂电源、后插 USB，跑第 05 节 find-port 找口并核对别名</div>
+  </div>
+  <div class="img-pair" style="grid-template-columns:repeat(2,minmax(0,1fr));max-width:880px;margin:14px auto 0;text-align:left">
+    <figure class="img-block" style="margin:0">
+      <img src="./images/photo-camera-fangdai.png" alt="机械臂摄像头装臂：注意防呆口方向（LZ-XL01 §3.1/§3.2）" loading="lazy" decoding="async">
+      <figcaption>步骤 4·装臂 · 机械臂摄像头与从臂摄像头均要<b>按防呆口方向</b>对位卡入，插反/插歪会进不去或接触不良（LZ-XL01 §3.1/§3.2）</figcaption>
+    </figure>
+    <figure class="img-block" style="margin:0">
+      <img src="./images/photo-serial-hub.jpg" alt="摄像头线插入电脑背面：必须按指导顺序（LZ-XL01 §4.1）；串口线经拓展坞接机箱前面" loading="lazy" decoding="async">
+      <figcaption>步骤 4·插线 · <b>摄像头线</b>插在电脑背面、按指导顺序插入；<b>串口线</b>通过拓展坞连到机箱前面，插口和顺序无要求（LZ-XL01 §4.1/§4.2）</figcaption>
+    </figure>
+  </div>
+  <div class="vgrid">
+    <div class="vitem">
+      <video controls preload="metadata" playsinline poster="../../../../media/industry/ind01-endtoend-platform/exp-02-arm-assembly/videos/主臂安装-poster.jpg" src="../../../../media/industry/ind01-endtoend-platform/exp-02-arm-assembly/videos/主臂安装.mp4"></video>
+      <h4>① 主臂安装</h4>
+      <p>第 02 章「主臂组装」演示：卡钳旋转夹紧固定桌面，左电源右串口接线（主臂电源 5V 2A）。</p>
+    </div>
+    <div class="vitem">
+      <video controls preload="metadata" playsinline poster="../../../../media/industry/ind01-endtoend-platform/exp-02-arm-assembly/videos/从臂安装-poster.jpg" src="../../../../media/industry/ind01-endtoend-platform/exp-02-arm-assembly/videos/从臂安装.mp4"></video>
+      <h4>② 从臂安装</h4>
+      <p>第 02 章「从臂组装」演示：从臂连同底座卡到小推车上，接 12V 8A 电源与串口线。</p>
+    </div>
+    <div class="vitem">
+      <video controls preload="metadata" playsinline poster="../../../../media/industry/ind01-endtoend-platform/exp-02-arm-assembly/videos/设置电机编号-poster.jpg" src="../../../../media/industry/ind01-endtoend-platform/exp-02-arm-assembly/videos/设置电机编号.mp4"></video>
+      <h4>③ 设置电机编号</h4>
+      <p>给每个关节电机写入编号，编号是后续校准与遥操作映射的身份依据，不可跳过。</p>
+    </div>
+    <div class="vitem">
+      <video controls preload="metadata" playsinline poster="../../../../media/industry/ind01-endtoend-platform/exp-02-arm-assembly/videos/Gripper_v2-poster.jpg" src="../../../../media/industry/ind01-endtoend-platform/exp-02-arm-assembly/videos/Gripper_v2.mp4"></video>
+      <h4>④ Gripper 夹爪装配</h4>
+      <p>第 6 关节 gripper：夹爪舵机与弹簧组件的安装、对位与试合拢。</p>
+    </div>
+    <div class="vitem">
+      <video controls preload="metadata" playsinline poster="../../../../media/industry/ind01-endtoend-platform/exp-02-arm-assembly/videos/Joint1_v2-poster.jpg" src="../../../../media/industry/ind01-endtoend-platform/exp-02-arm-assembly/videos/Joint1_v2.mp4"></video>
+      <h4>⑤ Joint1 · shoulder_pan</h4>
+      <p>底座水平旋转关节：电机落座、同步带/齿轮对位，装好后底座应能平滑左右转。</p>
+    </div>
+    <div class="vitem">
+      <video controls preload="metadata" playsinline poster="../../../../media/industry/ind01-endtoend-platform/exp-02-arm-assembly/videos/Joint2_v2-poster.jpg" src="../../../../media/industry/ind01-endtoend-platform/exp-02-arm-assembly/videos/Joint2_v2.mp4"></video>
+      <h4>⑥ Joint2 · shoulder_lift</h4>
+      <p>肩俯仰关节：大臂起落的主受力关节，注意螺丝力矩与限位对齐。</p>
+    </div>
+    <div class="vitem">
+      <video controls preload="metadata" playsinline poster="../../../../media/industry/ind01-endtoend-platform/exp-02-arm-assembly/videos/Joint3_v2-poster.jpg" src="../../../../media/industry/ind01-endtoend-platform/exp-02-arm-assembly/videos/Joint3_v2.mp4"></video>
+      <h4>⑦ Joint3 · elbow_flex</h4>
+      <p>肘俯仰关节：小臂折叠的枢纽，装配后手动掰动应无卡滞。</p>
+    </div>
+    <div class="vitem">
+      <video controls preload="metadata" playsinline poster="../../../../media/industry/ind01-endtoend-platform/exp-02-arm-assembly/videos/Joint4_v2-poster.jpg" src="../../../../media/industry/ind01-endtoend-platform/exp-02-arm-assembly/videos/Joint4_v2.mp4"></video>
+      <h4>⑧ Joint4 · wrist_flex</h4>
+      <p>腕俯仰关节：控制手腕上下摆，零件细小，注意防呆与走线不夹线。</p>
+    </div>
+    <div class="vitem">
+      <video controls preload="metadata" playsinline poster="../../../../media/industry/ind01-endtoend-platform/exp-02-arm-assembly/videos/Joint5_v2-poster.jpg" src="../../../../media/industry/ind01-endtoend-platform/exp-02-arm-assembly/videos/Joint5_v2.mp4"></video>
+      <h4>⑨ Joint5 · wrist_roll</h4>
+      <p>腕滚转关节：最后一个旋转自由度，装完接夹爪即构成完整六关节手臂。</p>
+    </div>
+  </div>
+  <div class="tip amber"><span class="lab">⚠ 装配纪律</span>每装完一个关节，先<b>手动全程掰一遍</b>确认无卡滞再装下一个；发现卡滞立即拆检，别等通电了才发现——那时候你已经不知道是哪个关节装偏了。</div>
+</section>
+
+<!-- 05 -->
+<section class="blk" id="s5">
+  <h2><span class="no">05</span>关键命令：搜索端口与核对别名<span class="seg">随课段 6 对照使用</span></h2>
+  <pre><span class="c"># ① 顺序：先将主从臂接通电源，再把 USB 插到电脑（顺序不要颠倒！）</span>
+<span class="g">conda</span> activate lerobot
+
+<span class="c"># ② 搜索端口（第 03 章）——列出当前所有端口后提示拔线</span>
+<span class="g">lerobot-find-port</span>
+<span class="y">Finding all available ports for the MotorsBus.</span>
+<span class="y">Ports before disconnecting: ['/dev/ttyACM0', '/dev/ttyACM2', '/dev/ttyACM3', '/dev/ttyACM1', …]</span>
+<span class="y">Remove the USB cable from your MotorsBus and press Enter when done.</span>
+
+<span class="c"># ③ 拔掉要找的那只臂的 USB → 回车，输出即为它的端口</span>
+<span class="y">The port of this MotorsBus is '/dev/ttyACM0'</span>
+<span class="y">Reconnect the USB cable.</span>   <span class="c"># 插回继续找下一条（每次重启端口号可能会变化）</span>
+
+<span class="c"># ④ 查询串口信息，核对序列号与别名（示例为右主臂）</span>
+<span class="g">udevadm</span> info --query=all --name=/dev/ttyACM0
+<span class="y">S: arm_master_right</span>
+<span class="y">E: ID_SERIAL_SHORT=5B79018622</span>
+<span class="y">E: DEVLINKS=… /dev/arm_master_right …</span>
+
+<span class="c"># ⑤ 写入/检查四条别名规则（第 03 章 5）</span>
+<span class="g">sudo</span> nano /etc/udev/rules.d/99-lerobot-arms.rules
+<span class="c">#   5B61034506→arm_master_left   5B79018622→arm_master_right</span>
+<span class="c">#   5B79019324→arm_slave_left     5B79018452→arm_slave_right</span>
+
+<span class="c"># ⑥ 之后所有命令直接用稳定别名</span>
+<span class="c">#   /dev/arm_slave_left · /dev/arm_slave_right · /dev/arm_master_left · /dev/arm_master_right</span></pre>
+  <div class="tip teal" style="margin-top:14px"><span class="lab">◆ find-port 口诀</span><b>先通电 → 再插 USB → 运行 find-port → 拔线看差异</b>。每次重启端口号可能变，但序列号不变——所以 find-port 找到后必须写 udev 别名固化身份，别靠记 ttyACM 编号。</div>
+</section>
+
+<!-- 06 -->
+<section class="blk" id="s6">
+  <h2><span class="no">06</span>动画讲解：六关节结构爆炸图<span class="seg">课段 4 · 示证新知 · 12 min</span></h2>
+  <p class="lead">下方是 SO100 机械臂的<b>可动 3D 模型</b>：拖拽旋转视角、滚轮缩放、滑杆独立控制 6 个关节角度（J1~J5 + 夹爪），点"挥手"看预设动作演示：</p>
+  <div class="anim3d-block">
+    <div id="scene-arm" class="anim3d-canvas"
+         data-src="./anim-3d/anim3d-so100-arm.js"
+         style="height:440px"></div>
+    <p class="anim3d-hint">� 拖拽旋转 · 滚轮缩放 · 滑杆控制各关节 · 右键平移</p>
+    <p class="anim3d-caption">模型 2-1｜SO100 六关节可动 3D 模型（J1 底座旋转 → J2 肩俯仰 → J3 肘俯仰 → J4 腕俯仰 → J5 腕滚转 → 夹爪开合）</p>
+  </div>
+</section>
+
+<!-- 07 -->
+<section class="blk" id="s7">
+  <h2><span class="no">07</span>互动练习：装配顺序点击排序<span class="seg">课段 7 · 应用新知 · 10 min</span></h2>
+  <p class="lead">下面 8 张卡片被打乱了。按正确流程<b>依次点击</b>：点对亮绿、点错亮红并提示，全部排完自动通关：</p>
+  <div class="ix-panel">
+    <div class="ix-title">装配流水线 · 按正确顺序点击步骤卡</div>
+    <div class="ctl-row" id="asmRow">
+      <button class="btn ghost" data-step="4" onclick="asmPick(4,this)">接 12V 电源（从臂上车）</button>
+      <button class="btn ghost" data-step="2" onclick="asmPick(2,this)">设置电机编号</button>
+      <button class="btn ghost" data-step="7" onclick="asmPick(7,this)">摄像头按顺序插电脑背面</button>
+      <button class="btn ghost" data-step="1" onclick="asmPick(1,this)">主臂卡钳夹紧固定桌面</button>
+      <button class="btn ghost" data-step="5" onclick="asmPick(5,this)">Joint1~5 + Gripper 逐关节上臂</button>
+      <button class="btn ghost" data-step="3" onclick="asmPick(3,this)">摄像头装臂（注意防呆口）</button>
+      <button class="btn ghost" data-step="8" onclick="asmPick(8,this)">find-port 找口核对别名</button>
+      <button class="btn ghost" data-step="6" onclick="asmPick(6,this)">先接臂电源、后插 USB</button>
+    </div>
+    <div class="io" id="asmIo"><span class="dim">// 待排步骤 8 / 已排 0 —— 从第 1 步开始点</span>
+<span class="dim">提示：① 主臂上桌 → ② 编号 → ③ 摄像头装臂 → ④ 从臂上车 → ⑤ 上关节 → ⑥ 插线 → ⑦ 背面顺序插相机 → ⑧ 找口</span></div>
+    <div class="ctl-row" style="margin-top:8px">
+      <button class="btn ghost" onclick="asmReset()">↺ 重排</button>
+    </div>
+  </div>
+  <div class="tip violet" style="margin-top:14px"><span class="lab">🙋 为什么第 6 步"先电源后 USB"这么靠后还关键</span>它是每次开机都要重复的"肌肉记忆"，装机当天做错一次，就会在 find-port 阶段表现为"少一只臂"——排障成本极高，所以单独成卡。</div>
+</section>
+
+<!-- 08 -->
+<section class="blk" id="s8">
+  <h2><span class="no">08</span>常见问题<span class="seg">课段 8 · 融会贯通 · 13 min</span></h2>
+  <ul class="check">
+    <li><span class="ok">find-port 找到的 ttyACM 比臂少一只</span>：先查供电（主臂 5V 2A / 从臂 12V 8A 是否插对），再按"先断电→插 USB→再通电"顺序重插（第 03 章 1）</li>
+    <li><span class="ok">重启后端口号对不上了</span>：正常现象——"每次重启端口号可能会变化"，靠 udev 别名而不是 ttyACM 序号识别</li>
+    <li><span class="ok">udevadm info 查不到 arm_* 别名</span>：规则文件没重载，或该臂序列号抄错一位</li>
+    <li><span class="ok">摄像头线插了没画面</span>：摄像头必须插<b>电脑背面</b>且按指导顺序插入；串口线才走拓展坞（第 02 章 4）</li>
+    <li><span class="ok">某个关节方向装反/卡死</span>：对照对应 Joint 视频重装，编号与机械限位一次对齐，别带病进 EXP-03</li>
+    <li><span class="ok">GPIO/串口权限报错</span>：见 EXP-01 已加入 dialout 组；本课临时排查可用 <code>sudo chmod 666 /dev/ttyACM*</code></li>
+  </ul>
+  <div class="tip amber"><span class="lab">💡 排障顺序</span>先看灯与电源（硬件通电没）→ 再看线（左电源右串口对吗）→ 最后看软件（find-port 输出）。八成问题出在前两步。</div>
+</section>
+
+<!-- 09 -->
+<section class="blk" id="s9">
+  <h2><span class="no">09</span>拓展挑战<span class="seg">课段 8 · 融会贯通</span></h2>
+  <div class="tip violet"><span class="lab">🚀 挑战一：做一张"序列号—别名—插口"三联台账</span>四条臂逐一 udevadm info 核对，把 ID_SERIAL_SHORT、SYMLINK 别名、实际插的拓展坞口位记成表；下次换机复现只看这张表。</div>
+  <div class="tip violet"><span class="lab">🚀 挑战二：盲装一个关节</span>在不看视频的情况下装配一个关节（如 Joint3），再回放视频核对螺丝顺序与走线，记录差异点——差异清单就是你的技能盲区清单。</div>
+</section>
+
+<!-- 10 -->
+<section class="blk" id="s10">
+  <h2><span class="no">10</span>思考题<span class="seg">课段 8 · 融会贯通</span></h2>
+  <div class="tip violet"><span class="lab">📝 思考题 1</span>指导文档强调"先接通电源，再插 USB，顺序不要颠倒，可能导致连接失败"。结合 USB 枚举与供电时序，推演<b>反着插</b>时主机可能看到什么现象？你会用哪条命令验证猜测？</div>
+  <div class="tip violet"><span class="lab">📝 思考题 2</span>如果"设置电机编号"时把 Joint2 和 Joint3 的编号写反了，到 EXP-03 校准或 EXP-04 遥操作阶段会分别出现什么症状？为什么越早发现代价越小？</div>
+</section>
+
+<nav class="expnav">
+  <a class="prev" href="../exp-01-platform-setup/index.html"><span class="lb">← 上一个实验</span>EXP-01 主机环境搭建</a>
+  <a class="next" href="../exp-03-arm-calibration/index.html"><span class="lb">下一个实验 →</span>EXP-03 摄像头配置与主从臂校准</a>
+</nav>
+
+<footer>
+  <span>IND-01 · 具身智能端到端平台与基础 · EXP-02 机械臂硬件组装与串口识别</span>
+  <span>8 学时 · 操作性 · 基于 LZ-XL01 指导文档第 02 章《硬件组装》、第 03 章《机械臂串口》改编</span>
+</footer>
+
+</main>
+</div>
+
+<script>
+// 装配顺序点击排序：1→8
+var asmNext=1;
+function asmOut(t){document.getElementById('asmIo').innerHTML=t;}
+function asmPick(step,btn){
+  if(step===asmNext && asmNext<=8){
+    btn.classList.remove('ghost');
+    btn.style.background='var(--theme)';
+    btn.style.borderColor='var(--theme)';
+    btn.style.color='#fff';
+    btn.disabled=true;
+    var done=asmNext;
+    asmNext=asmNext+1;
+    asmOut('<span class="dim">// 第 '+done+' 步：'+btn.textContent+'</span>\n<span class="ok">✔ 顺序正确！当前进度 '+done+' / 8</span>'+(done===8?'\n<span class="ok">🎉 全部排完：现场装配即按此流水线执行，可进入 EXP-03</span>':'\n<span class="dim">继续点第 '+(asmNext)+' 步</span>'));
+  }else{
+    asmOut('<span class="dim">// 第 ? 步尝试：'+btn.textContent+'</span>\n<span class="bad">✘ 不是当前该做的步骤 —— 回想流程：上桌 → 编号 → 装摄像头 → 上车 → 上关节 → 接线找口</span>\n<span class="warn">当前正等第 '+asmNext+' 步</span>');
+  }
+}
+function asmReset(){
+  asmNext=1;
+  var bs=document.querySelectorAll('#asmRow .btn');
+  bs.forEach(function(b){b.disabled=false;b.className='btn ghost';b.style.cssText='';});
+  asmOut('<span class="dim">// 已重排，从第 1 步开始：主臂卡钳夹紧固定桌面</span>');
+}
+</script>
+<script src="../shared/tutorial.js" defer></script>
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.180.0/build/three.module.js",
+               "three/addons/": "https://unpkg.com/three@0.180.0/examples/jsm/" } }
+</script>
+<script type="module">
+  import * as THREE from 'three';
+  import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+  function initArm(container) {
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x111827);
+    scene.fog = new THREE.Fog(0x111827, 8, 20);
+    const cam = new THREE.PerspectiveCamera(40, container.clientWidth / container.clientHeight, 0.1, 100);
+    cam.position.set(4, 3.5, 5);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    container.appendChild(renderer.domElement);
+    container.style.position = 'relative';
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x1e293b, 0.7));
+    const dir = new THREE.DirectionalLight(0xffffff, 1.4);
+    dir.position.set(5, 8, 4); dir.castShadow = true;
+    dir.shadow.mapSize.set(1024, 1024);
+    dir.shadow.camera.left = -5; dir.shadow.camera.right = 5;
+    dir.shadow.camera.top = 5; dir.shadow.camera.bottom = -5;
+    scene.add(dir);
+    const fill = new THREE.DirectionalLight(0x5eead4, 0.3);
+    fill.position.set(-4, 3, -3); scene.add(fill);
+    const ground = new THREE.Mesh(new THREE.CircleGeometry(5, 48), new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: .2, roughness: .9 }));
+    ground.rotation.x = -Math.PI / 2; ground.position.y = -0.01; ground.receiveShadow = true;
+    scene.add(ground);
+    const grid = new THREE.GridHelper(8, 16, 0x334155, 0x1e293b);
+    grid.material.opacity = .4; grid.material.transparent = true;
+    scene.add(grid);
+    const mat = (c, m = .4, r = .5) => new THREE.MeshStandardMaterial({ color: c, metalness: m, roughness: r });
+    const colors = { j1: 0x0d9488, j2: 0x38bdf8, j3: 0xa78bfa, j4: 0xfbbf24, j5: 0xf472b6, grip: 0x34d399, link: 0x475569, dark: 0x1e293b };
+    const root = new THREE.Group(); scene.add(root);
+    const baseDisk = new THREE.Mesh(new THREE.CylinderGeometry(.5, .6, .12, 32), mat(colors.dark, .6, .3));
+    baseDisk.position.y = .06; baseDisk.castShadow = true; baseDisk.receiveShadow = true;
+    root.add(baseDisk);
+    const j1 = new THREE.Group(); j1.position.y = .12; root.add(j1);
+    const j1Motor = new THREE.Mesh(new THREE.CylinderGeometry(.22, .26, .3, 24), mat(colors.j1));
+    j1Motor.position.y = .15; j1Motor.castShadow = true; j1.add(j1Motor);
+    const j1Ring = new THREE.Mesh(new THREE.TorusGeometry(.27, .03, 8, 24), mat(colors.j1, .5, .3));
+    j1Ring.rotation.x = Math.PI / 2; j1Ring.position.y = .15; j1.add(j1Ring);
+    const j2 = new THREE.Group(); j2.position.y = .3; j1.add(j2);
+    const j2Motor = new THREE.Mesh(new THREE.CylinderGeometry(.18, .2, .26, 24), mat(colors.j2));
+    j2Motor.rotation.z = Math.PI / 2; j2Motor.castShadow = true; j2.add(j2Motor);
+    const upperArm = new THREE.Mesh(new THREE.BoxGeometry(.14, 1.2, .14), mat(colors.link, .5, .4));
+    upperArm.position.y = .65; upperArm.castShadow = true; j2.add(upperArm);
+    const upperStripe = new THREE.Mesh(new THREE.BoxGeometry(.16, .02, .02), mat(colors.j2));
+    upperStripe.position.y = .65; j2.add(upperStripe);
+    const j3 = new THREE.Group(); j3.position.y = 1.3; j2.add(j3);
+    const j3Motor = new THREE.Mesh(new THREE.CylinderGeometry(.16, .18, .22, 24), mat(colors.j3));
+    j3Motor.rotation.z = Math.PI / 2; j3Motor.castShadow = true; j3.add(j3Motor);
+    const forearm = new THREE.Mesh(new THREE.BoxGeometry(.12, 1.0, .12), mat(colors.link, .5, .4));
+    forearm.position.y = .55; forearm.castShadow = true; j3.add(forearm);
+    const j4 = new THREE.Group(); j4.position.y = 1.1; j3.add(j4);
+    const j4Motor = new THREE.Mesh(new THREE.CylinderGeometry(.14, .16, .2, 24), mat(colors.j4));
+    j4Motor.rotation.z = Math.PI / 2; j4Motor.castShadow = true; j4.add(j4Motor);
+    const wristSeg = new THREE.Mesh(new THREE.BoxGeometry(.1, .4, .1), mat(colors.link, .5, .4));
+    wristSeg.position.y = .25; wristSeg.castShadow = true; j4.add(wristSeg);
+    const j5 = new THREE.Group(); j5.position.y = .5; j4.add(j5);
+    const j5Motor = new THREE.Mesh(new THREE.CylinderGeometry(.12, .14, .18, 24), mat(colors.j5));
+    j5Motor.castShadow = true; j5.add(j5Motor);
+    const gripBase = new THREE.Mesh(new THREE.BoxGeometry(.16, .06, .16), mat(colors.grip));
+    gripBase.position.y = .14; gripBase.castShadow = true; j5.add(gripBase);
+    const fingerL = new THREE.Mesh(new THREE.BoxGeometry(.04, .2, .06), mat(colors.grip));
+    fingerL.position.set(-.06, .28, 0); fingerL.castShadow = true; j5.add(fingerL);
+    const fingerR = new THREE.Mesh(new THREE.BoxGeometry(.04, .2, .06), mat(colors.grip));
+    fingerR.position.set(.06, .28, 0); fingerR.castShadow = true; j5.add(fingerR);
+    const controls = new OrbitControls(cam, renderer.domElement);
+    controls.enableDamping = true; controls.dampingFactor = .08;
+    controls.target.set(0, 1.5, 0); controls.minDistance = 3; controls.maxDistance = 12;
+    controls.maxPolarAngle = Math.PI * .85;
+    const jointAngles = { j1: 0, j2: 0, j3: 0, j4: 0, j5: 0, grip: .06 };
+    const jointRanges = {
+      j1: { min: -180, max: 180, label: 'J1 底座旋转' },
+      j2: { min: -90, max: 90, label: 'J2 肩俯仰' },
+      j3: { min: -135, max: 135, label: 'J3 肘俯仰' },
+      j4: { min: -90, max: 90, label: 'J4 腕俯仰' },
+      j5: { min: -180, max: 180, label: 'J5 腕滚转' },
+      grip: { min: 0, max: 15, label: '夹爪开合' }
+    };
+    function applyAngles() {
+      j1.rotation.y = jointAngles.j1 * Math.PI / 180;
+      j2.rotation.z = jointAngles.j2 * Math.PI / 180;
+      j3.rotation.z = jointAngles.j3 * Math.PI / 180;
+      j4.rotation.z = jointAngles.j4 * Math.PI / 180;
+      j5.rotation.y = jointAngles.j5 * Math.PI / 180;
+      fingerL.position.x = -jointAngles.grip / 100 - .01;
+      fingerR.position.x = jointAngles.grip / 100 + .01;
+    }
+    const ui = document.createElement('div');
+    ui.style.cssText = 'display:flex;flex-direction:column;gap:6px;font-family:sans-serif;margin-top:10px;padding:12px 14px;background:#1e293b;border:1px solid #334155;border-radius:12px';
+    container.parentElement.insertBefore(ui, container.nextSibling);
+    const sliders = {};
+    Object.keys(jointRanges).forEach(k => {
+      const r = jointRanges[k];
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:8px;background:rgba(17,24,39,.82);border:1px solid #334155;border-radius:8px;padding:5px 10px';
+      const lab = document.createElement('span');
+      lab.textContent = r.label;
+      lab.style.cssText = 'font-size:11px;color:#5eead4;font-weight:700;min-width:80px;white-space:nowrap';
+      const sl = document.createElement('input');
+      sl.type = 'range'; sl.min = r.min; sl.max = r.max; sl.value = jointAngles[k];
+      sl.step = k === 'grip' ? .5 : 1;
+      sl.style.cssText = 'flex:1;accent-color:#5eead4;width:120px';
+      const val = document.createElement('span');
+      val.textContent = jointAngles[k] + (k === 'grip' ? 'mm' : '°');
+      val.style.cssText = 'font-size:10px;color:#94a3b8;font-family:monospace;min-width:42px;text-align:right';
+      sl.addEventListener('input', () => {
+        jointAngles[k] = parseFloat(sl.value);
+        val.textContent = sl.value + (k === 'grip' ? 'mm' : '°');
+        applyAngles();
+      });
+      row.appendChild(lab); row.appendChild(sl); row.appendChild(val);
+      ui.appendChild(row); sliders[k] = sl;
+    });
+    const btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap';
+    ui.appendChild(btnRow);
+    const btnReset = document.createElement('button');
+    btnReset.textContent = '⟲ 归零';
+    btnReset.style.cssText = 'padding:4px 12px;border:1px solid #475569;border-radius:6px;background:rgba(71,85,105,.3);color:#94a3b8;font-size:11px;cursor:pointer';
+    btnReset.addEventListener('click', () => {
+      Object.keys(jointAngles).forEach(k => { jointAngles[k] = 0; sliders[k].value = 0; });
+      jointAngles.grip = .06; sliders.grip.value = .06;
+      applyAngles();
+      Object.keys(sliders).forEach(k => {
+        const valEl = sliders[k].parentElement.querySelector('span:last-child');
+        valEl.textContent = sliders[k].value + (k === 'grip' ? 'mm' : '°');
+      });
+    });
+    btnRow.appendChild(btnReset);
+    const btnWave = document.createElement('button');
+    btnWave.textContent = '👋 挥手';
+    btnWave.style.cssText = 'padding:4px 12px;border:1px solid #a78bfa;border-radius:6px;background:rgba(167,139,250,.15);color:#c4b5fd;font-size:11px;cursor:pointer';
+    btnRow.appendChild(btnWave);
+    let waving = false, waveT = 0;
+    btnWave.addEventListener('click', () => {
+      waving = !waving;
+      btnWave.textContent = waving ? '⏸ 停止' : '👋 挥手';
+    });
+    // hint 已移到模型下方控件区
+    let visible = true;
+    new IntersectionObserver(([e]) => visible = e.isIntersecting, { threshold: .05 }).observe(container);
+    function loop() {
+      requestAnimationFrame(loop);
+      if (!visible) return;
+      if (waving) {
+        waveT += 0.04;
+        jointAngles.j1 = Math.sin(waveT * .5) * 30;
+        jointAngles.j2 = -30 + Math.sin(waveT * 1.5) * 15;
+        jointAngles.j3 = -60;
+        jointAngles.j4 = Math.sin(waveT * 2) * 25;
+        jointAngles.j5 = Math.sin(waveT * 1.5) * 45;
+        jointAngles.grip = 8;
+        Object.keys(jointAngles).forEach(k => sliders[k].value = jointAngles[k]);
+        const labels = ui.querySelectorAll('span:last-child');
+        Object.keys(jointRanges).forEach((k, i) => {
+          if (labels[i]) labels[i].textContent = Math.round(jointAngles[k] * 10) / 10 + (k === 'grip' ? 'mm' : '°');
+        });
+        applyAngles();
+      }
+      controls.update();
+      renderer.render(scene, cam);
+    }
+    applyAngles(); loop();
+    addEventListener('resize', () => {
+      cam.aspect = container.clientWidth / container.clientHeight;
+      cam.updateProjectionMatrix();
+      renderer.setSize(container.clientWidth, container.clientHeight);
+    });
+  }
+
+  // 初始化所有 3D 画布
+  document.querySelectorAll('.anim3d-canvas[data-src]').forEach(el => {
+    try { initArm(el); }
+    catch(e) {
+      el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#5eead4;font-size:14px;text-align:center;padding:20px">⚠ 3D 模型加载失败<br>需联网首次加载 Three.js 库</div>';
+      console.error('3D init error:', e);
+    }
+  });
+</script>
+</body>
+</html>

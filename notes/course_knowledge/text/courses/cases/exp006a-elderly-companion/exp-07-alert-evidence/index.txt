@@ -1,0 +1,299 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/cases/exp006a-elderly-companion/exp-07-alert-evidence/index.html
+TITLE: EXP-07 · 告警与证据链 — 老人跌倒监护综合项目
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+EXP-07 · 告警与证据链 — 老人跌倒监护综合项目
+🧠 具身智能课程 ·
+教程首页
+综合项目
+/
+老人跌倒监护
+/ EXP-07
+本页目录
+01 问题引入：报警响了，证据呢
+02 原理通俗讲解：寄包裹式的告警帧与"行车记录仪"
+03 关联知识点：协议帧 · 证据链 · 推流
+04 实验目标
+05 实验环境与准备
+06 动画讲解：告警帧结构与证据时间轴
+07 互动讲解：告警链路与节流沙盘
+08 实操步骤：T9 用例与证据验证
+09 重点与易错点
+10 总结与思考
+CH1 · 需求与配置
+EXP-01 需求分析
+EXP-02 分层架构
+EXP-03 配置详解
+CH2 · 感知与交互
+EXP-04 语音交互
+EXP-05 检测与姿态
+EXP-06 跌倒状态机
+CH3 · 告警与验证
+EXP-07 告警证据链
+EXP-08 LLM·VLM
+EXP-09 全功能验证
+EXP-07 · 第 3 章 · 综合性 · 4 学时
+告警与证据链：让每一次报警"有声、有据、可回放"
+状态机喊出 ALERT 之后，系统要做三件事：让下位机
+响起来
+（STM32 串口帧驱动蜂鸣/LED/OLED）、让证据
+留下来
+（FrameRing 三前二后三件套 + events.jsonl）、让画面
+播出去
+（:8088 MJPEG 推流）。本实验拆解
+[AA][55]+Func+Len+Data+CRC8
+帧格式与 CRC-8/MAXIM 校验、
+buzzer.refresh 5s + alert_tts_interval 10s 双节流
+、环形缓冲容量公式，按 T9-1~T9-8 用例完成含降级路径的全流程验证。
+难度 ⭐⭐⭐ · 4 学时
+0xAA55+CRC8
+FrameRing
+双节流 5s/10s
+MJPEG :8088
+01
+问题引入：报警响了，证据呢
+深夜老人跌倒，蜂鸣器响了、语音也播了 —— 可第二天子女问"当时到底怎么倒的"，系统什么也拿不出；或者反过来：证据存了 20 分钟全程录像、占满磁盘，隐私还全暴露。告警系统的完整闭环是
+声、据、流三件事同时成立
+：不响是失职，不留证据是无据，不分流展示是盲区。
+1
+ALERT 事件 → 串口协议帧 → STM32 驱动蜂鸣/LED/OLED（有声）
+2
+FrameRing 前 3s + 后 2s → jpg/_post.jpg/avi + events.jsonl（有据）
+3
+MJPEG :8088/fall.mjpg → 家属/看护端实时画面（有流）
+4
+任何一环故障都要
+优雅降级不崩溃
+：串口拔了 → 音频+日志顶上
+💡 一个类比
+整条链路就是小区的
+火警系统 + 监控回放
+：警铃要响（告警帧）、监控要留下事前事后片段（环形录像）、消控室能实时看到画面（推流）—— 三件缺一件，物业都担不起责任。
+02
+原理通俗讲解：寄包裹式的告警帧与"行车记录仪"
+串口帧
+像寄快递：面单+包裹+防伪码
+串口是无边界的字节流，必须自己切帧。
+0xAA 0x55 帧头
+=快递面单（收端滑到这两个字节就知道帧开始了），
+Len
+=包裹重量（按它收 Data），
+CRC8
+=防伪校验码 —— 从 Func 到 Data 末尾算出 1 字节，
+不含帧头
+。校验值对不上就丢弃，防传输误码。
+CRC-8/MAXIM
+自行车密码锁一样的算法
+多项式 x⁸+x⁵+x⁴+1（反射 0x8C），查表法每字节一次异或+一次查表，微秒级。公开对拍基准：
+checksum_crc8(b"123456789")==0xA1
+—— 算不出 0xA1 说明实现错了。
+证据链
+行车记录仪的"哨兵模式"
+不等事故发生了才开录 ——
+FrameRing 常驻环形缓冲
+只留最近 3s（capacity=3.0×10=30 帧），ALERT 瞬间取回前段，再收 2s 后段，落盘"前截图+后截图+约5s视频+事件日志"，超 100 条自动轮转。
+双节流
+闹钟分开定，互不干扰
+蜂鸣/LED/OLED 走
+buzzer.refresh 5.0s
+，TTS 走
+alert_tts_interval 10.0s
+，两套独立时间戳。硬件提醒密一点、语音播报疏一点 —— 都急会吵到老人，都疏又提醒不足。首次触发 force=True 无条件响。
+🔔 人文关怀与隐私底线
+证据只在
+ALERT 触发时
+留前后 5 秒，不全程录像 —— 既够复盘"怎么倒的"，又最大限度保护老人日常起居隐私；runs/ 目录含人像，
+.gitignore 排除不入库
+，交给家人按需取用。
+03
+关联知识点：协议帧 · 证据链 · 推流
+知识点
+内容
+源码锚点
+5.2.1 STM32 串口协议
+[AA][55][Func 1B][Len 1B][Data N B][CRC8 1B]；蜂鸣器 Func=2 <HHHH>(freq/on_ms/off_ms/repeat)、LED Func=1 <BHHH>、OLED Func=10(行号+UTF-8)；/dev/ttyUSB0 1Mbps；CRC 范围 Func→Data；蜂鸣帧实例 AA 55 02 08 E8 03 96 00 96 00 00 00
+2D
+（1000Hz/0.15s/0.15s）
+stm32_protocol.py L31-L33（常量）、L36-L40（CRC8 查表）、L44-L47（build_frame）、L50-L71（三种 build）
+告警调用链与门控
+_dispatch(ALERT) → _start_alarm(force=True) → _refresh_alarm → hw_alert.buzzer_on → build_buzzer → uart.send；_gated 同时检查 buzzer.enabled 与串口可用，任一不满足静默跳过；串口打开失败自动降级（「串口打开失败，硬件告警降级为音频+日志」）
+monitor.py L502-L525（_start_alarm/_refresh_alarm）；alert_hw.py L25-L34（降级）、L70-L78（_gated）
+5.2.2 证据存档
+FrameRing capacity=max(1,int(pre×fps))=30 帧，deque 挤出最旧；window() 按时间戳取帧（掉帧也健壮）；_pending_save 双阶段：ALERT 立取 pre、每帧收 post 至 due=+2.0s；save_evidence 写 jpg/_post.jpg/avi(mp4v,≥2帧)/events.jsonl，max_files=100 轮转
+evidence.py L19-L33（FrameRing）、L42-L86（save_evidence/轮转）；monitor.py L251（每帧 push）、L508-L512（pending）、L354-L363（落盘）
+5.2.3 MJPEG 推流
+mjpeg_streamer；multipart/x-mixed-replace 逐帧独立 JPEG、低延迟无帧间压缩；start() 先 socket 预检端口防静默 404；流名自动补 .mjpg；stop() 吞 aiohttp GracefulExit 防 core dumped
+mjpeg_server.py L42（补 .mjpg）、L47-L57（预检）、L61-L63（set_frame）、L68-L71（stop）
+测试与清理
+docs/09 用例 T9-1~T9-8 四大类（正常/降级/轮转/冲突）；pkill 清理 aplay/llm_server/mjpeg_streamer，TIME_WAIT 不算占用
+docs/09_告警与证据测试用例.md；monitor.py L579-L588（shutdown 强制落盘）
+04
+实验目标
+能手工推演一帧蜂鸣器帧的 CRC8（对照
+check("123456789")=0xA1
+与实测 0x2D），说清 CRC 范围为何不含帧头
+能默写告警调用链
+_dispatch → _start_alarm → _refresh_alarm → buzzer_on → build_buzzer → uart.send
+，解释 force 语义
+能独立触发 ALERT 并验证
+证据四件套
+（jpg / _post.jpg / avi / events.jsonl）完整性
+能解释 FrameRing 容量公式 3.0×10=30 与
+按时间取帧
+的健壮性
+能实测双节流节奏（蜂鸣≈5s、TTS≈10s），并完成 T9 用例 + pkill 清理
+05
+实验环境与准备
+1
+硬件：小车 C1（RK3576 + STM32F407），告警板
+/dev/ttyUSB0
+（1Mbps，USB1 是雷达别插错）
+2
+无硬件也可做
+：串口打开失败自动降级为音频+日志（alert_hw L30-L34），证据与 MJPEG 照常验证
+3
+软件：Ubuntu 22.04 + ROS 2 Humble · Python 3.10 · pyserial · opencv · pip install -i https://pypi.tuna.tsinghua.edu.cn/simple mjpeg_streamer
+4
+核心模块：common/stm32_protocol.py · fall/alert_hw.py · fall/evidence.py；配置 evidence / alert / interaction 三段
+5
+确认 runs/evidence/ 可写；改 server.port 前先 lsof -i :8088 查占用
+06
+动画讲解：告警帧结构与证据时间轴
+告警帧: build_frame(func, data) = AA 55 | func | len | data | crc8
+AA
+帧头1B
+55
+帧头1B
+Func=02
+蜂鸣器
+Len=08
+Data长
+E8 03 │ 96 00 │ 96 00 │ 00 00
+<HHHH> 1000Hz│响150ms│停150ms│无限次
+CRC8=2D
+查表·不含帧头
+checksum_crc8 覆盖范围: Func→Data 末尾（build_frame L45 payload）
+帧头 AA55 仅用于同步，不参与校验
+调用链: ALERT → 蜂鸣
+_start_alarm
+_refresh_alarm
+buzzer_on→_gated
+build_buzzer
+uart.send
+force=True 首帧无条件 → 之后 buzzer.refresh≥5.0s 闸门 │ TTS 独立闸 alert_tts_interval≥10.0s
+证据时间轴（FrameRing 30 帧常驻 + 双阶段收集）
+pre 前段 3.0s（ring.window 按时间戳取，掉帧也健壮）
+post 2.0s 收集
+ALERT (due=now+2s)
+落盘: pre[-1]→jpg │ post[0]→_post.jpg │ 合并→avi(mp4v,≥2帧) │ events.jsonl 追加，max_files=100 轮转
+轮转>100 删除
+动画 7-1：上——蜂鸣器实帧 AA 55 02 08 E8 03 96 00 96 00 00 00
+2D
+，紫色 CRC 块闪烁强调其覆盖 Func→Data、不含帧头；中——ALERT 到 uart.send 五级调用链与双闸门（5s 硬件 / 10s 语音）；下——FrameRing 时间轴：ALERT 红线时刻立取前 3s、再收 2s 后段，四件套落盘、超 100 条滚动清理。
+07
+互动讲解：告警链路与节流沙盘
+🕹️ 告警链路沙盘 · Alert Bench —— 模拟 ALERT 后时间轴推进，看双节流、证据与降级如何联动
+🚨 触发 ALERT（force 首响）
+⏩ 推进 5 秒
+🗣 再过 10 秒（TTS 闸）
+🔌 拔掉 USB0 串口
+💬 输入「没事」
+↺ 重置
+🔔 试试「拔串口」再触发
+降级后的链路停在 _gated 的 available=False 分支，
+uart.send 永不执行
+、程序不崩 —— 这就是 T9-2 的期望结果：告警降级为音频+日志，证据与推流完全不受影响。
+08
+实操步骤：T9 用例与证据验证
+1
+读 stm32_protocol.py 三核心函数，手工对拍一帧 CRC8
+2
+触发 ALERT（stdin 输入救命），核对证据四件套与 events.jsonl 末条
+3
+--mjpeg 开推流，浏览器看 :8088/fall.mjpg 与状态色块
+4
+ALERT 持续态实测蜂鸣≈5s、TTS≈10s 两套节流节奏
+5
+按 docs/09 执行 T9-1~T9-8（重点 T9-2 拔串口降级、T9-7 端口冲突）
+6
+pkill 三层清理，pgrep/lsof 复核无残留
+# ① 源码定位 + 配置确认
+cd ~/ros2_ws/src/xflz_eai_car1/app/elderly_companion
+grep -n "build_frame\|checksum_crc8\|0xAA" common/stm32_protocol.py
+grep -A5 "^alert:" config/fall_config.yaml
+# ② 触发 ALERT 并验证证据（ASK 时输入「救命」）
+python3 apps/fall_video_demo.py --video testdata/fall_slow_x264.mp4 --text
+# 预期: 串口告警就绪: /dev/ttyUSB0 → ALERT: {…} → buzzer_on（无硬件则日志）
+ls runs/evidence/ | tail
+python3 -c
+"import json;print(json.dumps([json.loads(l) for l in open('runs/evidence/events.jsonl') if l.strip()],ensure_ascii=False,indent=2))"
+# 末条应含 person_id / from / to=ALERT / ts / confidence
+# ③ MJPEG 推流（另开浏览器）
+python3 apps/fall_video_demo.py --video testdata/fall_slow_x264.mp4 --text --mjpeg
+# 浏览器 http://<板端IP>:8088/fall.mjpg —— 色块: 白IDLE→黄FALLING→橙LYING→蓝ASK→红闪ALERT
+# ④ 端口冲突检测（T9-7）：server.port 与 llm.server.port 都改 8080 → 启动报错退出
+# ⑤ 三层清理（T9-8）
+pkill -9 aplay
+pgrep -f llm_server && pkill -9 -f llm_server
+pgrep -f mjpeg_streamer && pkill -9 -f mjpeg_streamer
+lsof /dev/ttyUSB0
+# 应返回空
+💡 记录要点
+每次 ALERT 都留存一份 events.jsonl 片段与日志截图 —— 实验报告要交"帧结构分析 + 调用链图 + 四件套验证 + T9 逐条 Pass/Fail + 清理清单"五件套。
+09
+重点与易错点
+CRC 范围不含帧头
+：payload=[func,len]+data（build_frame L45），帧头只管同步
+Len 是 Data 长度
+，不含 Func/Len 自身；OLED 的 Len=2+utf8 字节数
+双定时器各管各的
+：5s 管蜂鸣/LED/OLED、10s 管 TTS，force=True 保首次无延迟
+降级靠门控
+：三件硬件操作全走 _gated，串口不可用即静默跳过，绝不裸调 uart.send
+现象
+原因
+解决
+.avi 没生成
+合并帧数 <2（evidence L66 条件）
+用更长视频或调小 evidence.pre_seconds
+events.jsonl 为空
+状态机根本没进 ALERT
+先确认日志有 ALERT:{…}、输入词在 confirm_words 内
+首次蜂鸣也被"节流"了
+误解 force 语义
+_start_alarm L513 传 force=True 本就无条件首响，查日志核实
+启动报"端口 8088 已被占用"
+上次 demo 未退净 / 与 llm 8080 冲突
+lsof -i :8088 找真残留进程 kill；两端口分开配置（双保险预检）
+浏览器打不开推流
+mjpeg_streamer 未装 / 不同网段 / 防火墙
+pip show 查装；同局域网；mjpeg_server.py L13-L15 注释给了清华源安装命令
+拔串口后程序崩溃
+有硬件操作绕过了 _gated
+核对 alert_hw L70-L78：buzzer/led/oled 必须都过门控
+证据目录无限膨胀
+max_files 被调大/轮转失效
+默认 100 自动删最旧（同名 jpg/_post/avi 连带），需要全留再调大
+pkill 后仍报端口占用
+socket 处于 TIME_WAIT，或 daemon 线程残留
+lsof 分辨 TIME_WAIT（无需处理）与真残留（pkill -9 -f mjpeg_streamer）
+10
+总结与思考
+✅ 完成成果
+六件交付
+帧结构分析笔记（含 CRC 手工对拍 0x2D/0xA1）、告警调用链图、四件套完整性记录、双节流实测节奏、T9-1~T9-8 Pass/Fail 表、pkill 清理清单。
+🧠 原理收获
+协议+缓冲+节流
+帧头/Len/CRC 的切帧与校验分工；环形缓冲"常驻时间窗、触发即取证"的事件驱动思路；时间戳差值节流天然免疫帧率波动。
+🛠 技能收获
+可复现实验习惯
+串口协议逐字段解析法；门控+降级的容错写法；lsof/pgrep 三层残留排查 —— 让每轮实验起点干净。
+❓ 排障思路
+沿链路回溯
+没证据？查是否进 ALERT → 目录可写 → 帧数≥2。没声？查 force 首响日志 → 门控 available → 串口设备号。推流 404？先 lsof 端口。
+🟣 思考题 1
+CRC8 为何用 256 项查表法而非逐位移位？在 1Mbps 下它能检出哪些传输错误？若帧头 0xAA 0x55 被干扰翻转，CRC8 能发现吗 —— 既然帧头不参与校验，系统靠什么挡住脏帧？（提示：帧头错 → 校验/解析自然失步，但要结合 Len 与 CRC 两道闸分析）
+🟣 思考题 2
+把 pre_seconds 从 3s 加大到 10s，在 RK3576 内存受限环境下代价是什么？按 capacity=int(pre×fps)，30 帧 640×480×3 ≈ 27.6MB —— fps 从 10 改 30 会怎样？再回答：蜂鸣 5s 与 TTS 10s 两套定时器为什么不能合并成一个？
+CASE-03 · 老人跌倒监护 · EXP-07 告警与证据链
+4 学时 · 综合性 · 基于 elderly_companion 实验讲义改编

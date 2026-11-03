@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>图 16-1 · bag 存储结构</title>
+<style>
+:root{--bg-page:#ffffff;--bg-card:#ffffff;--text:#0f172a;--text2:#475569;--muted:#94a3b8;
+  --border:#e2e8f0;--teal:#0891b2;--green:#059669;--purple:#7c3aed;--orange:#ea580c;--red:#e11d48;--gray:#64748b;
+  --teal-bg:rgba(8,145,178,.08);--green-bg:rgba(5,150,105,.08);--purple-bg:rgba(124,58,237,.08);
+  --orange-bg:rgba(234,88,12,.10);--gray-bg:rgba(100,116,139,.08)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg-page);color:var(--text);font-family:system-ui,"PingFang SC","Microsoft YaHei",sans-serif;padding:16px 14px 12px}
+.hd{margin-bottom:6px}
+.hd h1{font-size:15px;margin:0 0 4px}
+.hd .q{font-size:12px;color:var(--text2);margin:0}
+svg{width:100%;height:auto;display:block}
+.t{font:600 12.5px system-ui,sans-serif;fill:var(--text)}
+.s{font:400 10.5px system-ui,sans-serif;fill:var(--text2)}
+.l{font:600 10.5px ui-monospace,Consolas,monospace;fill:var(--text2)}
+.dock{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.dock span{font-size:11.5px;border-radius:999px;padding:3px 10px;line-height:1.6}
+.ok{background:#ecfdf5;color:#047857;border:1px solid #a7f3d0}
+.warn{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca}
+.evid{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}
+.ft{font-size:10.5px;color:var(--muted);margin-top:8px;text-align:right}
+</style>
+</head>
+<body>
+<div class="hd">
+  <h1>图 16-1 · 一个 bag 目录里到底装了什么</h1>
+  <p class="q">本图回答的问题：为什么删掉 metadata.yaml 这个包就"失忆"，而 .db3 才是消息本体？</p>
+</div>
+<svg viewBox="0 0 760 470" role="img" aria-label="bag 存储结构图">
+  <!-- 层标签 -->
+  <text class="l" x="14" y="24" fill="var(--purple)">目录层</text>
+
+  <!-- bag 目录容器 -->
+  <rect x="40" y="34" width="680" height="392" rx="10" fill="none" stroke="var(--purple)" stroke-width="1.5" stroke-dasharray="6,4"/>
+  <rect x="40" y="34" width="196" height="22" rx="6" fill="var(--purple)"/>
+  <text x="138" y="50" text-anchor="middle" fill="#fff" font-size="12" font-weight="700" font-family="system-ui">exp16_full/ （一个 bag = 一个目录）</text>
+
+  <!-- metadata.yaml -->
+  <rect x="64" y="76" width="260" height="130" rx="8" fill="#fff"/>
+  <rect x="64" y="76" width="260" height="130" rx="8" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1.5"/>
+  <text class="t" x="194" y="100" text-anchor="middle">metadata.yaml · 清单</text>
+  <g class="s">
+    <text x="80" y="124">duration: 13.55s（算频率的分母）</text>
+    <text x="80" y="146">storage_identifier: sqlite3</text>
+    <text x="80" y="168">relative_file_paths → *.db3</text>
+    <text x="80" y="190">topics_with_message_count：条数/QoS</text>
+  </g>
+
+  <!-- .db3 数据库 -->
+  <rect x="360" y="76" width="336" height="326" rx="8" fill="#fff"/>
+  <rect x="360" y="76" width="336" height="326" rx="8" fill="var(--purple-bg)" stroke="var(--purple)" stroke-width="1.5"/>
+  <text class="t" x="528" y="100" text-anchor="middle">exp16_full_0.db3 · SQLite3 消息本体</text>
+
+  <!-- topics 表 -->
+  <rect x="382" y="116" width="292" height="98" rx="6" fill="#fff" stroke="var(--border)" stroke-width="1"/>
+  <text class="l" x="394" y="138" fill="var(--purple)">表1 · topics（话题元数据）</text>
+  <g class="s">
+    <text x="394" y="160">id → name / type / serialization_format</text>
+    <text x="394" y="182">offered_qos_profiles：录时声明的 QoS</text>
+    <text x="394" y="204">→ info 秒查、play 回放按它重建发布端</text>
+  </g>
+
+  <!-- messages 表 -->
+  <rect x="382" y="232" width="292" height="98" rx="6" fill="#fff" stroke="var(--border)" stroke-width="1"/>
+  <text class="l" x="394" y="254" fill="var(--purple)">表2 · messages（时间序列）</text>
+  <g class="s">
+    <text x="394" y="276">timestamp + topic_id + CDR 字节流</text>
+    <text x="394" y="298">索引 → 任意时间点随机访问（跳转按钮）</text>
+    <text x="394" y="320">事务 → 断电最多损坏最后一笔</text>
+  </g>
+
+  <!-- CDR 注解 -->
+  <rect x="382" y="346" width="292" height="40" rx="6" fill="var(--orange-bg)" stroke="var(--orange)" stroke-width="1.5"/>
+  <text class="s" x="528" y="371" text-anchor="middle" font-weight="600">CDR = DDS 线上原样字节 · 回放零转换 100% 保真</text>
+
+  <!-- 关系连线 -->
+  <line x1="324" y1="128" x2="382" y2="128" stroke="var(--teal)" stroke-width="1.5" marker-end="url(#at)"/>
+  <text class="l" x="330" y="120">指向</text>
+  <line x1="194" y1="206" x2="194" y2="252" stroke="var(--red)" stroke-width="1.5" marker-end="url(#ar)"/>
+  <text class="l" x="204" y="236" fill="var(--red)">删了它 → info 读不出</text>
+
+  <!-- 交叉勾连：count 心算 -->
+  <line x1="252" y1="150" x2="382" y2="270" stroke="var(--gray)" stroke-width="1.2" stroke-dasharray="5,4"/>
+  <text class="l" x="248" y="222" fill="var(--gray)">Count 来自 topics</text>
+
+  <!-- 底部心算条 -->
+  <rect x="64" y="240" width="260" height="66" rx="8" fill="var(--green-bg)" stroke="var(--green)" stroke-width="1.5"/>
+  <text class="t" x="194" y="266" text-anchor="middle">频率心算尺</text>
+  <text class="l" x="194" y="290" text-anchor="middle" fill="var(--green)" font-weight="700">14 / 13.55s ≈ 1.03 Hz ✓</text>
+
+  <rect x="64" y="326" width="260" height="66" rx="8" fill="var(--red)" fill-opacity=".06" stroke="var(--red)" stroke-width="1.5"/>
+  <text class="s" x="194" y="352" text-anchor="middle" font-weight="600" fill="var(--red)">单查一个 _0.db3 会漏分片</text>
+  <text class="s" x="194" y="374" text-anchor="middle" fill="var(--red)">查总数必须 ros2 bag info 目录</text>
+
+  <defs>
+    <marker id="at" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="var(--teal)"/></marker>
+    <marker id="ar" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="var(--red)"/></marker>
+  </defs>
+</svg>
+<div class="dock">
+  <span class="ok">✅ 结论：metadata.yaml 管"找得到"、.db3 管"内容在"，两者缺一不可</span>
+  <span class="warn">⚠️ 风险：单查一个 .db3 漏分片 · 删 yaml 后 info 失忆</span>
+  <span class="evid">🔍 验证：04 节 1.6 cat metadata.yaml + 2 info 心算 1.03Hz</span>
+</div>
+<div class="ft">EXP-16 · rosbag2 数据录制与回放</div>
+</body>
+</html>

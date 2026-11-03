@@ -1,0 +1,332 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/industry/ind03-material-sorting/exp-03-data-training/index.html
+TITLE: EXP-03 · 数据转换与模型训练 | IND-03 物料分拣应用场景
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+EXP-03 · 数据转换与模型训练 | IND-03 物料分拣应用场景
+课程
+工厂
+本页目录 · 五星学习法
+00 课程节奏 · 8 段微课
+01 学习目标 ①聚焦问题
+02 原理 ①聚焦 ②激活
+03 硬件与材料 ③示证新知
+04 操作步骤 ④应用新知
+05 关键命令 ④应用新知
+06 动画 ③示证新知
+07 互动 ④应用新知
+08 常见问题 ⑤融会贯通
+09 拓展 ⑤融会贯通
+10 思考题 ⑤融会贯通
+兄弟实验
+EXP-01 成果演示
+EXP-02 遥操作采集
+EXP-04 真机复现
+EXP-03 · 8 学时
+数据转换与模型训练
+把 save_data 原始采集记录转换成 LeRobot v3.0 标准数据集，再用 lerobot-train 驱动 ACT 策略向示范学习——数据是原料，训练是锻造。
+LeRobot v3.0
+ACT
+本地/云端双路线
+00
+课程节奏：五星学习法 · 8 段微课（每段 ≤ 15 min）
+本实验按
+五星学习法
+组织：先抛出"loss 不降/KeyError"的数据转换翻车现场
+聚焦问题
+，再用装订相册与学徒背书
+激活旧知
+，接着对照训练环境清单与帧-动作对动画
+示证新知
+，然后动手完成转换→训练两条线并练超参选择
+应用新知
+，最后借常见问题与思考题
+融会贯通
+。全程切成
+8 段微课、每段不超过 15 分钟
+，段间停顿 1~2 分钟消化；纯讲授合计约 100 分钟，其余课时用于动手实操与个别辅导。
+① 聚焦问题
+课段 1 · 12 min
+"loss 不降/KeyError"数据转换翻车现场
+② 激活旧知
+课段 2 · 8 min
+装订相册·学徒背书·数据质量>数量
+③ 示证新知
+课段 3~4 · 27 min
+训练环境清单 + 帧动作对/训练进度动画
+④ 应用新知
+课段 5~7 · 40 min
+转换→训练两线·关键命令·超参选择
+⑤ 融会贯通
+课段 8 · 13 min
+排障收口·拓展·思考题拔高
+课段
+五星阶段
+时长
+对应章节
+本段任务
+课段 1
+聚焦问题
+12 min
+§01 + §02 前半
+抛出"loss 不降/KeyError"的数据翻车，明确本课目标
+课段 2
+激活旧知
+8 min
+§02 后半
+用装订相册/学徒背书激活数据装订与训练旧知
+课段 3
+示证新知
+15 min
+§03
+对照清单认识本地/云端两条训练路线与环境
+课段 4
+示证新知
+12 min
+§06
+看帧-动作对与训练进度动画，理解对齐与存档
+课段 5
+应用新知
+15 min
+§04 前半 + §05 ①②
+定区间→跑转换→验数据，对应环境与转换命令
+课段 6
+应用新知
+15 min
+§04 后半 + §05 ③
+准备训练环境→启动训练→收敛判断，对应训练命令
+课段 7
+应用新知
+10 min
+§07
+超参选择题，练 OOM 优先级与坏组处理直觉
+课段 8
+融会贯通
+13 min
+§08~§10
+排障收口，拓展与思考题拔高迁移
+讲课提示：课段 1/2 以讲授 + 提问为主；课段 3~4 用实物 + 动画；课段 5~6 边看视频边动手；课段 7 学员独立完成；课段 8 答疑拔高。段间停顿 1~2 分钟。
+01
+学习目标
+课段 1 · 聚焦问题 · 12 min
+理解四阶段转换架构：读取 CSV → 组装 Parquet → 拼接视频 → 生成 meta 三件套。
+会用 --start/--end/--skip/--task 四种切法处理编号不连续与坏 episode 的现实问题。
+独立搭建训练环境（Python 3.10 必须、PyTorch+CUDA、ffmpeg、pip install -e .）并跑通 lerobot-train。
+读懂训练日志与 loss 曲线，掌握 checkpoint 目录结构，知道 batch_size 与 OOM 的取舍。
+02
+原理：从散装记录到「帧-动作对」教材
+课段 1 收尾 + 课段 2 · 激活旧知 · 8 min
+❓ 聚焦问题（课段 1）
+学员最常翻的车：训练跑了半天 loss 死活不降，甚至直接 KeyError——回头查才发现 episode 163 是坏组没跳过、CSV 的 _trailing 哑列没修、帧和动作错位了半拍。问题出在数据转换，不在模型。带着这个痛点学完整课——到课段 6 你会亲手把散装记录炼成一份干净教材。
+原始采集是一堆按编号存放的文件夹：CSV 关节角 + 零散视频帧，格式是自定义 33 列表头/34 列数据。转换器把它们
+像装订相册一样
+：每组 episode 的每一帧配一条动作标签，照片按时间码贴齐，最后压成标准 Parquet + MP4 + meta 清单。训练时 ACT 每次抽一个 batch，看「这一帧画面 + 当前 16 维关节状态」，预测接下来 100 步动作块（chunk_size=100），预测与人的示范做差——这个差回传（kl_weight=10、use_vae=true），网络就一点点「越看越像你」。
+阶段1 读取
+read_episode_data 解析 34 列 CSV（修复 _trailing 哑列、r_s_7 的 NaN→0），取出 16 关节真值。
+阶段2 Parquet
+[Nᵢ,16] 各文件 concatenate 成 [ΣNᵢ,16]，加 7 元数据列写入 data/chunk-000/file-000.parquet。
+阶段3 视频
+ffmpeg concat demuxer 以 -c copy 流复制拼接三路相机视频，不重编码、不掉帧、不耗 CPU。
+阶段4 meta
+info.json（features dtype/shape）+ tasks.parquet（任务名即标签）+ stats.json + episodes 统计。
+↺ 激活旧知（课段 2）
+回忆两件旧事：① 装订相册——把散装照片按「一次完整活动」分组、按拍摄时间排好、写上拍摄说明，才能当教材用；② 学徒背书——翻得越勤记得越牢，但教材装订错了（页码错位），背得越勤奋错得越狠——所以转换就是装订教材，训练就是背书，数据质量 > 数据数量。
+阶段1 数据流：
+Episode 180–209 的
+[Nᵢ,16]
+关节矩阵逐个 concatenate 成
+[ΣNᵢ,16]
+；阶段2 再补 7 元数据列（episode_index / frame_index / task 等）转成 Parquet。
+生活化类比：
+转换 = 把手机相册（散图）按「一次完整分拣」分组、按拍摄时间排好、写上拍摄说明（meta），炼成一本训练教材；训练 = 学徒反复翻这本教材，把你的手法记进肌肉记忆。
+教材装订错了（帧动作错位），学徒学得越勤奋错得越狠——数据质量 > 数据数量。
+03
+硬件与材料：训练环境清单
+课段 3 · 示证新知 · 15 min
+本地路线
+4060 Ti 16GB + 64GB RAM：能训 ACT，但注意控制数据量防 OOM；batch_size 默认 12 可下调。
+云端路线
+gpufree L40S 镜像（lerobot）：JupyterLab 终端操作，数据 zip 上传至 /root/gpufree-data。
+软件基线
+Miniconda（清华源）+ Python 3.10（必须）+ PyTorch cu121/cu118 + ffmpeg + LeRobot 0.4.1 editable 安装。
+输入物料
+EXP-02 产出的 save_data 目录（编号不从 0 起、含坏组需 skip/区间截取）。
+环境搭建：
+sudo apt install -y ...
+安装基础工具 → 创建 Conda 环境（
+Python 必须 3.10
+，否则 LeRobot 依赖不兼容）→
+pip install -e .
+安装项目。
+依赖排错 Top 3：
+① opencv-python-headless 缺失 →
+pip install opencv-python-headless
+；② pip install 超慢 → 加
+-i https://pypi.tuna.tsinghua.edu.cn/simple
+镜像；③ CUDA 版本不匹配 → 确认
+nvidia-smi
+与 PyTorch 版本对齐。
+04
+操作步骤：转换 → 训练两条线
+课段 5~6 · 应用新知 · 2×15 min
+S1
+定区间
+找最大编号，剔除坏组
+→
+S2
+跑转换
+convert 脚本产出 v3.0 数据集
+→
+S3
+验数据
+目录树/日志/可视化三验
+→
+S4
+lerobot-train
+盯 loss，存 checkpoint
+盘点编号
+：ls save_data 找最大编号（=最新一集），标出坏组编号；案例示例区间 180–209、坏组 163/172/202。
+执行转换
+：按需选用区间 / 跳过 / 任务名三种参数，日志出现「29 episodes、120450 帧、57.23MB 数据 + 2845.67MB 视频」即成功量级。
+验证产出
+：检查 data/ videos/ meta/ 三目录齐全；meta/info.json 可读、tasks.parquet 有任务名；缺 stats.json 图像统计可按排错补。
+准备训练环境
+：conda create -n lerobot python=3.10 → PyTorch → ffmpeg → git clone lerobot → pip install -e . → python -c 导入 ACTPolicy 验证。
+启动训练
+：lerobot-train 全参数执行；控制台或 JupyterLab 终端观察 log_freq=100 的 loss 输出。
+收敛判断与存档
+：loss 长时间平台化后按 save_freq 取 checkpoint（如 050000/pretrained_model）；OOM 时优先降 batch_size。
+转换收尾排错：
+① Episode 163 不存在被跳过属
+正常
+（编号不连续）；② KeyError
+observation.images.side
+多因 stats.json 缺图像统计，按文档补即可；③ ffmpeg 未装导致视频阶段失败 →
+sudo apt install ffmpeg
+。
+训练启动两种方式：
+① 控制台：
+conda activate lerobot && cd lerobot && lerobot-train ...
+；② JupyterLab → 终端：同样命令。两种方式等价，Jupyter 适合边跑边查日志。
+收敛判断与 loss 曲线：
+训练前再次确认转换命令（
+--input
+/
+--output
+/
+--start 1 --end 50 --task
+）与环境就绪。loss 曲线整体下降即健康，长时间平台化后按 save_freq 取 checkpoint；OOM 优先降 batch_size。
+05
+关键命令
+随课段 5 / 6 对照使用
+# ① 环境（03-数据训练：Python 必须 3.10）
+conda create -n lerobot python=3.10 -y
+conda activate lerobot && conda install ffmpeg -y
+git clone <lerobot仓库> && cd lerobot && pip install -e .
+# ② 转换的四种切法（02-数据转换 / 工厂场景案例）
+python convert_lerobot_v3_fixed_simple.py --input ... --output ... \
+  --start 180 --end 209
+# 场景1：连续区间
+python convert_lerobot_v3_fixed_simple.py ... --skip 163,172,202
+# 场景2：剔坏组
+python convert_lerobot_v3_fixed_simple.py ... --task
+"Parts Categorization"
+# 场景3：任务名
+# ③ 训练（工厂场景案例真实命令）
+lerobot-train \
+  --policy.type=act \
+  --dataset.repo_id=lindenbot/parts_categorization \
+  --dataset.root=/home/lindenbot/converted_data \
+  --output_dir=~/lerobot-0.4.1/output/act_fac \
+  --job_name=
+"place fruits in the box"
+\
+  --batch_size=12 --steps=50000 --save_freq=4000 \
+  --log_freq=100 --num_workers=8 \
+  --wandb.enable=false --policy.push_to_hub=false --policy.use_amp=true
+参数速记：
+batch_size=12（显存不够就降）· steps=50000（示例步数；案例复盘建议 500000 步以上更稳）· save_freq=4000（每 4000 步存档）· use_amp=true（AMP 混合精度省显存）。
+06
+动画：帧-动作对与训练进度
+课段 4 · 示证新知 · 12 min
+画面帧（相机观测）
+t₀
+t₁
+t₂
+t₃
+t₄
+t₅
+动作标签（16 关节 + 夹爪）
+每一列 = 一个训练样本
+画面↑ + 状态 → 动作↓
+对齐错位即噪声
+动画：光点逐列扫过——每个「帧-动作对」就是一条样本，损失函数在这条对齐关系上反复纠错。
+训练轮次推进（steps → checkpoint）
+save@4000
+save@8000
+save@12000
+…
+steps=50000
+loss 每 100 步打印一次；进度条走到哪，哪一段权重就被存成 checkpoint
+动画：训练像「进度条 + 里程碑存档」——每 save_freq=4000 步落一个 checkpoint，方便择优回滚到真机。
+07
+互动：训练超参选择题
+课段 7 · 应用新知 · 10 min
+Q1：4060 Ti 上训练报 CUDA OOM，第一优先级调什么？
+A. 把 steps 从 50000 加到 500000
+B. 降低 batch_size（12 → 8 → 4）
+C. 删掉视频目录省磁盘
+Q2：转换日志说「跳过 episode 163」，该怎么办？
+A. 报错中断，必须补齐 163
+B. 属正常——163 是被 skip 的坏组，跳过即预期
+C. 改用 --start 163 --end 163 重转
+重置答题
+已答 0 / 2
+超参直觉：
+batch_size 管显存、steps 管时长、save_freq 管后悔药、log_freq 管心跳
+。数据量大而步数少 = 没看完书；步数多而数据烂 = 背错书。
+08
+常见问题
+课段 8 · 融会贯通 · 13 min
+Q torch.cuda 为 False？
+PyTorch 装成 CPU 版了：按 03-文档重装对应 cu121/cu118 轮子，nvidia-smi 先确认驱动。
+Q pip install -e . 超慢/失败？
+用文档给出的镜像加速方案（清华源/代理），补装 opencv-python-headless、libGL、evdev 等缺失依赖。
+Q 找不到数据集？
+确认 --dataset.root 指向 converted_data 且 data/videos/meta 三目录齐全；路径写错会直接 FileNotFoundError。
+Q loss 不降？
+先查数据：帧动作是否错位、任务名是否唯一、坏组是否混入；再查 lr/batch——多数是数据问题不是模型问题。
+产物打包（云端路线）：
+训练产出按 save_freq 落 checkpoint 目录（如
+outputs/sort/ACT/checkpoints/050000/pretrained_model
+），zip 上传至
+/root/gpufree-data
+供真机推理取用。
+视频阶段前置检查：
+ffmpeg -version
+确认可用；concat demuxer 负责三路相机视频的无损拼接（
+-c copy
+流复制，不重编码、不掉帧、不耗 CPU）。
+09
+拓展阅读
+课段 8 · 融会贯通
+02-数据转换 §性能对比：不加 -c 的全转码路径会大幅耗 CPU，simple 版 -c copy 为何「又快又保真」。
+convert_lerobot_data.py 源码：对照 LeRobotVivialConverter 四阶段类结构读懂工程实现。
+src/lerobot/policies/act/configuration_act.py：chunk_size、kl_weight、use_vae 等超参的官方定义与默认值。
+command/8_train_dual_arm.sh：工程模板如何组织双臂数据集的训练入口与输出目录。
+10
+思考题 · 自测
+课段 8 · 融会贯通
+✅ 完成成果
+产出一份验证通过的 v3.0 数据集 + 至少一个收敛的 checkpoint，日志与目录截图留档。
+🧠 原理收获
+画出四阶段转换架构图，标注每阶段的输入/输出与失败时的排错入口。
+🛠 技能收获
+独立完成环境搭建、四种转换切法、lerobot-train 全参数调用与 OOM 处置。
+📐 评分速览
+互动答题 30% + 数据/训练产物 40% + 思考题 30%。
+思考 1
+为什么 ffmpeg 拼接用 -c copy 就够了？如果相机帧率在两段采集间发生抖动，concat demuxer 会埋下什么隐患？
+思考 2
+案例说「训练步数在 500000 步以上」而示例命令写 steps=50000——这两者如何统一？判断「练够了」除了步数还应看什么证据？
+IND-03 · 物料分拣应用场景 · EXP-03 数据转换与模型训练
+8 学时 · 数据与算法实验 · 基于 聆动课程指导文档《02-聆动机器人数据转换》《03-聆动机器人数据训练》改编

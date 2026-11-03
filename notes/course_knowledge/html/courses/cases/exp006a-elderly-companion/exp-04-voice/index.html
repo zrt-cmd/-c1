@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-04 · 语音交互子系统 — 老人跌倒监护综合项目</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+:root{--theme:#059669;--theme-deep:#047857;--theme-bg:#d1fae5;--theme-bd:#a7f3d0}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit" title="返回课程首页">🧠 具身智能课程 · <i>教程首页</i></a>
+  <div class="crumb"><a href="../../../index.html#case">综合项目</a> / <a href="../index.html">老人跌倒监护</a> / EXP-04</div>
+</div>
+
+<div class="wrap">
+
+<aside class="side">
+  <h4>本页目录</h4>
+  <a href="#s1" class="now">01 问题引入：抢在唤醒前开麦为什么会"哑掉"</a>
+  <a href="#s2">02 原理通俗讲解：语音链路像"值班接线员"</a>
+  <a href="#s3">03 关联知识点：六个语音知识块</a>
+  <a href="#s4">04 实验目标</a>
+  <a href="#s5">05 实验环境与准备</a>
+  <a href="#s6">06 动画讲解：三状态机与唤醒对话闭环</a>
+  <a href="#s7">07 互动讲解：语音事件调度台</a>
+  <a href="#s8">08 实操步骤：文本模式 → 单点 → 全链路</a>
+  <a href="#s9">09 重点与易错点</a>
+  <a href="#s10">10 总结与思考</a>
+  <h4>CH1 · 需求与配置</h4>
+  <a href="../exp-01-requirements/index.html">EXP-01 需求分析</a>
+  <a href="../exp-02-architecture/index.html">EXP-02 分层架构</a>
+  <a href="../exp-03-config/index.html">EXP-03 配置详解</a>
+  <h4>CH2 · 感知与交互</h4>
+  <a href="../exp-04-voice/index.html">EXP-04 语音交互</a>
+  <a href="../exp-05-pose-detection/index.html">EXP-05 检测与姿态</a>
+  <a href="../exp-06-fall-judgment/index.html">EXP-06 跌倒状态机</a>
+  <h4>CH3 · 告警与验证</h4>
+  <a href="../exp-07-alert-evidence/index.html">EXP-07 告警证据链</a>
+  <a href="../exp-08-llm-vlm/index.html">EXP-08 LLM·VLM</a>
+  <a href="../exp-09-full-verification/index.html">EXP-09 全功能验证</a>
+</aside>
+
+<main class="content">
+
+<div class="exp-head">
+  <span class="code">EXP-04 · 第 2 章 · 综合性 · 6 学时</span>
+  <h1>语音交互子系统：唤醒 → 聆听 → 播报的闭环</h1>
+  <p class="desc">语音是老人与系统之间最自然的沟通方式：跌倒后系统问一句"您还好吗？"，老人答"救命"或"没事"，整条监护链路才能善意收尾。本实验吃透 <b>VoiceLoop 三状态机（IDLE / LISTENING / SPEAKING）</b>、<b>XFM 六麦唤醒后才开录音</b>的 ALSA 时序、<b>双次排空防回声</b>、<b>ASK 2s 兜底快答</b>与 <b>epoch 版本号防重复</b>，按 docs/07 用例从文本模式一路验证到硬件全链路。</p>
+  <div class="meta">
+    <span class="tag hl">难度 ⭐⭐ · 6 学时</span>
+    <span class="tag">sherpa-onnx KWS</span><span class="tag">zipformer ASR</span>
+    <span class="tag">Matcha-TTS</span><span class="tag">XFM 六麦</span>
+  </div>
+</div>
+
+<!-- 01 -->
+<section class="blk" id="s1">
+  <h2><span class="no">01</span>问题引入：抢在唤醒前开麦为什么会"哑掉"</h2>
+  <p>新手接语音的第一反应往往是"先把麦克风打开等着"。结果 XFM 六麦（/dev/ttyACM0）录到的全是稀疏帧 —— 每 5 秒只有约 10 帧，<b>而且真正唤醒之后也不恢复</b>。这不是驱动 bug，而是硬件的工作方式：六麦阵列被唤醒词"点亮"之前，故意只吐稀疏监听流。</p>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>提前打开 ALSA → 设备停在监听态稀疏流（docs/07 T7-4 实测），唤醒后不恢复</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>正确时序：唤醒事件 → notify_wake()（L119-L123）→ _ensure_capture() 才启动录音线程</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>再解决第二个坑：TTS 播完的回声残帧会被 KWS 误当唤醒词 → 双次排空 + reset_stream</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span>最后收口 ASK：老人只喊一声"救命"，不能干等 4.5s 端点静音 → 2s 兜底快答</div>
+  </div>
+  <div class="tip amber"><span class="lab">💡 一个类比</span>语音链路像<b>值班接线员</b>：平时坐着不动（IDLE），电话铃响才拿起听筒（LISTENING），复述完再挂断（SPEAKING）。提前把听筒摘了放桌上（提前开 ALSA），来电反而打不进来 —— 设备"在岗方式"有时序规矩。</div>
+</section>
+
+<!-- 02 -->
+<section class="blk" id="s2">
+  <h2><span class="no">02</span>原理通俗讲解：一个状态机管住所有语音事件</h2>
+  <p>VoiceLoop 是单线程三态状态机（voice_loop.py L34-L35）：<b>无论事件来自 XFM 硬件、软件 KWS、stdin 文本还是跌倒状态机的 trigger_ask，最终都只是推动状态迁移</b>。文本模式甚至被刻意设计成"同一份代码路径"，好让你在无硬件环境下先验证交互逻辑。</p>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">类比 · 接电话</div><div class="kt">三状态 = 挂机 / 拿起听筒 / 通话中</div><p>IDLE 喂 KWS、LISTENING 喂 ASR、SPEAKING 盯打断 —— 就像接线员在不同岗位间切换，一次只做一件事。</p></div>
+    <div class="kcard"><div class="kd">类比 · 会议静音</div><div class="kt">双次排空 = 撤掉别人的话筒余音</div><p>TTS 播完先 drain 一次、等 0.2s 让在途帧落地、再 drain 一次并 reset KWS 流 —— 彻底清掉自己说话的回声，防止"自己把自己唤醒"。</p></div>
+    <div class="kcard"><div class="kd">类比 · 取餐号</div><div class="kt">epoch = 过期作废的号码牌</div><p>每次打断 epoch+1，迟到的 LLM 回复拿着旧号码来取餐 → 直接丢弃。不加锁也能防"旧回复突然冒出来吓老人一跳"。</p></div>
+    <div class="kcard"><div class="kd">类比 · 点名秒答</div><div class="kt">ASK 2s 兜底 = 答"到"也立刻记录</div><p>ASK 是二选一确认（救命 / 没事），语义短促；partial 出现后 2s+120ms 无变化就强制提交，不等 4.5s 长静音端点。</p></div>
+  </div>
+  <div class="tip tealb"><span class="lab">🔒 人文关怀与隐私</span>语音链路默认<b>本地端侧推理</b>（sherpa-onnx 全在板上跑），录音帧只进内存队列（maxsize=100，约 10s 缓冲），不落盘、不上云。给独居老人装监护设备，家属最在意的就是"家里说话会不会被录走"—— 我们的设计答案是：正常运行不保存任何原始音频。</div>
+</section>
+
+<!-- 03 -->
+<section class="blk" id="s3">
+  <h2><span class="no">03</span>关联知识点：六个语音知识块</h2>
+  <table>
+    <thead><tr><th>知识点</th><th>内容要点</th><th>关键参数 / 位置</th></tr></thead>
+    <tbody>
+      <tr><td>3.1.1 XFM 硬件唤醒</td><td>串口 AIUI 协议，0xA5 同步头拆帧；eventType=4 为唤醒事件，带 ivw.beam / angle / keyword</td><td>3s 防抖 + wakeup_lock；xfm_wake.py L109-L127</td></tr>
+      <tr><td>3.1.2 软件 KWS</td><td>sherpa-onnx KeywordSpotter + zipformer 流式打分；词表 拼音@中文，命中即 reset_stream</td><td>threshold 0.25 / score 1.5；kws.py L62-L73</td></tr>
+      <tr><td>3.1.3 流式 ASR</td><td>zipformer 增量解码，三规则端点检测：rule1 4.5s 长静音 / rule2 1.5s 短静音 / rule3 300ms 短句</td><td>greedy_search；asr.py L48-L62</td></tr>
+      <tr><td>3.2.1 TTS 与缓存</td><td>Matcha-TTS + Vocos；固定提示语预合成，内存 _pcm_cache + 磁盘 MD5 缓存零合成</td><td>tts.py L204-L230；gain 3.0 tanh 软饱和</td></tr>
+      <tr><td>3.2.2 唤醒后开录音</td><td>XFM ALSA 时序约束 → _ensure_capture 幂等延迟启动；播完双次排空防回声</td><td>voice_loop.py L124-L144、L338-L341</td></tr>
+      <tr><td>3.2.3 ASK 应答窗口</td><td>trigger_ask 两阶段等播放；2s+120ms 兜底快答；epoch 单次应答防重复</td><td>voice_loop.py L393-L421、L307-L313、L433-L442</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 04 -->
+<section class="blk" id="s4">
+  <h2><span class="no">04</span>实验目标</h2>
+  <ul class="check">
+    <li><span class="ok">掌握</span>唤醒 → 提示音 → ASR → LLM 应答 → TTS → 打断全流程，能在代码中追踪每一步状态迁移</li>
+    <li><span class="ok">理解</span>录音线程为何在硬件唤醒后才启动（XFM ALSA 时序），以及软件 KWS / 文本模式下常开的差异</li>
+    <li><span class="ok">独立完成</span>KWS / ASR / TTS 单点测试与全链路集成，按 docs/07_语音测试用例.md 逐条验证</li>
+    <li><span class="ok">掌握</span>ASK 2s 兜底快答、双次排空防回声、epoch 防重复三个精巧机制的设计动机</li>
+    <li><span class="ok">迁移应用</span>自定义唤醒词并验证端到端流程，理解唤醒词"三处同步"对双链路的影响</li>
+  </ul>
+</section>
+
+<!-- 05 -->
+<section class="blk" id="s5">
+  <h2><span class="no">05</span>实验环境与准备</h2>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>硬件：小车 C1（RK3576）+ XFM 六麦（/dev/ttyACM0，VID 0x1a86 PID 0x55d4）+ 扬声器 plughw:3,0；<b>--text 模式无需任何硬件</b></div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>系统：Ubuntu 22.04 + Python 3.10（/home/iflytek/ros2_venv），依赖 sherpa-onnx、ALSA、aplay、numpy</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>进入 <code>ros2_ws/src/xflz_eai_car1/app/elderly_companion/</code>，预读 speech/ 下五个关键文件：voice_loop.py、xfm_wake.py、kws.py、asr.py、tts.py</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span>开工前先 <code>pkill -9 aplay</code> 清理残留播放进程；查 <code>lsof /dev/ttyACM0</code> 确认串口没被 log_server 占用</div>
+  </div>
+</section>
+
+<!-- 06 -->
+<section class="blk" id="s6">
+  <h2><span class="no">06</span>动画讲解：三状态机与唤醒对话闭环</h2>
+  <p class="lead">左侧三态之间的箭头循环流动；右侧展示一次完整唤醒对话的时间轴 —— 提示音、双次排空、开听、识别各占一段：</p>
+  <div class="anim-box">
+    <svg viewBox="0 0 720 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="语音三状态机与唤醒对话闭环动画">
+      <rect x="8" y="8" width="330" height="304" rx="12" fill="#111827" stroke="#334155"/>
+      <text x="173" y="34" text-anchor="middle" font-size="13.5" font-weight="700" fill="#6ee7b7">VoiceLoop · 三状态机</text>
+      <g font-family="sans-serif" font-size="12.5" font-weight="700" text-anchor="middle">
+        <rect x="108" y="54" width="130" height="44" rx="10" fill="#1e293b" stroke="#059669" stroke-width="2"/>
+        <text x="173" y="81" fill="#6ee7b7">IDLE 待机</text>
+        <rect x="30" y="180" width="130" height="44" rx="10" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/>
+        <text x="95" y="207" fill="#7dd3fc">LISTENING 聆听</text>
+        <rect x="190" y="180" width="130" height="44" rx="10" fill="#1e293b" stroke="#fbbf24" stroke-width="2"/>
+        <text x="255" y="207" fill="#fde68a">SPEAKING 播报</text>
+      </g>
+      <g stroke-width="2" fill="none">
+        <path id="p1" d="M120 98 C 80 130, 80 150, 95 178" stroke="#38bdf8" stroke-dasharray="7 6"/>
+        <path id="p2" d="M95 178 C 130 150, 200 150, 240 178" stroke="#fbbf24" stroke-dasharray="7 6"/>
+        <path id="p3" d="M262 98 C 300 130, 280 150, 258 178" stroke="#fbbf24" stroke-dasharray="7 6"/>
+        <path id="p4" d="M262 178 C 300 140, 268 110, 238 98" stroke="#059669" stroke-dasharray="7 6"/>
+        <path id="p5" d="M108 202 C 60 160, 60 120, 108 92" stroke="#94a3b8" stroke-dasharray="6 6"/>
+      </g>
+      <g fill="none">
+        <circle r="5" fill="#38bdf8"><animateMotion dur="2.6s" repeatCount="indefinite"><mpath href="#p1"/></animateMotion></circle>
+        <circle r="5" fill="#fbbf24"><animateMotion dur="2.6s" begin="0.9s" repeatCount="indefinite"><mpath href="#p2"/></animateMotion></circle>
+        <circle r="5" fill="#fbbf24"><animateMotion dur="2.6s" begin="1.6s" repeatCount="indefinite"><mpath href="#p3"/></animateMotion></circle>
+        <circle r="5" fill="#4ade80"><animateMotion dur="2.6s" begin="2.2s" repeatCount="indefinite"><mpath href="#p4"/></animateMotion></circle>
+        <circle r="4" fill="#cbd5e1"><animateMotion dur="3.4s" begin="0.4s" repeatCount="indefinite"><mpath href="#p5"/></animateMotion></circle>
+      </g>
+      <g font-size="10.5" fill="#94a3b8" font-family="sans-serif" text-anchor="middle">
+        <text x="66" y="140">唤醒/ASK触发</text>
+        <text x="176" y="152">ASR final</text>
+        <text x="296" y="140">interrupt +1</text>
+        <text x="300" y="128" fill="#6ee7b7">播完排空→IDLE</text>
+        <text x="42" y="120">无话10s超时</text>
+        <text x="173" y="256" fill="#64748b">单线程 · 事件只推动迁移 · 文本/音频同一条回调链</text>
+      </g>
+
+      <rect x="352" y="8" width="360" height="304" rx="12" fill="#111827" stroke="#334155"/>
+      <text x="532" y="34" text-anchor="middle" font-size="13.5" font-weight="700" fill="#93c5fd">唤醒对话闭环 · 时间轴</text>
+      <g font-size="11" font-family="sans-serif">
+        <rect x="370" y="52" width="326" height="30" rx="7" fill="#1e293b" stroke="#059669"/>
+        <text x="382" y="71" fill="#a7f3d0">① XFM 唤醒事件 → notify_wake() → 开 ALSA 录音</text>
+        <rect x="370" y="90" width="200" height="30" rx="7" fill="#1e293b" stroke="#fbbf24"/>
+        <text x="382" y="109" fill="#fde68a">② 播提示音（dur + 0.8s 余量）</text>
+        <rect x="578" y="90" width="118" height="30" rx="7" fill="#1e293b" stroke="#f87171"/>
+        <text x="590" y="109" fill="#fca5a5">③ 双次排空</text>
+        <rect x="370" y="128" width="326" height="30" rx="7" fill="#1e293b" stroke="#38bdf8"/>
+        <text x="382" y="147" fill="#7dd3fc">④ _begin_listen：开 ASR 流 → LISTENING（记录 _listen_started）</text>
+        <rect x="370" y="166" width="326" height="30" rx="7" fill="#1e293b" stroke="#38bdf8"/>
+        <text x="382" y="185" fill="#7dd3fc">⑤ ASR 端点 4.5s/1.5s/300ms（ASK 再叠 2s 兜底）→ final</text>
+        <rect x="370" y="204" width="326" height="30" rx="7" fill="#1e293b" stroke="#fbbf24"/>
+        <text x="382" y="223" fill="#fde68a">⑥ LLM 回复流式 TTS（epoch 记号，打断即作废）</text>
+        <g opacity="0">
+          <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.3;.85;1" dur="5s" repeatCount="indefinite"/>
+          <rect x="370" y="246" width="326" height="34" rx="7" fill="#052e2b" stroke="#4ade80"/>
+          <text x="382" y="267" fill="#86efac">⑦ 播完 → 双次排空 + reset KWS → IDLE，回声不自唤醒</text>
+        </g>
+        <text x="532" y="298" text-anchor="middle" font-size="10.5" fill="#64748b">文本模式跳过 ②③，直接 _begin_listen —— 同一状态机</text>
+      </g>
+    </svg>
+  </div>
+  <div class="anim-cap">动画 4-1｜左：三状态之间带流动粒子的迁移箭头（含 10s 无话超时回 IDLE）；右：一次唤醒对话的七段时间轴，收尾高亮"双次排空→IDLE"</div>
+</section>
+
+<!-- 07 -->
+<section class="blk" id="s7">
+  <h2><span class="no">07</span>互动讲解：语音事件调度台</h2>
+  <p class="lead">逐个投喂事件（等价于 feed_text 的输入），观察状态机与回调链的走向：</p>
+  <div class="ix-panel">
+    <div class="ix-title">语音事件调度台 · Voice Bench</div>
+    <div class="ctl-row">
+      <button class="btn" onclick="vWAKE()">🔔 输入「小飞小飞」</button>
+      <button class="btn ghost" onclick="vDIALOG()">💬 聆听后输入「你好」</button>
+      <button class="btn ghost" onclick="vASK()">🆘 输入「ask」再「救命」</button>
+      <button class="btn ghost" onclick="vSILENT()">⏳ 10s 不说话</button>
+      <button class="btn ghost" onclick="vINT()">⚡ 播报中再喊唤醒词</button>
+      <button class="btn ghost" onclick="vReset()">↺ 复位</button>
+    </div>
+    <div class="io" id="voiceIo"><span class="dim">// 初始：IDLE。事件按 feed_text / voice_loop 判定顺序推进状态机</span>
+<span class="ok">IDLE → 喂 KWS（每 0.1s 一帧），命中 wake_words 才开听</span></div>
+  </div>
+  <div class="tip violet"><span class="lab">🙋 为什么 IDLE 态"不理人"</span>唤醒词之外的文本被静默忽略是设计行为（voice_loop L170-L177）——但<b>呼救词是例外</b>：救命/帮帮我 在 IDLE 态直达 on_help_kws 告警。"平时不打扰，真喊救命一定听得见"，这是监护产品的克制与担当。</div>
+</section>
+
+<!-- 08 -->
+<section class="blk" id="s8">
+  <h2><span class="no">08</span>实操步骤：文本模式 → 单点 → 全链路</h2>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>文本模式验证状态机（60min）：唤醒/对话/ASK/呼救四条路径逐一过</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>子系统单点（90min）：speech_kws_test / speech_asr_test / speech_tts_test 各跑一遍</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>全链路集成（90min）：fall_video_demo --text 跑打断、10s 超时、epoch 丢弃</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span>按 docs/07 执行 T7-1~T7-9（呼救直告警、ASK 单次应答、防回声逐条记录）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">5</span>自定义唤醒词（30min）：kws_keywords.txt + session.wake_words + XFM set_wake_word 三处同步后复验</div>
+  </div>
+  <pre><span class="c"># ① 文本模式状态机验证（无需任何硬件，stdin 即"音频帧"）</span>
+<span class="g">cd</span> /home/iflytek/ros2_ws/src/xflz_eai_car1/app/elderly_companion
+<span class="g">python3</span> apps/speech_text_demo.py
+<span class="c"># 输入: 小飞小飞 → 唤醒; 你好 → LLM对话; ask → 模拟跌倒; 救命 → 告警; exit → 退出</span>
+<span class="c"># 预期日志: [文本] 唤醒 → 开始聆听（mode=DIALOG） → &gt;&gt;&gt; ASK 确认（ALERT）</span>
+
+<span class="c"># ② 三个子系统单点测试（记录模型参数与实时率）</span>
+<span class="g">python3</span> apps/speech_kws_test.py   <span class="c"># KWS 就绪（5 词）: 小飞同学/你好小飞/小飞小飞/救命/帮帮我</span>
+<span class="g">python3</span> apps/speech_asr_test.py   <span class="c"># 逐 wav 输出 partial + 实时率（0.1x~0.3x）</span>
+<span class="g">python3</span> apps/speech_tts_test.py   <span class="c"># 合成耗时 2.03s / RTF 0.39（&lt;1 即实时）</span>
+
+<span class="c"># ③ 全链路集成（--text 不做语音播报，验证状态机 + 打断 + 超时）</span>
+<span class="g">python3</span> apps/fall_video_demo.py --video testdata/fall_slow_x264.mp4 --text
+<span class="c"># 有硬件时: 换 --mjpeg，真人对六麦说"小飞小飞"验证提示音+录音线程启动</span>
+
+<span class="c"># ④ 清理：ALSA 残留 + LLM 服务</span>
+<span class="g">pkill</span> -9 aplay; <span class="g">pkill</span> -f llm_server</pre>
+  <div class="tip tealb"><span class="lab">🔍 唤醒词"三处同步"</span>改自定义唤醒词必须同时改三处：<b>① config/kws_keywords.txt</b>（格式 <code>拼音 @ 中文</code>，行首无空格）；<b>② fall_config.yaml 的 session.wake_words</b>（VoiceLoop 分流判断）；<b>③ XFM set_wake_word() JSON</b>（固件词表，threshold 900 是固件私有灵敏度，与 KWS 的 0.25 互不相通）。只改一处会出现"KWS 检出了但 VoiceLoop 不认"。</div>
+</section>
+
+<!-- 09 -->
+<section class="blk" id="s9">
+  <h2><span class="no">09</span>重点与易错点</h2>
+  <ul class="check">
+    <li>三状态 + 一条总原则：<span class="ok">所有事件只推动状态迁移，业务逻辑都在回调里</span></li>
+    <li>三个保命机制：<span class="ok">双次排空防回声、ASK 2s 兜底、epoch 版本号防迟到回复</span></li>
+    <li>XFM 时序是<span class="ok">设备约束而非 bug</span>：唤醒后才开 ALSA；软件 KWS 场景才常开</li>
+    <li>文本模式是<span class="ok">调试基座</span>：与硬件走同一状态机/回调链，先逻辑正确再上硬件</li>
+  </ul>
+  <table>
+    <thead><tr><th>⚠️ 常见坑</th><th>现象 → 解法</th></tr></thead>
+    <tbody>
+      <tr><td>说话唤醒无反应</td><td>文本模式对麦克风本就无反应 → 必须 stdin 输文本；有硬件才走 --mjpeg</td></tr>
+      <tr><td>唤醒后无"录音线程"日志</td><td>/dev/ttyACM0 被 log_server 占用 → lsof 查占用、停进程、重插 USB</td></tr>
+      <tr><td>录音 X/5s 仅约 10 帧</td><td>XFM 监听态（没真正唤醒）→ 真人对麦克风说唤醒词，看"检测到唤醒"日志</td></tr>
+      <tr><td>对话无回复</td><td>llm.enabled 未开 / LLM 服务没起 → 确认配置或看 llm_server.log（首次加载 30-60s）</td></tr>
+      <tr><td>自己播的话把自己唤醒</td><td>双次排空没跑全 → 检查 _handle_speaking 两次 _drain_q + kws reset_stream（L366-L367）</td></tr>
+      <tr><td>ASK 应答刷出多条</td><td>_invoke_ask 误走 worker → 必须同步调用且 break（voice_loop L443-L461）</td></tr>
+      <tr><td>播放失败 / 设备忙</td><td>aplay 残留进程占设备 → 每次测试前 pkill -9 aplay</td></tr>
+      <tr><td>TTS 合成失败</td><td>speech.tts.model_dir 路径错 → 核对配置；首次约 1s 合成延迟属正常</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 10 -->
+<section class="blk" id="s10">
+  <h2><span class="no">10</span>总结与思考</h2>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">✅ 完成成果</div><div class="kt">语音全链路测试报告</div><p>文本模式四路径 + 三子系统单点 + 全链路集成 + docs/07 用例 + 自定义唤醒词记录。</p></div>
+    <div class="kcard"><div class="kd">🧠 原理收获</div><div class="kt">单状态机设计</div><p>三态流转 + 回调注入：驱动（键盘/麦克风/硬件事件）与决策彻底解耦。</p></div>
+    <div class="kcard"><div class="kd">🛠 技能收获</div><div class="kt">时序与并发排障</div><p>ALSA 唤醒时序、双次排空、epoch 版本号 —— 三招应对嵌入式音频的"迟到与残留"。</p></div>
+    <div class="kcard"><div class="kd">❓ 排障思路</div><div class="kt">先分层再定位</div><p>没反应？先分"文本模式也这样"还是"只有硬件这样"，把问题收敛到状态机层或驱动层。</p></div>
+  </div>
+  <div class="tip violet"><span class="lab">📝 思考题 1</span>为什么 XFM 硬件唤醒场景录音线程必须"唤醒后才启动"，而软件 KWS 场景可以常开？结合 AIUI 事件时序与 ALSA 流特性分析：如果提前打开设备，实测的"5s 仅约 10 帧"会怎样传导成全链路故障？</div>
+  <div class="tip violet"><span class="lab">📝 思考题 2</span>ASK 的 2s 兜底快答与 ASR 内置的 4.5s 端点静音是两套计时，为什么 ASK 额外要一层、而 DIALOG 反而不需要？再想深一层：如果把 2s 兜底也套到 DIALOG 上，老人慢条斯理的问候会被截成什么样？</div>
+</section>
+
+<nav class="expnav">
+  <a href="../exp-03-config/index.html"><span class="lb">← 上一个实验</span>EXP-03 fall_config.yaml 配置详解</a>
+  <a class="next" href="../exp-05-pose-detection/index.html"><span class="lb">下一个实验 →</span>EXP-05 人体检测与姿态估计</a>
+</nav>
+
+<footer>
+  <span>CASE-03 · 老人跌倒监护 · EXP-04 语音交互子系统</span>
+  <span>6 学时 · 综合性 · 基于 elderly_companion 实验讲义改编</span>
+</footer>
+
+</main>
+</div>
+
+<script>
+// 语音事件调度台
+var vBase='<span class="dim">// 初始：IDLE。事件按 feed_text / voice_loop 判定顺序推进状态机</span>\n'+
+'<span class="ok">IDLE → 喂 KWS（每 0.1s 一帧），命中 wake_words 才开听</span>';
+function setV(t){document.getElementById('voiceIo').innerHTML=t;}
+function vWAKE(){
+  setV('<span class="dim">// 输入「小飞小飞」→ feed_text L158-L161</span>\n'+
+'<span class="ok">wake_words 命中 → _start_listening(DIALOG)</span>\n'+
+'<span class="ok">硬件路径差异: 文本模式跳过提示音直接 _begin_listen（L361-L363）</span>\n'+
+'<span class="ok">状态: IDLE → LISTENING（mode=DIALOG），日志「开始聆听」</span>');
+}
+function vDIALOG(){
+  setV('<span class="dim">// 聆听中输入「你好」→ LISTENING 且 mode=DIALOG</span>\n'+
+'<span class="ok">_invoke_dialog(text): 状态转 SPEAKING，记 start_epoch，worker 线程调 LLM+TTS</span>\n'+
+'<span class="ok">llm.enabled=true 时流式播报; 否则打印「LLM 未启用」</span>\n'+
+'<span class="warn">播报中再输入唤醒词 → _interrupt(): epoch+1、杀 aplay、清队列</span>\n'+
+'<span class="dim">迟到的 LLM 回复 epoch 不匹配 → 丢弃（版本号防重复）</span>');
+}
+function vASK(){
+  setV('<span class="dim">// 输入「ask」模拟跌倒 → trigger_ask 置标志</span>\n'+
+'<span class="warn">打断当前播报 → 等 playback_event set(≤8s) → 等 clear(≤15s) → 双次排空</span>\n'+
+'<span class="ok">_begin_listen(ASK): 开听，日志「开始聆听（mode=ASK）」</span>\n'+
+'<span class="warn">输入「救命」→ _invoke_ask 同步回调 → &gt;&gt;&gt; ASK 确认（ALERT）</span>\n'+
+'<span class="ok">若输入「没事」→ &gt;&gt;&gt; ASK 取消（CANCELLED）</span>\n'+
+'<span class="dim">只喊一声就沉默 → 2s+120ms 兜底强制提交 partial，不等 4.5s 端点</span>');
+}
+function vSILENT(){
+  setV('<span class="dim">// 唤醒后 10s 不说话（DIALOG 模式）</span>\n'+
+'<span class="ok">partial 一直为空，_listen_started 超期 → 「DIALOG 无话超时 → IDLE」</span>\n'+
+'<span class="warn">这是活性保护: 防止无人时系统永久卡在 LISTENING 态</span>\n'+
+'<span class="dim">ASK 模式不同: 超时由 monitor 控制（ask_timeout 12s）→ 转 ALERT，宁可信其有</span>');
+}
+function vINT(){
+  setV('<span class="dim">// SPEAKING 播报中再次命中唤醒词 → 打断路径</span>\n'+
+'<span class="warn">_interrupt（L349-L355）: _epoch += 1; Playback.interrupt()</span>\n'+
+'<span class="ok">Playback.interrupt: 杀 aplay → 清播放队列 → 重启播放进程（tts.py L158-L180）</span>\n'+
+'<span class="ok">新开 ASR 流继续对话；旧回复持旧 epoch → 静默作废</span>\n'+
+'<span class="dim">验证: 连打两次打断，日志不应出现第一条的迟到回复</span>');
+}
+function vReset(){setV(vBase);}
+</script>
+<script src="../shared/tutorial.js" defer></script>
+</body>
+</html>

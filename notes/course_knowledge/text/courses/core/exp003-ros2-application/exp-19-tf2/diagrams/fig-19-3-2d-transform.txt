@@ -1,0 +1,112 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp003-ros2-application/exp-19-tf2/diagrams/fig-19-3-2d-transform.html
+TITLE: 图 19-3 · TF 二维坐标变换：子坐标系 base_link → 父坐标系 map
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+图 19-3 · TF 二维坐标变换：子坐标系 base_link → 父坐标系 map
+交互示意图：拖动下方参数，图实时联动
+X 向右 ↑ Y 向上
+X
+map
+Y
+map
+O（map 原点）
+θ
+X
+bl
+Y
+bl
+O′
+P
+① 原始读数：P 在 base_link 上
+④ 最终：换算到 map 上
+变换流程（先旋转，后平移）
+① 读数：P 在 base_link (x
+bl
+, y
+bl
+)
+② 旋转：对齐 map 的轴方向（θ）
+③ 平移：加上 O′ 的偏移 (t
+x
+, t
+y
+)
+④ 得到 P 在 map 上 (x
+map
+, y
+map
+)
+t
+x
+150
+t
+y
+80
+θ (°)
+39
+x
+bl
+70
+y
+bl
+36
+二维 TF 变换：子坐标系 base_link → 父坐标系 map
+x
+map
+=
+x
+bl
+cosθ − y
+bl
+sinθ
++
+t
+x
+y
+map
+=
+x
+bl
+sinθ + y
+bl
+cosθ
++
+t
+y
+左图实时计算结果：
+一句话理解：点 P 没有动，只是
+从一把尺子（子 base_link）上的读数，换算到另一把尺子（父 map）上
+。
+✅
+变换顺序：先旋转，后平移
+（ROS TF 固定顺序）
+⚠️ 顺序不能颠倒！必须先把 P 的方向转正对齐 K，再叠加原点偏移。
+✅
+参数含义
+t
+x
+, t
+y
+子坐标系 base_link 的原点
+O′
+，在父坐标系 map 中的位置
+θ
+base_link 相对于 map
+逆时针旋转
+的角度
+x
+bl
+, y
+bl
+点 P 在子坐标系 base_link 里的
+读数
+x
+map
+, y
+map
+同一个点 P，换算到父坐标系 map 里的读数
+图例
+黑色：父坐标系 map
+红色：子坐标系 base_link
+蓝色圆点：测试点 P
+橙色圆弧：②绕O旋转θ · 灰色空心点：①读数原位 · 橙色空心点：②旋转后 · 灰虚线：③平移(tx,ty)

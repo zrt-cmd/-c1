@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-02 · ROS2 常用命令工具 — 机器人 ROS2 应用与开发</title>
+<link rel="stylesheet" href="../shared/tutorial.css?v=20261027b">
+<style>
+:root{--theme:#2563eb;--theme-deep:#1d4ed8;--theme-bg:#dbeafe;--theme-bd:#bfdbfe}
+/* 04 实操中心 · 关卡切换 */
+.gtabs{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0 0}
+.gtab{border:1px solid var(--theme-bd);background:#fff;color:#475569;padding:.55rem 1.05rem;border-radius:999px;cursor:pointer;font-size:.86rem;font-weight:600;font-family:inherit;transition:.18s}
+.gtab:hover{border-color:var(--theme);color:var(--theme-deep)}
+.gtab.on{background:var(--theme);border-color:var(--theme);color:#fff;box-shadow:0 4px 12px rgba(37,99,235,.25)}
+.gtab .gno{font-weight:800;margin-right:.35rem}
+.gtab .gdif{display:block;font-size:.7rem;font-weight:400;opacity:.9;margin-top:1px}
+.gpane{display:none;margin-top:14px;border:1px solid var(--theme-bd);border-radius:16px;padding:1.1rem 1.25rem;background:var(--bg-surface)}
+.gpane.on{display:block}
+.gpane>.ghead{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin-bottom:.6rem}
+.gpane>.ghead h3{font-size:1.02rem;font-weight:800;margin:0}
+.gpane>.ghead .gt{font-size:.72rem;background:var(--theme-bg);color:var(--theme-deep);border:1px solid var(--theme-bd);border-radius:999px;padding:.12rem .6rem}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit" title="返回课程首页">🧠 具身智能课程 · <i>教程首页</i></a>
+  <div class="crumb"><a href="../../../index.html#core">核心课程</a> / <a href="../index.html">ROS2 应用与开发</a> / EXP-02</div>
+</div>
+
+<div class="wrap">
+
+<aside class="side">
+  <h4>本页目录</h4>
+  <a href="#goal">★ 课程目标</a>
+  <a href="#s1" class="now">01 程序跑起来就变黑盒？ROS2 的答案</a>
+  <a href="#s2">02 核心原理：命令体系与计算图动画</a>
+  <a href="#s4">03 异步话题 vs 同步服务——两种通信模型的对比</a>
+  <a href="#s6">04 实操中心：四关（试车台 · node · topic · bag）</a>
+  <a href="#s9">05 注意事项与验收清单</a>
+  <a href="#s5">06 互动：命令选配台（综合自测）</a>
+  <a href="#s10">07 实验总结与思考题</a>
+  <h4>CH1 · ROS2 基础</h4>
+  <a href="../exp-01-ros2-intro/index.html">EXP-01 ROS2 简介</a>
+  <a href="../exp-02-cli-tools/index.html">EXP-02 命令工具</a>
+  <a href="../exp-03-workspace/index.html">EXP-03 工作空间</a>
+  <a href="../exp-04-package/index.html">EXP-04 功能包</a>
+</aside>
+
+<main class="content">
+
+<div class="exp-head">
+  <span class="code">EXP-02 · 第 1 章 · 验证性 · 2 学时</span>
+  <h1>ROS2 常用命令工具：给系统做"体检"</h1>
+  <p class="desc">一个跑起来的 ROS2 系统是<b>看不见的分布式进程网</b>。ros2 命令行是<b>名词域 × 动作</b>结构：先选名词域，再给动作——<b>node / topic / service / param / interface / bag 是最常用的六个命令族</b>，另外还有action 专管长任务，run / launch / pkg 负责启动与编排（`ros2` 还有更多名词域，用到时 `ros2 --help` 一查便知）。list / info / echo / call 是它们常用的动作。本实验以这六族为主线，教你不用读一行源码，就能回答"谁在发、谁在收、发的什么、多快"——并用 rosbag2 把现场录成可以回放的"时间机器"。</p>
+  <div class="meta">
+    <span class="tag hl">难度 ⭐ · 2 学时</span>
+    <span class="tag">ros2 CLI</span><span class="tag">名词域 × 动作</span>
+    <span class="tag">topic · service · param</span><span class="tag">rosbag2</span>
+  </div>
+</div>
+
+<!-- 01 -->
+<section class="blk reveal" id="goal">
+<h2><span class="no">目标</span>本课学完，你应该能做到</h2>
+<div class="kgrid">
+  <div class="kcard"><div class="kd">① 说清设计</div><div class="kt">一个入口统一全部</div><p>能阐述 ros2 CLI 的设计理念——为什么把 node / topic / service / param / action / bag / interface / launch / run / pkg 这些子命令收敛到 <code>ros2</code> 一个入口。</p></div>
+  <div class="kcard"><div class="kd">② 掌握主力命令</div><div class="kt">node / topic / service</div><p>熟练使用 <code>node list|info</code>、<code>topic list|echo|info|hz|pub</code>、<code>service list|type|call</code>。</p></div>
+  <div class="kcard"><div class="kd">③ 独立排查</div><div class="kt">param / interface / bag</div><p>能独立用 <code>ros2 param</code> 管理参数、<code>ros2 interface</code> 查消息定义、<code>ros2 bag</code> 录放数据。</p></div>
+  <div class="kcard"><div class="kd">④ 迁移成习惯</div><div class="kt">遇事先敲命令</div><p>后续实验中遇到"这节点是什么""这话题有没有在发""这服务怎么调"，能第一反应想到对应的 CLI 工具，而不是先翻代码。</p></div>
+</div>
+<div class="tip tealb"><span class="lab">本课的重点与难点</span>
+<b>重点</b>：<code>topic echo</code> / <code>hz</code> / <code>info</code> 三件套——它们是后面每一个实验的验收工具。<br>
+<b>难点</b>：建立"名词域 × 动作"的检索思维：先想"我要看的是哪类东西"（node/topic/service），再想"要对它做什么"（list/info/echo）。</div>
+<div class="tip amber"><span class="lab">和前后的关系</span>
+本课学的命令会在<b>后续 18 个实验里反复出现</b>。这里多敲几遍，后面能省几十遍。</div>
+</section>
+
+<section class="blk" id="s1">
+  <h2><span class="no">01</span>问题引入：程序跑起来就变成黑盒？ROS2 给了一个不一样的答案</h2>
+
+  <p>先问一个几乎每个开发者都遇过的问题：<b>程序一旦跑起来，你还剩多少手段看清它在干什么？</b></p>
+  <p>不管写 Java、Python 还是嵌入式 C，程序运行后的"可观测手段"翻来覆去就那么几样：</p>
+
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">手段一</div><div class="kt">看日志</div><p>最通用，也最原始。问题是：日志<b>是写代码的人预先决定要打印的</b>——他没想起来打的地方，你永远看不见。</p></div>
+    <div class="kcard"><div class="kd">手段二</div><div class="kt">断点调试 / 仿真器</div><p>单步执行很爽，但它要求能<b>停下来</b>。机器人正在跑、电机正在转、传感器 30Hz 在出数据——一旦停下来，现象就消失了。</p></div>
+    <div class="kcard"><div class="kd">手段三</div><div class="kt">抓包 / 中间件工具</div><p>能看到字节，但要<b>先知道去哪抓</b>：端口、协议、序列化格式都得事先搞清，还得会和业务字段对应上。</p></div>
+    <div class="kcard"><div class="kd">手段四</div><div class="kt">埋点 / 接口注入</div><p>最"正规"，代价是<b>要改代码、重新发布</b>。生产环境下往往根本不允许。</p></div>
+  </div>
+
+  <p>这四种手段有个共同的隐含前提：<b>你得先知道内部结构，才能去观察它</b>。于是出现一个尴尬局面——</p>
+
+  <div class="tip amber"><span class="lab">⚠ 传统开发的"黑盒时刻"</span>
+接手一份别人写的代码、或者一个已经在跑的系统，你常常要回答三个问题：<b>它现在在做什么？谁在给它发数据？它发出去的东西别人收到了吗？</b><br>
+而传统手段的答案往往分别是：<b>不知道（日志没打）、不知道（代码里没写）、不知道（只能靠猜）</b>。</div>
+
+  <h3>ROS2 的答案：让"内部结构"本身变成可查询的公开信息</h3>
+
+  <p>ROS2 之所以能跳出这个困境，是因为它在架构层面做了一件别家很少做的事：<b>把"谁存在、谁和谁连着、连线上流什么"这件事，从程序内部搬到了系统层面，并规定所有组件都必须如实登记。</b></p>
+
+  <p>这份登记表就是上一课讲过的<b>计算图（Graph）</b>。它不是某个人画出来的文档，而是 <b>DDS 在运行时实时维护的在场名单</b>：每个节点一上线就自动登记自己的名字、开放了哪些话题、提供哪些服务——谁来问都一样，<b>不区分是"自己人"还是"路过的工具"</b>。</p>
+
+  <p>于是 <code>ros2</code> 这套 CLI 工具，本质上就是<b>一批合法的"第三方观察者"</b>：它以普通参与者身份加入这张图，把图里已经登记好的信息读出来给你看。</p>
+
+  <div class="anim-box">
+    <svg viewBox="0 0 720 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="传统黑盒与 ROS2 可查询计算图的对比">
+      <rect x="0" y="0" width="720" height="250" rx="12" fill="#0f172a"/>
+      <line x1="360" y1="24" x2="360" y2="230" stroke="#334155" stroke-width="1" stroke-dasharray="5 5"/>
+
+      <!-- 左：传统黑盒 -->
+      <text x="180" y="34" text-anchor="middle" font-size="13" font-weight="700" fill="#f87171">传统程序：边界之内是黑盒</text>
+      <rect x="60" y="56" width="240" height="112" rx="12" fill="#111827" stroke="#7f1d1d" stroke-width="1.8"/>
+      <text x="180" y="82" text-anchor="middle" font-size="11.5" fill="#94a3b8">程序内部（模块互相调用）</text>
+      <rect x="84" y="96" width="66" height="34" rx="7" fill="#1e293b" stroke="#475569"/>
+      <text x="117" y="117" text-anchor="middle" font-size="10.5" fill="#cbd5e1">模块A</text>
+      <rect x="170" y="96" width="66" height="34" rx="7" fill="#1e293b" stroke="#475569"/>
+      <text x="203" y="117" text-anchor="middle" font-size="10.5" fill="#cbd5e1">模块B</text>
+      <rect x="256" y="96" width="30" height="34" rx="7" fill="#1e293b" stroke="#475569"/>
+      <text x="271" y="117" text-anchor="middle" font-size="10.5" fill="#cbd5e1">C</text>
+      <line x1="150" y1="113" x2="170" y2="113" stroke="#475569" stroke-width="1.6"/>
+      <text x="180" y="152" text-anchor="middle" font-size="10.5" fill="#f87171">调用关系 / 数据流向 —— 外部看不见</text>
+      <text x="180" y="192" text-anchor="middle" font-size="11" fill="#94a3b8">你只能：看日志、加埋点、停下来调试</text>
+      <text x="180" y="212" text-anchor="middle" font-size="10.5" fill="#64748b">→ 都得先知道内部结构，或先改代码</text>
+
+      <!-- 右：ROS2 计算图 -->
+      <text x="540" y="34" text-anchor="middle" font-size="13" font-weight="700" fill="#4ade80">ROS2：结构本身可被查询</text>
+      <rect x="420" y="56" width="240" height="112" rx="12" fill="#0b1220" stroke="#164e63" stroke-width="1.8" stroke-dasharray="6 5"/>
+      <text x="540" y="80" text-anchor="middle" font-size="11.5" fill="#94a3b8">计算图（DDS 实时维护）</text>
+      <rect x="444" y="94" width="62" height="32" rx="7" fill="#1e293b" stroke="#4ade80" stroke-width="1.4"/>
+      <text x="475" y="114" text-anchor="middle" font-size="10.5" fill="#4ade80">talker</text>
+      <rect x="574" y="94" width="62" height="32" rx="7" fill="#1e293b" stroke="#60a5fa" stroke-width="1.4"/>
+      <text x="605" y="114" text-anchor="middle" font-size="10.5" fill="#60a5fa">listener</text>
+      <line x1="506" y1="110" x2="574" y2="110" stroke="#fbbf24" stroke-width="2"/>
+      <text x="540" y="104" text-anchor="middle" font-size="9.5" fill="#fbbf24">/chatter</text>
+      <text x="540" y="150" text-anchor="middle" font-size="10.5" fill="#86efac">节点 / 话题 / 服务 —— 已登记，可随时问</text>
+      <text x="540" y="192" text-anchor="middle" font-size="11" fill="#cbd5e1">你可以：<tspan font-family="Consolas,monospace" fill="#6ee7a8">ros2 topic echo</tspan> 直接旁听</text>
+      <text x="540" y="212" text-anchor="middle" font-size="10.5" fill="#64748b">→ 不改代码、不改配置、不打断运行</text>
+
+      <!-- 中间箭头 -->
+      <text x="360" y="118" text-anchor="middle" font-size="18" fill="#475569">→</text>
+      <text x="360" y="140" text-anchor="middle" font-size="9.5" fill="#64748b">架构</text>
+      <text x="360" y="154" text-anchor="middle" font-size="9.5" fill="#64748b">改变</text>
+    </svg>
+  </div>
+  <div class="anim-cap">图 1-1｜差别不在于"工具更强"，而在于<b>结构信息归谁保管</b>：传统程序的调用关系藏在进程内部，ROS2 把它提升成了系统级的公开事实。</div>
+
+  <p>这就是 ROS2 相对传统开发方式最实质的一个优势：<b>它把"可观测性"做进了架构，而不是靠开发者事后补日志。</b>你可以对着一台完全陌生的机器人，不读一行源码，30 秒内问清"谁在线、谁给谁发数据、发的是什么、多快"。</p>
+
+  <h3>横向对比：五种开发场景，各自怎么看运行中的系统</h3>
+  <p>把话说准一点——<b>不是 ROS2 在所有方面都更强</b>。不同场景各有各的成熟手段，只是在"运行时结构可见性"这一项上，ROS2 的做法有天然优势。下面这张表按同一组维度横向摆开：</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:96px">场景</th>
+        <th style="width:23%">运行时主要靠什么看</th>
+        <th style="width:18%">能否不读代码看清结构</th>
+        <th style="width:18%">能否不改程序拿到数据</th>
+        <th>主要瓶颈</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><b>服务端 / 后端</b></td>
+        <td>日志 + APM 链路追踪 + 接口文档</td>
+        <td>部分可以（靠 OpenAPI/Swagger 文档）</td>
+        <td>较难（要加日志或埋点）</td>
+        <td>文档与代码易脱节；调用链跨服务后靠 trace 拼</td>
+      </tr>
+      <tr>
+        <td><b>网页前端</b></td>
+        <td>浏览器 DevTools（网络面板、元素检查、Performance）</td>
+        <td>可以（DOM / Network 直接可见）</td>
+        <td><b>可以</b>（Network 面板就能抓请求）</td>
+        <td>只管得了浏览器内；跨端、跨设备后断链</td>
+      </tr>
+      <tr>
+        <td><b>小程序</b></td>
+        <td>开发者工具 + vConsole + 平台真机调试</td>
+        <td>较难（需在开发者工具内运行）</td>
+        <td>较难（真机环境受限）</td>
+        <td>真机与模拟器行为不一致，线上问题难复现</td>
+      </tr>
+      <tr>
+        <td><b>嵌入式 C/C++</b></td>
+        <td>串口打印 + J-Link/ST-Link 调试器 + 逻辑分析仪</td>
+        <td>难（结构在编译期就定死了）</td>
+        <td>难（要占用串口或加探针）</td>
+        <td>资源紧张放不下日志；打断点即改变时序</td>
+      </tr>
+      <tr style="background:#f0fdfa">
+        <td><b>ROS2 应用</b></td>
+        <td><code>ros2</code> CLI + rqt + rviz2 + rosbag2（后续实验逐个展开）</td>
+        <td><b>可以</b>（计算图由 DDS 实时登记）</td>
+        <td><b>可以</b>（CLI 以第三方参与者旁听）</td>
+        <td>前提是所有组件都遵守 ROS2 规范并入同一通信域</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="tip tealb"><span class="lab">💡 一句话读懂这张表</span>
+前端有 DevTools、服务端有链路追踪、嵌入式调试器——<b>每种开发都有自己的"透视镜"</b>。ROS2 的特别之处在于：它的透视镜不是附加工具，而是<b>架构自带的</b>。因为节点之间的通信本来就走统一的中间件，所以"旁听"和"查图"是白送的，不需要你提前埋任何东西。</div>
+
+  <div class="tip amber"><span class="lab">⚠ 但要记住 ROS2 的前提与代价</span>
+这个优势不是没有条件的：<b>①</b> 所有组件必须都按 ROS2 规范写、在同一 <code>ROS_DOMAIN_ID</code> 下运行——一个用私有 socket 通信的模块，CLI 一样看不到它；<b>②</b> 这套机制本身有开销（序列化、发现流量），所以对微秒级实时性要求极高的环节，往往仍要绕开它直接操作寄存器；<br><b>③</b> "能看见"不等于"能理解"——图上告诉你 <code>/cmd_vel</code> 在发数据，但为什么发这个值，还得看算法。</div>
+
+  <h3>那具体怎么"看"？先认两个词</h3>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">名词 · 计算图</div><div class="kt">系统长什么样，就是一张图</div><p>节点是图上的<b>点</b>，话题是图上的<b>线</b>。把"谁在线、谁和谁连着、连线上流什么"全画出来，就是计算图（Graph）。它由 DDS 实时维护，不是谁画出来的文档。</p></div>
+    <div class="kcard"><div class="kd">名词 · CLI</div><div class="kt">命令行里敲的那套工具</div><p>CLI = Command Line Interface。<code>ros2</code> 开头的一整套命令，专门用来向计算图提问——它就是那把"翻通讯录的手"。</p></div>
+  </div>
+
+  <p>有了这两个概念，"30 秒看懂一个陌生系统"其实就是<b>对着计算图连问四个问题</b>：</p>
+  <div class="flow">
+    <div class="step"><span class="n">1</span><code>ros2 node list</code>：先看有哪些<b>进程单元</b>（谁活着）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span><code>ros2 topic list -t</code>：再看它们之间流着什么<b>数据</b>（在说什么）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span><code>ros2 topic echo /chatter</code> 看<b>内容</b>、<code>ros2 topic hz /chatter</code> 测<b>频率</b>（说得对不对、多快）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span><code>ros2 topic info /chatter</code> 看<b>谁发谁收</b>、<code>ros2 node info /talker</code> 看节点全貌（谁和谁认识）</div>
+  </div>
+
+  <div class="tip amber"><span class="lab">💡 一句话总结</span>把 ROS2 系统当成人，计算图就是它的<b>通讯录</b>，CLI 就是翻通讯录的手——你不动任何人的脑子，只是把通讯录里已经记好的内容念出来。<b>而这份通讯录之所以存在，是因为 ROS2 要求每个组件入职时都必须登记。</b></div>
+</section>
+
+<!-- 02 -->
+<section class="blk" id="s2">
+  <h2><span class="no">02</span>核心原理：ros2 的"名词域 × 动作"体系</h2>
+  <p>ros2 CLI 和 git 一样是<b>先说对象、再说动作</b>的结构：<code>ros2 &lt;名词域&gt; &lt;动作&gt;</code>——先选名词域（操作什么），再给动作（怎么操作）。除六大命令族外还有 action 与执行入口一族，按职责分五组，各管计算图的一个侧面：</p>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">图拓扑</div><div class="kt">node / topic / service / action</div><p>进程、数据流、请求应答、长任务——四种图元素的 list / info / echo / call。</p></div>
+    <div class="kcard"><div class="kd">运行配置</div><div class="kt">param</div><p>list / get / set / dump：每个节点自带一个参数服务器，随时查改其"旋钮"。</p></div>
+    <div class="kcard"><div class="kd">接口定义</div><div class="kt">interface</div><p>show 查看 .msg / .srv / .action 的字段结构——通信双方的"合同原文"。</p></div>
+    <div class="kcard"><div class="kd">数据存档</div><div class="kt">bag</div><p>record 录制话题流 → play 回放：把现场时间冻结成可复现的数据集。</p></div>
+    <div class="kcard"><div class="kd">执行入口</div><div class="kt">run / launch / pkg</div><p>run 启动单个可执行文件，launch 编排一群，pkg 在已安装包里搜索。</p></div>
+  </div>
+  <table>
+    <thead><tr><th>你想回答的问题</th><th>命令</th><th>关键输出</th></tr></thead>
+    <tbody>
+      <tr><td>系统里有哪些节点？</td><td><code>ros2 node list</code></td><td>节点名（如 /talker）</td></tr>
+      <tr><td>这个话题谁在发谁在收？</td><td><code>ros2 topic info /chatter</code></td><td>Type + Pub/Sub count</td></tr>
+      <tr><td>消息长什么样？</td><td><code>ros2 interface show std_msgs/msg/String</code></td><td>字段清单 <code>string data</code></td></tr>
+      <tr><td>消息以什么频率发？</td><td><code>ros2 topic hz /chatter</code></td><td><code>average rate: 1.000</code></td></tr>
+      <tr><td>节点参数是什么？</td><td><code>ros2 param list /talker</code><br><code>ros2 param get /talker use_sim_time</code><br><code>ros2 param set /talker use_sim_time true</code></td><td>参数名清单 → 单个值 → 改后返回 <code>Set parameter successful</code></td></tr>
+      <tr><td>这个服务怎么调？</td><td><code>ros2 service type /talker/get_parameters</code><br><code>ros2 interface show rcl_interfaces/srv/GetParameters</code><br><code>ros2 service call /talker/get_parameters rcl_interfaces/srv/GetParameters "{names: ['use_sim_time']}"</code></td><td>先查类型 → 看字段 → 用 <code>---</code> 分请求与响应</td></tr>
+    </tbody>
+  </table>
+
+  <p class="lead" style="font-size:14.5px;margin-top:18px">上表这些命令按下去，计算图里到底发生了什么？关键在于 <code>echo</code> / <code>hz</code> / <code>info</code> <b>并不侵入 talker 进程</b>——它们以第三方订阅者/查询者身份加入计算图，拿的是 DDS 分发的同一份数据：</p>
+  <div class="anim-box">
+    <svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ros2 CLI 工具挂上计算图的动画">
+      <rect x="0" y="0" width="720" height="300" rx="12" fill="#0f172a"/>
+      <!-- 运行中系统 -->
+      <rect x="24" y="40" width="300" height="220" rx="14" fill="#111827" stroke="#334155" stroke-dasharray="6 5"/>
+      <text x="174" y="30" text-anchor="middle" font-size="12.5" fill="#64748b" font-weight="700">运行中的 ROS2 系统（你不许改它）</text>
+      <rect x="54" y="76" width="110" height="46" rx="10" fill="#1e293b" stroke="#4ade80" stroke-width="1.6"/>
+      <text x="109" y="97" text-anchor="middle" font-size="13" font-weight="700" fill="#4ade80">/talker</text>
+      <text x="109" y="114" text-anchor="middle" font-size="10.5" fill="#94a3b8">Publisher</text>
+      <rect x="184" y="196" width="110" height="46" rx="10" fill="#1e293b" stroke="#60a5fa" stroke-width="1.6"/>
+      <text x="239" y="217" text-anchor="middle" font-size="13" font-weight="700" fill="#60a5fa">/listener</text>
+      <text x="239" y="234" text-anchor="middle" font-size="10.5" fill="#94a3b8">Subscriber</text>
+      <!-- 话题管线 -->
+      <line x1="164" y1="99" x2="320" y2="99" stroke="#fbbf24" stroke-width="2.5"/>
+      <line x1="320" y1="99" x2="320" y2="219" stroke="#fbbf24" stroke-width="2.5"/>
+      <line x1="320" y1="219" x2="294" y2="219" stroke="#fbbf24" stroke-width="2.5"/>
+      <text x="330" y="152" font-size="12" fill="#fbbf24" font-weight="700">/chatter</text>
+      <text x="330" y="168" font-size="10.5" fill="#b45309">std_msgs/String · 1Hz</text>
+      <g fill="#fbbf24">
+        <circle r="5"><animate attributeName="cx" values="164;320" dur="1.4s" repeatCount="indefinite"/><animate attributeName="cy" values="99;99" dur="1.4s" repeatCount="indefinite"/></circle>
+        <circle r="5"><animate attributeName="cx" values="320;320" dur="1.4s" begin=".7s" repeatCount="indefinite"/><animate attributeName="cy" values="99;219" dur="1.4s" begin=".7s" repeatCount="indefinite"/></circle>
+      </g>
+      <!-- CLI 终端 -->
+      <rect x="410" y="40" width="286" height="220" rx="14" fill="#10151f" stroke="#3b82f6" stroke-width="1.6"/>
+      <text x="553" y="30" text-anchor="middle" font-size="12.5" fill="#60a5fa" font-weight="700">ros2 CLI · 第三方自省视角</text>
+      <g font-family="Consolas,monospace" font-size="12.5">
+        <text x="432" y="80" fill="#4ade80">$ ros2 topic echo /chatter</text>
+        <text x="432" y="104" fill="#e2e8f0">data: Hello World: 7</text>
+        <text x="432" y="136" fill="#4ade80">$ ros2 topic hz /chatter</text>
+        <text x="432" y="160" fill="#e2e8f0">average rate: 1.000</text>
+        <text x="432" y="192" fill="#4ade80">$ ros2 topic info /chatter</text>
+        <text x="432" y="216" fill="#e2e8f0">Publisher: 1  Subscriber: 1</text>
+        <text x="432" y="244" fill="#fbbf24"># 匿名订阅 · 零侵入 · 不改对方一行代码</text>
+      </g>
+      <!-- 挂载连接 -->
+      <line x1="344" y1="150" x2="410" y2="110" stroke="#3b82f6" stroke-width="2" stroke-dasharray="7 5">
+        <animate attributeName="stroke-dashoffset" values="0;-24" dur="1.1s" repeatCount="indefinite"/>
+      </line>
+      <line x1="344" y1="180" x2="410" y2="200" stroke="#3b82f6" stroke-width="2" stroke-dasharray="7 5">
+        <animate attributeName="stroke-dashoffset" values="0;-24" dur="1.1s" repeatCount="indefinite"/>
+      </line>
+      <text x="377" y="276" text-anchor="middle" font-size="11" fill="#64748b">CLI 以普通 DDS 参与者身份加入同一域 → 拿到的是分发给所有订阅者的同一份数据</text>
+    </svg>
+  </div>
+  <div class="anim-cap">动画 2-1｜CLI 工具零侵入挂载计算图：echo 是订阅者、info 是图查询（1.4 秒循环）</div>
+  <p class="lead" style="font-size:14.5px;margin-top:18px">动画只示意了"命令如何挂到计算图上"这一步。命令敲下去究竟等多久、返回什么、失败了会怎样，得自己跑一遍才清楚。不过动手之前要先认清一个分岔：<b>topic 与 service 用的是两种不同的通信模型</b>——一个异步单向，一个同步等待应答。下一节用对比图把这两者讲透，再到第 04 节实操中心按四关依次练习。</p>
+</section>
+
+<!-- 03 -->
+<section class="blk" id="s4">
+  <h2><span class="no">03</span>异步话题 vs 同步服务——两种通信模型的对比</h2>
+  <p>不要把这节理解成"两条命令的使用技巧不同"。真正的差别在<b>通信模型</b>：<b>topic 是异步单向的</b>——发布者把消息扔进话题就完事，不关心谁收、收没收到；<b>service 是同步一问一答的</b>——客户端发请求后<b>阻塞等待</b>，直到服务端回一个响应才继续往下走。</p>
+
+  <p style="margin-top:16px">用同一个场景对比：<b>你想问 talker 节点"你的 use_sim_time 参数是什么"</b>。两种模型各写一遍，看差在哪。</p>
+
+  <div class="anim-box">
+    <svg viewBox="0 0 720 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="topic 异步发布与 service 同步请求应答的时序对比图">
+      <rect x="0" y="0" width="720" height="400" rx="12" fill="#0f172a"/>
+
+      <!-- ===== 上半：topic 异步 ===== -->
+      <text x="24" y="26" font-size="13" font-weight="700" fill="#4ade80">① topic · 异步单向：发完立刻返回，不等任何人</text>
+      <text x="96" y="58" font-size="11" fill="#94a3b8" font-weight="700">Publisher</text>
+      <text x="452" y="58" font-size="11" fill="#94a3b8" font-weight="700">Subscriber</text>
+      <line x1="110" y1="66" x2="110" y2="176" stroke="#334155" stroke-width="1.6" stroke-dasharray="5 4"/>
+      <line x1="466" y1="66" x2="466" y2="176" stroke="#334155" stroke-width="1.6" stroke-dasharray="5 4"/>
+
+      <line x1="110" y1="92" x2="466" y2="92" stroke="#4ade80" stroke-width="2"/>
+      <polygon points="466,92 456,87 456,97" fill="#4ade80"/>
+      <text x="288" y="84" text-anchor="middle" font-size="11" fill="#4ade80">publish(msg) 扔进 /chatter</text>
+
+      <!-- 立即返回标记 -->
+      <rect x="60" y="112" width="100" height="26" rx="6" fill="#14532d" stroke="#4ade80" stroke-width="1.2"/>
+      <text x="110" y="129" text-anchor="middle" font-size="10.5" fill="#86efac" font-weight="700">立刻返回</text>
+      <line x1="110" y1="112" x2="110" y2="100" stroke="#4ade80" stroke-width="1.2" stroke-dasharray="3 3"/>
+
+      <line x1="466" y1="148" x2="110" y2="148" stroke="#475569" stroke-width="1.6" stroke-dasharray="6 5"/>
+      <text x="288" y="164" text-anchor="middle" font-size="10.5" fill="#64748b">无响应 · 无确认 · 无返回值</text>
+      <text x="288" y="196" text-anchor="middle" font-size="10.5" fill="#fbbf24">对方在不在线、收没收到 —— 发送方一概不知</text>
+
+      <line x1="24" y1="214" x2="696" y2="214" stroke="#334155" stroke-width="1"/>
+
+      <!-- ===== 下半：service 同步 ===== -->
+      <text x="24" y="240" font-size="13" font-weight="700" fill="#60a5fa">② service · 同步请求应答：发完阻塞，必须等到响应</text>
+      <text x="96" y="270" font-size="11" fill="#94a3b8" font-weight="700">Client</text>
+      <text x="452" y="270" font-size="11" fill="#94a3b8" font-weight="700">Server</text>
+      <line x1="110" y1="278" x2="110" y2="368" stroke="#334155" stroke-width="1.6" stroke-dasharray="5 4"/>
+      <line x1="466" y1="278" x2="466" y2="368" stroke="#334155" stroke-width="1.6" stroke-dasharray="5 4"/>
+
+      <line x1="110" y1="298" x2="466" y2="298" stroke="#60a5fa" stroke-width="2"/>
+      <polygon points="466,298 456,293 456,303" fill="#60a5fa"/>
+      <text x="288" y="291" text-anchor="middle" font-size="11" fill="#60a5fa">request：get_parameters(names=[use_sim_time])</text>
+
+      <!-- 阻塞框 -->
+      <rect x="62" y="312" width="96" height="24" rx="6" fill="#1e3a8a" stroke="#60a5fa" stroke-width="1.2"/>
+      <text x="110" y="328" text-anchor="middle" font-size="10.5" fill="#93c5fd" font-weight="700">阻塞等待…</text>
+
+      <line x1="466" y1="342" x2="110" y2="342" stroke="#22d3ee" stroke-width="2"/>
+      <polygon points="110,342 120,337 120,347" fill="#22d3ee"/>
+      <text x="288" y="335" text-anchor="middle" font-size="11" fill="#22d3ee">response：values=[false]</text>
+
+      <rect x="62" y="352" width="96" height="24" rx="6" fill="#164e63" stroke="#22d3ee" stroke-width="1.2"/>
+      <text x="110" y="368" text-anchor="middle" font-size="10.5" fill="#67e8f9" font-weight="700">拿到值，继续</text>
+
+      <text x="288" y="384" text-anchor="middle" font-size="10.5" fill="#fbbf24">服务端不在线？服务端卡住？—— 客户端就一直等</text>
+    </svg>
+  </div>
+  <div class="anim-cap">图 3-1｜同一件事的两种时序：上为 topic 单向投递（发完即返回），下为 service 请求应答（阻塞至响应到达）</div>
+
+  <h3 style="margin:24px 0 10px;font-size:16px">📋 同一个需求，两种写法对照</h3>
+  <table>
+    <thead><tr><th style="width:88px">对比项</th><th>topic（异步发布）</th><th>service（同步请求应答）</th></tr></thead>
+    <tbody>
+      <tr><td>命令</td><td><code>ros2 topic pub --once /chatter std_msgs/msg/String "{data: 'hi'}"</code></td><td><code>ros2 service call /talker/get_parameters rcl_interfaces/srv/GetParameters "{names: ['use_sim_time']}"</code></td></tr>
+      <tr><td>通道</td><td>话题 <code>/chatter</code>（广播式，多个订阅者都能收到）</td><td>服务 <code>/talker/get_parameters</code>（点对点，一对一）</td></tr>
+      <tr><td>方向</td><td>单向：只有去，没有回</td><td>双向：先请求，再响应</td></tr>
+      <tr><td>命令何时返回</td><td><b>立刻</b>——消息写进 DDS 就结束</td><td><b>等到 response 才返回</b>——中间一直阻塞</td></tr>
+      <tr><td>能拿到返回值吗</td><td><b>不能</b>。终端只打印 <code>publishing #1</code>，仅表示"发出去了"</td><td><b>能</b>。终端打印 <code>response:</code> 及其内容</td></tr>
+      <tr><td>对方不在线时</td><td>命令照常成功返回。消息被丢弃，<b>你不会知道</b></td><td>先打印 <code>waiting for service to become available...</code>，然后<b>一直等</b></td></tr>
+      <tr><td>适合什么</td><td>持续数据流：传感器、状态广播、控制指令</td><td>需要结果的查询/操作：读参数、查状态、触发一次计算</td></tr>
+    </tbody>
+  </table>
+
+  <h3 style="margin:24px 0 10px;font-size:16px">⏱️ 关于超时：一个无限等，一个限时等</h3>
+  <p>这是初学者最容易踩的坑。同一段"等响应"的逻辑，写不写超时，行为是两回事——<b>左边是 CLI 的做法（无限等），右边是你在程序里应该写的做法（限时等）</b>：</p>
+  <table>
+    <thead><tr><th style="width:104px"></th><th>❌ 无限等待（CLI 源码就是这么写的）</th><th>✅ 带超时（程序里应该这么写）</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>等连接建立</b></td>
+        <td><pre style="margin:0;font-size:12px"><span class="g">if</span> not cli.service_is_ready():
+    cli.wait_for_service()
+    <span class="c"># 服务永远不起 → 死等</span></pre></td>
+        <td><pre style="margin:0;font-size:12px">ok = cli.wait_for_service(
+        timeout_sec=<span class="b">2.0</span>)
+<span class="g">if</span> not ok:
+    <span class="c"># 2 秒后主动放弃，去处理</span>
+    <span class="g">return</span> <span class="y">'service 不在线'</span></pre></td>
+      </tr>
+      <tr>
+        <td><b>等响应返回</b></td>
+        <td><pre style="margin:0;font-size:12px">rclpy.spin_until_future_complete(
+    node, future)
+<span class="c"># 服务不回包 → 死等</span></pre></td>
+        <td><pre style="margin:0;font-size:12px">rclpy.spin_until_future_complete(
+    node, future, timeout_sec=<span class="b">2.0</span>)
+<span class="g">if</span> not future.done():
+    <span class="c"># 超时了，主线程继续走</span></pre></td>
+      </tr>
+      <tr>
+        <td><b>服务端卡死时</b></td>
+        <td>整个进程僵住，只能 <kbd>Ctrl+C</kbd> 或 kill</td>
+        <td>2 秒后返回失败，<b>机器人继续正常动作</b></td>
+      </tr>
+      <tr>
+        <td><b>在你的机器人上</b></td>
+        <td>主循环停摆 → 底盘不响应遥控、<b>机器人"僵住不动"</b></td>
+        <td>降级处理 → 停下等指令 / 报警，仍可控</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="tip amber"><span class="lab">⚠️ 两个事实，别记混</span><b>① CLI 本身没有超时参数。</b><code>ros2 service call</code> 只支持 <code>-r/--rate</code>（重复调用频率），<b>没有</b> <code>--timeout</code>。上面左栏那种"无限等"就是它真实的实现（源码见 <code>ros2service/verb/call.py</code>）。命令卡住时，交互状态下可以 <kbd>Ctrl+C</kbd> 中断；<b>写脚本时可以用 shell 的 <code>timeout</code> 命令从外部包一层</b>（下一小节讲）。<br><b>② 写程序时，等连接和等响应这两处都要给超时。</b>很多人只给了其中一处——比如给 <code>spin_until_future_complete</code> 加了 <code>timeout_sec</code>，却漏了 <code>wait_for_service</code>，结果服务端根本没起，程序一样卡死。<b>两处都要设。</b></div>
+  <div class="tip"><span class="lab">💡 还有一条官方警告：别在回调里用同步的 call()</span><code>rclpy</code> 的 <code>Client.call()</code>（同步版）内部是 <code>event.wait()</code>——<b>永久阻塞、没有超时参数</b>。官方源码里明确写着 <span style="font-family:Consolas,monospace">Do not call this method in a callback or a deadlock may occur</span>。<br>因为回调函数本身就跑在执行器线程里，你在回调里同步等响应，等于让执行器停下来等自己——<b>死锁</b>。回调里要用 <code>call_async()</code> 拿 Future，或者干脆换 <code>call_async</code> + 回调链的写法。</div>
+
+  <h3 style="margin:24px 0 10px;font-size:16px">🧪 亲手验证：让"阻塞"和"不阻塞"肉眼可见</h3>
+  <p>光看理论不会形成直觉。按下面三步做，你会亲眼看到两者的差别——<b>这是本实验最值得做的一次对比</b>：</p>
+  <pre data-copy="cmd"><span class="c"># 准备：终端 A 跑 talker，终端 B 备用</span>
+<span class="g">ros2</span> run demo_nodes_cpp talker
+
+<span class="c"># ① 先看 topic 的"发完就走"：终端 C</span>
+<span class="g">ros2</span> topic pub --once /chatter std_msgs/msg/String <span class="y">"{data: 'hello'}"</span>
+<span class="c"># → 瞬间返回。即使终端 B 的 listener 没开，这条命令也照样"成功"</span>
+
+<span class="c"># ② 再看 service 的"必须等到回包"：终端 C</span>
+<span class="g">ros2</span> service call /talker/get_parameters rcl_interfaces/srv/GetParameters <span class="y">"{names: ['use_sim_time']}"</span>
+<span class="c"># → 立刻返回 response: values=[false]（服务端在线，所以很快）</span>
+
+<span class="c"># ③ 关键对比：把终端 A 的 talker 杀掉，再执行 ②</span>
+<span class="c"># → 卡住了。屏幕停在 "waiting for service to become available..."</span>
+<span class="c"># → 此时 ① 依然瞬间返回。这就是异步与同步的鸿沟</span>
+<span class="c"># → 只能 Ctrl+C 中断：CLI 没有超时参数，它不会自己放弃</span></pre>
+  <div class="tip tealb"><span class="lab">✅ 做完这步你应该能回答</span>为什么 <code>topic pub</code> 在没人订阅时也"成功"？——因为异步模型不定义"送达"，它只保证"投递出去"。<br>为什么 <code>service call</code> 会卡死？——因为同步模型的定义就是"等到应答"，没有应答就没有结束条件，而 CLI 又没给超时。</div>
+
+  <h3 style="margin:24px 0 10px;font-size:16px">🛡️ 命令行也能限时：用 shell 的 timeout 包一层</h3>
+  <p>上面第 ③ 步你只能 <kbd>Ctrl+C</kbd> 手动脱身。<b>但命令行并非没有办法限时</b>——既然 <code>ros2 service call</code> 自己不带超时参数，就让外层的 <b>shell 定时器</b>替它掐断。这是 Linux 上处理"可能卡死的命令"的标准做法，不只用于 ROS2：</p>
+  <pre data-copy="cmd"><span class="c"># 语法：timeout [选项] 秒数 命令...</span>
+<span class="c"># ③ 的改进版：最多等 3 秒，超时自动杀掉</span>
+<span class="g">timeout</span> <span class="b">3</span> ros2 service call /talker/get_parameters rcl_interfaces/srv/GetParameters <span class="y">"{names: ['use_sim_time']}"</span>
+<span class="c"># → 3 秒后进程被终止，提示：Terminated</span>
+<span class="c"># → 终端立即回到提示符，不用手动 Ctrl+C</span>
+
+<span class="c"># 想知道"到底是超时了，还是命令自己失败"？用 --preserve-status 区分退出码</span>
+<span class="g">timeout</span> --preserve-status <span class="b">3</span> ros2 service call ...
+<span class="g">echo</span> $?      <span class="c"># 124 = 超时被杀；0 = 正常返回；其他 = 命令自身报错</span>
+
+<span class="c"># 常用选项</span>
+<span class="c">#   -s SIGINT   超时后发 SIGINT（相当于替你按 Ctrl+C，更温和）</span>
+<span class="c">#   --preserve-status  保留命令自身的退出码，便于脚本判断</span>
+<span class="c">#   -k 2        如果 SIGINT 不管用，2 秒后补一个 SIGKILL 强制杀</span></pre>
+  <div class="tip"><span class="lab">💡 三层超时，各管一段——别把它们搞混</span>
+  <b>① 命令参数层：</b><code>ros2 service call</code> 没有超时参数，这一层是空的。<br>
+  <b>② shell 包装层：</b>用 <code>timeout 3 ros2 ...</code> 从外部掐断，适合在终端里手动排查、或写 shell 脚本时兜底。<b>注意它杀的是整个进程</b>——命令被强行终止，你拿不到"调用失败"这种结构化结果，只能靠退出码判断。<br>
+  <b>③ 代码层：</b>在 rclpy 里给 <code>wait_for_service</code> 和 <code>spin_until_future_complete</code> 设 <code>timeout_sec</code>。这是唯一能<b>优雅降级</b>的做法——超时后程序继续执行，你可以发告警、改用备用方案、或重试。<br>
+  <b>结论：终端里排查用 ②，写进产品代码必须用 ③。</b></div>
+</section>
+
+<!-- 04 实操中心 -->
+<section class="blk" id="s6">
+  <h2><span class="no">04</span>实操中心：四关打通命令工具（点哪关练哪关）</h2>
+  <p>四关按难度递进编排：<b>第一关</b>先在仿真终端把 02 节表格六行逐条验证（只点按钮，零门槛）；<b>第二关</b>学会读懂单个节点的"户口本"；<b>第三关</b>动手注入消息、热改参数；<b>第四关</b>录制回放闭环，完整带走一次现场。按顺序解锁：</p>
+  <div class="tip amber"><span class="lab">🔧 实机前提 · 一次配好全程通用</span>开 <b>3 个终端</b>（全部先 <code>source /opt/ros/humble/setup.bash</code>）：终端 A <code>ros2 run demo_nodes_cpp talker</code>；终端 B <code>ros2 run demo_nodes_cpp listener</code>（即 EXP-01 跑通的 Hello World 案例，保持运行）；<b>终端 C 留作观察位</b>——下面所有"实机步骤"都在终端 C 执行。四关同用这一套环境，不用反复重启。</div>
+  <div class="gtabs">
+    <button class="gtab on" data-g="g1" onclick="gate('g1')"><span class="gno">第 1 关</span>命令试车台<span class="gdif">⭐ 六条基础命令验证</span></button>
+    <button class="gtab" data-g="g2" onclick="gate('g2')"><span class="gno">第 2 关</span>node 组 · 户口本<span class="gdif">⭐ 读懂 node info 输出</span></button>
+    <button class="gtab" data-g="g3" onclick="gate('g3')"><span class="gno">第 3 关</span>topic 组 · 注入与调参<span class="gdif">⭐⭐ 动手改系统</span></button>
+    <button class="gtab" data-g="g4" onclick="gate('g4')"><span class="gno">第 4 关</span>bag 组 · 时间机器<span class="gdif">⭐⭐ 录放闭环，综合</span></button>
+  </div>
+
+  <!-- 第 1 关 · 试车台 -->
+  <div class="gpane on" id="gpane-g1">
+    <div class="ghead"><span class="gt">难度 ⭐</span><h3>第 1 关 · 命令试车台：先在仿真里熟悉，再到设备上验证</h3></div>
+    <p><b>仿真先行：</b>下面是一个搭好了 EXP-01 案例的仿真终端——点按钮逐条执行，对照 02 节表格的"关键输出"确认理解。</p>
+    <div class="ix-panel">
+      <div class="ix-title">命令试车台 · 用 EXP-01 的 talker / listener 验证六条命令</div>
+      <div class="ctl-row">
+        <button class="btn" id="tcBtn_a" onclick="runCmd('a')">▶ ros2 node list</button>
+        <button class="btn" id="tcBtn_b" onclick="runCmd('b')">▶ ros2 topic info /chatter</button>
+        <button class="btn" id="tcBtn_c" onclick="runCmd('c')">▶ interface show String</button>
+        <button class="btn" id="tcBtn_d" onclick="runCmd('d')">▶ ros2 topic hz /chatter</button>
+        <button class="btn" id="tcBtn_e" onclick="runCmd('e')">▶ ros2 param list /talker</button>
+        <button class="btn" id="tcBtn_f" onclick="runCmd('f')">▶ service get_parameters</button>
+        <button class="btn" id="tcBtn_clr" onclick="clearTerm()">🧹 清屏</button>
+      </div>
+      <div class="io" id="termIo"><span class="dim">// 仿真终端就绪：EXP-01 的 talker / listener 已在后台运行，点击上方任一命令开始验证…</span></div>
+      <p style="margin-top:8px;font-size:13px;color:var(--theme-deep)">已过关命令：<b id="tcCount">0</b> / 6 ✅——六条全亮后，仿真过关，进入实机验证。</p>
+    </div>
+    <p style="font-size:14px;margin-top:14px"><b>实机验证</b>（终端 C，talker / listener 保持运行）：把上面六条命令原样敲一遍，按下表核对——<b>输出与仿真一致即过关</b>：</p>
+    <table>
+      <thead><tr><th>#</th><th>实机命令（终端 C）</th><th>过关标准（与仿真对照）</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td><code>ros2 node list</code></td><td>输出 <code>/talker</code> 和 <code>/listener</code> 两行</td></tr>
+        <tr><td>2</td><td><code>ros2 topic info /chatter</code></td><td><code>Publisher count: 1</code> 且 <code>Subscription count: 1</code></td></tr>
+        <tr><td>3</td><td><code>ros2 interface show std_msgs/msg/String</code></td><td>只有 <code>string data</code> 一字段</td></tr>
+        <tr><td>4</td><td><code>ros2 topic hz /chatter</code>（Ctrl+C 退出）</td><td><code>average rate: 1.000</code> 左右</td></tr>
+        <tr><td>5</td><td><code>ros2 param list /talker</code></td><td>列出 <code>use_sim_time</code></td></tr>
+        <tr><td>6</td><td><code>ros2 service call /talker/get_parameters rcl_interfaces/srv/GetParameters "{names: ['use_sim_time']}"</code></td><td>返回 <code>bool_value: false</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 第 2 关 · node 组 -->
+  <div class="gpane" id="gpane-g2">
+    <div class="ghead"><span class="gt">难度 ⭐</span><h3>第 2 关 · node 组——图的"户口本"（实机）</h3></div>
+    <div class="flow">
+      <div class="step"><span class="n">1</span>确认前提：终端 A/B 的 talker、listener 还在跑（没跑按实机前提重启）</div>
+      <div class="arr"></div>
+      <div class="step"><span class="n">2</span>终端 C 敲 <code>ros2 node info /talker</code></div>
+      <div class="arr"></div>
+      <div class="step"><span class="n">3</span>对照下方输出样板，逐区认出 Publishers / Subscribers / Service Servers</div>
+      <div class="arr"></div>
+      <div class="step"><span class="n">4</span>换 <code>ros2 node info /listener</code> 再来一遍——Subscribers 里应有 <code>/chatter</code></div>
+    </div>
+    <pre data-copy="cmd"><span class="c"># 终端 C：</span>
+<span class="g">ros2</span> node info /talker
+<span class="c"># Publishers:</span>
+<span class="c">#   /chatter            ← 它往外说的话题</span>
+<span class="c">#   /parameter_events   ← 参数变更广播（每个节点都有）</span>
+<span class="c">#   /rosout             ← 日志话题（每个节点都有）</span>
+<span class="c"># Subscribers:</span>
+<span class="c">#   /parameter_events /rosout</span>
+<span class="c"># Service Servers:</span>
+<span class="c">#   /talker/describe_parameters   ← 自带参数服务器！</span>
+<span class="c">#   /talker/get_parameters  /talker/set_parameters ...</span></pre>
+    <div class="tip tealb"><span class="lab">🔍 读法口诀 · 过关标准</span>对每个节点问三句话：<b>它说什么（Publishers）、它听什么（Subscribers）、它提供什么服务（Service Servers）</b>。任何节点还自带 parameter_events 与 rosout 两条"官方频道"——list 出来别慌，那不是业务话题。<b>✅ 过关：能在实机输出里指认出这三区，且 listener 的 Subscribers 含 /chatter。</b></div>
+  </div>
+
+  <!-- 第 3 关 · topic 组 -->
+  <div class="gpane" id="gpane-g3">
+    <div class="ghead"><span class="gt">难度 ⭐⭐</span><h3>第 3 关 · topic 组——注入与调参（实机）</h3></div>
+    <div class="flow">
+      <div class="step"><span class="n">1</span>终端 C：<code>ros2 topic list</code> 与 <code>list -t</code>——先看全局水流</div>
+      <div class="arr"></div>
+      <div class="step"><span class="n">2</span><code>echo</code> 看内容、<code>hz</code> 看频率、<code>bw</code> 看带宽</div>
+      <div class="arr"></div>
+      <div class="step"><span class="n">3</span>另开终端 D（也先 source），<code>pub --once</code> 注入一条消息——<b>盯终端 B：listener 应立刻打印 injected</b></div>
+      <div class="arr"></div>
+      <div class="step"><span class="n">4</span>参数组：<code>param list → dump → set</code> 三连，观察 set 后命令立即返回 Success</div>
+    </div>
+    <pre data-copy="cmd"><span class="c"># 终端 C：观察</span>
+<span class="g">ros2</span> topic list -t
+<span class="c"># /chatter [std_msgs/msg/String]  /parameter_events  /rosout</span>
+<span class="g">ros2</span> topic hz /chatter                  <span class="c"># average rate: 1.000 · min/max 软实时统计</span>
+
+<span class="c"># 终端 D：动手改系统</span>
+<span class="g">ros2</span> topic pub --once /chatter std_msgs/msg/String <span class="y">"{data: 'injected'}"</span>
+<span class="c"># 验证点：终端 B 的 listener 多打印一行 I heard: [injected] —— 发布者是谁它根本不关心</span>
+
+<span class="c"># 参数组三连（终端 C）</span>
+<span class="g">ros2</span> param list /talker                  <span class="c"># /talker  use_sim_time</span>
+<span class="g">ros2</span> param dump /talker &gt; talker.yaml    <span class="c"># 导出快照（生成了 yaml 文件即成功）</span>
+<span class="g">ros2</span> param set /talker use_sim_time false <span class="c"># 返回 Success 即热改生效</span></pre>
+    <div class="tip tealb"><span class="lab">✅ 过关标准</span>三项实见其一不可：① <code>pub --once</code> 后<b>终端 B 立刻多出 injected 行</b>（松耦合实证）；② <code>dump</code> 后 <code>cat talker.yaml</code> 能看到 <code>use_sim_time: false</code>；③ <code>set</code> 返回 <span class="ok">Success</span>。</div>
+  </div>
+
+  <!-- 第 4 关 · bag 组 -->
+  <div class="gpane" id="gpane-g4">
+    <div class="ghead"><span class="gt">难度 ⭐⭐</span><h3>第 4 关 · bag 组——把现场冻进"时间机器"（实机）</h3></div>
+    <div class="flow">
+      <div class="step"><span class="n">1</span>终端 D：<code>ros2 bag record -a -o exp02_test</code>——录全部话题，<b>10~20 秒后 Ctrl+C</b>（防止文件膨胀）</div>
+      <div class="arr"></div>
+      <div class="step"><span class="n">2</span><code>ros2 bag info exp02_test</code>：核对条数、时长、话题清单里有 <code>/chatter</code></div>
+      <div class="arr"></div>
+      <div class="step"><span class="n">3</span><b>把终端 A 的 talker Ctrl+C 杀掉</b>（制造"现场已灭"），再 <code>ros2 bag play exp02_test</code>——<b>终端 B 的 listener 重新开始打印</b></div>
+      <div class="arr"></div>
+      <div class="step"><span class="n">4</span>进阶：<code>--rate 2.0</code> 变速回放；录完重开 talker 恢复现场</div>
+    </div>
+    <pre data-copy="cmd"><span class="c"># 终端 D：录制（跑着的 talker/listener 会一起被录下来）</span>
+<span class="g">ros2</span> bag record -a -o exp02_test        <span class="c"># -a=all  10~20 秒就 Ctrl+C</span>
+<span class="g">ros2</span> bag info exp02_test
+<span class="c"># Files: exp02_test_0.db3        Duration: 12.3s</span>
+<span class="c"># Topic /chatter: 12 msgs    Serialization: cdr</span>
+
+<span class="c"># 关键验证：先杀掉终端 A 的 talker，再回放</span>
+<span class="g">ros2</span> bag play exp02_test                <span class="c"># 时间戳原样 → 终端 B 恢复打印 Hello World</span>
+<span class="g">ros2</span> bag play exp02_test --rate <span class="b">2.0</span>    <span class="c"># 2 倍速回放，调试效率翻倍</span></pre>
+    <div class="tip"><span class="lab">✅ 过关标准 · bag 的两种身份</span><b>过关：终端 A 已杀掉的前提下 play，终端 B 仍持续打印</b>——"人不在，时间还在"。<b>调试</b>：现场偶发 bug 录下来，回实验室无限次复现；<b>数据集</b>：SlamNav 算法的训练/评估数据就是这样采的——bag 是 ROS2 世界的"行车记录仪"。</div>
+  </div>
+
+  <p style="margin-top:14px;font-size:13.5px;color:var(--text-secondary)">四关全部通过后，去下一节对照验收清单核对一遍，再到最后的<b>命令选配台</b>做一次反向自测（给任务 → 选命令）。</p>
+</section>
+
+<!-- 05 验收 -->
+<section class="blk" id="s9">
+  <h2><span class="no">05</span>注意事项与验收清单</h2>
+  <ul class="check">
+    <li>至少开 <b>3 个终端</b>（talker / listener / CLI 观察位），全部正确 source</li>
+    <li><code>ros2 node info /talker</code> 能指出 Publishers / Service Servers 两大区</li>
+    <li><code>topic echo</code>、<code>topic hz</code>（≈1.000）、<code>pub --once</code> 三项全部见输出</li>
+    <li><code>service call get_parameters</code> 返回 <span class="ok">bool_value: false type: 1</span></li>
+    <li><code>bag record → info → play</code> 完整闭环，回放期间 listener 持续打印</li>
+  </ul>
+  <table>
+    <thead><tr><th>⚠️ 常见坑</th><th>现象 → 解法</th></tr></thead>
+    <tbody>
+      <tr><td>前提未满足</td><td>node/topic list 为空 → 先确认被观察的节点还活着（CLI 不会主动帮你启动）</td></tr>
+      <tr><td>YAML 引号</td><td><code>pub/call</code> 的参数串必须整体单引号包裹，内层用双引号</td></tr>
+      <tr><td>echo 只出一条</td><td>与 <code>pub --once</code> 搞混——echo 是持续流，<code>pub --once</code> 才是一次</td></tr>
+      <tr><td>bag 文件暴涨</td><td><code>-a</code> 全录增长 10~20MB/s → 及时 Ctrl+C，或只录目标话题</td></tr>
+      <tr><td>回放没反应</td><td>play 前确认订阅节点在线；bag 内话题名与类型 <b>原样</b>复现，不需要 remap</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 06 · 收尾自测：命令选配台 -->
+<section class="blk" id="s5">
+  <h2><span class="no">06</span>互动：命令选配台（综合自测）</h2>
+  <p class="lead">最后做一次<b>反向自测</b>：前三关都是"给你命令，验证输出"，这里反过来——<b>只给排查任务，你自己挑命令</b>。七个任务覆盖本实验全部命令组，看看还记不记得选：</p>
+  <div class="ix-panel">
+    <div class="ix-title">命令选配台 · Verb Picker（先心里选命令，再点"给出命令"对答案）</div>
+    <div class="ctl-row">
+      <label class="ctl">排查任务
+        <select id="task">
+          <option value="who">系统里有哪些节点在跑？</option>
+          <option value="what">/chatter 里到底传了什么？</option>
+          <option value="hz">/chatter 发送频率正常吗？</option>
+          <option value="who2">/chatter 谁在发、谁在收、什么类型？</option>
+          <option value="srv">查一下 talker 的 use_sim_time 参数</option>
+          <option value="dump">把当前所有参数导出成 YAML 备用</option>
+          <option value="rec">路上机器人偶发异常，先保住现场数据</option>
+        </select>
+      </label>
+      <button class="btn" onclick="pickCmd()">⚡ 给出命令</button>
+    </div>
+    <div class="io" id="cmdIo"><span class="dim">// 先自己想好用哪条命令，再点右上"给出命令"对答案…</span></div>
+  </div>
+</section>
+
+<!-- 07 -->
+<section class="blk" id="s10">
+  <h2><span class="no">07</span>实验总结与思考题</h2>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">✅ 完成成果</div><div class="kt">六大命令族 + 执行入口全链路通关</div><p>node / topic / service / param / interface / bag 配 list / info / echo / call 各至少用过一次；run / pkg / launch 各司其职。</p></div>
+    <div class="kcard"><div class="kd">🧠 原理收获</div><div class="kt">CLI = 计算图查询界面</div><p>零侵入自省的原理；同步 service call 与异步 topic pub 的模型差异。</p></div>
+    <div class="kcard"><div class="kd">🛠 技能收获</div><div class="kt">30 秒系统体检流程</div><p>list → echo/hz → info → param dump 的固定排查套路，迁移到任何 ROS2 系统。</p></div>
+    <div class="kcard"><div class="kd">❓ 排障思路</div><div class="kt">空输出三连查</div><p>节点活着吗 → 域一致吗（DOMAIN_ID）→ 话题名拼对了吗（前导 /）。</p></div>
+  </div>
+  <div class="tip violet">
+    <span class="lab">📝 思考题 1 · 综合应用</span>
+    <p style="margin:0 0 10px">你接手一台陌生机器人，只有命令行权限、不许看源码。运行 <code>ros2 topic list -t</code> 后看到 <code>/cmd_vel</code>、<code>/scan</code>、<code>/image_raw</code>、<code>/odom</code> 四个话题，但 <code>ros2 node list</code> 只输出一个节点 <code>/nav_node</code>。</p>
+    <ol style="margin:0;padding-left:22px;list-style:none">
+      <li style="margin-bottom:10px;position:relative"><b style="color:var(--accent-violet)">问 1</b>　请只靠 CLI 判断出：<code>/scan</code> 和 <code>/odom</code> 是"这个节点自己发的"还是"它订阅别人发的"？用哪条命令、看输出里的哪一区？</li>
+      <li style="margin-bottom:10px"><b style="color:var(--accent-violet)">问 2</b>　如果 <code>ros2 topic echo /scan</code> 有数据、但 <code>ros2 topic hz /scan</code> 显示 0.2 Hz（期望 10 Hz），此时 <code>/scan</code> 的 <code>Publisher count</code> 可能是多少？请把<b>数字与现象对应起来</b>说明你的推理。</li>
+      <li><b style="color:var(--accent-violet)">问 3 · 扩展</b>　<code>/image_raw</code> 用 <code>echo</code> 刷屏根本看不清。除了 <code>hz</code>，本章的哪条命令能帮你判断它的<b>数据量</b>是否正常？如果 <code>/image_raw</code> 在 <code>topic list -t</code> 里显示的类型与 <code>node info</code> 里该节点声明的不一致，说明什么？</li>
+    </ol>
+  </div>
+  <div class="tip violet">
+    <span class="lab">📝 思考题 2 · 现场排查</span>
+    <p style="margin:0 0 10px">一台导航小车在跑，<b>偶发</b>出现"原地打转"——大约跑十分钟才出现一次，出现后几秒自行恢复。</p>
+    <ol style="margin:0;padding-left:22px;list-style:none">
+      <li style="margin-bottom:10px"><b style="color:var(--accent-violet)">问 1</b>　现场只有你一个人，bug 无法主动复现。请设计一套 bag 方案把现场"带回去"：录哪些话题（提示：想清楚"打转"这个动作由哪个话题决定）、用 <code>-a</code> 还是指定话题、为什么？</li>
+      <li style="margin-bottom:10px"><b style="color:var(--accent-violet)">问 2</b>　回到实验室回放时，你<b>先启动了什么节点</b>？如果只 <code>play</code> 而不启动任何订阅节点，能否观察到问题？</li>
+      <li style="margin-bottom:10px"><b style="color:var(--accent-violet)">问 3</b>　回放时想快速定位异常时刻，用 <code>--rate</code> 加速会遇到什么风险？请给出一个"先粗后细"的两段式回放策略。</li>
+      <li><b style="color:var(--accent-violet)">问 4 · 扩展</b>　如果同一现象你想在<b>两台机器</b>上分别录制再对比（比如车载端 vs 遥控端），录出来的 bag 能否直接叠加播放？需要考虑什么问题？</li>
+    </ol>
+  </div>
+</section>
+
+<nav class="expnav">
+  <a href="../exp-01-ros2-intro/index.html"><span class="lb">← 上一个实验</span>EXP-01 ROS2 简介</a>
+  <a class="next" href="../exp-03-workspace/index.html"><span class="lb">下一个实验 →</span>EXP-03 工作空间与 colcon</a>
+</nav>
+
+<footer>
+  <span>CORE-01 · 机器人 ROS2 应用与开发 · EXP-02 常用命令工具</span>
+  <span>2 学时 · 验证性 · 基于 ros_practice 实验讲义改编</span>
+</footer>
+
+</main>
+</div>
+
+<script>
+var CMD_TASKS = {
+  who: '<span class="dim"># 图拓扑 · 节点域</span>\n<span class="ok">$ ros2 node list</span>\n<span class="warn">/listener</span>\n<span class="warn">/talker</span>\n<span class="dim"># 输出即"活着的进程单元"，含各自命名空间</span>',
+  what: '<span class="dim"># 数据流 · 看内容</span>\n<span class="ok">$ ros2 topic echo /chatter</span>\n<span class="warn">data: Hello World: 7</span>\n<span class="warn">data: Hello World: 8</span>\n<span class="dim"># 持续流式打印，Ctrl+C 退出（你是匿名订阅者）</span>',
+  hz: '<span class="dim"># 数据流 · 看频率</span>\n<span class="ok">$ ros2 topic hz /chatter</span>\n<span class="ok">average rate: 1.000</span>\n<span class="dim"># min/max/count 统计；明显偏低 → 查定时器周期或负载</span>',
+  who2: '<span class="dim"># 数据流 · 看拓扑</span>\n<span class="ok">$ ros2 topic info /chatter</span>\nType: std_msgs/msg/String\n<span class="warn">Publisher count: 1</span>\n<span class="warn">Subscription count: 1</span>\n<span class="dim"># count 为 0 的一侧 = 断链方向，顺着查</span>',
+  srv: '<span class="dim"># 服务 · 同步调用（会阻塞到响应）</span>\n<span class="ok">$ ros2 service call /talker/get_parameters \\\n    rcl_interfaces/srv/GetParameters \\\n    "{names: [\'use_sim_time\']}"</span>\n<span class="warn">response:\n  values:\n  - bool_value: false\n    type: 1</span>',
+  dump: '<span class="dim"># 参数 · 快照导出（供 Launch / 复现实验复用）</span>\n<span class="ok">$ ros2 param dump /talker &gt; talker.yaml</span>\ntalker:\n  ros__parameters:\n    use_sim_time: false\n<span class="dim"># 之后可用 ros2 run --ros-args --params-file 注入</span>',
+  rec: '<span class="dim"># 数据存档 · 保住现场（时间机器）</span>\n<span class="ok">$ ros2 bag record -a -o incident_001</span>\n<span class="dim"># 长时间运行只录关键话题：</span>\n<span class="ok">$ ros2 bag record /scan /odom /cmd_vel -o incident_001</span>\n<span class="dim"># 10~20 秒即 Ctrl+C 防膨胀 → info 检查 → play 复现</span>'
+};
+function pickCmd(){
+  var k = document.getElementById('task').value;
+  document.getElementById('cmdIo').innerHTML = CMD_TASKS[k];
+}
+function gate(g){
+  var panes = document.querySelectorAll('.gpane');
+  for(var i=0;i<panes.length;i++) panes[i].classList.toggle('on', panes[i].id === 'gpane-' + g);
+  var tabs = document.querySelectorAll('.gtab');
+  for(var i=0;i<tabs.length;i++) tabs[i].classList.toggle('on', tabs[i].getAttribute('data-g') === g);
+}
+var TC_CMDS = {
+  a:{cmd:'ros2 node list',out:'/talker\n/listener',note:'# 正好两行 = talker 与 listener 都活着，对应表格第 1 行',btn:'tcBtn_a'},
+  b:{cmd:'ros2 topic info /chatter',out:'Type: std_msgs/msg/String\nPublisher count: 1\nSubscription count: 1',note:'# Type + 两个 count 齐全 = 1 发 1 收，对应表格第 2 行',btn:'tcBtn_b'},
+  c:{cmd:'ros2 interface show std_msgs/msg/String',out:'string data',note:'# 一字段到顶 = "合同原文"就这么短，对应表格第 3 行',btn:'tcBtn_c'},
+  d:{cmd:'ros2 topic hz /chatter',out:'average rate: 1.000\n\tmin: 0.999s max: 1.001s std dev: 0.000s',note:'# ≈1.000 = talker 定时器 1Hz 无丢包，对应表格第 4 行（Ctrl+C 不会退出仿真，点下一条即可）',btn:'tcBtn_d'},
+  e:{cmd:'ros2 param list /talker',out:'/talker\n  use_sim_time',note:'# 每个节点自带参数服务器，use_sim_time 是 ROS2 默认注入的，对应表格第 5 行',btn:'tcBtn_e'},
+  f:{cmd:'ros2 service type /talker/get_parameters\nros2 interface show rcl_interfaces/srv/GetParameters\nros2 service call /talker/get_parameters rcl_interfaces/srv/GetParameters "{names: [\'use_sim_time\']}"',out:'rcl_interfaces/srv/GetParameters\n---\nstring[] names\n---\nParameter[] values\nresponse:\n  values:\n  - bool_value: false\n    type: 1',note:'# "type→show→call" 两步查证法全套 = 表格第 6 行：--- 上请求下响应，三命令一次演示',btn:'tcBtn_f'}
+};
+var tcDone = {};
+function termAppend(html){
+  var io = document.getElementById('termIo');
+  if(io.querySelector('.dim')) io.innerHTML = '';
+  io.innerHTML += html + '\n';
+  io.scrollTop = io.scrollHeight;
+}
+function runCmd(k){
+  var t = TC_CMDS[k];
+  termAppend('<span class="ok">$ ' + t.cmd.split('\n').join('\n$ ') + '</span>\n' +
+    t.out.split('\n').map(function(l,i){return '<span class="warn">' + l + '</span>';}).join('\n') + '\n' +
+    '<span class="dim">' + t.note + '</span>');
+  if(!tcDone[k]){
+    tcDone[k] = 1;
+    document.getElementById(t.btn).textContent = '✅ ' + document.getElementById(t.btn).textContent.replace('▶ ','');
+    document.getElementById('tcCount').textContent = Object.keys(tcDone).length;
+    if(Object.keys(tcDone).length === 6) termAppend('<span class="ok">// 🎉 第 1 关通关！表格六行已逐条验证 —— 真实终端复现后，点上方"第 2 关"继续</span>');
+  }
+}
+function clearTerm(){
+  document.getElementById('termIo').innerHTML = '<span class="dim">// 终端已清屏：继续点击命令验证（过关状态保留）…</span>';
+}
+</script>
+<script src="../shared/tutorial.js?v=20261027a" defer></script>
+</body>
+</html>

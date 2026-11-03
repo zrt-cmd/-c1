@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-04 · AMCL 自适应蒙特卡洛定位 — 机器人 SLAM 与自主导航</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+:root{--theme:#2563eb;--theme-deep:#1d4ed8;--theme-bg:#dbeafe;--theme-bd:#bfdbfe}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit" title="返回课程首页">🧠 具身智能课程 · <i>教程首页</i></a>
+  <div class="crumb"><a href="../../../index.html#core">核心课程</a> / <a href="../index.html">SLAM 与自主导航</a> / EXP-04</div>
+</div>
+
+<div class="wrap">
+
+<aside class="side">
+  <h4>本页目录</h4>
+  <a href="#s1" class="now">01 问题引入：里程计漂移与"被绑架"的车</a>
+  <a href="#s2">02 原理通俗讲解：粒子滤波三步</a>
+  <a href="#s3">03 关联知识点</a>
+  <a href="#s4">04 实验目标</a>
+  <a href="#s5">05 实验环境与准备</a>
+  <a href="#s6">06 动画讲解：粒子云收敛</a>
+  <a href="#s7">07 互动讲解：粒子数 × 传感器噪声实验台</a>
+  <a href="#s8">08 实操步骤：给初始位姿并观察收敛</a>
+  <a href="#s9">09 重点与易错点</a>
+  <a href="#s10">10 总结与思考</a>
+  <h4>CH1 · 建模与建图</h4>
+  <a href="../exp-01-slam-urdf/index.html">EXP-01 原理与 URDF</a>
+  <a href="../exp-02-slam-toolbox/index.html">EXP-02 SLAM Toolbox 建图</a>
+  <h4>CH2 · 定位与导航</h4>
+  <a href="../exp-03-nav2-navigation/index.html">EXP-03 Nav2 导航</a>
+  <a href="../exp-04-amcl-localization/index.html">EXP-04 AMCL 定位</a>
+  <a href="../exp-05-dwa-teb-avoidance/index.html">EXP-05 DWA/TEB 避障</a>
+  <h4>CH3 · 进阶</h4>
+  <a href="../exp-06-radar-multiwaypoint/index.html">EXP-06 多点导航</a>
+  <a href="../exp-07-rtabmap-3d/index.html">EXP-07 RTAB-Map 3D</a>
+</aside>
+
+<main class="content">
+
+<div class="exp-head">
+  <span class="code">EXP-04 · 第 2 章 · 综合性 · 8 学时</span>
+  <h1>AMCL 自适应蒙特卡洛定位</h1>
+  <p class="desc">实验 3 里小车导航前"大概知道自己在哪"（默认 0,0,0）。但真实场景下小车可能被搬动、地图和现实对不上。这节课解决"我到底在地图哪里"——用 AMCL 粒子滤波，让小车拿雷达扫一扫，就自己猜出精确位置。</p>
+  <div class="meta">
+    <span class="tag hl">难度 ⭐⭐⭐ · 8 学时</span>
+    <span class="tag">粒子滤波</span><span class="tag">似然场</span>
+    <span class="tag">初始位姿</span><span class="tag">/initialpose</span>
+  </div>
+</div>
+
+<!-- 01 -->
+<section class="blk" id="s1">
+  <h2><span class="no">01</span>问题引入：里程计漂移与"被绑架"的车</h2>
+  <p>两个真实场景把定位问题逼到台前：</p>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>麦轮原地旋转打滑严重（航向漂移约 45%）——里程计说"转了 90°"，实际可能只有 50°</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>同学把小车从教室这头搬到那头（"绑架机器人"）——上一秒的位姿全部作废</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>地图与现实对不上，激光扫出来的墙落在"错误的地方"，导航全线跑偏</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span>需要一个"拿眼前扫描与地图比对、不断自我纠偏"的定位器 —— AMCL</div>
+  </div>
+  <div class="tip amber"><span class="lab">💡 一句话读懂</span>这一课解决"我到底在地图哪里"：用粒子滤波（预测 → 更新 → 重采样三步循环），让小车拿雷达扫一圈就自己猜出精确位置。就像黑店里的手电筒：地图是店铺布局，激光扫描是光斑，猜对了位置，光斑才和墙重合。</div>
+</section>
+
+<!-- 02 -->
+<section class="blk" id="s2">
+  <h2><span class="no">02</span>原理通俗讲解：粒子滤波三步</h2>
+  <div class="tip tealb"><span class="lab">🎲 蒙眼人猜位置：撒一把"假想我"</span>在户型图上同时撒 500 个"假想的我"（<b>粒子</b>，每个都自带一组位置+朝向猜测）。<b>预测</b>：听到"向右转 10°、前进 1 步"，500 个假想我一起挪（按运动模型加点抖动）；<b>更新（打分）</b>：拿当前雷达扫描和地图比对——"我"猜的位置若让扫到的墙和地图墙重合就加分，对不上就扣分；<b>重采样</b>：按分数抽签复制——高分的多生几个、低分的被淘汰。循环三步，假想我越挤越紧，最后那团"人堆"的中心 = 小车真实位置。</div>
+  <table>
+    <thead><tr><th>AMCL 参数</th><th>本项目值</th><th>通俗解释</th></tr></thead>
+    <tbody>
+      <tr><td>min_particles / max_particles</td><td>500 / 2000</td><td>撒多少个"假想我"（KLD 自适应增减：迷茫时多撒、笃定时少撒）</td></tr>
+      <tr><td>alpha1 ~ alpha5</td><td>0.2</td><td>运动有多"善变"：打滑严重的车调大，让假想我敢散开</td></tr>
+      <tr><td>laser_model_type</td><td>likelihood_field</td><td>似然场打分：先给地图算好"离墙距离场"，扫一扫按光斑重合度打分，比 beam 模型快得多</td></tr>
+      <tr><td>update_min_a / update_min_d</td><td>0.15 rad / 0.15 m</td><td>每转 8.6° 或每走 15 cm 才重新打分一次——省算力，别每帧都算</td></tr>
+      <tr><td>laser_max_range / min_range</td><td>8.0 / 0.10 m</td><td>只信这个距离窗口内的扫描点（比雷达物理量程 12 m 更保守），太近的反光噪点直接弃</td></tr>
+      <tr><td>set_initial_pose / initial_pose</td><td>true / (0,0,0)</td><td>启动时直接按 <b>initial_pose</b> 撒粒子；设为 false 则等外部发 /initialpose 再开始</td></tr>
+      <tr><td>recovery_alpha_fast / slow</td><td>0.0 / 0.0</td><td>随机粒子注入（=0 关闭）：开成如 0.001 后，粒子会周期性"炸开重撒"，用来救被绑架的车</td></tr>
+    </tbody>
+  </table>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">自适应</div><div class="kt">KLD 采样</div><p>分布复杂（走廊对称、多房间）时自动加粒子，简单场景自动减——"迷茫就多猜几个"，上下限由 min/max_particles 卡住。</p></div>
+    <div class="kcard"><div class="kd">输出</div><div class="kt">/particle_cloud + /amcl_pose</div><p>粒子云可视化 = 团的松紧直接反映"信心"；amcl_pose 是带协方差的最终位姿。</p></div>
+    <div class="kcard"><div class="kd">假收敛</div><div class="kt">对称环境的陷阱</div><p>长走廊两头长得一样，粒子可能在"错误的那头"抱团——收敛 ≠ 收敛对了，换特征明显的房间再验。</p></div>
+    <div class="kcard"><div class="kd">双坐标系</div><div class="kt">AMCL 只发 map→odom</div><p>它把"纠正量"写进 map→odom 这根 TF，odom→base_footprint 仍由 EKF 平滑输出——所以定位校正时车不会抽搐。</p></div>
+  </div>
+</section>
+
+<!-- 03 -->
+<section class="blk" id="s3">
+  <h2><span class="no">03</span>关联知识点</h2>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">知识点 1</div><div class="kt">里程计 vs 雷达定位</div><p>里程计"记得自己走了多远"但会漂；雷达"看得见墙在哪"但只看眼前——两者互补正是滤波的思想。</p></div>
+    <div class="kcard"><div class="kd">知识点 2</div><div class="kt">map→odom→base TF</div><p>AMCL 负责发 map→odom 的修正量：定位跳变 = 这根 TF 被纠正，odom 链保持平滑小车才不抽搐。</p></div>
+    <div class="kcard"><div class="kd">知识点 3</div><div class="kt">初始位姿两法</div><p>RViz「2D Pose Estimate」手动给（发 /initialpose）；或配置 set_initial_pose: true，让节点启动时就用 initial_pose (0,0,0) 起播。</p></div>
+    <div class="kcard"><div class="kd">知识点 4</div><div class="kt">/initialpose 话题</div><p>RViz 按钮发的就是它（带 6×6 协方差的 PoseWithCovarianceStamped）——程序化重定位可直接 publish 到这，协方差写大表示"我很不确定"。</p></div>
+    <div class="kcard"><div class="kd">知识点 5</div><div class="kt">收敛判定</div><p>粒子团半径 &lt; 0.3 m、且激光点与地图墙线重合 = 收敛；散成一地 = 还没定位上。</p></div>
+    <div class="kcard"><div class="kd">知识点 6</div><div class="kt">绑架机器人问题</div><p>车被搬走后旧信念全部失效：默认 recovery_alpha=0 不会自动重撒 → 手动重给 /initialpose，或把 recovery_alpha_fast 开成 0.001 让算法自己找。</p></div>
+  </div>
+</section>
+
+<!-- 04 -->
+<section class="blk" id="s4">
+  <h2><span class="no">04</span>实验目标</h2>
+  <ul class="check">
+    <li>说清粒子滤波 <span class="ok">预测 → 更新 → 重采样</span> 三步及各自输入输出</li>
+    <li>用 RViz 与命令行 <span class="ok">两种方式</span>下发初始位姿，观察 /initialpose 生效</li>
+    <li>观察 /particle_cloud：从散乱 → <span class="ok">聚团（半径 &lt; 0.3 m）</span>的收敛全过程</li>
+    <li>完成一次"绑架测试"：搬动小车后重新定位，<span class="ok">记录恢复秒数</span></li>
+    <li>完成调优三组 A/B/C 对照（粒子数 2000 / 3000、alpha 0.5），写出结论</li>
+  </ul>
+</section>
+
+<!-- 05 -->
+<section class="blk" id="s5">
+  <h2><span class="no">05</span>实验环境与准备</h2>
+  <table>
+    <thead><tr><th>项目</th><th>要求</th></tr></thead>
+    <tbody>
+      <tr><td>地图</td><td>EXP-02 验收合格的 map_01（对称走廊类场景会撞上"假收敛"，选特征明显房间）</td></tr>
+      <tr><td>软件</td><td>nav2_bringup（amcl 节点已含在 navigation.launch.py 中）+ RViz Nav2 配置</td></tr>
+      <tr><td>参数文件</td><td>amcl 参数段：min/max_particles 500/2000、alpha1~5=0.2、likelihood_field、set_initial_pose true</td></tr>
+      <tr><td>硬件</td><td>小车 C1 满电、3 m × 3 m 场地、桌面标记物（作参照）方便核对"真实位置"</td></tr>
+      <tr><td>对照工具</td><td>秒表（记录绑架恢复时间）、纸笔（三组调优记录表）</td></tr>
+    </tbody>
+  </table>
+  <div class="tip"><span class="lab">💡 操作礼仪</span>对小车<b>轻拿轻放</b>：搬动时先停导航目标，落地后重新给初始位姿；别在走廊两端这种"长得一样"的地方考它。</div>
+</section>
+
+<!-- 06 -->
+<section class="blk" id="s6">
+  <h2><span class="no">06</span>动画讲解：粒子云收敛</h2>
+  <p class="lead">左：初始位姿不确定，粒子（绿点）撒满一片；随小车移动与扫描比对，粒子在"真值"处越挤越紧，最终聚成一团 —— 团心即定位结果（青色箭头）。</p>
+  <div class="anim-box">
+    <svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="AMCL 粒子云收敛动画">
+      <rect x="8" y="8" width="704" height="284" rx="12" fill="#111827" stroke="#334155"/>
+      <text x="360" y="34" text-anchor="middle" font-size="14" font-weight="700" fill="#93c5fd">粒子滤波：散乱猜测 → 打分重采样 → 收敛聚团</text>
+
+      <!-- 地图房间 -->
+      <rect x="70" y="56" width="580" height="212" rx="8" fill="none" stroke="#475569" stroke-width="3"/>
+      <rect x="300" y="130" width="70" height="70" fill="none" stroke="#475569" stroke-width="3"/>
+      <text x="616" y="258" text-anchor="end" font-size="11" fill="#64748b">地图 = 已知布局</text>
+
+      <!-- 真值标记 -->
+      <g>
+        <circle cx="180" cy="150" r="18" fill="none" stroke="#f472b6" stroke-width="2.5" stroke-dasharray="5 4"/>
+        <text x="180" y="124" text-anchor="middle" font-size="11" fill="#f9a8d4">真实位置</text>
+      </g>
+
+      <!-- 粒子云：混沌期（散开） -->
+      <g fill="#4ade80">
+        <circle cx="120" cy="90" r="6" opacity=".85"><animate attributeName="cx" values="120;168" dur="5s" repeatCount="indefinite"/><animate attributeName="cy" values="90;142" dur="5s" repeatCount="indefinite"/><animate attributeName="opacity" values=".85;.85;1;1" keyTimes="0;.4;.6;1" dur="5s" repeatCount="indefinite"/></circle>
+        <circle cx="240" cy="86" r="6" opacity=".85"><animate attributeName="cx" values="240;192" dur="5s" repeatCount="indefinite"/><animate attributeName="cy" values="86;140" dur="5s" repeatCount="indefinite"/></circle>
+        <circle cx="110" cy="220" r="6" opacity=".85"><animate attributeName="cx" values="110;166" dur="5s" repeatCount="indefinite"/><animate attributeName="cy" values="220;164" dur="5s" repeatCount="indefinite"/></circle>
+        <circle cx="250" cy="226" r="6" opacity=".85"><animate attributeName="cx" values="250;196" dur="5s" repeatCount="indefinite"/><animate attributeName="cy" values="226;162" dur="5s" repeatCount="indefinite"/></circle>
+        <circle cx="150" cy="60" r="6" opacity=".85"><animate attributeName="cx" values="150;174" dur="5s" repeatCount="indefinite"/><animate attributeName="cy" values="60;136" dur="5s" repeatCount="indefinite"/></circle>
+        <circle cx="100" cy="150" r="6" opacity=".85"><animate attributeName="cx" values="100;162" dur="5s" repeatCount="indefinite"/><animate attributeName="cy" values="150;150" dur="5s" repeatCount="indefinite"/></circle>
+        <circle cx="270" cy="150" r="6" opacity=".85"><animate attributeName="cx" values="270;198" dur="5s" repeatCount="indefinite"/><animate attributeName="cy" values="150;150" dur="5s" repeatCount="indefinite"/></circle>
+        <circle cx="160" cy="250" r="6" opacity=".85"><animate attributeName="cx" values="160;178" dur="5s" repeatCount="indefinite"/><animate attributeName="cy" values="250;168" dur="5s" repeatCount="indefinite"/></circle>
+        <circle cx="220" cy="250" r="6" opacity=".85"><animate attributeName="cx" values="220;190" dur="5s" repeatCount="indefinite"/><animate attributeName="cy" values="250;166" dur="5s" repeatCount="indefinite"/></circle>
+        <circle cx="130" cy="190" r="6" opacity=".85"><animate attributeName="cx" values="130;170" dur="5s" repeatCount="indefinite"/><animate attributeName="cy" values="190;156" dur="5s" repeatCount="indefinite"/></circle>
+      </g>
+
+      <!-- 估计箭头（收敛后出现） -->
+      <g opacity="0">
+        <animate attributeName="opacity" values="0;0;1;1" keyTimes="0;.55;.75;1" dur="5s" repeatCount="indefinite"/>
+        <g transform="translate(180,150)">
+          <path d="M -8 8 L 26 -14" stroke="#22d3ee" stroke-width="4" stroke-linecap="round"/>
+          <path d="M 26 -14 L 14 -16 L 22 -4 Z" fill="#22d3ee"/>
+        </g>
+        <text x="180" y="196" text-anchor="middle" font-size="11.5" font-weight="700" fill="#67e8f9">amcl_pose · 协方差骤降</text>
+      </g>
+
+      <!-- 扫描比对（右侧示意） -->
+      <g transform="translate(470,150)">
+        <rect x="-90" y="-70" width="240" height="150" rx="8" fill="#0b1220" stroke="#475569" stroke-width="2.5"/>
+        <rect x="-40" y="-20" width="60" height="60" fill="none" stroke="#475569" stroke-width="2.5"/>
+        <circle cx="30" cy="10" r="10" fill="#1e293b" stroke="#60a5fa" stroke-width="2.5"/>
+        <g stroke="#38bdf8" stroke-width="1.6">
+          <line x1="30" y1="10" x2="-88" y2="-40"><animate attributeName="opacity" values="1;.2;1" dur="1.2s" repeatCount="indefinite"/></line>
+          <line x1="30" y1="10" x2="142" y2="-56"><animate attributeName="opacity" values="1;.2;1" dur="1.2s" begin=".3s" repeatCount="indefinite"/></line>
+          <line x1="30" y1="10" x2="136" y2="72"><animate attributeName="opacity" values="1;.2;1" dur="1.2s" begin=".6s" repeatCount="indefinite"/></line>
+          <line x1="30" y1="10" x2="-70" y2="74"><animate attributeName="opacity" values="1;.2;1" dur="1.2s" begin=".9s" repeatCount="indefinite"/></line>
+        </g>
+        <text x="30" y="104" text-anchor="middle" font-size="11.5" fill="#93c5fd">每一帧扫描都在给每个粒子打分</text>
+      </g>
+
+      <text x="360" y="286" text-anchor="middle" font-size="11.5" fill="#64748b">预测（随运动整体挪）→ 更新（比对打分）→ 重采样（高分多生）· 5 秒收敛循环</text>
+    </svg>
+  </div>
+  <div class="anim-cap">动画 4-1｜粒子云 5 秒从满屋散点收缩到真值附近：团越紧 = 协方差越小 = 定位越自信</div>
+</section>
+
+<!-- 07 -->
+<section class="blk" id="s7">
+  <h2><span class="no">07</span>互动讲解：粒子数 × 传感器噪声实验台</h2>
+  <p class="lead">调两个旋钮，看定位表现怎么变——太少粒子覆盖不住真值，噪声太大分数全是干扰：</p>
+  <div class="ix-panel">
+    <div class="ix-title">粒子滤波调参台 · MCL Lab</div>
+    <div class="ctl-row">
+      <button class="btn" onclick="mclRun('few')">粒子 100 · 环境安静</button>
+      <button class="btn ghost" onclick="mclRun('many')">粒子 2000 · 环境安静</button>
+      <button class="btn ghost" onclick="mclRun('noisy')">粒子 2000 · 高噪声/对称走廊</button>
+      <button class="btn ghost" onclick="mclRun('kidnap')">🚗 绑架：直接搬去另一头</button>
+    </div>
+    <div class="io" id="mclIo"><span class="dim">// 选择一种工况，观察收敛判定与建议</span>
+<span class="ok">基线：min 500 / max 2000 · alpha 0.2 · likelihood_field · 团半径 &lt; 0.3m 为收敛</span></div>
+  </div>
+  <table>
+    <thead><tr><th>调优组</th><th>改什么</th><th>预期现象</th></tr></thead>
+    <tbody>
+      <tr><td>A 组</td><td>max_particles 2000 → 3000</td><td>复杂房间收敛更稳，CPU 升高；记录收敛秒数</td></tr>
+      <tr><td>B 组</td><td>保持 3000，房间换对称走廊</td><td>观察假收敛：团很紧但位置错——特征决定上限</td></tr>
+      <tr><td>C 组</td><td>alpha1 0.2 → 0.5</td><td>粒子更敢散开，动态/打滑场景恢复更快，代价是平时抖一点</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 08 -->
+<section class="blk" id="s8">
+  <h2><span class="no">08</span>实操步骤：给初始位姿并观察收敛</h2>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>启动导航栈（AMCL 随 navigation.launch 起播，set_initial_pose 默认给 0,0,0）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>RViz 点「2D Pose Estimate」，在小车真实位置按下并拖出朝向箭头——看绿粒子被"吸"拢</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>遥控走一段再停下，观察收敛稳定性；最后做绑架测试并计时</div>
+  </div>
+  <pre><span class="c"># ① 启动导航（AMCL 随 localization.launch 起播，参数 set_initial_pose=true）</span>
+<span class="g">ros2</span> launch car1_navigation navigation.launch.py map:=map_01
+
+<span class="c"># ② 观察粒子云与位姿话题（另开终端；注意话题名是 particle_cloud，没有下划线连写）</span>
+<span class="g">ros2</span> topic echo /particle_cloud --once
+<span class="g">ros2</span> topic echo /amcl_pose --once
+
+<span class="c"># ③ 命令行下发初始位姿（与 RViz 按钮等价）——朝向四元数 w=1 即 yaw 0</span>
+<span class="g">ros2</span> topic pub -1 /initialpose geometry_msgs/msg/PoseWithCovarianceStamped \
+  <span class="y">"{header: {frame_id: 'map'}, pose: {pose: {position: {x: 0.5, y: 0.3}, orientation: {w: 1.0}}}}"</span>
+
+<span class="c"># ④ 绑架测试：手动把车搬到 2m 外，重新 pub /initialpose，秒表记录恢复时间</span>
+<span class="c">#    对比两种做法：① 手动重给位姿  ② 开 recovery_alpha_fast 0.001 让算法自己找回</span>
+
+<span class="c"># ⑤ 调优后必须整栈重启（Ctrl+C 再 launch），别热改参数</span></pre>
+  <div class="tip tealb"><span class="lab">🔍 验证小技巧</span>在地面贴一张醒目胶带作"真实原点"，让小车正对它站好再给初始位姿——之后 /amcl_pose 的读数应与摆放值一致，误差大就重给。判收敛看 <b>/particle_cloud</b> 散点是否收缩成一小团（半径 &lt; 0.3 m），而不是看单个箭头。</div>
+</section>
+
+<!-- 09 -->
+<section class="blk" id="s9">
+  <h2><span class="no">09</span>重点与易错点</h2>
+  <div class="tip amber"><span class="lab">⚠️ 重点</span>定位出错时先回查两件事：① 初始位姿给准了吗（箭头方向 = 车头朝向，很容易给反 180°）；② 粒子云收敛了吗（散成一地 = 没资格导航）。<b>先位姿、后粒子、再参数。</b></div>
+  <table>
+    <thead><tr><th>⚠️ 常见坑</th><th>现象 → 解法</th></tr></thead>
+    <tbody>
+      <tr><td>初始位姿给反</td><td>车头朝南箭头却朝北 → 重新按住拖方向；症状是"出发就拐弯撞墙"</td></tr>
+      <tr><td>粒子一锅粥不收敛</td><td>团散、散点乱跳 → 地图特征弱/太对称，换个特征丰富处再给位姿</td></tr>
+      <tr><td>"收敛"了但位置错</td><td>假收敛（对称走廊）→ 挪到有拐角家具的区域验证；必要时做绑架恢复测试</td></tr>
+      <tr><td>搬车后不恢复</td><td>默认 recovery_alpha_fast/slow = 0.0 不会自动重撒 → 手动重给 /initialpose，或开 recovery_alpha_fast 0.001</td></tr>
+      <tr><td>粒子数盲目调大</td><td>3000+ 未必更好：先确认地图与传感器没问题，KLD 已在 500~2000 间自适应</td></tr>
+      <tr><td>改参不生效</td><td>AMCL 参数启动时读取 → Ctrl+C 整栈重启 navigation.launch</td></tr>
+    </tbody>
+  </table>
+  <ul class="check">
+    <li>粒子云从散乱到 <span class="ok">聚团半径 &lt; 0.3 m</span>，激光点与地图墙线重合</li>
+    <li>RViz 与命令行 <span class="ok">两种初始位姿方式</span>都亲手用过</li>
+    <li>绑架测试 <span class="ok">恢复秒数有记录</span>，A/B/C 三组调优表填写完整</li>
+    <li>能解释 likelihood_field 为什么比 beam 模型快（先算好"离墙距离场"，打分只查表）</li>
+  </ul>
+</section>
+
+<!-- 10 -->
+<section class="blk" id="s10">
+  <h2><span class="no">10</span>总结与思考</h2>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">✅ 完成成果</div><div class="kt">车知道自己在哪了</div><p>两种方式给位姿、观察收敛、完成绑架测试与三组调优对照。</p></div>
+    <div class="kcard"><div class="kd">🧠 原理收获</div><div class="kt">滤波三步 + 自适应</div><p>预测/更新/重采样的循环本质；KLD"迷茫多撒、笃定少撒"。</p></div>
+    <div class="kcard"><div class="kd">🛠 技能收获</div><div class="kt">定位体检手法</div><p>/initialpose 发布、/particle_cloud 判读、协方差与团半径肉眼诊断。</p></div>
+    <div class="kcard"><div class="kd">❓ 排障思路</div><div class="kt">先位姿后参数</div><p>位姿给准 → 等收敛 → 仍不对再查地图特征与 alpha/粒子数。</p></div>
+  </div>
+  <div class="tip violet"><span class="lab">📝 思考题 1</span>为什么粒子需要"重采样"这一步？如果只保留"打分"不重采样，几百帧之后粒子群会发生什么？（提示：大部分粒子分数趋近 0 —— 穷光蛋繁殖不出后代）</div>
+  <div class="tip violet"><span class="lab">📝 思考题 2</span>长走廊两端一模一样，AMCL 可能"自信地错着"。请设计两个具体改进方向（提示从特征与机制下手：增加环境特征？让粒子周期性炸开？），并说明各自代价。</div>
+</section>
+
+<nav class="expnav">
+  <a href="../index.html"><span class="lb">← 返回</span>课程目录 · SLAM 与自主导航</a>
+  <a class="next" href="../exp-05-dwa-teb-avoidance/index.html"><span class="lb">下一个实验 →</span>EXP-05 DWA/TEB 局部避障</a>
+</nav>
+
+<footer>
+  <span>CORE-04 · 机器人 SLAM 与自主导航 · EXP-04 AMCL 自适应蒙特卡洛定位</span>
+  <span>8 学时 · 综合性 · 基于 slam_practice 实验讲义改编</span>
+</footer>
+
+</main>
+</div>
+
+<script>
+// 粒子滤波调参台
+function mclRun(k){
+  var io=document.getElementById('mclIo'),h='';
+  if(k==='few'){
+    h='<span class="dim">// min=max=100，环境安静、运动平稳</span>\n'+
+      '<span class="warn">⚠ 粒子太少：覆盖不住真值的概率上升，偶尔"跟丢"需 2~3 次重采样才找回</span>\n'+
+      '<span class="ok">收敛速度：快（CPU 低），团半径约 0.35m —— 简单场景勉强够用</span>\n'+
+      '<span class="dim">结论：500 是下限的由来；别为省算力牺牲覆盖度</span>';
+  }else if(k==='many'){
+    h='<span class="dim">// min=500 max=2000，安静环境</span>\n'+
+      '<span class="ok">✔ KLD 自适应：场景简单时回落到 ~800 粒子，复杂时冲到 2000</span>\n'+
+      '<span class="ok">✔ 2~3 帧扫描内聚团，团半径 0.22m，绿箭头稳稳贴住车头</span>\n'+
+      '<span class="ok">基线工况 —— 本项目默认配置，先在这调好再上难度</span>';
+  }else if(k==='noisy'){
+    h='<span class="dim">// 高噪声 / 对称走廊</span>\n'+
+      '<span class="warn">⚠ 更新打分被噪声污染：似然场上到处是"假高分"，出现两个团</span>\n'+
+      '<span class="warn">⚠ 对称走廊：错误的那团也可能抱团 → 假收敛！半径小 ≠ 位置对</span>\n'+
+      '<span class="dim">对策：A组加粒子到3000 / C组 alpha=0.5 容忍抖动 / 换特征明显房间复测</span>';
+  }else{
+    h='<span class="dim">// 绑架：车被搬到 2m 外另一房间，仍沿用旧位姿信念</span>\n'+
+      '<span class="bad">✘ 旧粒子团聚在原地 → 扫描与地图对不上，分数全低，怎么走都歪</span>\n'+
+      '<span class="warn">默认 recovery_alpha_fast/slow = 0.0：不会自动"炸开重撒"</span>\n'+
+      '<span class="ok">恢复二选一：① 手动重发 /initialpose（秒级）② 开 recovery_alpha_fast 0.001 让算法自动找回（记录秒数）</span>';
+  }
+  io.innerHTML=h;
+}
+</script>
+<script src="../shared/tutorial.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>图 11-2 · 双时钟框架</title>
+<style>
+:root{--bg-page:#ffffff;--bg-card:#ffffff;--text:#0f172a;--text2:#475569;--muted:#94a3b8;
+  --border:#e2e8f0;--teal:#0891b2;--green:#059669;--purple:#7c3aed;--orange:#ea580c;--red:#e11d48;--gray:#64748b;
+  --teal-bg:rgba(8,145,178,.08);--green-bg:rgba(5,150,105,.08);--purple-bg:rgba(124,58,237,.08);
+  --orange-bg:rgba(234,88,12,.10);--gray-bg:rgba(100,116,139,.08)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg-page);color:var(--text);font-family:system-ui,"PingFang SC","Microsoft YaHei",sans-serif;padding:16px 14px 12px}
+.hd{margin-bottom:6px}
+.hd h1{font-size:15px;margin:0 0 4px}
+.hd .q{font-size:12px;color:var(--text2);margin:0}
+svg{width:100%;height:auto;display:block}
+.t{font:600 12.5px system-ui,sans-serif;fill:var(--text)}
+.s{font:400 10.5px system-ui,sans-serif;fill:var(--text2)}
+.l{font:600 10.5px ui-monospace,Consolas,monospace;fill:var(--text2)}
+.dock{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.dock span{font-size:11.5px;border-radius:999px;padding:3px 10px;line-height:1.6}
+.ok{background:#ecfdf5;color:#047857;border:1px solid #a7f3d0}
+.warn{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca}
+.evid{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}
+.ft{font-size:10.5px;color:var(--muted);margin-top:8px;text-align:right}
+</style>
+</head>
+<body>
+<div class="hd">
+  <h1>图 11-2 · 双时钟框架：一个开关选源，一个出口取时</h1>
+  <p class="q">本图回答的问题：use_sim_time 切换后，get_clock().now() 的时间到底从哪里来？</p>
+</div>
+<svg viewBox="0 0 760 470" role="img" aria-label="双时钟框架图">
+  <!-- 判断：开关 -->
+  <polygon points="380,24 505,60 380,96 255,60" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1.5"/>
+  <text class="t" x="380" y="56" text-anchor="middle">use_sim_time ?</text>
+  <text class="s" x="380" y="74" text-anchor="middle">唯一开关</text>
+
+  <!-- 分支标注 -->
+  <text class="l" x="238" y="122">false · 默认</text>
+  <text class="l" x="470" y="122">true</text>
+  <line x1="344" y1="96" x2="170" y2="150" stroke="var(--purple)" stroke-width="1.5" marker-end="url(#ap)"/>
+  <line x1="416" y1="96" x2="528" y2="150" stroke="var(--orange)" stroke-width="1.5" marker-end="url(#ao)"/>
+
+  <!-- 源A 系统时钟 -->
+  <rect x="60" y="152" width="185" height="56" rx="6" fill="#fff"/>
+  <rect x="60" y="152" width="185" height="56" rx="6" fill="var(--purple-bg)" stroke="var(--purple)" stroke-width="1.5"/>
+  <text class="t" x="152" y="176" text-anchor="middle">系统时钟 · 墙上钟</text>
+  <text class="s" x="152" y="195" text-anchor="middle">OS 时间 · 永远匀速</text>
+
+  <!-- 源B /clock -->
+  <rect x="455" y="152" width="175" height="56" rx="6" fill="#fff"/>
+  <rect x="455" y="152" width="175" height="56" rx="6" fill="var(--orange-bg)" stroke="var(--orange)" stroke-width="1.5"/>
+  <text class="t" x="542" y="176" text-anchor="middle">/clock 话题</text>
+  <text class="s" x="542" y="195" text-anchor="middle">rosgraph_msgs/Clock</text>
+
+  <!-- 外部 Gazebo/rosbag -->
+  <rect x="455" y="300" width="175" height="52" rx="6" fill="#fff"/>
+  <rect x="455" y="300" width="175" height="52" rx="6" fill="var(--gray-bg)" stroke="var(--gray)" stroke-width="1.5" stroke-dasharray="6,4"/>
+  <text class="t" x="542" y="322" text-anchor="middle">Gazebo / rosbag play</text>
+  <text class="s" x="542" y="340" text-anchor="middle">外部系统 · 仅仿真/回放</text>
+  <line x1="542" y1="300" x2="542" y2="216" stroke="var(--gray)" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#ag)"/>
+  <text class="l" x="552" y="262">推进/播放</text>
+
+  <!-- 源 → Clock -->
+  <line x1="165" y1="212" x2="252" y2="308" stroke="var(--purple)" stroke-width="1.5" marker-end="url(#ap)"/>
+  <line x1="470" y1="212" x2="398" y2="308" stroke="var(--orange)" stroke-width="1.5" marker-end="url(#ao)"/>
+
+  <!-- Clock 出口 -->
+  <rect x="238" y="310" width="175" height="62" rx="6" fill="#fff"/>
+  <rect x="238" y="310" width="175" height="62" rx="6" fill="var(--green-bg)" stroke="var(--green)" stroke-width="2"/>
+  <text class="t" x="325" y="336" text-anchor="middle">Clock · 唯一出口</text>
+  <text class="s" x="325" y="356" text-anchor="middle">get_clock().now()</text>
+
+  <!-- Clock → 代码 -->
+  <line x1="325" y1="372" x2="325" y2="404" stroke="var(--green)" stroke-width="1.5" marker-end="url(#ag2)"/>
+  <text class="l" x="336" y="394">返回 time</text>
+  <rect x="215" y="406" width="220" height="50" rx="6" fill="#fff"/>
+  <rect x="215" y="406" width="220" height="50" rx="6" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1.5"/>
+  <text class="t" x="325" y="428" text-anchor="middle">你的代码 · 盖 stamp</text>
+  <text class="s" x="325" y="446" text-anchor="middle">to_msg() → Header.stamp</text>
+
+  <defs>
+    <marker id="ap" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="var(--purple)"/></marker>
+    <marker id="ao" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="var(--orange)"/></marker>
+    <marker id="ag" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="var(--gray)"/></marker>
+    <marker id="ag2" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="var(--green)"/></marker>
+  </defs>
+</svg>
+<div class="dock">
+  <span class="ok">✅ 结论：只有两个时间源、一个开关、一个出口，换源不改业务代码</span>
+  <span class="warn">⚠️ 风险：true 而无 /clock 发布 → 永久等待</span>
+  <span class="evid">🔍 验证：04 节实操 A/B（卡死复现与 pub /clock 复活）</span>
+</div>
+<div class="ft">EXP-11 · 时间 API 与双时钟体系</div>
+</body>
+</html>

@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>智慧工厂装货分拣码垛综合项目 · 教程首页</title>
+<style>
+:root{
+  --bg-base:#f8fafc; --bg-surface:#ffffff; --bg-muted:#f1f5f9;
+  --text-primary:#0f172a; --text-secondary:#475569; --text-muted:#94a3b8;
+  --accent-teal:#0d9488; --accent-blue:#2563eb; --accent-amber:#d97706; --accent-violet:#7c3aed; --accent-rose:#e11d48;
+  --border:#e2e8f0;
+  --font-body:'Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif;
+  --font-mono:'Cascadia Code','JetBrains Mono','Consolas',monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:var(--font-body);background:var(--bg-base);color:var(--text-primary);line-height:1.7}
+a{text-decoration:none;color:inherit}
+.topbar{position:sticky;top:0;z-index:50;background:rgba(248,250,252,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--border)}
+.topbar-in{max-width:1200px;margin:0 auto;padding:.7rem 1.5rem;display:flex;align-items:center;justify-content:space-between}
+.logo{font-weight:800;font-size:.95rem}
+.logo span{color:var(--accent-teal)}
+.crumb{font-size:.85rem;color:var(--text-secondary)}
+.crumb a:hover{color:var(--accent-teal)}
+.hero{background:linear-gradient(135deg,#0f172a 0%,#7c2d12 55%,#ea580c 100%);color:#fff;padding:3.5rem 1.5rem 3rem;text-align:center}
+.eyebrow{font-size:.8rem;letter-spacing:.28em;opacity:.75;margin-bottom:.8rem}
+.hero h1{font-size:clamp(1.7rem,4vw,2.6rem);font-weight:900;margin-bottom:.9rem}
+.hero h1 .grad{background:linear-gradient(90deg,#fdba74,#fde68a);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.hero p{max-width:760px;margin:0 auto 1.4rem;opacity:.85;font-size:1rem}
+.bades{display:flex;gap:.6rem;justify-content:center;flex-wrap:wrap}
+.bade{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.28);padding:.3rem .85rem;border-radius:999px;font-size:.85rem}
+.wrap{max-width:1200px;margin:0 auto;padding:2.5rem 1.5rem}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:2.5rem}
+.stat{background:var(--bg-surface);border:1px solid var(--border);border-radius:14px;padding:1rem 1.2rem;text-align:center}
+.stat b{display:block;font-size:1.5rem;color:var(--accent-teal)}
+.stat span{font-size:.8rem;color:var(--text-secondary)}
+.sec-head{margin:2.4rem 0 1.2rem}
+.sec-head .k{font-size:.75rem;letter-spacing:.24em;color:var(--accent-teal);font-weight:700}
+.sec-head h2{font-size:1.45rem;font-weight:800;margin-top:.25rem}
+.sec-head p{color:var(--text-secondary);font-size:.92rem;margin-top:.3rem}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:1.1rem}
+.card{background:var(--bg-surface);border:1px solid var(--border);border-radius:16px;padding:1.2rem 1.3rem;transition:box-shadow .25s,transform .25s;display:flex;flex-direction:column}
+.card:hover{box-shadow:0 10px 30px rgba(234,88,12,.12);transform:translateY(-3px)}
+.card .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:.6rem}
+.card .code{font-family:var(--font-mono);font-size:.72rem;background:#ffedd5;color:#c2410c;padding:.15rem .55rem;border-radius:6px;font-weight:700}
+.card h3{font-size:1.05rem;font-weight:800;margin-bottom:.35rem}
+.card>p{font-size:.86rem;color:var(--text-secondary);margin-bottom:.7rem}
+.card .meta{display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.6rem}
+.tag{font-size:.7rem;background:var(--bg-muted);color:var(--text-secondary);padding:.14rem .55rem;border-radius:999px;border:1px solid var(--border)}
+.explist{list-style:none;max-height:1400px;overflow:hidden;margin-bottom:.7rem}
+.explist li{display:flex;align-items:center;gap:.5rem;font-size:.82rem;padding:.42rem 0;border-top:1px dashed var(--border);color:var(--text-secondary)}
+.explist .no{font-family:var(--font-mono);font-size:.7rem;color:var(--text-muted);min-width:2.1em}
+.explist .stars{color:var(--accent-amber);font-size:.7rem;letter-spacing:1px}
+.explist a.ttl{flex:1;min-width:0;color:var(--text-secondary);border-radius:4px;transition:color .2s}
+.explist a.ttl:hover{color:var(--accent-teal);text-decoration:underline}
+.explist a.dur{margin-left:auto;font-size:.7rem;color:var(--accent-blue);background:#eff6ff;border:1px solid #bfdbfe;border-radius:999px;padding:.05rem .55rem;transition:background .2s}
+.explist a.dur:hover{background:#dbeafe}
+.hint{font-size:.75rem;color:var(--accent-teal);margin-top:auto;padding-top:.55rem;display:flex;justify-content:space-between;align-items:center}
+.pills{display:flex;flex-wrap:wrap;gap:.65rem}
+.pill{display:inline-flex;align-items:center;gap:.45rem;background:var(--bg-surface);border:1px solid var(--border);border-radius:999px;padding:.4rem .95rem;font-size:.83rem;color:var(--text-secondary);transition:.2s}
+.pill:hover{border-color:var(--accent-teal);color:var(--accent-teal);transform:translateY(-2px)}
+.pill i{width:.55rem;height:.55rem;border-radius:50%;display:inline-block}
+.kgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:1rem}
+.kcard{background:var(--bg-surface);border:1px solid var(--border);border-radius:14px;padding:1.1rem 1.2rem}
+.kcard h4{font-size:.95rem;margin-bottom:.45rem;display:flex;align-items:center;gap:.5rem}
+.kcard p{font-size:.84rem;color:var(--text-secondary)}
+.dot{width:.5rem;height:.5rem;border-radius:50%;display:inline-block}
+footer{border-top:1px solid var(--border);background:var(--bg-surface);margin-top:3rem}
+.foot-in{max-width:1200px;margin:0 auto;padding:1.4rem 1.5rem;display:flex;justify-content:space-between;align-items:center;font-size:.82rem;color:var(--text-secondary);flex-wrap:wrap;gap:.5rem}
+.reveal{opacity:0;transform:translateY(22px);transition:opacity .55s ease,transform .55s ease}
+.reveal.show{opacity:1;transform:none}
+@media(max-width:760px){.stats{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-in">
+    <a class="logo" href="../../index.html" style="text-decoration:none;color:inherit" title="返回课程首页">🎓 具身智能课程 · <span>教程首页</span></a>
+    <div class="crumb"><a href="../../index.html">← 返回总首页</a></div>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="eyebrow">CATEGORY 2 · 综合项目 / CASE-01</div>
+  <h1><span class="grad">智慧工厂装货分拣码垛</span> 综合项目</h1>
+  <p>9 个实验贯穿一个完整的具身智能工厂项目：从需求工程 R1-R10 到五节点系统架构与 A/C/D/E/F 接口族，
+     落地语音交互、AprilTag tag36h11 + PnP 视觉自适应装货、定点分拣、光电停靠码垛与激光雷达 60°/20cm/0.5s 危险急停，
+     最终一键启动全功能快速验证 —— 每个实验均配原理讲解、动画演示与互动沙盒。</p>
+  <div class="bades">
+    <span class="bade">📚 9 个实验</span>
+    <span class="bade">⏱️ 48 学时</span>
+    <span class="bade">🤖 小车+机械臂+语音+视觉</span>
+    <span class="bade">🎯 前置：ROS2 与视觉基础</span>
+  </div>
+</section>
+
+<div class="wrap">
+
+  <div class="stats reveal">
+    <div class="stat"><b>9</b><span>递进实验</span></div>
+    <div class="stat"><b>48</b><span>总学时</span></div>
+    <div class="stat"><b>3</b><span>知识篇章</span></div>
+    <div class="stat"><b>⭐1~3</b><span>难度跨度</span></div>
+  </div>
+
+  <div class="sec-head reveal">
+    <div class="k">PROJECT OVERVIEW</div>
+    <h2>项目总览：这条智能产线在做什么</h2>
+    <p>一句话需求拆成四块拼图：任务链、语音入口、视觉/执行、安全底线。</p>
+  </div>
+  <div class="kgrid reveal">
+    <div class="kcard">
+      <h4><span class="dot" style="background:#ea580c"></span>一条完整的物流链</h4>
+      <p>装货区 → 分拣区 → 流水线（定点停靠）→ 码垛区。装货靠视觉找位置，分拣靠人工教点位，码垛等光电传感器到位再下手——难度逐级递增。</p>
+    </div>
+    <div class="kcard">
+      <h4><span class="dot" style="background:#0d9488"></span>语音是总入口</h4>
+      <p>唤醒词（如"小飞小飞"）→ ASR 热词增强 → LLM 意图分类 → 固定话术回放与任务触发；R8 允许随时打断复位。</p>
+    </div>
+    <div class="kcard">
+      <h4><span class="dot" style="background:#2563eb"></span>五节点 + 视觉协作</h4>
+      <p>N1 语音、N2 调度、N-grasp 抓取、N-conveyor 流水线、N3 安全各司其职，N-vision 提供 AprilTag 位姿，复用底盘与机械臂底层。</p>
+    </div>
+    <div class="kcard">
+      <h4><span class="dot" style="background:#e11d48"></span>安全优先于一切</h4>
+      <p>R9：激光雷达前方 60° 扇区、20cm、持续 0.5s 判定危险 → 释放 6 舵机力矩；R9.1：雷达打断 &gt; 语音打断。</p>
+    </div>
+  </div>
+
+  <div class="sec-head reveal">
+    <div class="k">CHAPTER 1</div>
+    <h2>第 1 章 · 工程设计：需求 → 架构 → 接口</h2>
+    <p>开餐厅先定菜单再排厨房工位：先把需求写清楚、把节点分工定下来、把接口契约钉死，后面的功能开发才不会返工。</p>
+  </div>
+  <div class="grid">
+
+    <article class="card reveal">
+      <div class="top"><span class="code">EXP-01</span><span class="tag">⭐ · 4 学时</span></div>
+      <h3>需求分析（R1-R10）</h3>
+      <p>从"让机器帮我搬货"的一句话出发，梳理 R1-R10 十条需求：交互、任务、播报打断、安全、工程组织五组；
+         分清 R8 语音打断与 R9 雷达危险的边界，建立"可验收"的需求观。</p>
+      <div class="meta"><span class="tag">需求工程</span><span class="tag">R1-R10</span><span class="tag">需求追溯</span></div>
+      <ul class="explist">
+        <li><a class="ttl" href="exp-01-requirements/index.html#s1">① 问题引入：一句话需求为什么会越做越多</a><span class="stars">⭐</span><a class="dur" href="exp-01-requirements/index.html#s1">4 学时 · 开始</a></li>
+        <li><a class="ttl" href="exp-01-requirements/index.html#s6">② 动画：R1-R10 需求全景与五组划分</a><span class="stars">⭐</span><a class="dur" href="exp-01-requirements/index.html#s6">动画</a></li>
+        <li><a class="ttl" href="exp-01-requirements/index.html#s7">③ 互动：需求优先级裁剪实验台</a><span class="stars">⭐</span><a class="dur" href="exp-01-requirements/index.html#s7">互动</a></li>
+        <li><a class="ttl" href="exp-01-requirements/index.html#s8">④ 实操：grep 按 R 编号走读需求文档</a><span class="stars">⭐</span><a class="dur" href="exp-01-requirements/index.html#s8">实操</a></li>
+        <li><a class="ttl" href="exp-01-requirements/index.html#s10">⑤ 总结与思考：R8 与 R9 之辨</a><span class="stars">⭐</span><a class="dur" href="exp-01-requirements/index.html#s10">总结</a></li>
+      </ul>
+      <div class="hint"><span>👆 点击小节标题或右侧标签直达对应章节</span></div>
+    </article>
+
+    <article class="card reveal">
+      <div class="top"><span class="code">EXP-02</span><span class="tag">⭐⭐ · 4 学时</span></div>
+      <h3>五节点系统架构</h3>
+      <p>N1 语音 → N2 调度 → N-grasp / N-conveyor 执行 → N3 安全护航的分工拓扑；
+         异步 run_until_sensor、2s 自动重试、状态话题回报完成，理解"触发 ≠ 完成"的编排语义。</p>
+      <div class="meta"><span class="tag">五节点架构</span><span class="tag">任务状态机</span><span class="tag">异步编排</span></div>
+      <ul class="explist">
+        <li><a class="ttl" href="exp-02-architecture/index.html#s1">① 问题引入：多模块协作为什么会互相踩脚</a><span class="stars">⭐⭐</span><a class="dur" href="exp-02-architecture/index.html#s1">4 学时 · 开始</a></li>
+        <li><a class="ttl" href="exp-02-architecture/index.html#s6">② 动画：五节点数据流与任务编排</a><span class="stars">⭐⭐</span><a class="dur" href="exp-02-architecture/index.html#s6">动画</a></li>
+        <li><a class="ttl" href="exp-02-architecture/index.html#s7">③ 互动：任务调度沙盘</a><span class="stars">⭐⭐</span><a class="dur" href="exp-02-architecture/index.html#s7">互动</a></li>
+        <li><a class="ttl" href="exp-02-architecture/index.html#s8">④ 实操：一键 launch 与节点清单核对</a><span class="stars">⭐⭐</span><a class="dur" href="exp-02-architecture/index.html#s8">实操</a></li>
+        <li><a class="ttl" href="exp-02-architecture/index.html#s10">⑤ 总结与思考：触发与完成之辨</a><span class="stars">⭐⭐</span><a class="dur" href="exp-02-architecture/index.html#s10">总结</a></li>
+      </ul>
+      <div class="hint"><span>👆 点击小节标题或右侧标签直达对应章节</span></div>
+    </article>
+
+    <article class="card reveal">
+      <div class="top"><span class="code">EXP-03</span><span class="tag">⭐⭐ · 4 学时</span></div>
+      <h3>接口设计</h3>
+      <p>A（语音交互）/ C（安全）/ D（复用底层）/ E（任务触发）/ F（流水线）五大接口族一张表钉死；
+         yaml 集中管理点位与意图映射，用 ros2 命令实测话题与服务，识别文档与代码的偏差。</p>
+      <div class="meta"><span class="tag">话题/服务</span><span class="tag">接口族 A-F</span><span class="tag">YAML 配置</span></div>
+      <ul class="explist">
+        <li><a class="ttl" href="exp-03-interface-design/index.html#s1">① 问题引入：接口不对齐，联调两小时</a><span class="stars">⭐⭐</span><a class="dur" href="exp-03-interface-design/index.html#s1">4 学时 · 开始</a></li>
+        <li><a class="ttl" href="exp-03-interface-design/index.html#s6">② 动画：A/C/D/E/F 接口族数据流向</a><span class="stars">⭐⭐</span><a class="dur" href="exp-03-interface-design/index.html#s6">动画</a></li>
+        <li><a class="ttl" href="exp-03-interface-design/index.html#s7">③ 互动：接口契约选择台</a><span class="stars">⭐⭐</span><a class="dur" href="exp-03-interface-design/index.html#s7">互动</a></li>
+        <li><a class="ttl" href="exp-03-interface-design/index.html#s8">④ 实操：ros2 接口清单与服务实测</a><span class="stars">⭐⭐</span><a class="dur" href="exp-03-interface-design/index.html#s8">实操</a></li>
+        <li><a class="ttl" href="exp-03-interface-design/index.html#s10">⑤ 总结与思考：文档写错了听谁的</a><span class="stars">⭐⭐</span><a class="dur" href="exp-03-interface-design/index.html#s10">总结</a></li>
+      </ul>
+      <div class="hint"><span>👆 点击小节标题或右侧标签直达对应章节</span></div>
+    </article>
+
+  </div>
+
+  <div class="sec-head reveal">
+    <div class="k">CHAPTER 2</div>
+    <h2>第 2 章 · 功能集成：语音 · 视觉 · 分拣 · 码垛</h2>
+    <p>让工厂真正动起来：嘴（语音）、眼（AprilTag 视觉）、手（机械臂）、腿（流水线）依次接进调度链路。</p>
+  </div>
+  <div class="grid">
+
+    <article class="card reveal">
+      <div class="top"><span class="code">EXP-04</span><span class="tag">⭐⭐ · 6 学时</span></div>
+      <h3>语音交互集成</h3>
+      <p>唤醒 → ASR 热词增强 → LLM 意图分类（装载/分拣/码垛，不做关键词硬匹配）→ 固定话术播报；
+         掌握 R8 语音打断的四步复位，打通"说一句话 → 任务跑起来 → 完成播报"闭环。</p>
+      <div class="meta"><span class="tag">语音闭环</span><span class="tag">LLM 意图</span><span class="tag">R8 打断</span></div>
+      <ul class="explist">
+        <li><a class="ttl" href="exp-04-voice-integration/index.html#s1">① 问题引入：机器听不懂话的三重原因</a><span class="stars">⭐⭐</span><a class="dur" href="exp-04-voice-integration/index.html#s1">6 学时 · 开始</a></li>
+        <li><a class="ttl" href="exp-04-voice-integration/index.html#s6">② 动画：唤醒→识别→意图→播报四级流水</a><span class="stars">⭐⭐</span><a class="dur" href="exp-04-voice-integration/index.html#s6">动画</a></li>
+        <li><a class="ttl" href="exp-04-voice-integration/index.html#s7">③ 互动：意图分类与打断实验台</a><span class="stars">⭐⭐</span><a class="dur" href="exp-04-voice-integration/index.html#s7">互动</a></li>
+        <li><a class="ttl" href="exp-04-voice-integration/index.html#s8">④ 实操：语音触发装货全链路</a><span class="stars">⭐⭐</span><a class="dur" href="exp-04-voice-integration/index.html#s8">实操</a></li>
+        <li><a class="ttl" href="exp-04-voice-integration/index.html#s10">⑤ 总结与思考：意图认错了怎么办</a><span class="stars">⭐⭐</span><a class="dur" href="exp-04-voice-integration/index.html#s10">总结</a></li>
+      </ul>
+      <div class="hint"><span>👆 点击小节标题或右侧标签直达对应章节</span></div>
+    </article>
+
+    <article class="card reveal">
+      <div class="top"><span class="code">EXP-05</span><span class="tag">⭐⭐⭐ · 8 学时</span></div>
+      <h3>视觉自适应装货</h3>
+      <p>AprilTag tag36h11（tag_id=3、tag_size=0.025）+ solvePnP 求解目标位姿，经 camera→base_link TF 变换、
+         pick_offset 补偿后抓取：观察位 → 检测 → 抓取 → 放置 → 回 work 八步闭环，debug/production 双模式微调。</p>
+      <div class="meta"><span class="tag">AprilTag</span><span class="tag">PnP + TF</span><span class="tag">pick_offset</span></div>
+      <ul class="explist">
+        <li><a class="ttl" href="exp-05-visual-loading/index.html#s1">① 问题引入：固定点位为什么抓不到新货</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-05-visual-loading/index.html#s1">8 学时 · 开始</a></li>
+        <li><a class="ttl" href="exp-05-visual-loading/index.html#s6">② 动画：AprilTag 位姿纠偏的全过程</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-05-visual-loading/index.html#s6">动画</a></li>
+        <li><a class="ttl" href="exp-05-visual-loading/index.html#s7">③ 互动：pick_offset 补偿调参台</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-05-visual-loading/index.html#s7">互动</a></li>
+        <li><a class="ttl" href="exp-05-visual-loading/index.html#s8">④ 实操：视觉自适应抓取八步验收</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-05-visual-loading/index.html#s8">实操</a></li>
+        <li><a class="ttl" href="exp-05-visual-loading/index.html#s10">⑤ 总结与思考：tag_size 填错了会怎样</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-05-visual-loading/index.html#s10">总结</a></li>
+      </ul>
+      <div class="hint"><span>👆 点击小节标题或右侧标签直达对应章节</span></div>
+    </article>
+
+    <article class="card reveal">
+      <div class="top"><span class="code">EXP-06</span><span class="tag">⭐⭐⭐ · 4 学时</span></div>
+      <h3>智能分拣</h3>
+      <p>vision=false 的定点抓取路线：人工教学 observe/place 点位，固定八步"提前开爪→到位→闭爪→抬升→
+         放置→开爪→再抬 5cm→回 work"，配合 lift_height / place_lift 调参解决拖拽回刮。</p>
+      <div class="meta"><span class="tag">定点抓取</span><span class="tag">八步时序</span><span class="tag">位姿教学</span></div>
+      <ul class="explist">
+        <li><a class="ttl" href="exp-06-sorting/index.html#s1">① 问题引入：分拣为什么先要"教"一遍</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-06-sorting/index.html#s1">4 学时 · 开始</a></li>
+        <li><a class="ttl" href="exp-06-sorting/index.html#s6">② 动画：固定抓取八步动作时序</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-06-sorting/index.html#s6">动画</a></li>
+        <li><a class="ttl" href="exp-06-sorting/index.html#s7">③ 互动：放置位姿与抬升高度调参台</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-06-sorting/index.html#s7">互动</a></li>
+        <li><a class="ttl" href="exp-06-sorting/index.html#s8">④ 实操：分拣任务跑通与日志核对</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-06-sorting/index.html#s8">实操</a></li>
+        <li><a class="ttl" href="exp-06-sorting/index.html#s10">⑤ 总结与思考：视觉与定点的取舍</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-06-sorting/index.html#s10">总结</a></li>
+      </ul>
+      <div class="hint"><span>👆 点击小节标题或右侧标签直达对应章节</span></div>
+    </article>
+
+    <article class="card reveal">
+      <div class="top"><span class="code">EXP-07</span><span class="tag">⭐⭐⭐ · 6 学时</span></div>
+      <h3>自主码垛</h3>
+      <p>最完整的跨节点编排：N2 调 run_until_sensor 送料 → 光电传感器（GPIO17）清沿/挡沿 + 防抖定点停 →
+         sensor_blocked 状态回调触发定点抓取，2s 失败自动重试，急停与恢复嵌入状态机。</p>
+      <div class="meta"><span class="tag">流水线</span><span class="tag">光电停靠</span><span class="tag">跨节点编排</span></div>
+      <ul class="explist">
+        <li><a class="ttl" href="exp-07-palletizing/index.html#s1">① 问题引入：货不就位就下手会怎样</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-07-palletizing/index.html#s1">6 学时 · 开始</a></li>
+        <li><a class="ttl" href="exp-07-palletizing/index.html#s6">② 动画：流水线光电停靠与码垛任务链</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-07-palletizing/index.html#s6">动画</a></li>
+        <li><a class="ttl" href="exp-07-palletizing/index.html#s7">③ 互动：跨节点编排时序台</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-07-palletizing/index.html#s7">互动</a></li>
+        <li><a class="ttl" href="exp-07-palletizing/index.html#s8">④ 实操：码垛全链路与状态话题观察</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-07-palletizing/index.html#s8">实操</a></li>
+        <li><a class="ttl" href="exp-07-palletizing/index.html#s10">⑤ 总结与思考：2s 重试为什么必要</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-07-palletizing/index.html#s10">总结</a></li>
+      </ul>
+      <div class="hint"><span>👆 点击小节标题或右侧标签直达对应章节</span></div>
+    </article>
+
+  </div>
+
+  <div class="sec-head reveal">
+    <div class="k">CHAPTER 3</div>
+    <h2>第 3 章 · 安全联锁与系统验证</h2>
+    <p>功能做完只是起点：危险时先放开手（力矩释放），验收时一条命令带起全系统、一条命令清干净。</p>
+  </div>
+  <div class="grid">
+
+    <article class="card reveal">
+      <div class="top"><span class="code">EXP-08</span><span class="tag">⭐⭐⭐ · 4 学时</span></div>
+      <h3>危险检测与急停</h3>
+      <p>激光雷达前方 60° 扇区（±30° 跨 0° 环绕）、20cm 距离阈值、0.5s 持续判定防误报；
+         触发即释放 6 舵机力矩（臂变软可手推），解除后恢复力矩并 go_work 回位——雷达打断 &gt; 语音打断。</p>
+      <div class="meta"><span class="tag">雷达扇区</span><span class="tag">力矩释放</span><span class="tag">打断分层</span></div>
+      <ul class="explist">
+        <li><a class="ttl" href="exp-08-emergency-stop/index.html#s1">① 问题引入：机械臂"较劲"伤人谁负责</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-08-emergency-stop/index.html#s1">4 学时 · 开始</a></li>
+        <li><a class="ttl" href="exp-08-emergency-stop/index.html#s6">② 动画：危险扇区触发与解除的时序</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-08-emergency-stop/index.html#s6">动画</a></li>
+        <li><a class="ttl" href="exp-08-emergency-stop/index.html#s7">③ 互动：急停条件参数实验台</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-08-emergency-stop/index.html#s7">互动</a></li>
+        <li><a class="ttl" href="exp-08-emergency-stop/index.html#s8">④ 实操：TS1-TS5 安全测试用例验收</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-08-emergency-stop/index.html#s8">实操</a></li>
+        <li><a class="ttl" href="exp-08-emergency-stop/index.html#s10">⑤ 总结与思考：为什么危险时不刹车</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-08-emergency-stop/index.html#s10">总结</a></li>
+      </ul>
+      <div class="hint"><span>👆 点击小节标题或右侧标签直达对应章节</span></div>
+    </article>
+
+    <article class="card reveal">
+      <div class="top"><span class="code">EXP-09</span><span class="tag">⭐⭐⭐ · 8 学时</span></div>
+      <h3>全功能快速验证</h3>
+      <p>launch 一键启动 + 7 个 start_* 开关按需裁剪；装货/分拣/码垛/急停四条链路"语音 + 服务"双通道闭环验证，
+         stop_eai_factory.sh 收尾清理，做到"一条命令启动、全链路闭环、干净停止"。</p>
+      <div class="meta"><span class="tag">一键启动</span><span class="tag">7 开关裁剪</span><span class="tag">停止清理</span></div>
+      <ul class="explist">
+        <li><a class="ttl" href="exp-09-full-verification/index.html#s1">① 问题引入：一把梭启动为什么会翻车</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-09-full-verification/index.html#s1">8 学时 · 开始</a></li>
+        <li><a class="ttl" href="exp-09-full-verification/index.html#s6">② 动画：7 开关裁剪与分阶段启动</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-09-full-verification/index.html#s6">动画</a></li>
+        <li><a class="ttl" href="exp-09-full-verification/index.html#s7">③ 互动：验证 checklist 步进台</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-09-full-verification/index.html#s7">互动</a></li>
+        <li><a class="ttl" href="exp-09-full-verification/index.html#s8">④ 实操：四条链路闭环验证与清理</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-09-full-verification/index.html#s8">实操</a></li>
+        <li><a class="ttl" href="exp-09-full-verification/index.html#s10">⑤ 总结与思考：残留进程的危害</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-09-full-verification/index.html#s10">总结</a></li>
+      </ul>
+      <div class="hint"><span>👆 点击小节标题或右侧标签直达对应章节</span></div>
+    </article>
+
+  </div>
+
+  <div class="sec-head reveal">
+    <div class="k">TECH STACK</div>
+    <h2>技术栈与硬件平台</h2>
+    <p>全课程围绕 eai_factory 五节点功能包与真实外设展开，参数全部来自 config/eai_factory.yaml 实配。</p>
+  </div>
+  <div class="pills reveal">
+    <span class="pill"><i style="background:#2563eb"></i>ROS2 Humble</span>
+    <span class="pill"><i style="background:#0d9488"></i>rclpy</span>
+    <span class="pill"><i style="background:#ea580c"></i>需求工程 R1-R10</span>
+    <span class="pill"><i style="background:#7c3aed"></i>五节点架构</span>
+    <span class="pill"><i style="background:#0891b2"></i>接口族 A/C/D/E/F</span>
+    <span class="pill"><i style="background:#4f46e5"></i>语音 KWS · ASR · LLM · TTS</span>
+    <span class="pill"><i style="background:#be185d"></i>热词增强 modified_beam_search</span>
+    <span class="pill"><i style="background:#b45309"></i>AprilTag tag36h11</span>
+    <span class="pill"><i style="background:#059669"></i>solvePnP IPPE_SQUARE</span>
+    <span class="pill"><i style="background:#334155"></i>TF 手眼变换 + pick_offset</span>
+    <span class="pill"><i style="background:#d97706"></i>定点抓取八步</span>
+    <span class="pill"><i style="background:#e11d48"></i>光电传感器 GPIO17</span>
+    <span class="pill"><i style="background:#0f766e"></i>run_until_sensor 异步</span>
+    <span class="pill"><i style="background:#9333ea"></i>激光雷达 60° 扇区急停</span>
+    <span class="pill"><i style="background:#dc2626"></i>总线舵机力矩释放</span>
+    <span class="pill"><i style="background:#0e7490"></i>launch 7 开关 + stop 脚本</span>
+  </div>
+
+  <div class="sec-head reveal">
+    <div class="k">LEARNING PATH</div>
+    <h2>学习路径建议</h2>
+  </div>
+  <div class="kgrid reveal">
+    <div class="kcard"><h4><span class="dot" style="background:#ea580c"></span>先定需求，再写代码</h4><p>EXP-01~03 是工程地基：拿不准需求就动手，后面每个"改一点参数重调两小时"都是它的利息。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#7c3aed"></span>单项功能逐个击破</h4><p>EXP-04 语音、EXP-05 视觉、EXP-06 分拣、EXP-07 码垛逐一对通再串联——每个实验都有独立验证命令。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#e11d48"></span>安全永远最后上也最先想</h4><p>EXP-08 的急停逻辑要在每次实操前默念一遍：障碍对准雷达正前方、机械臂放安全位、手离抓取区。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#0d9488"></span>用验证收口学习</h4><p>EXP-09 的四链路 checklist 是全课程成绩单：能独立跑完"启动→任务→急停→清理"，才算真正通关。</p></div>
+  </div>
+
+  <div class="sec-head reveal">
+    <div class="k">PROJECT SETUP</div>
+    <h2>环境与配置速查</h2>
+    <p>开做之前对齐四件事：硬件在位、配置文件读懂、语音服务活着、启停命令记牢。</p>
+  </div>
+  <div class="kgrid reveal">
+    <div class="kcard">
+      <h4><span class="dot" style="background:#ea580c"></span>硬件清单</h4>
+      <p>6 自由度总线舵机机械臂（舵机 ID 0-5）、差速底盘、麦克风阵列、单目摄像头（内参 fx=592.9 / fy=593.1 / cx=335.4 / cy=237.7）、
+         激光雷达、流水线直流电机 M1 + GPIO17 光电传感器。做实验前逐一确认串口、GPIO17 导出与雷达 frame 就绪。</p>
+    </div>
+    <div class="kcard">
+      <h4><span class="dot" style="background:#0d9488"></span>核心配置 eai_factory.yaml</h4>
+      <p>mode（debug/production）双模式；vision：tag_id=3、tag_size=0.025、tag_family=tag36h11；
+         grasp.tasks 三任务各自的 vision 开关与 observe/place 点位；pick_offset（+0.015 / -0.010 / +0.023）；
+         safety：±30°、0.20m、0.5s；intents 意图映射与 wakeup_words 唤醒词。</p>
+    </div>
+    <div class="kcard">
+      <h4><span class="dot" style="background:#2563eb"></span>语音侧服务</h4>
+      <p>本地 LLM 为 Qwen3.5-0.8B（w4a16 量化约 500MB，监听 127.0.0.1:8080），起来后先
+         curl http://127.0.0.1:8080/v1/models 自检；TTS 用 Matcha 声学模型 + vocos 声码器；
+         8080 起不来是 EXP-04 / EXP-09 的头号失败点。</p>
+    </div>
+    <div class="kcard">
+      <h4><span class="dot" style="background:#e11d48"></span>一键启停</h4>
+      <p>ros2 launch 一条命令带 7 个 start_* 开关（start_base / viz / voice / vision / grasp / conveyor / radar，
+         其中 radar 默认 false、独立于 start_base）；收工用 stop_eai_factory.sh 五段清理，直至打印"已全部清理干净"。</p>
+    </div>
+  </div>
+
+  <div class="sec-head reveal">
+    <div class="k">FAQ</div>
+    <h2>常见疑问</h2>
+  </div>
+  <div class="kgrid reveal">
+    <div class="kcard">
+      <h4><span class="dot" style="background:#7c3aed"></span>前置要求是什么？</h4>
+      <p>需要 ROS2 与视觉基础：会用 colcon 构建与 ros2 topic/service/launch 基本命令，了解相机成像与 TF 概念即可，
+         课程内的需求工程、接口设计部分不要求任何嵌入式经验。</p>
+    </div>
+    <div class="kcard">
+      <h4><span class="dot" style="background:#0891b2"></span>为什么分拣和码垛不用视觉？</h4>
+      <p>yaml 中 sort / palletize 任务 vision=false，走人工示教定点（observe_pose / place_pose），稳定且可复现；
+         只有装货 load 任务 vision=true，因为货物每次来的位置不同——这正是"能定点就定点，必须自适应才上视觉"的工程取舍。</p>
+    </div>
+    <div class="kcard">
+      <h4><span class="dot" style="background:#e11d48"></span>急停触发后任务会丢吗？</h4>
+      <p>危险判定触发后释放 6 舵机力矩、传送带停转，抓取与流水线进入受控中断；障碍离开并满足解除条件后自动恢复力矩并
+         go_work 回位，但按 R9.1 任务需要手动重新触发，不会凭空续跑半截动作。</p>
+    </div>
+    <div class="kcard">
+      <h4><span class="dot" style="background:#d97706"></span>48 学时怎么排？</h4>
+      <p>第 1 章 12 学时打地基（EXP-01~03），第 2 章 24 学时做功能（EXP-04~07），第 3 章 12 学时收口（EXP-08~09）；
+         难度 ⭐ 的 EXP-01 可与理论课并行，⭐⭐⭐ 的 EXP-05 / 09 各留足整块实验时段，别拆开做。</p>
+    </div>
+  </div>
+
+  <div class="sec-head reveal">
+    <div class="k">ASSESSMENT</div>
+    <h2>验收评分速查</h2>
+    <p>各实验满分 100，评分构成摘自每页"重点与易错点"一节，可用于互评与验收打分。</p>
+  </div>
+  <div class="reveal" style="background:var(--bg-surface);border:1px solid var(--border);border-radius:14px;overflow:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:.85rem">
+      <tr><th style="text-align:left;padding:.6rem .9rem;border-bottom:2px solid var(--border)">实验</th>
+          <th style="text-align:left;padding:.6rem .9rem;border-bottom:2px solid var(--border)">主题</th>
+          <th style="text-align:left;padding:.6rem .9rem;border-bottom:2px solid var(--border)">评分构成（合计 100）</th></tr>
+      <tr><td style="padding:.5rem .9rem;border-bottom:1px solid var(--border)">EXP-01</td><td style="padding:.5rem .9rem;border-bottom:1px solid var(--border)">需求分析</td><td style="padding:.5rem .9rem;border-bottom:1px solid var(--border)">需求分组 40 · 逐条解读 30 · R8/R9 边界 20 · 追溯矩阵 10</td></tr>
+      <tr><td style="padding:.5rem .9rem;border-bottom:1px solid var(--border)">EXP-02</td><td style="padding:.5rem .9rem;border-bottom:1px solid var(--border)">五节点架构</td><td style="padding:.5rem .9rem;border-bottom:1px solid var(--border)">节点分工 30 · 数据流讲清 30 · 编排语义 20 · 日志核对 20</td></tr>
+      <tr><td style="padding:.5rem .9rem;border-bottom:1px solid var(--border)">EXP-03</td><td style="padding:.5rem .9rem;border-bottom:1px solid var(--border)">接口设计</td><td style="padding:.5rem .9rem;border-bottom:1px solid var(--border)">接口族梳理 40 · 命令实测 30 · 文档偏差 20 · 配置管理 10</td></tr>
+      <tr><td style="padding:.5rem .9rem;border-bottom:1px solid var(--border)">EXP-04</td><td style="padding:.5rem .9rem;border-bottom:1px solid var(--border)">语音交互</td><td style="padding:.5rem .9rem;border-bottom:1px solid var(--border)">链路日志 15 · LLM 意图 20 · TC 用例 25 · 打断复位 15 · 总结 25</td></tr>
+      <tr><td style="padding:.5rem .9rem;border-bottom:1px solid var(--border)">EXP-05</td><td style="padding:.5rem .9rem;border-bottom:1px solid var(--border)">视觉装货</td><td style="padding:.5rem .9rem;border-bottom:1px solid var(--border)">检测链 15 · PnP+TF 20 · 八步验收 30 · offset 整定 20 · 总结 15</td></tr>
+      <tr><td style="padding:.5rem .9rem;border-bottom:1px solid var(--border)">EXP-06</td><td style="padding:.5rem .9rem;border-bottom:1px solid var(--border)">智能分拣</td><td style="padding:.5rem .9rem;border-bottom:1px solid var(--border)">示教点位 25 · 八步日志 30 · 参数调优 20 · TG7 打断 15 · 总结 10</td></tr>
+      <tr><td style="padding:.5rem .9rem;border-bottom:1px solid var(--border)">EXP-07</td><td style="padding:.5rem .9rem;border-bottom:1px solid var(--border)">自主码垛</td><td style="padding:.5rem .9rem;border-bottom:1px solid var(--border)">GPIO 就绪 15 · 全链路 30 · 状态机 35 · 急停恢复 10 · 总结 10</td></tr>
+      <tr><td style="padding:.5rem .9rem;border-bottom:1px solid var(--border)">EXP-08</td><td style="padding:.5rem .9rem;border-bottom:1px solid var(--border)">危险急停</td><td style="padding:.5rem .9rem;border-bottom:1px solid var(--border)">扇区判定 15 · TS 用例 30 · 打断分层 35 · 恢复回位 10 · 总结 10</td></tr>
+      <tr><td style="padding:.5rem .9rem">EXP-09</td><td style="padding:.5rem .9rem">全功能验证</td><td style="padding:.5rem .9rem">启动裁剪 15 · 四链路 30 · checklist 35 · 清理 10 · 总结 10</td></tr>
+    </table>
+  </div>
+
+</div>
+
+<footer>
+  <div class="foot-in">
+    <span>🎓 具身智能课程 · CASE-01 · 智慧工厂装货分拣码垛综合项目（CASE-01 · 48 学时 · 9 实验）</span>
+    <span><a href="../../index.html">总首页</a> · 基于 llm_practice 实验讲义改编，含原理讲解与互动演示</span>
+  </div>
+</footer>
+
+<script>
+var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('show');io.unobserve(e.target);}});},{threshold:.12});
+document.querySelectorAll('.reveal').forEach(function(el){io.observe(el);});
+</script>
+</body>
+</html>

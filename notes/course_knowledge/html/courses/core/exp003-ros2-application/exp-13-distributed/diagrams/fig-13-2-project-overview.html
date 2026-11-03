@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>图 13-2 · 工程全景</title>
+<style>
+:root{--bg-page:#ffffff;--bg-card:#fff;--text:#0f172a;--text2:#475569;--muted:#94a3b8;
+  --border:#e2e8f0;--teal:#0891b2;--green:#059669;--purple:#7c3aed;--orange:#ea580c;--red:#e11d48;--gray:#64748b;
+  --teal-bg:rgba(8,145,178,.08);--green-bg:rgba(5,150,105,.08);--purple-bg:rgba(124,58,237,.08);
+  --orange-bg:rgba(234,88,12,.10);--gray-bg:rgba(100,116,139,.08)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg-page);color:var(--text);font-family:system-ui,"PingFang SC","Microsoft YaHei",sans-serif;padding:16px 14px 12px}
+.hd{margin-bottom:6px}
+.hd h1{font-size:15px;margin:0 0 4px}
+.hd .q{font-size:12px;color:var(--text2);margin:0}
+svg{width:100%;height:auto;display:block}
+.t{font:600 12.5px system-ui,sans-serif;fill:var(--text)}
+.s{font:400 10.5px system-ui,sans-serif;fill:var(--text2)}
+.l{font:600 10.5px ui-monospace,Consolas,monospace;fill:var(--text2)}
+.dock{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.dock span{font-size:11.5px;border-radius:999px;padding:3px 10px;line-height:1.6}
+.ok{background:#ecfdf5;color:#047857;border:1px solid #a7f3d0}
+.warn{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca}
+.evid{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}
+.ft{font-size:10.5px;color:var(--muted);margin-top:8px;text-align:right}
+</style>
+</head>
+<body>
+<div class="hd">
+  <h1>图 13-2 · 工程全景：三终端实操动了谁、走哪条道</h1>
+  <p class="q">本图回答的问题：本实验的终端、DDS 发现和组网条件如何连成一张网？</p>
+</div>
+<svg viewBox="0 0 760 540" role="img" aria-label="分布式通讯实验工程全景">
+  <!-- 层框 -->
+  <rect x="12" y="14" width="736" height="96" rx="10" fill="none" stroke="#bae6fd" stroke-width="1.5"/>
+  <text class="l" x="24" y="34" fill="#0891b2">入口层 · 三终端 + 诊断台</text>
+  <rect x="12" y="132" width="736" height="100" rx="10" fill="none" stroke="#a7f3d0" stroke-width="1.5"/>
+  <text class="l" x="24" y="152" fill="#059669">处理层 · DDS 发现</text>
+  <rect x="12" y="254" width="736" height="92" rx="10" fill="none" stroke="#fed7aa" stroke-width="1.5"/>
+  <text class="l" x="24" y="274" fill="#ea580c">消息层 · 域号决定的组播通道</text>
+  <rect x="12" y="368" width="736" height="70" rx="10" fill="none" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="6,4"/>
+  <text class="l" x="24" y="388" fill="#64748b">外部 · 组网三前提</text>
+
+  <!-- 入口层 -->
+  <rect x="30" y="44" width="200" height="54" rx="6" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1.5"/>
+  <text class="t" x="130" y="66" text-anchor="middle">终端 1 · talker</text>
+  <text class="s" x="130" y="86" text-anchor="middle">export DOMAIN_ID=42</text>
+  <rect x="250" y="44" width="200" height="54" rx="6" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1.5"/>
+  <text class="t" x="350" y="66" text-anchor="middle">终端 2 · listener</text>
+  <text class="s" x="350" y="86" text-anchor="middle">同域 42 → 能收到</text>
+  <rect x="470" y="44" width="130" height="54" rx="6" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1.5"/>
+  <text class="t" x="535" y="66" text-anchor="middle">终端 3 · 异域</text>
+  <text class="s" x="535" y="86" text-anchor="middle">域 99 → 收不到</text>
+  <rect x="620" y="44" width="114" height="54" rx="6" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1.5"/>
+  <text class="t" x="677" y="66" text-anchor="middle">组网诊断台</text>
+  <text class="s" x="677" y="86" text-anchor="middle">六场景演练</text>
+
+  <!-- 处理层 -->
+  <rect x="120" y="162" width="250" height="56" rx="6" fill="var(--green-bg)" stroke="var(--green)" stroke-width="1.5"/>
+  <text class="t" x="245" y="186" text-anchor="middle">SPDP 发现（同域才互达）</text>
+  <text class="s" x="245" y="206" text-anchor="middle">GUID + 域号 → 花名册</text>
+  <rect x="430" y="162" width="250" height="56" rx="6" fill="var(--green-bg)" stroke="var(--green)" stroke-width="1.5"/>
+  <text class="t" x="555" y="186" text-anchor="middle">SEDP 撮合</text>
+  <text class="s" x="555" y="206" text-anchor="middle">话题同名 + QoS 兼容 → 建链</text>
+
+  <!-- 消息层 -->
+  <rect x="66" y="276" width="300" height="50" rx="6" fill="var(--orange-bg)" stroke="var(--orange)" stroke-width="1.5"/>
+  <text class="t" x="216" y="298" text-anchor="middle">域 42 组播通道 · 互通成功</text>
+  <text class="s" x="216" y="316" text-anchor="middle">239.255.0.43 : 17900</text>
+  <rect x="410" y="276" width="290" height="50" rx="6" fill="var(--orange-bg)" stroke="var(--orange)" stroke-width="1.5"/>
+  <text class="t" x="555" y="298" text-anchor="middle">域 99 组播通道 · 隔离失败样本</text>
+  <text class="s" x="555" y="316" text-anchor="middle">239.255.0.100 : 32150</text>
+
+  <!-- 连线 -->
+  <line x1="130" y1="98" x2="200" y2="162" stroke="var(--green)" stroke-width="1.5"/>
+  <text class="l" x="136" y="136">启动</text>
+  <line x1="350" y1="98" x2="290" y2="162" stroke="var(--green)" stroke-width="1.5"/>
+  <line x1="535" y1="98" x2="530" y2="162" stroke="var(--gray)" stroke-width="1.5" stroke-dasharray="5,4"/>
+  <text class="l" x="546" y="136">异域</text>
+  <line x1="677" y1="98" x2="640" y2="162" stroke="var(--green)" stroke-width="1.5"/>
+  <line x1="245" y1="218" x2="216" y2="276" stroke="var(--orange)" stroke-width="1.5"/>
+  <text class="l" x="252" y="252">SPDP 命中</text>
+  <line x1="555" y1="218" x2="555" y2="276" stroke="var(--orange)" stroke-width="1.5" stroke-dasharray="5,4"/>
+  <text class="l" x="565" y="252">地址不同</text>
+  <line x1="400" y1="218" x2="460" y2="276" stroke="var(--green)" stroke-width="1.5"/>
+
+  <!-- 外部三前提 -->
+  <rect x="46" y="390" width="210" height="40" rx="6" fill="var(--gray-bg)" stroke="var(--gray)" stroke-width="1.5" stroke-dasharray="6,4"/>
+  <text class="s" x="151" y="415" text-anchor="middle">前提① 同网段 · ping 通</text>
+  <rect x="276" y="390" width="200" height="40" rx="6" fill="var(--gray-bg)" stroke="var(--gray)" stroke-width="1.5" stroke-dasharray="6,4"/>
+  <text class="s" x="376" y="415" text-anchor="middle">前提② 同域号 · 同 ID</text>
+  <rect x="496" y="390" width="230" height="40" rx="6" fill="var(--gray-bg)" stroke="var(--gray)" stroke-width="1.5" stroke-dasharray="6,4"/>
+  <text class="s" x="611" y="415" text-anchor="middle">前提③ 组播通 · 防火墙放行</text>
+  <line x1="376" y1="390" x2="376" y2="346" stroke="var(--gray)" stroke-width="1.5" stroke-dasharray="5,4"/>
+
+  <text class="l" x="380" y="500" text-anchor="middle" fill="#94a3b8">实操顺序：域号三种给法 → 三终端 4 步 → 组网诊断台六场景 → 验收表</text>
+</svg>
+<div class="dock">
+  <span class="ok">✅ 结论：同域同地址同端口才互通，其余一切现象都由域号派生</span>
+  <span class="warn">⚠️ 风险：三前提任一不满足即"看不见"，且没有任何报错</span>
+  <span class="evid">🔍 验证：04 节三终端四步 + 诊断台六场景切换</span>
+</div>
+<div class="ft">EXP-13 · ROS2 分布式通讯</div>
+</body>
+</html>

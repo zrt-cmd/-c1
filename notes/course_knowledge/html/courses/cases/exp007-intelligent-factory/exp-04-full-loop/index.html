@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>EXP-04 综合闭环实战 · 建设中 · EXP007</title>
+<style>
+:root{--bg-base:#f8fafc;--bg-card:#fff;--border:#e2e8f0;--accent-blue:#2563eb;--accent-cyan:#0891b2;
+  --text-primary:#0f172a;--text-secondary:#64748b;--text-muted:#94a3b8;--bg-tint:#eef4ff;
+  --font-mono:'Cascadia Code','JetBrains Mono',Consolas,monospace}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:flex;flex-direction:column;
+  background:var(--bg-base);color:var(--text-secondary);
+  font-family:"Noto Sans CJK SC","PingFang SC","Microsoft YaHei","Segoe UI",system-ui,sans-serif;
+  background-image:radial-gradient(ellipse 60% 40% at 50% -5%,rgba(37,99,235,.05),transparent)}
+.topbar{height:60px;display:flex;align-items:center;justify-content:space-between;padding:0 40px;
+  background:rgba(255,255,255,.85);border-bottom:1px solid var(--border)}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;color:var(--text-primary);font-size:15px;text-decoration:none}
+.logo .dot{width:9px;height:9px;border-radius:50%;background:var(--accent-blue)}
+.crumb{font-size:13px;color:var(--text-muted)}
+.crumb b{color:var(--text-secondary);font-weight:500}
+.wrap{flex:1;max-width:760px;margin:0 auto;padding:72px 32px;text-align:center}
+.code{font-family:var(--font-mono);font-size:12.5px;letter-spacing:.14em;color:var(--accent-blue);
+  background:var(--bg-tint);border:1px solid #dbeafe;border-radius:100px;padding:5px 14px}
+.icon{font-size:56px;margin:26px 0 6px}
+h1{margin:10px 0 14px;font-size:30px;color:var(--text-primary);font-weight:800}
+.status{display:inline-block;font-size:13px;color:#b45309;background:#fffbeb;border:1px solid #fde68a;
+  border-radius:100px;padding:5px 14px}
+.card{margin-top:34px;background:var(--bg-card);border:1px solid var(--border);border-radius:14px;
+  padding:26px 28px;text-align:left;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.card h2{margin:0 0 14px;font-size:16px;color:var(--text-primary)}
+.card ul{margin:0;padding-left:20px;line-height:2.1;font-size:14px}
+.card li::marker{color:var(--accent-cyan)}
+.bar{height:6px;background:#e2e8f0;border-radius:100px;overflow:hidden;margin-top:22px}
+.bar i{display:block;height:100%;width:45%;border-radius:100px;
+  background:linear-gradient(90deg,var(--accent-blue),var(--accent-cyan))}
+.bar-lbl{display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted);margin-top:7px}
+.acts{display:flex;gap:14px;justify-content:center;margin-top:34px;flex-wrap:wrap}
+.btn{display:inline-block;padding:11px 24px;border-radius:10px;font-size:14px;text-decoration:none;transition:.28s}
+.btn.p{background:var(--accent-blue);color:#fff;box-shadow:0 6px 18px rgba(37,99,235,.25)}
+.btn.p:hover{transform:translateY(-2px)}
+.btn.s{background:var(--bg-card);border:1px solid var(--border);color:var(--text-secondary)}
+.btn.s:hover{border-color:var(--accent-blue);color:var(--accent-blue)}
+footer{padding:26px;text-align:center;font-size:12.5px;color:var(--text-muted);border-top:1px solid var(--border)}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <a class="logo" href="../index.html"><span class="dot"></span>具身智能课程 · 科普教程</a>
+  <div class="crumb"><a href="../index.html" style="color:inherit">EXP007</a> / <b>实验 04 综合闭环实战</b></div>
+</div>
+<div class="wrap">
+  <span class="code">EXPERIMENT · EXP-04</span>
+  <div class="icon">🔁</div>
+  <h1>综合闭环实战</h1>
+  <span class="status">⏳ 本实验正在建设中</span>
+  <div class="card">
+    <h2>规划建设内容</h2>
+    <ul>
+      <li>一句话任务 "去蓝色方块那里" 的解析链路</li>
+      <li>导航、视觉、抓取、语音四条链路的状态机协同</li>
+      <li>全链路集成与端到端验收实操</li>
+    </ul>
+    <div class="bar"><i></i></div>
+    <div class="bar-lbl"><span>内容就绪度</span><span>45%</span></div>
+  </div>
+  <div class="acts">
+    <a class="btn p" href="../exp-01-slam-nav/index.html">先看：实验 01 建图与导航 →</a>
+    <a class="btn s" href="../index.html">返回课程首页</a>
+  </div>
+</div>
+<footer>EXP007 · 实验 04 综合闭环实战 · 输出于 training/output</footer>
+</body>
+</html>

@@ -1,0 +1,30 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp003-ros2-application/exp-20-urdf/diagrams/fig-20-2-two-publisher-flow.html
+TITLE: 图 20-2 · 两发布者协作数据流
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+图 20-2 · 两发布者协作数据流
+图 20-2 · 两发布者合力把车"画"出来
+本图回答的问题：从一份静态 XML 到屏幕上会动的小车，中间有谁在发、谁在收？
+URDF 模型
+robot_description
+静态结构：轮装在哪
+joint_state_publisher_gui
+拖滑块 → 发布关节角
+robot_state_publisher
+URDF × 关节角 → 算 TF
+robot_description 参数注入
+/joint_states（关节角）
+/tf · /tf_static
+robot_description（模型外观）
+RViz2
+RobotModel 着色
+TF Display 画轴
+Fixed Frame: chassis
+断任何一环，车就"散架"
+断 /joint_states → No transform
+断参数注入 → RViz2 黑屏
+模型（URDF）与状态（joint_states）分离——同一份 URDF 可复用于全车队
+✅ 结论：静态模型 × 动态关节角 = 每帧 TF，RViz 只负责按 Fixed Frame 重绘
+⚠️ 风险：话题断连 → No transform；参数未注入 → 黑屏
+🔍 验证：04 节 display.launch.py 三节点 + URDF Doctor 症状诊断
+EXP-20 · URDF 与 Xacro 机器人建模

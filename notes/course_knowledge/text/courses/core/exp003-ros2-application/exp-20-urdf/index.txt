@@ -1,0 +1,892 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp003-ros2-application/exp-20-urdf/index.html
+TITLE: EXP-20 · URDF 与 Xacro 机器人建模 — 机器人 ROS2 应用与开发
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+EXP-20 · URDF 与 Xacro 机器人建模 — 机器人 ROS2 应用与开发
+🧠 具身智能课程 ·
+教程首页
+核心课程
+/
+ROS2 应用与开发
+/ EXP-20
+本页目录
+★ 课程目标
+01 问题引入：屏幕里的小车，是谁画的
+02 先看现象：一份 XML，一台会动的车
+03 原理讲解
+04 实验步骤
+05 注意事项与避坑清单
+06 本课总结与验证题
+CH5 · 建模基础
+EXP-19 TF2 坐标变换
+EXP-20 URDF 机器人建模
+EXP-20 · 第 5 章 · 设计性 · 4 学时
+URDF 与 Xacro：给机器人造一份数字骨架
+URDF
+，全称
+U
+nified
+R
+obot
+D
+escription
+F
+ormat（统一机器人描述格式），是 Rviz2/Gazebo/TF2/运动规划的唯一模型输入——rviz2 里那台蓝底盘黑轮的小车，源头就是一份这样的 XML。
+Xacro
+=
+X
+ML +
+Macro
+（XML 宏），即"在 XML 里嵌宏"的宏语言：用参数与宏把 150 行模型压缩到 80 行。本实验讲透 link 三重属性与 joint 六类型的原理，并让惯性矩阵从"魔法数字"变成公式推导。
+难度 ⭐⭐⭐
+4 学时
+设计性
+关键词 URDF · link · joint · Xacro · 惯性矩阵
+目标
+本课学完，你应该能做到
+① 说清三重属性
+visual / collision / inertial
+能阐述 URDF 中 link 三重属性各自的作用及其分离设计的工程意义——为什么渲染、碰撞检测、动力学计算需要独立定义。
+② 掌握写法
+URDF + Xacro
+能正确编写含多个 link 与 joint 的 URDF，用 Xacro 参数化建模，并用
+xacro
+工具把
+.xacro
+展开为标准 URDF。
+③ 独立完成
+造一台差分车
+独立构建简化差分驱动机器人（底盘 + 双轮 + 万向轮），在 rviz2 中加载并验证其运动学结构。
+④ 迁移应用
+为真机建模
+能为 B2 实验箱上的实际机器人编写含真实尺寸参数的 URDF，并在 rviz2 中验证。
+本课的重点与难点
+重点
+：joint 的六种类型怎么选（continuous / revolute / prismatic / fixed …），以及 parent-child 的方向不能写反。
+难点
+：惯性矩阵不能拍脑袋——非法值会让 Gazebo 求解器发散、模型原地爆炸。
+和前后的关系
+本课是
+全课程收口
+：URDF 给出机器人的"身体"，EXP-19 的 TF2 给出"位置"，两者合起来，机器人才在数字世界里真正存在。
+01
+问题引入：屏幕里的小车，是谁画的
+先回忆
+EXP-19 的 TF 树（谁是谁的 child、原点在哪）——URDF 就是那棵树的
+源头文件
+：你用 link 和 joint 描述机器人，
+robot_state_publisher
+把它变成 TF 变换和三维模型，rviz2 里那台小车就是从这里"画"出来的。
+1
+echo /scan 只看到一堆浮点数——数据有了，"车"在哪？
+2
+rviz2 勾选 RobotModel 后，一台蓝底盘、黑驱动轮、白万向轮的小车瞬间出现
+3
+模型形状、颜色、轮轴位置全部来自参数
+robot_description
+——它的内容就是一份 URDF 文件
+4
+拖动 joint 滑块，轮子绕轴旋转：几何 + 运动约束 + 物理属性，一份 XML 全定义
+定义
+URDF
+（Unified Robot Description Format，统一机器人描述格式）是一种 XML 语言，用来描述机器人的
+几何结构
+（长什么样）、
+运动学约束
+（怎么动）与
+动力学参数
+（多沉、惯性多大）。它是 Rviz2、Gazebo、TF2、MoveIt 运动规划的
+唯一模型输入源
+——写好一份 URDF，整条工具链共享同一台"数字孪生"。
+02
+先看现象：一份 XML，一台会动的车
+怎么读这一节
+用工程真车模型
+car1.urdf
+（SolidWorks 导出，约 1200 行）认识 URDF：
+不整篇贴文件
+，按不同写法
+摘片段举例
+——link 怎么写、joint 怎么分类、xyz/rpy 装在哪、什么能一直转、什么只能有限转。每个片段都点开看注释；常用标签的完整说明在 03 节。
+例 1 · 文件头与空 link — robot 是唯一根标签，空 link 就是纯坐标系
+节选自 car1.urdf 开头（robot 标签横跨全文到文件末尾）
+<?xml version="1.0" encoding="utf-8"?>
+<robot name="car1">
+<!-- 空 link：没有几何也没有质量，只当坐标系用——base_footprint 是整车"落地点" -->
+<link name="base_footprint" />
+<!-- 同款空 link 还有 tcp_link（末端工具点）、camera_depth_optical_frame（相机光轴系）…全文十几处 -->
+</robot>
+读法：
+name="car1"
+就是
+check_urdf
+第一行
+robot name is: car1
+的出处；空 link 不显示任何东西，只为给 TF 树提供一个原点。
+例 2 · link 三重属性 — base_link 把 inertial / visual / collision 写全
+节选自 car1.urdf 的 base_link（惯性矩阵共 9 个数，此处原样摘录）
+<link name="base_link">
+<!-- inertial：动力学读它——质量 1.97 kg + SolidWorks 算好的 3×3 惯性矩阵 -->
+<inertial>
+    <origin xyz="0.00119523538791205 0.00195957701632652 0.0457542650231294" rpy="0 0 0"/>
+    <mass value="1.97049077979221"/>
+    <inertia ixx="0.00486152635724755" ixy="2.00512337711509E-06" ixz="0.000162020407436135"
+             iyy="0.00915836901735741" iyz="2.72820673876569E-06" izz="0.0130028044572217"/>
+  </inertial>
+<!-- visual：RViz2 读它——STL 网格 + 颜色（rgba 值域是 [0,1]，不是 0~255） -->
+<visual>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <geometry><mesh filename="package://car1_description/meshes/base_link.STL"/></geometry>
+    <material name=""><color rgba="1 1 1 1"/></material>
+  </visual>
+<!-- collision：Gazebo 碰撞检测读它，这里直接复用同一 STL（真实工程可简化成包围盒） -->
+<collision>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <geometry><mesh filename="package://car1_description/meshes/base_link.STL"/></geometry>
+  </collision>
+</link>
+读法：三块内容消费方各不相同——渲染吃 visual、碰撞吃 collision、动力学吃 inertial；
+package://
+是"包内相对路径"，装到哪台机器都能找到网格。三属性的完整作用表在 03 节。
+例 3 · joint 之 fixed + xyz — 焊死的安装关节，xyz 就是安装位置
+节选自 car1.urdf：base_footprint 与 base_link 之间的"垫高"关节
+<joint name="base_joint" type="fixed">
+<origin xyz="0 0 0.029" rpy="0 0 0"/>
+<!-- 子 link 相对父 link：仅沿 Z 抬高 2.9 cm -->
+<parent link="base_footprint"/>
+  <child link="base_link"/>
+</joint>
+读法：
+fixed
+= 0 自由度、焊死不能动，只负责定安装位姿；
+xyz
+三个数是平移（米），遵循 REP-103（X 前 / Y 左 / Z 上）。激光雷达
+laser_joint
+的
+xyz="0.146 0 0.087"
+同理——"往前 14.6 cm、往上 8.7 cm"装雷达。
+例 4 · joint 之 rpy — 旋转姿态：相机光轴系掰了两个 90°
+节选自 car1.urdf：深度相机末端的光学坐标系关节
+<joint name="camera_depth_optical_joint" type="fixed">
+  <origin xyz="0 0.01655 0"
+rpy="-1.57079633 0 -1.57079633"
+/>
+<!-- -π/2 ≈ -1.5708，两个 90° 把车体系掰成相机光学系约定 -->
+<parent link="camera_depth_link"/>
+  <child link="camera_depth_optical_frame"/>
+</joint>
+读法：
+rpy
+三个数 = 绕 X、Y、Z 的旋转弧度（roll / pitch / yaw），求值
+先 rpy 旋转、再 xyz 平移
+；±1.5708 就是 90°。joint 里的 origin = 子 link 相对父 link 的位姿——与 link 内 visual 下的 origin（几何体对自己的偏移）语义完全不同，详见 03 节。
+例 5 · joint 之 continuous — 一直转动：四个驱动轮，转圈无尽头
+节选自 car1.urdf：左前驱动轮（其余三个轮同构，仅 name/xyz 不同）
+<joint name="wheel_lf_joint" type="continuous">
+  <origin xyz="0.097300000000001 0.105834744636228 0.0195000000000009" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="wheel_lf_link"/>
+<axis xyz="0 1 0"/>
+<!-- 轮轴沿 Y（车宽方向）——绕它一直转 -->
+</joint>
+读法：
+continuous
+=
+一直转动
+，无限转圈，因此
+没有也不允许
+<limit>
+；只要给
+axis
+（转轴方向）。拖滑块时轮子转不到"头"——这正是它和例 6 的分界。
+例 6 · joint 之 revolute — 有限转动：机械臂关节必须写 limit
+节选自 car1.urdf：机械臂第一轴（arm_joint2~5、夹爪诸关节同款写法）
+<joint name="arm_joint1" type="revolute">
+  <origin xyz="0.0100000000000003 0 0.0434999999999999" rpy="0 0 0"/>
+  <parent link="arm_base_link"/>
+  <child link="arm_link1"/>
+  <axis xyz="0 0 1"/>
+<!-- 绕 Z 转（肩关节回转） -->
+<limit lower="-3.14" upper="3.14" effort="100" velocity="1"/>
+<!-- 有限转动，四件套写全 -->
+</joint>
+读法：
+revolute
+=
+有限转动
+，角度被
+limit
+锁死在 −3.14 ~ +3.14 rad（±180°）；
+effort=100
+最大力矩、
+velocity=1
+最大角速度。拖滑块到头即停、check_urdf 缺 limit 直接报错——revolute 的 limit 是
+必填项
+。
+例 7 · joint 之 mimic — 其他分类：左指跟着右指动
+节选自 car1.urdf：左外指关节，从动于右关节
+<joint name="l_joint" type="revolute">
+  <origin xyz="0.01900706 0.01375021 0.0025" rpy="0 0 0"/>
+  <parent link="arm_link6"/>
+  <child link="l_link"/>
+  <axis xyz="0 0 -1"/>
+  <limit lower="-3.14" upper="3.14" effort="100" velocity="1"/>
+<mimic joint="r_joint" multiplier="-1" offset="0"/>
+<!-- 跟随 r_joint：角度 ×(-1) 反向联动 -->
+</joint>
+读法：
+mimic
+让本关节成为
+从动关节
+——只驱动
+r_joint
+，
+l_joint
+按 multiplier 自动反向跟动（夹爪对开就是这么省出来的）。这是 car1 文件里除 fixed / continuous / revolute 之外的又一种分类。
+关节分类对照（car1 实例）— 哪些一直转、哪些有限转、哪些根本不能转？
+分类
+car1.urdf 实例
+特征与判定
+fixed
+base_joint、laser_joint、imu_joint
+0 自由度焊死，只定安装位姿
+continuous
+wheel_lf_joint 等 4 个驱动轮
+一直转动
+：只写 axis，无 limit
+revolute
+arm_joint1~5、夹爪诸关节
+有限转动
+：必须 limit lower/upper
+prismatic
+本车未用
+直线滑轨（升降台类），同样必须 limit
+floating / planar
+本车未用
+6 / 3 自由度，实践中几乎不手写
+mimic
+（从动标记）
+l_joint → 跟随 r_joint
+不加自由度，按倍率复制另一关节的角度
+下一步
+上面 7 个片段就是
+car1.urdf
+的骨架读法——1200 行静态 XML，谁把它变成 RViz2 里会动的整车？03 节把常用元素列全并讲透，04 节直接上加载代码。
+03
+原理讲解
+link 三重属性 × joint 六类型
+建立在 EXP-19 的 TF 树之上——URDF 就是那棵树的源头文件：link 是节点，joint 是边。
+图 20-1 · link 三重属性 × joint 结构树｜本图回答：URDF 用什么把机器人拆成部件，又用什么把部件连回一棵树？
+✅ 结论：link 装属性、joint 定自由度，单根树结构与 TF 树同构
+⚠️ 风险：两种 origin 混淆 → 轮子转圈装不上轴
+🔍 验证：04 节 check_urdf 输出 root Link: base_footprint has 1 child(ren)
+link 属性
+作用
+取值/几何体
+何时必须
+<visual>
+渲染外观（给 Rviz2 看）
+box / cylinder / sphere / mesh（数万三角形也行）
+只想可视化时——
+可单独存在
+<collision>
+物理碰撞检测（给 Gazebo 看）
+同上，但应
+简化为包围盒
+以降低实时计算量
+仿真必须
+<inertial>
+动力学：mass + 3×3 惯性矩阵
+ixx iyy izz ixy ixz iyz
+仿真必须（否则模型飞走）
+三属性为何分离
+① 视觉模型数万三角形、碰撞模型要实时求交——解耦才能各自优化；② 同一个空心盒与实心铁块外观相同但惯性不同——独立声明才不撒谎；③ 纯可视化场景可只写 visual，省掉物理开销；④ Gazebo 要求三者齐全，缺 inertial 模型会乱飞、缺 collision 穿地不碰撞。
+一句话总表（PPT 可直接放）· joint 四大常用类型 —— 哪些一直转、哪些有限转、哪些滑直线、哪些根本不动？
+类型
+运动方式
+有没有限位
+典型例子
+continuous
+绕单轴旋转
+✅ 无角度上下限，
+可以一直转
+小车驱动轮（car1：wheel_lf_joint 等 4 轮）、云台无限制旋转
+revolute
+绕单轴旋转
+✅ 有角度上下限（单位：
+rad
+）
+机械臂舵机、夹爪转轴（car1：arm_joint1~5，±3.14）、舵机 0~180°
+prismatic
+沿单轴平移滑动
+✅ 有位置上下限（单位：
+m
+）
+电动推杆、伸缩气缸、升降滑台（car1 未用）
+fixed
+完全不动，刚性锁死
+❌ 不能动
+底盘上固定的相机、雷达（car1：laser_joint）、base_footprint→base_link
+补充两行凑齐常说的"joint 六类型"：
+floating
+（6 自由度）与
+planar
+（3 自由度）实践中几乎不手写；mimic 不是独立类型而是从动标记（02 节例 7）。
+逐个详细解释
+四种类型逐个点开：看运动方式、看要不要限位、看最小可用写法。
+① continuous 无限旋转关节 — 绕轴不停旋转，没有转角限制
+绕一根轴不停旋转，
+没有转角限制
+，可以转很多圈
+不需要
+<limit>
+标签
+示例：小车轮子，向前向后无限滚（car1 四个驱动轮，原文见 02 节例 5）
+<joint name="wheel_joint" type="continuous">
+  <parent link="base_link"/>
+  <child link="wheel_link"/>
+<axis xyz="0 1 0"/>
+<!-- 只给转轴，不写 limit —— 它可以一直转 -->
+</joint>
+② revolute 有限旋转关节 — 也绕轴旋转，但到最大/最小角度就卡住
+也是绕轴旋转，
+但是有最大、最小角度
+，到角度就卡住
+必须
+写
+<limit lower upper effort velocity/>
+—— 角度单位是
+弧度 rad
+（check_urdf 缺了直接报错）
+示例：机械臂关节、舵机，只能 0~90° 来回摆，不能一直转
+# car1 机械臂第一轴的原值四件套（02 节例 6 同款）
+<joint name="arm_joint1" type="revolute">
+  <parent link="arm_base_link"/>
+  <child link="arm_link1"/>
+<axis xyz="0 0 1"/>
+<limit lower="-3.14" upper="3.14" effort="100" velocity="1"/>
+<!-- 弧度限位 + 最大力矩 + 最大角速度 -->
+</joint>
+✅ 重点区分
+revolute 有范围；continuous 没有范围。
+同样是"绕单轴转"——一个到头卡住（±π 停），一个无限转圈；把轮子写成 revolute 并给了 limit，滑块推到边界轮子就锁死了（05 节坑条第 3 条）。
+③ prismatic 平移（棱柱）关节 — 不转，沿轴直线推拉滑动
+不是转，是
+沿着一根轴直线推拉滑动
+（滑轨、丝杆、气缸的动作）
+带位置限位，
+单位是米 m
+（不是弧度）
+示例：升降杆、伸缩夹爪、升降滑台（car1 本车未用，属通用写法）
+<joint name="lift_joint" type="prismatic">
+  <parent link="base_link"/>
+  <child link="lift_link"/>
+<axis xyz="0 0 1"/>
+<!-- 沿 Z 直线推 -->
+<limit lower="0" upper="0.3" effort="50" velocity="0.2"/>
+<!-- 行程 0~0.3 m，单位是米！ -->
+</joint>
+④ fixed 固定关节 — 没有任何相对运动，父子焊死
+没有任何相对运动，父子连杆
+焊死
+在一起，相对位置姿态永久不变
+不需要
+axis
+、
+limit
+、
+dynamics
+你前面那张 TF 图里
+base_footprint → base_link
+就是 fixed（02 节例 3 原文：xyz="0 0 0.029"）
+作用：把雷达、相机、外壳固定到底盘上，
+只用来传递静态 TF
+小白高频坑
+① 轮子千万别写成 revolute！轮子要一直滚，必须
+continuous
+② fixed 虽然叫 "joint"，本质
+不是运动关节
+，只是用来建立静态坐标变换——robot_state_publisher 就是靠 fixed 关节输出静态 TF
+③ revolute 单位是
+弧度
+，prismatic 单位是
+米
+④ joint_state 话题分工：continuous / revolute 发布
+角度
+；prismatic 发布
+位移
+；fixed
+不发布
+任何关节状态
+记忆口诀
+continuous：随便转圈无极限
+revolute：来回摆动有角度
+prismatic：前后伸缩滑直线
+fixed：死死固定不能动
+片段与表格互查
+02 节七个片段就是这两张表的落地：base_link 三属性齐写（例 2）、四轮 continuous（例 5）、臂关节 revolute+limit（例 6）、传感器全 fixed（例 3）、夹爪 mimic（例 7）。04 节加载这份 car1.urdf，逐项在 RViz2 里验证。
+最容易混淆的两种 origin
+link 内的 origin
+（visual/collision/inertial 之下）= 该几何体相对
+自己 link 原点
+的偏移；
+joint 里的 origin
+=
+子 link 相对父 link
+的初始位姿。语义完全不同——把激光雷达 laser_joint 的安装偏移误写进 visual origin，雷达会缩回 link 原点、装不到车头上："装在哪"永远由 joint origin 说算，不是 visual origin。
+另注：URDF 坐标系遵循 REP-103 —— X 前、Y 左、Z 上；origin 的求值顺序是
+先 rpy 旋转、再 xyz 平移
+。
+两个发布者如何合力把车"画"出来
+图 20-2 · 两发布者合力把车"画"出来｜本图回答：从一份静态 XML 到屏幕上会动的小车，中间有谁在发、谁在收？
+✅ 结论：静态模型 × 动态关节角 = 每帧 TF，RViz 只按 Fixed Frame 重绘
+⚠️ 风险：断 /joint_states → No transform；参数未注入 → 黑屏
+🔍 验证：04 节 display.launch.py 三节点 + URDF Doctor 症状诊断
+怎么设置（可照抄入口）
+launch 里三件事：读 URDF 文本、注入参数、起齐三节点：
+robot_description = open(urdf_path).read()
+Node(package=
+'robot_state_publisher'
+,
+     parameters=[{
+'robot_description'
+: robot_description}])
+Node(package=
+'joint_state_publisher_gui'
+)
+少了注入或少了 GUI 节点，就是下面分解图里的两种断链。
+为什么是"两个发布者"分工
+URDF 是
+静态
+结构（轮子装在哪），/joint_states 是
+动态
+状态（此刻转了多少度）。robot_state_publisher 把两者相乘得到每帧 TF——这正是"模型"与"状态"分离的设计哲学，同一份 URDF 可复用于全车队。
+惯性矩阵——从魔法数字到物理公式
+长方体 · 底盘
+Ixx=m/12·(y²+z²)　Iyy=m/12·(x²+z²)　Izz=m/12·(x²+y²)
+例：底盘 0.40×0.25×0.08 m、质量 3.0 kg → ixx=0.017、iyy=0.042、izz=0.053。沿某轴的惯量 = 质量对该轴分布的"转动惰性"，垂直于该轴的边长平方贡献最大。
+圆柱体 · 车轮
+Ixx=Iyy=m/12·(3r²+h²)　Izz=m/2·r²
+轮轴沿 Y：绕轴（Y）转动惯量小、绕直径大时看 h 贡献。r=0.05、L=0.03、m=0.2 代入即可，杜绝拍脑袋的 0.01。
+数学红线
+矩阵必须对称正定
+ixx、iyy、izz 全部 > 0，且满足三角不等式 ixx+iyy≥izz 等。非法值会让 Gazebo 求解器发散——模型原地爆炸或瞬间飞出场景。
+工程护栏
+初学用 1e-3 占位
+只做 Rviz2 可视化时惯性可省；进 Gazebo 前若懒得算，统一写 ixx=iyy=izz=1e-3（对角等值必正定），先跑通再精算。Xacro 则用公式自动算（见本段末 Xacro 主场，实操在 04 节）。
+✅ 结论：惯性按公式算，初学 1e-3 对角占位先跑通
+⚠️ 风险：矩阵非正定 → Gazebo 求解发散、模型原地爆炸
+🔍 验证：02 节例 2 base_link 六个惯性数即导出器按公式算出的落地（公式写法见下一小节 Xacro）
+Xacro：XML + Macro，展开即 URDF
+建立在 link / joint 写法之上——URDF 是纯静态 XML；Xacro 是它的"带宏超集"：变量、宏、子文件引入，全部在展开那一步翻译回普通 URDF。
+一句话定位与兼容性
+Xacro = XML + Macro
+（X 取自 XML，Macro 即宏）。
+兼容是双向的
+：① 展开产物 = 标准 URDF，robot_state_publisher / RViz2 / Gazebo 只认它，而且根本感知不到中间经过了 Xacro；② 普通 URDF 文件可以被
+<xacro:include>
+原样引入总装——car1 工程正是把
+car1.urdf
+一行不改地 include 进仿真 xacro（见案例 B）。
+维度
+URDF
+Xacro
+本质
+XML 方言，标签固定
+XML
+超集
+：
+xacro:*
+标签 +
+${}
+表达式
+重复结构
+复制粘贴（car1 四个轮关节手写四遍）
+macro
+定义一次、多处调用，
+${prefix}
+防撞名
+数值来源
+逐个写死（或由导出器代算）
+property / arg
+收编 +
+${}
+算式推导
+子文件复用
+不支持，只能合并全文
+xacro:include
+把多个文件拼成总装
+工具链直读
+直接吃
+先
+xacro
+展开（命令行或 launch 内）再吃
+兼容关系
+是 Xacro 的
+子集
+，可被原样 include
+展开 = URDF，向下兼容
+图 20-4 · Xacro 参数化重构（复用压缩到 80 行）｜本图回答：重复与魔法数字，靠哪四步收进参数与宏？
+✅ 结论：改一处参数全模联动——模板与公式代替复制粘贴
+⚠️ 风险：xmlns 未声明宏全失效；name 撞车解析失败
+🔍 验证：04 节 xacro 展开案例 B 总装文件后 check_urdf 三行通过
+看两个真案例
+以下 XML 全部原样摘自 car1 工程（
+car1_description/gazebo/
+与
+car1_gazebo/urdf/
+），注释逐行标好——点开看宏怎么定义、怎么调用、怎么把 URDF 拼进来。
+案例 A · 宏定义与调用 — car1.gazebo.xacro：params 形参 + ${} 占位，一处定义全车复用
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+<!-- Gazebo 物理参数宏：params="name" 声明形参，${name} 是调用处传入的实参 -->
+<xacro:macro name="gazebo_link" params="name">
+        <gazebo reference="${name}">
+            <kp>0</kp><kd>0</kd>
+            <mu1>1</mu1><mu2>1</mu2>
+<!-- 摩擦系数 -->
+<material>Gazebo/White</material>
+        </gazebo>
+    </xacro:macro>
+<!-- 夹爪换高刚度宏：kp=1e15 抓得稳、kd=1e13 减震——换个宏名即换整套参数 -->
+<xacro:macro name="gazebo_gripper" params="name">
+        <gazebo reference="${name}">
+            <kp>1e15</kp><kd>1e13</kd>
+            <mu1>1.0</mu1><mu2>1.0</mu2>
+            <material>Gazebo/Black</material>
+        </gazebo>
+    </xacro:macro>
+<!-- 宏调用：像普通标签一样使用；${prefix} 拼在每个名字前，多车不撞名 -->
+<xacro:macro name="car1_gazebo" params="prefix">
+        <xacro:gazebo_link name="${prefix}arm_base_link"/>
+        <xacro:gazebo_link name="${prefix}arm_link1"/>
+…（7 节臂各一行）
+<xacro:gazebo_gripper name="${prefix}r_link"/>
+…（6 个夹爪件）
+<xacro:gazebo_link name="${prefix}base_link"/>
+    </xacro:macro>
+</robot>
+读法：宏 = 带参数的 XML 模板——定义一次，
+car1_gazebo
+里连调十几行；
+${name}
+、
+${prefix}arm_link1
+在展开时做字符串替换，
+${}
+里也可以写算式（如
+${wheel_radius/2 + 0.01}
+，property 收编变量的完整流程即图 20-4）。
+忘写 xmlns:xacro，这些标签全部失效
+（05 节坑条）。
+案例 B · include 总装 — car1.gazebo.xacro：把普通 URDF 直接拼进 Xacro（兼容性实锤）
+<robot name="car1" xmlns:xacro="http://ros.org/wiki/xacro">
+<!-- 命令行/launch 可传参数：$(arg prefix) 逐处取值 -->
+<xacro:arg name="prefix" default=""/>
+<!-- 兼容实锤：include 的目标是一份普通 .urdf 文件，原样引入、一行不改 -->
+<xacro:include filename="$(find car1_description)/urdf/car1.urdf"/>
+<!-- 再叠加物理、传动、硬件接口三份宏文件 -->
+<xacro:include filename="$(find car1_description)/gazebo/car1.gazebo.xacro"/>
+    <xacro:include filename="$(find car1_description)/gazebo/car1.transmission.xacro"/>
+    <xacro:include filename="$(find car1_gazebo)/urdf/car1.gazebo.ros2_control.xacro"/>
+<!-- 宏调用：把物理参数/传动/硬件刷到每个 link、joint 上 -->
+<xacro:car1_gazebo prefix="$(arg prefix)"/>
+    <xacro:car1_transmission prefix="$(arg prefix)"/>
+    <xacro:car1_gazebo_ros2_control name="GazeboSimSystem"/>
+…（其后是 Gazebo<plugin>、相机<sensor> 等原生标签，按原样保留到文件尾）…
+</robot>
+读法：总装文件 = URDF（子集原样合入）+ Xacro 宏调用 + 原生 Gazebo 标签混排；
+xacro
+命令一跑，car1.urdf 的一千二百行原封并入、宏全部替换为普通标签，
+输出即标准 URDF
+。URDF 与 Xacro 的双向兼容在此文件里是实锤——加载方法就是 04 节步骤 ② 两段代码。
+高频失败模式
+漏
+xmlns:xacro
+→ 全部宏标签失效、
+${}
+原样泄漏进输出；宏调用 name 撞车 → 展开后重复 link/joint 解析失败；宏定义必须先于调用且同在一个
+<robot>
+内。三条都能被"展开 → check_urdf"当场抓住（04 节代码逐段对应）。
+✅ 结论：宏复用 + 表达式推导，展开即标准 URDF、与现有 URDF 双向兼容
+⚠️ 风险：xmlns 缺失宏全失效；name 撞车解析失败
+🔍 验证：04 节 xacro 展开案例 B 总装文件，check_urdf 三行通过
+04
+实验步骤
+本实验要干什么
+把现成的
+car1.urdf
+和它的 Xacro
+加载起来用
+——全程代码说话：
+步骤 ①
+体检 + launch 加载 car1.urdf，进 RViz2 拖滑块，亲眼比对"一直转动"与"有限转动"；
+步骤 ②
+用 xacro 展开组合文件，把展开文本注入
+robot_description
+。先看框架图认清文件、节点与工具；命令逐段可复制，输出直接列在下方对照。
+图 20-3 · 工程全景：一个模型文件、三个节点、两把工具｜本图回答：本实验改哪些文件、launch 起哪几个节点、用什么验证？
+✅ 结论：一份模型文件既喂三节点渲染，也喂两把工具体检
+⚠️ 风险：未 source / 硬编码路径 / Fixed Frame 写错 → 全链断
+🔍 验证：本节检验工具三件套的三条真实输出
+步骤 ① 加载 car1.urdf：体检 → 注入 → 三节点
+1
+装工具一次性做完：
+sudo apt install liburdfdom-tools ros-humble-xacro -y
+，并确认已
+source
+工作空间
+2
+体检：
+check_urdf …/car1.urdf
+→ 对照下方
+输出 ①
+的三行
+3
+读懂
+display.launch.py
+的核心八行——
+读文件 → 注入参数 → 起三节点
+（见
+代码段 ②
+）
+4
+一键加载
+ros2 launch car1_description display.launch.py
+→ RViz2 整车出现，拖滑块见
+输出 ③
+# 输出 ①：三行 = car1.urdf 解析通过；根 link 是 base_footprint，挂着 1 个直接子件（base_link）
+$ check_urdf $(ros2 pkg prefix car1_description)/share/car1_description/urdf/car1.urdf
+robot name is: car1
+---------- Successfully Parsed XML ---------------
+root Link: base_footprint has 1 child(ren)
+# 代码段 ②：launch 怎么把文件送进节点（car1_description/launch/display.launch.py 核心 8 行）
+pkg_share = get_package_share_directory(
+'car1_description'
+)
+urdf_file = os.path.join(pkg_share,
+'urdf'
+,
+'car1.urdf'
+)
+with open(urdf_file,
+'r'
+) as f:
+    robot_desc = f.read()
+# 文件全文 → 字符串
+Node(package=
+'robot_state_publisher'
+,
+     parameters=[{
+'robot_description'
+: robot_desc}])
+# 注入参数（缺这步 = 黑屏）
+Node(package=
+'joint_state_publisher_gui'
+, …)
+# 发 /joint_states，带滑块
+Node(package=
+'rviz2'
+, arguments=[
+'-d'
+, rviz_config])
+# 用预配 car1.rviz 画出来
+# 输出 ③：一键拉起三节点（launch 已写好，无需改）
+$ ros2 launch car1_description display.launch.py
+# RViz2：Fixed Frame 选 base_footprint → 底盘+4轮+机械臂+夹爪整体出现
+# 拖滑块 arm_joint1   → 转到 ±3.14 rad 就停 ……… revolute 有限转动（02 节例 6）
+# 拖滑块 wheel_lf_joint → 转圈没有尽头 …………… continuous 一直转动（02 节例 5）
+联动检查
+预期
+不满足时
+Fixed Frame = base_footprint
+整车居中显示
+Global Status 红字、场景全空
+RobotModel → Description Source = Topic
+/robot_description
+外形出现
+参数未注入或未 source install
+拖 arm_joint1 滑块
+臂转到 ±3.14 卡住
+joint type 被改成 fixed 或 GUI 没启动
+拖 wheel_lf_joint 滑块
+轮子连续转圈不停
+轴 axis 丢失，或关节被加了 limit
+步骤 ② 加载 Xacro：展开得到 URDF，再走同一条注入路
+# ① 命令行展开 + 体检（car1_gazebo 总装文件 = 03 节案例 B，内部 include 了 car1.urdf）
+$ sudo apt install ros-humble-xacro -y
+$ xacro $(ros2 pkg prefix car1_gazebo)/share/car1_gazebo/urdf/car1.gazebo.xacro \
+    > /tmp/car1_expanded.urdf
+$ check_urdf /tmp/car1_expanded.urdf
+robot name is: car1
+---------- Successfully Parsed XML ---------------
+root Link: base_footprint has 1 child(ren)
+# 展开件与原文件同样三行通过 = 宏、变量、include 已全部翻译成标准 URDF
+# ② 工程 launch 的真实做法（car1_gazebo/launch/gazebo_arm.launch.py 原代码）
+urdf_content = subprocess.check_output([
+'xacro'
+, xacro_file]).decode(
+'utf-8'
+)
+Node(package=
+'robot_state_publisher'
+,
+     parameters=[{
+'robot_description'
+: urdf_content}])
+# ③ 两条路线并排看——注入方式完全相同，唯一区别是文本从哪来
+URDF 路线：open('car1.urdf').read()            ──┐
+Xacro 路线：xacro 总装.xacro 的展开输出文本   ──┼─→ robot_description ─→ 三节点 ─→ RViz2/Gazebo
+┘  下游感知不到差别 = 03 节"双向兼容"的落地
+两条注意
+① 文件还在源码树、未 install 时，把
+$(ros2 pkg prefix …)
+换成绝对路径
+~/…/car1_description/urdf/car1.urdf
+照样能跑；但 launch 里请始终用
+get_package_share_directory()
+——install 之后 src/ 绝对路径必失效。② 展开得到的
+/tmp/car1_expanded.urdf
+可再喂
+urdf_to_graphiz
+出拓扑图，对照 02 节分类表逐关节核对 fixed / continuous / revolute 各在何处。
+加载环节
+容易踩的坑
+解法
+check_urdf 报错解析失败
+文件截断 / 标签没闭合（XML 零容忍）
+看报错行号；urdf_to_graphiz 二分定位
+RViz 黑屏、无模型
+robot_description 未注入 / 未 source install
+对照本节代码段 ② 的 open().read() 四行
+xacro 展开产物含
+${}
+变量未定义或 xmlns:xacro 缺失
+回查 03 节案例 A：宏先于调用、根标签声明命名空间
+launch 找不到模型文件
+硬编码 src/ 绝对路径，install 后失效
+统一用 get_package_share_directory()
+package:// 网格全丢（Gazebo 白模）
+仿真环境不解析包路径
+照 gazebo_arm.launch.py：展开后 replace 成 file:// 绝对路径
+检验工具三件套
+# ① 语法+结构验证（步骤 ① 的原命令，汇总在此）
+$ check_urdf $(ros2 pkg prefix car1_description)/share/car1_description/urdf/car1.urdf
+robot name is: car1
+---------- Successfully Parsed XML ---------------
+root Link: base_footprint has 1 child(ren)
+# ② 生成 link-joint 拓扑图（需 liburdfdom-tools）
+$ sudo apt install liburdfdom-tools -y
+$ urdf_to_graphiz /tmp/car1_expanded.urdf
+# → 生成 PDF：base_footprint→base_link 分叉到 4 轮 / 激光 / IMU / 6 节臂 / 夹爪
+# ③ Xacro 展开件复检（步骤 ② 的产物，两条命令即闭环）
+$ xacro $(ros2 pkg prefix car1_gazebo)/share/car1_gazebo/urdf/car1.gazebo.xacro \
+    > /tmp/car1_expanded.urdf
+$ check_urdf /tmp/car1_expanded.urdf
+# 同样三行通过 = 展开产物是合法标准 URDF（宏语法无误、include 拼接成功）
+RViz2 RobotModel 调试开关
+Visual Enabled
+看外观渲染、
+Collision Enabled
+看橙色碰撞线框、
+Alpha
+调透明度透视内部、同时开
+TF Display
+显示每根坐标轴（红绿蓝→XYZ），验证 origin 偏移是否指对方向。
+URDF Doctor 症状诊断
+URDF Doctor — 看到症状，定位 XML 病灶
+选择症状
+check_urdf 报 "Error parsing XML"
+Rviz2 报 "No transform from [wheel_lf_link] to [base_link]"
+拖滑块，轮子纹丝不动
+Gazebo 里模型起飞/爆炸
+Rviz2 一片黑，什么都不显示
+Visual 与 Collision 线框明显错位
+诊断处方
+开始诊断
+📸 关键操作与现象截图（3 图）
+① Fixed Frame 设为 base_link → Add 添加 RobotModel 显示面板
+② Description Source 选 Topic、话题 /robot_description → 场景出现小车
+③ 拖动 Joint State Publisher 的 wheel_joint 滑块 → 轮子实时转动
+05
+注意事项与避坑清单
+origin 求值顺序
+：先 rpy 旋转、再 xyz 平移——顺序颠倒视觉全变；开 TF Display 查坐标轴方向。
+惯性矩阵对称正定
+：ixx/iyy/izz>0 且满足三角不等式，非法值 = Gazebo 爆炸；初学 1e-3 占位。
+joint 类型不可混
+：轮子 continuous（无限转）、肘关节 revolute + limit；给轮子设 revolute 会限死角度。
+Xacro 声明命名空间
+：xmlns:xacro 缺失则所有宏标签失效。
+Fixed Frame 用根 link
+：必须是 URDF 中真实存在的 link 名（car1 用 base_footprint，通用写法 base_link），否则 RobotModel 拒绝渲染。
+路径用包索引
+：get_package_share_directory() 取路径，绝不要硬编码 src/ 下的绝对路径。
+三种验证手段分工
+：check_urdf 查语法结构、urdf_to_graphiz 查拓扑外观、RViz 查几何与坐标。
+工具
+作用
+命令
+check_urdf
+语法+结构验证
+check_urdf model.urdf
+urdf_to_graphiz
+生成链接拓扑图 PDF
+urdf_to_graphiz model.urdf
+Rviz2 RobotModel
+外观/碰撞可视化
+Visual / Collision Enabled 开关
+Rviz2 TF Display
+验证各坐标系位置
+观察 RGB 轴箭头方向
+xacro
+宏展开与表达式求值
+xacro model.xacro > out.urdf
+06
+本课总结与验证题
+概念
+URDF = 数字孪生的唯一入口
+XML 描述几何结构、运动学约束与动力学参数，Rviz2/Gazebo/TF2/运动规划共享同一模型源。
+结构
+link 三属性 × joint 六类型
+visual/collision/inertial 按用途分离，各场景只声明所需；fixed/revolute/continuous/prismatic 按自由度选型，两种 origin 语义严格区分。
+协作
+两发布者数据流
+joint_state_publisher 给关节角，robot_state_publisher 用 URDF 解算 TF，Rviz2 依据 Fixed Frame 绘制——状态与模型解耦。
+进阶
+Xacro：宏、变量与 include
+macro 模板复用、property/${} 收编尺寸与算式、include 把现有 URDF 拼进总装——展开即标准 URDF，与纯 URDF 双向兼容（见 03 节两案例、04 节两段加载代码）。
+验证题（改动型 · 每题先自己作答，再展开核对）
+1（目标①·改结构）
+把 base_link 的
+<collision>
+整段删掉、其余不动：RViz2 与 Gazebo 里的表现分别如何？由此说明三属性为何必须分离。
+参考答案与得分点
+得分点：①RViz2 外观完全正常（只消费 visual）②Gazebo 中底盘无碰撞体——穿地、与他物互穿 ③分离是为了解耦三种消费方：渲染吃数万三角形、碰撞要实时求交、动力学要真实惯性——独立声明各取所需。（①②各 30%，③ 40%）
+2（目标②·改类型）
+把
+wheel_lf_joint
+的
+type="continuous"
+改成
+"fixed"
+，拖 joint_state_publisher_gui 滑块会看到什么？用哪一步能最快定位到这个改动？
+参考答案与得分点
+得分点：①左前轮纹丝不动（fixed 零自由度焊死），其余三轮照常转——四轮不对称 ②URDF Doctor"拖滑块轮子不动"处方：先查 joint type ③不可与 revolute 混：轮子要一直转（continuous 无 limit）；revolute 有限转必带 limit lower/upper。（①②各 40%，③ 20%）
+3（目标②·改语法）
+删掉根标签上的
+xmlns:xacro="http://ros.org/wiki/xacro"
+，再运行
+xacro …/car1_gazebo/urdf/car1.gazebo.xacro
+，会发生什么？展开产物还能过 check_urdf 吗？
+参考答案与得分点
+得分点：①所有 <xacro:…> 标签不被识别——unknown macro 报错，或原样泄漏进输出 ②${} 不求值、宏不展开，产物不是合法 URDF，check_urdf 解析失败 ③修法：robot 根标签补回 xmlns 声明，且宏定义先于调用、同在 <robot> 内。（①②各 40%，③ 20%）
+4（目标③·改参数）
+car1.urdf 四个轮关节的 origin 把轮距 ±0.106 全部写死；要改成 ±0.13——手写四处逐一改 vs 轮关节由一个宏生成（03 节案例 A 的写法）只改一处推导式，两种做法的结果差异在哪？
+参考答案与得分点
+得分点：①手写方案：四处 origin 逐一手改，漏一处即左右轮距不一致，整车跑偏难查 ②宏方案：轮距收进 ${} 推导量，改一处四个轮关节全部联动 ③参数化的工程收益 = 改尺寸零遗漏、diff 屏蔽噪声。（①②各 40%，③ 20%）
+5（目标④·迁移改真机）
+为 B2 真机建模：轮半径实测 0.06、轮距 0.30，且要进 Gazebo 仿真——惯性还能用 1e-3 占位吗？列出必须同步改的内容。
+参考答案与得分点
+得分点：①不能——1e-3 只是正定占位，进 Gazebo 后惯性与真实质量分布不符，动力学失真（打滑、倾覆异常）②几何联动：wheel_radius、chassis_width（Xacro 下派生量自动更新；手写还要连 origin xyz 一起改）③惯性按圆柱/长方体公式带实测尺寸与质量重算，复核对称正定 ④验证链不变：xacro 展开 → check_urdf → RViz 目测轮距贴合。（②③各 35%，①④各 15%）
+CORE-01 · 机器人 ROS2 应用与开发 · EXP-20 URDF 与 Xacro 机器人建模
+4 学时 · 设计性 · 基于 ros_practice 实验讲义改编

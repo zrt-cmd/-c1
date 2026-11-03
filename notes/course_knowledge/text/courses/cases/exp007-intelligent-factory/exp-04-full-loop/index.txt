@@ -1,0 +1,22 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/cases/exp007-intelligent-factory/exp-04-full-loop/index.html
+TITLE: EXP-04 综合闭环实战 · 建设中 · EXP007
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+EXP-04 综合闭环实战 · 建设中 · EXP007
+具身智能课程 · 科普教程
+EXP007
+/
+实验 04 综合闭环实战
+EXPERIMENT · EXP-04
+🔁
+综合闭环实战
+⏳ 本实验正在建设中
+规划建设内容
+一句话任务 "去蓝色方块那里" 的解析链路
+导航、视觉、抓取、语音四条链路的状态机协同
+全链路集成与端到端验收实操
+内容就绪度
+45%
+先看：实验 01 建图与导航 →
+返回课程首页
+EXP007 · 实验 04 综合闭环实战 · 输出于 training/output

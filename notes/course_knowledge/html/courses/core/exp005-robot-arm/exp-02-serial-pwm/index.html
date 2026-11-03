@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-02 关节电机底层控制与应用 — 机器人机械臂应用与开发</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+:root{--theme:#dc2626;--theme-deep:#b91c1c;--theme-bg:#fee2e2;--theme-bd:#fecaca}
+.safe-banner{display:flex;align-items:center;gap:12px;background:#fff1f2;border:2px solid #fcafae;border-left:8px solid #dc2626;border-radius:10px;padding:12px 16px;margin:14px 0 6px;font-size:14.5px;line-height:1.7}
+.safe-banner b{color:#b91c1c}
+.safe-banner a{color:#b91c1c;font-weight:700}
+.frame-embed{border:1px solid var(--theme-bd);border-radius:10px;overflow:hidden;background:#fff;margin:12px 0}
+.frame-embed iframe{display:block;width:100%;border:0}
+.embed-cap{font-size:12.5px;color:#64748b;padding:7px 12px;background:#f8fafc;border-top:1px solid var(--edge,#e2e8f0);line-height:1.6}
+.goal-rows li{margin-bottom:4px}
+.kcard iframe{display:block;width:100%;border:0;background:transparent;margin-top:8px}
+.kgrid4{grid-template-columns:1fr}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit" title="返回课程首页">🤖 具身智能课程 · <i>教程首页</i></a>
+  <div class="crumb"><a href="../../../index.html#core">核心课程</a> / <a href="../index.html">机械臂应用与开发</a> / EXP-02</div>
+</div>
+
+<div class="wrap">
+<aside class="side">
+  <h4>本页目录</h4>
+  <a href="#s1" class="now">01 问题引入：关节是怎么动起来的</a>
+  <a href="#s2">02 舵机原理：一整套伺服系统</a>
+  <a href="#s3">03 舵机控制协议</a>
+  <a href="#s4">04 实操安全须知与环境准备</a>
+  <a href="#s5">05 实操全景：test_servo_direct</a>
+  <a href="#s6">06 功能①：打开串口发第一条指令</a>
+  <a href="#s7">07 功能②：interactive_mode 控关节</a>
+  <a href="#s8">08 功能③：录制动作交棒 EXP-05</a>
+  <a href="#s9">09 重点与易错点</a>
+  <a href="#s10">10 验收与总结</a>
+  <h4>本课程实验</h4>
+  <a href="../exp-01-urdf-simulation/index.html">EXP-01 URDF 模型与仿真控制</a>
+  <a href="../exp-02-serial-pwm/index.html" class="now">EXP-02 关节电机底层控制与应用</a>
+  <a href="../exp-03-kinematics/index.html">EXP-03 正运动学基础</a>
+  <a href="../exp-04-ik-solver/index.html">EXP-04 逆运动学基础与 IK 解算</a>
+  <a href="../exp-05-action-replay/index.html">EXP-05 ROS2 架构与动作回放</a>
+  <a href="../exp-06-fixed-grasp/index.html">EXP-06 逆运动学固定抓取</a>
+  <a href="../exp-07-visual-grasp/index.html">EXP-07 视觉动态抓取</a>
+</aside>
+<main class="content">
+
+<div class="exp-head">
+  <span class="code">EXP-02 · 第 2 章 · 验证性 · 4 学时</span>
+  <h1>关节电机底层控制与应用</h1>
+  <p class="desc">本章<b>不启动 ROS2 节点</b>。学习目标：<b>机械臂的关节原理是什么、关节如何转动起来、又如何被控制</b>。<br>注：机械臂关节设备的节点名称两平台不同——实验箱 <code>/dev/stm32</code>、小车 <code>/dev/car1_stm32</code>。</p>
+  <div class="meta">
+    <span class="tag hl">难度 ⭐⭐ · 4 学时 · 验证性</span>
+    <span class="tag">1Mbps 8N1</span>
+    <span class="tag">CRC8 查表</span>
+    <span class="tag">PWM 500~2500μs</span>
+    <span class="tag">interactive_mode</span>
+  </div>
+</div>
+
+<div class="safe-banner" id="safety">
+  <span style="font-size:20px">⚠️</span>
+  <div><b>机械臂通电后会自主、有力地运动。</b>在 04 节完成三条铁律打卡前，先不要给真实舵机上电发指令。详见 <a href="#s4">04 实操安全须知</a>。</div>
+</div>
+
+<!-- 01 -->
+<section class="blk" id="s1">
+  <h2><span class="no">01</span>问题引入：关节是怎么动起来的</h2>
+  <p>上一节提到了机械臂的 <b>joint（关节）</b>：它是<b>连杆的连接处</b>，是一个可以旋转的关节；而这个关节实际上是一台<b>可以旋转的电机</b>（也就是我们实验里真正用的<b>舵机</b>），带着连杆一起转动。<b>关节怎么动的、为什么能动、怎么控制它按照要求运动</b>，正是本章要解释的原理和应用的基础。为了解释这一系列问题，我们先从下面的流程图里查看关节被控制运动的完整流程，然后打开关节的黑盒，看看它的内部世界是如何运转的。</p>
+  <p>仿真里模型会动，是因为渲染软件收到了角度。真机上没人"渲染"，每一微秒的转角都是电机真实出的力。下图把两条链画在一起：上排是你已经会的仿真链，中间泳道那个<b>问号</b>，就是本章要拆开的黑盒。</p>
+  <div class="frame-embed">
+    <iframe src="_build/s1-joint-chain.html" title="关节控制链框架图" height="620"></iframe>
+    <div class="embed-cap">图 2-1｜从拖动 GUI 到舵机转动的完整链路（可缩放/搜索；紫虚线是回程：0x08 状态帧读回）</div>
+  </div>
+  <p><b>本实验要拿到的六样东西：</b></p>
+  <ul class="check goal-rows">
+    <li>能默写帧结构 <code>0xAA 0x55 + func + len + data + CRC8</code>，并解释每一段的作用</li>
+    <li>完成串口权限授权，验证 /dev/stm32（小车 /dev/car1_stm32）可读写</li>
+    <li>运行 <code>python3 test_servo_direct.py</code>，用 interactive_mode 控制 5 关节 + 夹爪</li>
+    <li>用 <code>s 1 1520</code> 单点微调、<code>work</code> 一键回工作位 [1500,1100,2200,1850,1500]</li>
+    <li>录制 pre_grasp → gripper_open → grasp_down → gripper_close → lift → back_work 六步动作，导出 <code>pick_and_place.yaml</code> 并 colcon build 安装</li>
+    <li>用 cutecom 抓一条真实帧，逐字节对照协议结构</li>
+  </ul>
+</section>
+
+<!-- 02 -->
+<section class="blk" id="s2">
+  <h2><span class="no">02</span>舵机原理：一整套伺服系统</h2>
+  <p>给舵机发一个数，过一会儿关节就停在对应角度；用手去掰，它还会顶回来（除非先释放力矩）。一个数就能换来"听话又倔强"的动作，它内部是怎么做到的？</p>
+  <p>拆开一台舵机，里面是四件套，各干一件事：</p>
+  <div class="kgrid kgrid4">
+    <div class="kcard"><div class="kd">四件套 · 动力</div><div class="kt">电机 Motor</div><iframe src="_build/card-motor.html" title="演示：电机只管转，不知转到哪" height="500"></iframe><p>把电能变成转速，只会"转多快"，不知道"转到哪"。</p></div>
+    <div class="kcard"><div class="kd">四件套 · 力矩</div><div class="kt">减速器 Gear</div><iframe src="_build/card-gear.html" title="演示：齿轮降速增矩" height="760"></iframe><p>齿轮组降速增矩：电机转好几圈，输出轴才转一圈，换来能抬起手臂的力矩。</p><div class="tip tealb" style="margin-top:8px"><span class="lab">🔧 先认识"力矩"（就是口语里的"劲"）</span>让东西<b>转</b>起来靠的不是力气本身，而是<b>力矩 τ = F × r</b>（力 × 力臂，单位 N·m 牛·米）。同样大的力气 F，<b>力臂 r 越长、力矩越大</b>——拧螺丝时短扳手拧不动，套根长管就拧动了：不是力气变大，是力臂变长、力矩变大。舵机要抬起手臂，输出轴给的就是力矩。所以下面公式里的 <b>T</b>，指的都是力矩。</div><div class="tip tealb" style="margin-top:8px"><span class="lab">📐 齿轮公式（四步推导）</span>每步都是三件套：<b>字母公式 → 代入数字 → 结果</b>，数字全部带单位；符号与单位对照见上面齿轮卡片底部的图注。<br><b>① 先数牙：i = z₂ ÷ z₁ = 40 颗 ÷ 16 颗 = 2.5</b>。两轮啮合处过牙速度必须一样，大轮一圈过 40 颗牙，小轮一圈只有 16 颗，所以小轮转 2.5 圈才配大轮 1 圈。颗÷颗，单位约掉，i 是纯倍数，只由齿数定。<br><b>② 转速：ω<sub>出</sub> = ω<sub>入</sub> ÷ i = 90 rpm ÷ 2.5 = 36 rpm</b>（rpm = 转/分钟）。电机 90 转/分，输出轴只有 36 转/分，慢下来了。<br><b>③ 前提：功率守恒，齿轮只搬功率不造功率，P<sub>入</sub> = T<sub>入</sub> × ω<sub>入</sub>，P<sub>出</sub> = T<sub>出</sub> × ω<sub>出</sub></b>。代入数字对账：1.0 N·m × 90 rpm = 2.5 N·m × 36 rpm = 90 N·m·rpm，两边始终相等（就像水管变粗流速变慢，每秒流过去的水总量不变）。<br><b>④ 结论：T<sub>出</sub> = T<sub>入</sub> × i = 1.0 N·m × 2.5 = 2.5 N·m</b>，就是把 ② 代进 ③ 解出来的。<br>一句话：转速除以 i，力矩就乘以 i，<b>降速增矩</b>四个字全在这（记住结论即可，推导不必背）。</div></div>
+    <div class="kcard"><div class="kd">四件套 · 眼睛</div><div class="kt">磁编码器 Encoder</div><iframe src="_build/card-encoder.html" title="演示：磁铁转，芯片从磁场读出角度" height="940"></iframe><p>轴尾巴上装块磁铁，跟着轴一起转；静止的芯片像枚指南针，读出磁场方向、换算出角度——舵机"知道自己在哪"全靠它。</p></div>
+    <div class="kcard"><div class="kd">四件套 · 大脑</div><div class="kt">驱动板 Driver</div><iframe src="_build/card-driver.html" title="演示：目标减实际，误差驱电机" height="900"></iframe><p>收到目标（脉宽），减去编码器读数得误差，再调电机电流把误差往零推——闭环的大脑。</p></div>
+  </div>
+  <p>串起来就一个回路：目标 − 现状 = 误差 → 电机朝误差变小的方向转 → 误差归零就停。这叫<b>闭环控制</b>，"伺服（Servo）"这个词指的就是这种自动纠偏。拿空调打比方：你设 26℃ 是目标，室温计读数是现状，温差让压缩机启停。像的部分是"设定值对测量值、误差驱执行"；不像的部分是空调量温度、舵机量角度，而且舵机的"室温计"是芯片从磁场里实时解出的角度，0.1° 的偏差它都看得见。</p>
+  <p>四件套拼在一起，才是那颗"听话又倔强"的舵机。上面四个卡片是一块块拆开看，下面的 3D 实验室把它们<b>装回同一台真舵机</b>——先看它们怎么协同转起来，再学怎么指挥它。</p>
+  <p>那"目标"从哪来？舵机只认一种表达：<b>脉宽</b>。高电平持续 1500μs 表示"立正"（中位），500~2500μs 是安全窗，脉冲越宽转得越远。脉宽和角度的换算只有一条公式，记住结论即可，推导不必背：</p>
+  <div class="tip tealb"><span class="lab">🔍 换算公式</span><code>弧度 = (PWM − 1500) × 0.002356</code>（CENTER_PWM=1500，PWM_TO_RAD=0.002356）。EXP-05 起 ROS2 发弧度，底层发 μs，两侧永远由这条公式对账。</div>
+  <p><b>观察任务（打开即有默认演示值 1500μs）：</b>① 拖 PWM 滑杆，盯住右上读数区——蓝线反馈总是追着红线目标，两条线的差就是误差；② 点"越界 3000"试试安全窗外会发生什么，再点"复位"回到中位；③ 点四个部件卡，3D 里对应零件会亮，对照左侧一句话说明。</p>
+  <div class="frame-embed">
+    <iframe src="../../../../assets/modules/servo-lab/servo-lab.html?mode=lab" title="舵机实验室：原理模式" height="660"></iframe>
+    <div class="embed-cap">互动 2-1｜舵机实验室 · 原理模式：四件套的 3D 合体总结——剖面 + 脉宽闭环 + 目标/反馈曲线（鼠标可旋转缩放；mode=lab）</div>
+  </div>
+  <p><b>你刚才证明了：</b>PWM 只是目标位置的"一句话表达"，真正的转角是编码器一直盯着、误差一点点磨出来的。</p>
+  <p>还有一个问题没解决：机械臂上 6 颗舵机，总不能给每颗单独拉一根信号线。我们的舵机是<b>总线舵机</b>：多颗共享一条串口线，脉宽这个数要装进"信封"、写上收件人编号才发得出去。这就是下一节的协议。</p>
+</section>
+
+<!-- 03 -->
+<section class="blk" id="s3">
+  <h2><span class="no">03</span>舵机控制协议</h2>
+  <p>先把上一节的四件套合起来看：电机 + 减速器 + 磁编码器 + 驱动板，四样拼齐，才是一颗能自己纠偏的"伺服舵机"。要是每做一个关节，都得自己绕电机绕组、切减速齿轮、焊驱动板、再写一套闭环固件，那机械臂 6 个关节就是 6 倍的重复工作——又难又不划算。</p>
+  <p>好在市面上有<b>现成的舵机</b>：它已经把四件套全部装进了同一个小盒子里，出厂就是一套<b>完整的伺服系统</b>。我们不用拆开它、也不必碰它内部，只要学会用它对外的<b>接口</b>说话就行。</p>
+  <p>我们这套设备给舵机留的接口是<b>串口</b>，说话的内容叫<b>协议</b>：不碰电机和电路，只发几条约定好的字节指令，就能让舵机转到指定位置、或回报它现在的状态。下面要学的，就是这门"语言的语法"。</p>
+  <svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="伺服舵机内部四件套与串口控制架构图" style="max-width:100%;display:block;margin:14px auto">
+    <defs>
+      <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#64748b"/></marker>
+      <marker id="arrBack" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#7c3aed"/></marker>
+      <marker id="arrSer" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#059669"/></marker>
+      <marker id="arrSerR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#059669"/></marker>
+    </defs>
+    <g font-family="Microsoft YaHei,Noto Sans CJK SC,sans-serif">
+      <!-- 伺服舵机虚线框 -->
+      <rect x="20" y="18" width="500" height="264" rx="14" fill="#ffffff" stroke="#0f766e" stroke-width="2" stroke-dasharray="8 5"/>
+      <text x="270" y="40" text-anchor="middle" font-size="13" font-weight="800" fill="#0f766e">伺服舵机（黑盒 · 四件套都在里面）</text>
+
+      <!-- 驱动板（含 PID） -->
+      <rect x="40" y="56" width="180" height="58" rx="8" fill="#ecfdf5" stroke="#059669" stroke-width="1.5"/>
+      <text x="130" y="79" text-anchor="middle" font-size="12" font-weight="800" fill="#047857">驱动板 Driver（大脑）</text>
+      <text x="130" y="97" text-anchor="middle" font-size="10" fill="#065f46">目标−实际=误差 → PID → 电流</text>
+
+      <!-- 电机 -->
+      <rect x="60" y="150" width="100" height="56" rx="8" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
+      <text x="110" y="183" text-anchor="middle" font-size="12" font-weight="700" fill="#1d4ed8">电机 Motor</text>
+
+      <!-- 减速器 -->
+      <rect x="200" y="150" width="100" height="56" rx="8" fill="#fff7ed" stroke="#d97706" stroke-width="1.5"/>
+      <text x="250" y="183" text-anchor="middle" font-size="12" font-weight="700" fill="#b45309">减速器 Gear</text>
+
+      <!-- 输出轴 -->
+      <rect x="340" y="150" width="110" height="56" rx="8" fill="#fef2f2" stroke="#dc2626" stroke-width="1.5"/>
+      <text x="395" y="183" text-anchor="middle" font-size="12" font-weight="700" fill="#b91c1c">输出轴 摇臂</text>
+
+      <!-- 磁编码器 -->
+      <rect x="200" y="226" width="150" height="48" rx="8" fill="#f0f9ff" stroke="#0284c7" stroke-width="1.5"/>
+      <text x="275" y="248" text-anchor="middle" font-size="12" font-weight="700" fill="#0369a1">磁编码器 Encoder</text>
+      <text x="275" y="264" text-anchor="middle" font-size="9.5" fill="#64748b">（读出角度，反馈）</text>
+
+      <!-- 连线 -->
+      <line x1="130" y1="114" x2="116" y2="150" stroke="#64748b" stroke-width="1.6" marker-end="url(#arr)"/>
+      <text x="150" y="128" font-size="9.5" fill="#64748b">电流</text>
+      <line x1="160" y1="178" x2="198" y2="178" stroke="#64748b" stroke-width="1.6" marker-end="url(#arr)"/>
+      <line x1="300" y1="178" x2="338" y2="178" stroke="#64748b" stroke-width="1.6" marker-end="url(#arr)"/>
+      <line x1="395" y1="206" x2="290" y2="224" stroke="#64748b" stroke-width="1.6" marker-end="url(#arr)"/>
+      <!-- 反馈线 -->
+      <path d="M200,250 L28,250 L28,85 L38,85" fill="none" stroke="#7c3aed" stroke-width="1.6" stroke-dasharray="6 4" marker-end="url(#arrBack)"/>
+      <text x="40" y="244" font-size="9.5" fill="#7c3aed">反馈角度</text>
+
+      <!-- 串口线 -->
+      <line x1="520" y1="130" x2="598" y2="130" stroke="#059669" stroke-width="2.2" marker-start="url(#arrSerR)" marker-end="url(#arrSer)"/>
+      <text x="559" y="118" text-anchor="middle" font-size="10" fill="#047857" font-weight="700">串口</text>
+      <text x="559" y="152" text-anchor="middle" font-size="9.5" fill="#64748b">TX / RX</text>
+
+      <!-- 下位机主板 -->
+      <rect x="600" y="80" width="150" height="100" rx="8" fill="#f8fafc" stroke="#334155" stroke-width="1.5"/>
+      <text x="675" y="112" text-anchor="middle" font-size="12" font-weight="800" fill="#0f172a">下位机主板</text>
+      <text x="675" y="132" text-anchor="middle" font-size="10.5" fill="#475569">STM32 / RK3576</text>
+      <text x="675" y="152" text-anchor="middle" font-size="9.5" fill="#64748b">（跑固件，收发串口）</text>
+    </g>
+  </svg>
+  <div class="embed-cap" style="border:1px solid #e2e8f0;border-radius:8px;margin-top:-4px">图 3-1｜舵机 = 封装好的伺服系统：四件套 + PID 闭环都关在虚线框里，我们只从外面接一根串口线，用协议跟它对话（主板发指令、舵机回状态）。</div>
+  <p>一条线上挂 6 颗舵机，谁该动、动多少、怎么防止听错和收错？发帧用挂号信那一套：先验信封，再拆正文，章不对整封退回。跟挂号信不一样的地方在于，这封"信"比真信多一个字段——信的类别（功能码），下指令和查状态是两种信。</p>
+  <p>一帧的完整结构（本课程全系列通用）：</p>
+  <table>
+    <thead><tr><th>字段</th><th>取值/含义</th><th>挂号信里的对应物</th></tr></thead>
+    <tbody>
+      <tr><td>帧头</td><td><code>0xAA 0x55</code>，固定两字节</td><td>信封暗印，见到它才开始拆信</td></tr>
+      <tr><td>功能码 func</td><td><code>0x05</code> 总线舵机指令（正文带子命令）</td><td>信的类别：下指令、问状态、还是写配置</td></tr>
+      <tr><td>长度 len + 数据段</td><td>子命令 + 舵机 ID + PWM 值，如 <code>[0x01, 时长, 数量, id, pwm…]</code></td><td>信的正文：几号舵机、转到几 μs</td></tr>
+      <tr><td>CRC8</td><td>从 func 一直盖到 data 的 256 字节查表 <code>_CRC8_TABLE</code>，与 board_sdk.py 一致</td><td>骑缝章，错一字节即整帧拒收</td></tr>
+    </tbody>
+  </table>
+  <p>正文里的子命令（脚本 <code>test_servo_direct.py</code> 实际用到的全部六种）：</p>
+  <table>
+    <thead><tr><th>子命令</th><th>功能</th><th>方向</th><th>你会在哪儿用到</th></tr></thead>
+    <tbody>
+      <tr><td><code>0x01</code></td><td>写多舵机目标（带运动时长）</td><td>PC → 舵机</td><td>work / s / g 等一切"让它动"的命令</td></tr>
+      <tr><td><code>0x05</code></td><td>读单舵机位置（一问一答）</td><td>问 → 答</td><td>恢复力矩前先读当前位置</td></tr>
+      <tr><td><code>0x08</code></td><td>全舵机状态持续上报（位置/温度/电压）</td><td>下位机 → PC</td><td>read 看状态、save 录姿态的数据源</td></tr>
+      <tr><td><code>0x0B</code> / <code>0x0C</code></td><td>释放力矩（可手掰）/ 锁定力矩</td><td>PC → 舵机</td><td>free / load，摆初始姿势靠它</td></tr>
+      <tr><td><code>0x40</code> / <code>0x42</code></td><td>写入 / 读取开机模式（写 EEPROM 后舵机重启）</td><td>PC → 舵机</td><td>csm / csr 配置开机行为</td></tr>
+    </tbody>
+  </table>
+  <div class="tip tealb"><span class="lab">🔍 两个必须算一遍的数（源码可验）</span><b>① CRC8 到底盖了哪些字节？</b>看 <code>board_sdk.py</code> 与 <code>test_servo_direct.py</code> 的组包代码 <code>buf = [0xAA, 0x55, func, len] + data</code> 后跟 <code>crc8(buf[2:])</code>——<b>帧头两字节 0xAA 0x55 不参与校验</b>，校验范围是 <code>func + len + data</code>。接收端也是同样的子串重算，所以少算一段或把帧头算进去都会导致"帧永远不通过"。<br><b>② 1Mbps 到底够不够用？</b>一帧约 7 字节（帧头 2 + func 1 + len 1 + 子命令/ID/PWM 约 3 + CRC 1），5 关节 50 Hz：<code>5 × 7 × 8 bit × 50 Hz = 14000 bps</code>，仅占 1 Mbps 的 <b>1.4%</b>。就算挂 10 颗舵机、提到 100 Hz，也只有 <code>10 × 7 × 8 × 100 = 56000 bps = 5.6%</code>——所以这套总线的瓶颈从来不是带宽，而是<b>单线半双工的分时排队</b>与应答等待。</div>
+  <p><b>观察任务（互动 2-2）：</b>① 表里点"写多舵机目标"，按"发送演示帧"，看右侧 3D 输出轴跟着转，同时左下字节日志亮出 <code>AA 55 05 …</code> 和随数据变化的 CRC；② 点"0x0B 释放力矩"，用出现的手掰滑块直接掰输出轴；③ 什么都不点，盯住 0x08 缓存表自己在跳。</p>
+  <div class="frame-embed">
+    <iframe src="../../../../assets/modules/servo-lab/servo-lab.html?mode=proto" title="舵机实验室：协议模式" height="700"></iframe>
+    <div class="embed-cap">互动 2-2｜舵机实验室 · 协议模式：还是 2-1 那台 3D，右侧换成协议面板——左表点接口 → 3D 同步执行 + 实时字节帧对照（mode=proto）</div>
+  </div>
+  <p><b>你刚才证明了：</b>去程帧里装的就是脉宽这个数加上收件人 ID；回程 0x08 是下位机白送的状态播报，save 不发问就有数据，靠的是它。</p>
+</section>
+
+<!-- 04 -->
+<section class="blk" id="s4">
+  <h2><span class="no">04</span>实操安全须知与环境准备</h2>
+  <p>接下来三节要动真家伙。机械臂关节是带力矩的舵机，指令错了它不会自己知道错，只会执行到位或顶到限位为止。三条铁律，动手前逐条过：</p>
+  <ul class="check">
+    <li><b>上电前：</b>机械臂展开摆到安全姿态，Workspace 里没有障碍物和手指；先确认知道急停/断电开关在哪，再合电。</li>
+    <li><b>运行中：</b>第一次发指令只发近中位值（如 <code>s 1 1520</code>）或直接 <code>work</code> 回工作位，禁止一上来就大角度横甩。</li>
+    <li><b>异常时：</b>出现异响、抖动、顶死，立刻 Ctrl+C 退出脚本并断电；按"线与权限 → 波特率与帧 → 上层逻辑"的顺序查（排障路径见 09 节）。</li>
+  </ul>
+  <p>能向同伴口头复述这三条，再往下走。环境侧三件事，缺一不可：</p>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">硬件连接</div><div class="kt">USB 转 TTL → /dev/stm32</div><p>1Mbps 8N1；设备名按平台：实验箱 <code>/dev/stm32</code>，小车 <code>/dev/car1_stm32</code>（udev 规则建的固定软链）。CH340/CP2102/FT232 都行。</p></div>
+    <div class="kcard"><div class="kd">权限授权</div><div class="kt">临时或永久二选一</div><p>临时：<code>sudo chmod 666 /dev/stm32</code>（小车换 /dev/car1_stm32）；永久：<code>sudo usermod -a -G dialout $USER</code> 后重新登录。</p></div>
+    <div class="kcard"><div class="kd">清场动作</div><div class="kt">cleanup_ros.sh 先行</div><p><code>test_servo_direct.py</code> 直接占用 /dev/stm32，与 bringup 的 base_driver 节点互斥——运行脚本前先停掉所有 ROS 节点，否则典型症状是 Permission denied 或应答乱码。</p></div>
+  </div>
+  <pre><span class="c"># ① 清理占用串口的应用（本实验全程不启动 bringup！）</span>
+<span class="g">bash</span> cleanup_ros.sh
+
+<span class="c"># ② 确认设备与权限</span>
+<span class="g">ls</span> -l /dev/stm32        <span class="c"># 小车换成 /dev/car1_stm32</span>
+<span class="c"># 预期：软链存在且可读写；打不开 → sudo chmod 666 /dev/stm32</span>
+<span class="g">dmesg</span> | grep tty     <span class="c"># 找不到设备时看内核插入日志</span></pre>
+</section>
+
+<!-- 05 -->
+<section class="blk" id="s5">
+  <h2><span class="no">05</span>实操全景：test_servo_direct.py</h2>
+  <p>动手前先见森林。这个脚本干的事可以一句话说完：<b>打开串口，拉起一个后台收线程，然后给你一个敲命令的菜单</b>。下图四个泳道对应四件事，主路径从左到右就是程序的一生。</p>
+  <div class="frame-embed">
+    <iframe src="_build/s5-panorama.html" title="test_servo_direct.py 实操全景图" height="640"></iframe>
+    <div class="embed-cap">图 2-2｜test_servo_direct.py 实操全景：主线程 / 串口线 / 后台线程 / 功能区</div>
+  </div>
+  <p><b>读图任务：</b>① 沿主路径从"打开 /dev/stm32"走到"yaml 导出"，每个格子念一遍它干啥；② 重点看中间两格的反向关系：你敲命令是下行，0x08 状态是上行，<b>两条路同时在一条串口线上跑</b>；③ 右下三张卡片回答了本节最常被问的两个问题——save 的数据哪来的、动作怎么才能不丢。</p>
+  <p>接下来三节把主路径按由易到难拆成三步走：先打开（06），再聊起来（07），最后录成果（08）。</p>
+  <p><b>一句话复述：</b>这个脚本 = 一个开串口的主线程 + 一个永远在收帧的后台线程 + 一个你敲命令的菜单。</p>
+</section>
+
+<!-- 06 -->
+<section class="blk" id="s6">
+  <h2><span class="no">06</span>功能①：打开串口，发出第一条指令</h2>
+  <p>先走通最小的一条往返：程序打开 /dev/stm32，发一帧，舵机动一下。</p>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>清场 + 授权：<code>bash cleanup_ros.sh</code>，再按 04 节确认 /dev/stm32 可读写</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>启动裸机调试：<code>python3 test_servo_direct.py</code>，出现选择模式提示即进入</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>输入 <code>1</code> 进入交互模式，先发 <code>work</code> 让 5 关节回工作位——这是你的第一条真实指令</div>
+  </div>
+  <pre><span class="c"># 启动与判定</span>
+<span class="g">python3</span> test_servo_direct.py
+<span class="c"># 成功标志：打印 打开串口 /dev/stm32 @ 1000000... 后出现 串口已打开</span>
+<span class="c"># 失败会提示三种可能：bringup 没停 / 设备不存在 / 权限不够（对照 04 节逐条排除）</span>
+
+<span class="c"># 可选：串口助手抓一条真帧逐字节看（观察任务）</span>
+<span class="g">cutecom</span> --device /dev/stm32 --baud 1000000
+<span class="c"># 看点：发 work 时应出现 AA 55 开头的一串字节；1Mbps 下字节会瞬间刷过，</span>
+<span class="c"># 抓完暂停再翻，对照 03 节数字段</span></pre>
+  <div class="tip amber"><span class="lab">⚠️ 半双工提醒</span>单线半双工：同一时刻只有一方讲话。发完一帧给舵机留应答时间（脚本 timeout=1），别像机关枪一样连发。</div>
+  <p><b>判定成功：</b>日志出现 <span class="ok">/dev/stm32 @ 1000000</span> 且无 Permission denied；<code>work</code> 后 5 关节与夹爪同步摆到工作位姿态。<b>你刚才证明了：</b>不启动任何 ROS2 节点，一段 Python 也能直接跟舵机对话。</p>
+</section>
+
+<!-- 07 -->
+<section class="blk" id="s7">
+  <h2><span class="no">07</span>功能②：interactive_mode 让关节听指挥</h2>
+  <p>进到交互菜单后，常用命令就下面这些。规律很明显：<b>每条命令最后都变成同一类帧，只有 data 段的 ID 和脉宽在换</b>（对照 03 节子命令表）。</p>
+  <table>
+    <thead><tr><th>命令</th><th>做什么</th><th>判读要点</th></tr></thead>
+    <tbody>
+      <tr><td><code>work</code></td><td>5 关节齐回工作位 [1500,1100,2200,1850,1500]</td><td>换算成弧度约 [0, −0.943, 1.65, 0.825, 0]，与 EXP-05 的 /joint_command 预置值对账</td></tr>
+      <tr><td><code>home</code></td><td>6 路全回 1500 中位</td><td>最安全的姿态，异常恢复先打它</td></tr>
+      <tr><td><code>s 1 1520</code></td><td>单颗舵机微调（ID 1 → 1520μs）</td><td>只有 1 号动 = ID 寻址正确</td></tr>
+      <tr><td><code>g 1000</code> / <code>g 2000</code></td><td>夹爪张开 / 全闭</td><td>裸机自定值；ROS2 侧的规范口径是 <b>开 800 / 闭 1500</b>（避开 ±135° 硬限位，EXP-05 沿用），别把两套数混着记</td></tr>
+      <tr><td><code>1500 1100 2200 1850 1500</code></td><td>五个数连打 = 5 关节一次到位</td><td>与 work 本质相同，数值自定</td></tr>
+      <tr><td><code>read</code></td><td>打印 0x08 上报的全部状态</td><td>PWM / 温度 / 电压一目了然</td></tr>
+      <tr><td><code>free</code> / <code>load</code></td><td>释放力矩（可手掰）/ 恢复锁死</td><td>摆初始姿势用 free，摆完记得 load</td></tr>
+    </tbody>
+  </table>
+  <pre><span class="c"># 安全流程：先回家，再微调</span>
+<span class="g">work</span>            <span class="c"># 第一条永远是它：回到已知安全位</span>
+<span class="g">s 1 1520</span>        <span class="c"># 1 号舵机中位+20μs，微调神器（换算 ≈ +0.0471 rad）</span>
+<span class="g">g 800</span>           <span class="c"># 张开夹爪；g 1500 全闭（与 EXP-05 的 servo 口径一致）</span>
+<span class="g">free</span>            <span class="c"># 手掰摆位；load 锁回去</span></pre>
+  <div class="tip tealb"><span class="lab">🔍 安全窗对账</span>任何手打的脉宽先心算：落在 500~2500 才准发；1520 这类近中位值永远是试手首选。03 节互动面板里点"越界 3000"看到的报警，就是实机同样的值会引发的后果。</div>
+  <p><b>判定成功：</b><code>s 1 1520</code> 只动 1 号舵机；<code>free</code> 后能推动、<code>load</code> 后推不动。<b>你刚才证明了：</b>ID + 脉宽两个数，足够在一条线上精确指挥任何一颗舵机。</p>
+</section>
+
+<!-- 08 -->
+<section class="blk" id="s8">
+  <h2><span class="no">08</span>功能③：录制动作，交棒 EXP-05</h2>
+  <p>最后一步把刚才摆过的姿势存成序列，导出给下一章回放。先弄清 <code>save</code> 的数据从哪来：下位机每隔几十毫秒广播一帧 0x08 状态，后台线程收到就覆盖缓存；你按 save 那一刻，脚本只是<b>给缓存拍了张快照</b>，从头到尾没现问过舵机（03 节互动面板的 0x08 表自己在跳，就是这条通道）。</p>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>摆一个姿势 → <code>save</code> → 命名，如 pre_grasp</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>依次录满六步：pre_grasp → gripper_open → grasp_down → gripper_close → lift → back_work（夹爪步用 <code>save -g</code>）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span><code>play</code> 原地回放检查一遍序列对不对</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span><code>yaml</code> → 动作组名 pick_front → 导出 pick_and_place.yaml → colcon build 安装</div>
+  </div>
+  <pre><span class="c"># 导出与安装（YAML 默认落在包的 config/actions/ 下）</span>
+<span class="g">yaml</span>             <span class="c"># 按提示输入动作组名，如 pick_front</span>
+<span class="g">colcon</span> build --packages-select car1_arm_controller
+<span class="c"># 不 build 的后果：EXP-05 的 action_player 找不到文件</span></pre>
+  <div class="tip amber"><span class="lab">⚠️ 动作只活在内存里</span>save 存的序列<b>退出 interactive_mode 即丢</b>，唯一持久化途径是 yaml 导出；导出后必须 colcon build，install/share 才会拿到新 YAML。</div>
+  <p><b>判定成功：</b>六条 save 全部命名成功，<code>yaml</code> 导出后 install/share 下存在新文件。<b>你刚才证明了：</b>裸机录下的不过是一行行"ID: 脉宽"清单，EXP-05 的 action_player 读的就是这份清单。</p>
+</section>
+
+<!-- 09 -->
+<section class="blk" id="s9">
+  <h2><span class="no">09</span>重点与易错点</h2>
+  <div class="tip"><span class="lab">💡 本实验最大重点</span><b>安全窗 500~2500μs 是铁律</b>：超出范围轻则撞机械限位，重则堵转发热打齿轮——堵转损失不在质保范围。任何手动输入前先心算它落在哪。</div>
+  <p>出问题时按自底向上的三层查，别一上来就怀疑上层逻辑。有分支的路径画出来是这样：</p>
+  <svg viewBox="0 0 760 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="串口打不开时的排查流程图" style="max-width:100%;display:block;margin:10px auto">
+    <defs><marker id="arT" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#94a3b8"/></marker></defs>
+    <g font-family="Microsoft YaHei,Noto Sans CJK SC,sans-serif">
+      <!-- 起点 -->
+      <rect x="300" y="14" width="160" height="44" rx="8" fill="#fee2e2" stroke="#dc2626" stroke-width="1.5"/>
+      <text x="380" y="41" text-anchor="middle" font-size="13" font-weight="700" fill="#991b1b">脚本打不开串口</text>
+      <line x1="380" y1="58" x2="380" y2="82" stroke="#94a3b8" stroke-width="1.6" marker-end="url(#arT)"/>
+
+      <!-- 第一层 · 线与权限 -->
+      <rect x="30" y="86" width="700" height="142" rx="12" fill="#fffbeb" stroke="#f59e0b" stroke-width="1.2" stroke-dasharray="8 5"/>
+      <text x="46" y="110" font-size="11" font-weight="700" fill="#b45309">第一层 · 线与权限</text>
+      <rect x="56" y="124" width="190" height="72" rx="8" fill="#ffffff" stroke="#94a3b8" stroke-width="1.5"/>
+      <text x="151" y="155" text-anchor="middle" font-size="12.5" font-weight="700" fill="#1e293b">ls /dev/stm32 存在？</text>
+      <text x="151" y="174" text-anchor="middle" font-size="9.5" fill="#64748b">设备枚举检查</text>
+      <rect x="330" y="118" width="250" height="50" rx="8" fill="#f0fdf4" stroke="#16a34a" stroke-width="1.5"/>
+      <text x="455" y="140" text-anchor="middle" font-size="11.5" font-weight="700" fill="#15803d" font-family="Consolas,monospace">dmesg | grep tty</text>
+      <text x="455" y="158" text-anchor="middle" font-size="9.5" fill="#475569">设备未枚举 → 换线 / 换接口</text>
+      <rect x="330" y="172" width="250" height="50" rx="8" fill="#f0fdf4" stroke="#16a34a" stroke-width="1.5"/>
+      <text x="455" y="194" text-anchor="middle" font-size="11.5" font-weight="700" fill="#15803d" font-family="Consolas,monospace">chmod 666 / 加 dialout 组</text>
+      <text x="455" y="212" text-anchor="middle" font-size="9.5" fill="#475569">Permission denied 专药</text>
+      <line x1="246" y1="150" x2="324" y2="143" stroke="#94a3b8" stroke-width="1.6" marker-end="url(#arT)"/>
+      <text x="284" y="133" text-anchor="middle" font-size="10.5" font-weight="700" fill="#b45309">否</text>
+      <line x1="246" y1="170" x2="324" y2="197" stroke="#94a3b8" stroke-width="1.6" marker-end="url(#arT)"/>
+      <text x="284" y="194" text-anchor="middle" font-size="10.5" font-weight="700" fill="#b45309">是</text>
+      <text x="612" y="146" font-size="9.5" fill="#94a3b8">判据：ls 看得见</text>
+      <text x="612" y="162" font-size="9.5" fill="#94a3b8">却打不开 ＝ 权限问题，</text>
+      <text x="612" y="178" font-size="9.5" fill="#94a3b8">不是设备坏</text>
+
+      <!-- 层间 1 -->
+      <line x1="380" y1="228" x2="380" y2="258" stroke="#94a3b8" stroke-width="1.6" marker-end="url(#arT)"/>
+      <text x="394" y="248" font-size="10.5" fill="#64748b">设备能打开了，但应答全是乱码</text>
+
+      <!-- 第二层 · 波特率与帧 -->
+      <rect x="30" y="262" width="700" height="104" rx="12" fill="#fffbeb" stroke="#f59e0b" stroke-width="1.2" stroke-dasharray="8 5"/>
+      <text x="46" y="286" font-size="11" font-weight="700" fill="#b45309">第二层 · 波特率与帧</text>
+      <rect x="56" y="296" width="280" height="54" rx="8" fill="#f0fdf4" stroke="#16a34a" stroke-width="1.5"/>
+      <text x="196" y="318" text-anchor="middle" font-size="11.5" font-weight="700" fill="#15803d" font-family="Consolas,monospace">bash cleanup_ros.sh 停 bringup</text>
+      <text x="196" y="336" text-anchor="middle" font-size="9.5" fill="#475569">脚本与 ROS 节点抢串口 = 头号原因</text>
+      <line x1="336" y1="323" x2="394" y2="323" stroke="#94a3b8" stroke-width="1.6" marker-end="url(#arT)"/>
+      <text x="365" y="314" text-anchor="middle" font-size="9.5" fill="#64748b">再发帧</text>
+      <rect x="398" y="296" width="276" height="54" rx="8" fill="#f0fdf4" stroke="#16a34a" stroke-width="1.5"/>
+      <text x="536" y="318" text-anchor="middle" font-size="11.5" font-weight="700" fill="#15803d" font-family="Consolas,monospace">cutecom 抓一帧真实字节</text>
+      <text x="536" y="336" text-anchor="middle" font-size="9.5" fill="#475569">对照 AA 55 开头的帧结构</text>
+
+      <!-- 层间 2 -->
+      <line x1="380" y1="366" x2="380" y2="394" stroke="#94a3b8" stroke-width="1.6" marker-end="url(#arT)"/>
+      <text x="394" y="384" font-size="10.5" fill="#64748b">帧对得上，但舵机不动作</text>
+
+      <!-- 第三层 · 才轮到上层逻辑 -->
+      <rect x="30" y="398" width="700" height="104" rx="12" fill="#fffbeb" stroke="#f59e0b" stroke-width="1.2" stroke-dasharray="8 5"/>
+      <text x="46" y="422" font-size="11" font-weight="700" fill="#b45309">第三层 · 才轮到上层逻辑</text>
+      <rect x="56" y="432" width="206" height="54" rx="8" fill="#f0fdf4" stroke="#16a34a" stroke-width="1.5"/>
+      <text x="159" y="454" text-anchor="middle" font-size="11.5" font-weight="700" fill="#15803d">查舵机 ID</text>
+      <text x="159" y="472" text-anchor="middle" font-size="9.5" fill="#475569" font-family="Consolas,monospace">s 1 1520 单点试</text>
+      <rect x="277" y="432" width="206" height="54" rx="8" fill="#f0fdf4" stroke="#16a34a" stroke-width="1.5"/>
+      <text x="380" y="454" text-anchor="middle" font-size="11.5" font-weight="700" fill="#15803d">查脉宽范围</text>
+      <text x="380" y="472" text-anchor="middle" font-size="9.5" fill="#475569" font-family="Consolas,monospace">500~2500 安全窗内？</text>
+      <rect x="498" y="432" width="206" height="54" rx="8" fill="#f0fdf4" stroke="#16a34a" stroke-width="1.5"/>
+      <text x="601" y="454" text-anchor="middle" font-size="11.5" font-weight="700" fill="#15803d">查力矩开关</text>
+      <text x="601" y="472" text-anchor="middle" font-size="9.5" fill="#475569" font-family="Consolas,monospace">free 之后要 load 回来</text>
+    </g>
+  </svg>
+  <div class="embed-cap" style="border:1px solid #e2e8f0;border-radius:8px;margin-top:-4px">图 2-3｜串口打不开时的排查路径：先线与权限，再波特率与帧，最后才怀疑逻辑</div>
+  <table>
+    <thead><tr><th>⚠️ 常见坑</th><th>现象 → 解法</th></tr></thead>
+    <tbody>
+      <tr><td>Permission denied</td><td>打不开 /dev/stm32（小车 /dev/car1_stm32） → <code>sudo chmod 666 /dev/stm32</code> 或加入 dialout 组重新登录</td></tr>
+      <tr><td>找不到设备</td><td>ls 无 /dev/stm32 → <code>dmesg | grep tty</code> 看内核枚举与 udev 建链，或换线/换接口</td></tr>
+      <tr><td>串口被抢占</td><td>脚本与 bringup 同开 → 应答乱码或直接失败 → 先 <code>bash cleanup_ros.sh</code></td></tr>
+      <tr><td>PWM 越界</td><td>输入 3000μs 手臂顶死 → 严格执行 500~2500 窗口，先试 1520 这种近中位值</td></tr>
+      <tr><td>yaml 后找不到文件</td><td>action_player 报文件不存在 → 检查 install/ 是否生成，必须 colcon build 重装</td></tr>
+      <tr><td>退出后动作丢失</td><td>重开脚本 save 列表空了 → 正常现象，持久化只能靠 yaml 命令</td></tr>
+    </tbody>
+  </table>
+  <p>三层排障观就是本章的方法论：<b>线与权限（04）→ 波特率与帧（06 的 cutecom）→ 上层逻辑</b>，从便宜的查起，从贵的停手。这条思路 EXP-05 接 ROS2 之后照样用。</p>
+</section>
+
+<!-- 10 -->
+<section class="blk" id="s10">
+  <h2><span class="no">10</span>验收与总结</h2>
+  <ul class="check">
+    <li>能向同伴复述 04 节三条安全铁律（上电前 / 首指令 / 异常时）</li>
+    <li>串口打开日志显示 <span class="ok">/dev/stm32 @ 1000000</span>，无 Permission denied</li>
+    <li><code>work</code> 后 5 关节与夹爪同步到达工作位姿态</li>
+    <li><code>s 1 1520</code> 只动 1 号舵机，说明 ID 寻址正确</li>
+    <li>六条 save 全部命名成功，<code>yaml</code> 导出后 install/share 下存在新 YAML</li>
+    <li>能口头解释：为什么这条路线"不依赖 ROS2 启动任何节点"，以及它与 EXP-05 ROS2 路线的分工</li>
+  </ul>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">✅ 完成成果</div><div class="kt">裸机驱动 5 臂 1 爪</div><p>pyserial 直连总线，菜单调试、单点微调、序列录制、YAML 导出全通过。</p></div>
+    <div class="kcard"><div class="kd">🧠 原理收获</div><div class="kt">伺服闭环 + 协议三件套</div><p>目标−编码器=误差的闭环；0xAA55 定界、func/len/data 载荷、CRC8 查表；PWM↔弧度一条公式打通软硬。</p></div>
+    <div class="kcard"><div class="kd">🛠 技能收获</div><div class="kt">串口工程能力</div><p>权限授权、设备排查（dmesg）、串口互斥清场（cleanup_ros.sh）、cutecom 抓帧。</p></div>
+    <div class="kcard"><div class="kd">❓ 排障思路</div><div class="kt">自底向上三层</div><p>线与权限 → 波特率与帧 → 才轮到上层逻辑。</p></div>
+  </div>
+  <div class="tip violet"><span class="lab">📝 思考题 1</span>五个关节 50Hz 持续刷新只用掉约 1.4% 的 1Mbps 带宽——如果总线上挂 10 个舵机并把频率提到 100Hz，带宽还够吗？请估算，并说明超出带宽会先出现什么症状。（提示：单帧约 7 字节）</div>
+  <div class="tip violet"><span class="lab">📝 思考题 2</span>CRC8 能发现"传输错字节"，却拦不住"命令本身写错"——比如你把 1520 误敲成 15200（越界值）。协议层和应用层各应该加什么防线？对照本页安全红线与下一章的限位表回答。</div>
+  <div class="tip tealb"><span class="lab">🔍 下一节的钩子</span>EXP-05 把同一条链路搬进 ROS2：话题和控制器在上层接管"决定发什么"，底层还是本章这套帧和脉宽——你手里那份 pick_and_place.yaml，就是交接棒。</div>
+</section>
+
+<nav class="expnav">
+  <a href="../exp-01-urdf-simulation/index.html"><span class="lb">← 上一个实验</span>EXP-01 URDF 模型与仿真控制</a>
+  <a class="next" href="../exp-05-action-replay/index.html"><span class="lb">下一个实验 →</span>EXP-05 ROS2 架构与动作回放</a>
+</nav>
+
+<footer>
+  <span>CORE-05 · 机器人机械臂应用与开发 · EXP-02 关节电机底层控制与应用</span>
+  <span>4 学时 · 验证性 · 基于 arm_practice 实验讲义改编</span>
+</footer>
+
+</main>
+</div>
+
+<script src="../shared/tutorial.js" defer></script>
+</body>
+</html>

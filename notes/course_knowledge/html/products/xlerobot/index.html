@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>XLeRobot 开源双臂移动机器人 · 产品介绍</title>
+<style>
+:root{
+  --bg-base:#f8fafc;--bg-card:#fff;--bg-soft:#f1f5f9;--bg-tint:#eef4ff;
+  --border:#e2e8f0;--border-hover:#94a3b8;
+  --accent-blue:#2563eb;--accent-cyan:#0891b2;--accent-teal:#0d9488;
+  --accent-amber:#d97706;--accent-rose:#e11d48;--accent-violet:#7c3aed;
+  --text-primary:#0f172a;--text-body:#334155;--text-secondary:#64748b;--text-muted:#94a3b8;
+  --shadow-glow:0 8px 24px rgba(37,99,235,.10);
+  --font-mono:'Cascadia Code','JetBrains Mono',Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg-base);color:var(--text-body);
+  font-family:"Noto Sans CJK SC","PingFang SC","Microsoft YaHei","Segoe UI",system-ui,sans-serif;
+  background-image:
+    radial-gradient(ellipse 60% 40% at 50% -5%,rgba(37,99,235,.05),transparent),
+    radial-gradient(ellipse 50% 35% at 100% 5%,rgba(13,148,136,.04),transparent);}
+/* Topbar */
+.topbar{position:sticky;top:0;z-index:50;height:60px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 40px;background:rgba(255,255,255,.85);backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;color:var(--text-primary);font-size:15px;text-decoration:none}
+.logo .dot{width:9px;height:9px;border-radius:50%;background:var(--accent-violet);animation:pulse 2.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.top-actions{display:flex;align-items:center;gap:10px}
+.btn{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:600;text-decoration:none;
+  border-radius:9px;padding:8px 16px;transition:.28s;border:1px solid var(--border);color:var(--text-secondary);background:var(--bg-card)}
+.btn:hover{border-color:var(--border-hover);color:var(--accent-blue)}
+/* Hero */
+.hero{max-width:1080px;margin:0 auto;padding:44px 40px 6px;display:grid;grid-template-columns:1.08fr .92fr;gap:38px;align-items:center}
+.hero .eyebrow{display:inline-block;font-size:12.5px;letter-spacing:.14em;color:var(--accent-violet);
+  background:#f5f3ff;border:1px solid #ede9fe;border-radius:100px;padding:5px 14px;font-family:var(--font-mono)}
+.hero h1{margin:16px 0 12px;font-size:31px;line-height:1.28;color:var(--text-primary);font-weight:800}
+.hero h1 .grad{background:linear-gradient(90deg,var(--accent-violet),var(--accent-blue),var(--accent-cyan));
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.hero p{margin:0;font-size:15px;line-height:1.85;color:var(--text-secondary)}
+.sku{display:inline-block;margin-top:14px;font-family:var(--font-mono);font-size:12px;color:var(--accent-violet);
+  background:#f5f3ff;border:1px solid #ede9fe;border-radius:7px;padding:4px 10px}
+.hero figure{margin:0;background:var(--bg-card);border:1px solid var(--border);border-radius:16px;padding:10px;
+  box-shadow:0 1px 3px rgba(0,0,0,.05);transition:.28s;text-align:center}
+.hero figure img{width:100%;height:auto;display:block;border-radius:10px;background:var(--bg-soft)}
+.hero figure:hover{transform:translateY(-4px);box-shadow:var(--shadow-glow);border-color:var(--border-hover)}
+.hero figcaption{font-size:12px;color:var(--text-muted);text-align:center;padding-top:8px}
+/* highlight strip */
+.hl{max-width:1080px;margin:30px auto 0;padding:0 40px;display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.hl .item{background:var(--bg-card);border:1px solid var(--border);border-radius:13px;padding:16px 18px;transition:.28s}
+.hl .item:hover{transform:translateY(-3px);box-shadow:var(--shadow-glow);border-color:var(--border-hover)}
+.hl .num{font-size:26px;font-weight:800;color:var(--accent-violet);font-family:var(--font-mono)}
+.hl .num small{font-size:14px;font-weight:700}
+.hl .num.c{color:var(--accent-cyan)}.hl .num.b{color:var(--accent-blue)}.hl .num.a{color:var(--accent-amber)}
+.hl .lbl{font-size:12.5px;color:var(--text-secondary);margin-top:4px;line-height:1.6}
+/* Section */
+.section{max-width:1080px;margin:0 auto;padding:50px 40px 6px}
+.section-head{display:flex;align-items:baseline;gap:14px;margin-bottom:6px;flex-wrap:wrap}
+.section-head h2{margin:0;font-size:22px;color:var(--text-primary);display:flex;align-items:center;gap:10px}
+.section-head h2 .idx{font-family:var(--font-mono);font-size:12px;font-weight:700;color:#fff;
+  background:linear-gradient(90deg,var(--accent-violet),var(--accent-blue));border-radius:7px;padding:3px 9px}
+.section-head .sub{font-size:13.5px;color:var(--text-muted)}
+.section .desc{font-size:14px;color:var(--text-secondary);line-height:1.8;margin:8px 0 20px;max-width:900px}
+/* values */
+.vals{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.val{background:var(--bg-card);border:1px solid var(--border);border-radius:13px;padding:18px;transition:.28s;position:relative;overflow:hidden}
+.val::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;transform:scaleX(0);transform-origin:left;
+  background:linear-gradient(90deg,var(--accent-violet),var(--accent-cyan));transition:transform .35s}
+.val:hover{transform:translateY(-4px);box-shadow:var(--shadow-glow);border-color:var(--border-hover)}
+.val:hover::before{transform:scaleX(1)}
+.val .ico{font-size:22px}
+.val h4{margin:10px 0 6px;font-size:15px;color:var(--text-primary)}
+.val p{margin:0;font-size:12.5px;line-height:1.75;color:var(--text-secondary)}
+/* spec table */
+.spec{background:var(--bg-card);border:1px solid var(--border);border-radius:14px;overflow:hidden;
+  display:grid;grid-template-columns:1fr 1fr;gap:0}
+.spec .row{display:flex;justify-content:space-between;gap:14px;padding:13px 20px;font-size:13.5px;border-bottom:1px solid var(--border)}
+.spec .row:nth-child(odd){background:#fbfdff}
+.spec .k{color:var(--text-muted);flex:none}
+.spec .v{color:var(--text-primary);font-weight:600;text-align:right;font-size:12.5px;font-family:var(--font-mono)}
+/* cards 2-col */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.card{background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:22px 24px;position:relative;overflow:hidden;transition:.28s}
+.card::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;transform:scaleX(0);transform-origin:left;
+  background:linear-gradient(90deg,var(--accent-violet),var(--accent-cyan));transition:transform .35s cubic-bezier(.4,0,.2,1)}
+.card:hover{transform:translateY(-4px);box-shadow:var(--shadow-glow);border-color:var(--border-hover)}
+.card:hover::before{transform:scaleX(1)}
+.card h3{margin:0 0 8px;font-size:16.5px;color:var(--text-primary);display:flex;align-items:center;gap:9px}
+.card h3 .ico{width:30px;height:30px;border-radius:8px;flex:none;display:grid;place-items:center;font-size:15px;
+  background:#f5f3ff;border:1px solid #ede9fe}
+.card p{margin:0;font-size:13.5px;line-height:1.8;color:var(--text-secondary)}
+/* flow chain */
+.chain{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center;
+  background:var(--bg-card);border:1px solid var(--border);border-radius:13px;padding:16px 18px;margin-top:16px}
+.chain .node{font-size:12.5px;font-weight:600;color:var(--text-primary);background:var(--bg-tint);
+  border:1px solid #dbeafe;border-radius:8px;padding:7px 13px}
+.chain .arr{color:var(--accent-cyan);font-weight:700}
+/* tags */
+.tags{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.tag{font-size:12px;padding:3px 10px;border-radius:100px;background:var(--bg-soft);border:1px solid var(--border);color:var(--text-secondary)}
+.tag.violet{color:var(--accent-violet);border-color:#ede9fe;background:#f5f3ff}
+/* scenarios */
+.scenes{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.scene{background:linear-gradient(120deg,#f5f3ff,#ecfeff);border:1px solid var(--border);border-radius:13px;padding:17px 19px;transition:.28s}
+.scene:hover{transform:translateY(-3px);box-shadow:var(--shadow-glow);border-color:var(--border-hover)}
+.scene h4{margin:0 0 6px;font-size:14.5px;color:var(--text-primary)}
+.scene p{margin:0;font-size:12.5px;line-height:1.75;color:var(--text-secondary)}
+/* video 卡片 2×2 网格 */
+.vgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:24px;align-items:start}
+.vcard{margin:0 auto;background:var(--bg-card);border:1px solid var(--border);border-radius:14px;
+  padding:16px 16px 18px;transition:.28s;display:flex;flex-direction:column;max-width:400px;width:100%}
+.vcard:hover{transform:translateY(-3px);box-shadow:var(--shadow-glow);border-color:var(--border-hover)}
+.vcard .vhead{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px}
+.vcard .vtag{font-family:var(--font-mono);font-size:12px;font-weight:700;border-radius:6px;padding:4px 10px}
+.vcard .vtag.act{color:var(--accent-amber);background:#fffbeb;border:1px solid #fef3c7}
+.vcard .vtag.smol{color:var(--accent-cyan);background:#ecfeff;border:1px solid #cffafe}
+.vcard .vtag.pi{color:var(--accent-violet);background:#f5f3ff;border:1px solid #ede9fe}
+.vcard .vres{font-size:11.5px;color:var(--text-muted);font-family:var(--font-mono)}
+.vcard .vframe{border-radius:10px;overflow:hidden;background:#0f172a;border:1px solid var(--border)}
+.vcard .vframe video{display:block;width:100%;height:auto}
+.vcard figcaption{margin-top:14px;padding-top:13px;border-top:1px dashed var(--border)}
+.vcard figcaption b{display:block;font-size:14.5px;color:var(--text-primary);margin-bottom:6px}
+.vcard figcaption p{margin:0;font-size:12.5px;line-height:1.8;color:var(--text-secondary)}
+/* list */
+.list{background:var(--bg-card);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+.list .li{display:flex;justify-content:space-between;gap:14px;padding:13px 20px;font-size:13.5px;border-bottom:1px solid var(--border)}
+.list .li:last-child{border-bottom:none}
+.list .k{color:var(--text-primary);font-weight:600;flex:none}
+.list .d{color:var(--text-secondary);text-align:right;font-size:12.5px}
+/* info / notice */
+.info{background:var(--bg-card);border:1px solid var(--border);border-radius:13px;padding:16px 20px;
+  font-size:13px;line-height:1.9;color:var(--text-secondary);margin-top:16px}
+.info b{color:var(--text-primary)}
+.notice{border-color:#ede9fe;background:#f5f3ff}
+.notice b{color:var(--accent-violet)}
+/* cta */
+.cta{max-width:1080px;margin:44px auto 0;padding:0 40px;display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+footer{max-width:1080px;margin:40px auto 0;padding:24px 40px 40px;border-top:1px solid var(--border);
+  text-align:center;font-size:12.5px;color:var(--text-muted);line-height:1.9}
+.reveal{opacity:1;transform:none}
+@media (max-width:980px){
+  .hero{grid-template-columns:1fr}
+  .hl{grid-template-columns:repeat(2,1fr)}
+  .vals{grid-template-columns:repeat(2,1fr)}
+  .grid2,.spec{grid-template-columns:1fr}
+  .scenes{grid-template-columns:1fr}
+}
+@media (max-width:760px){
+  .topbar,.hero,.hl,.section,.cta,footer{padding-left:20px;padding-right:20px}
+  .hero h1{font-size:27px}
+  .hl,.vals{grid-template-columns:1fr}
+  .vgrid{grid-template-columns:1fr;gap:18px}
+  .vcard .vframe video{max-height:none}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="logo" href="../../courses/index.html"><span class="dot"></span>具身智能课程</a>
+  <div class="top-actions">
+    <a class="btn" href="../../courses/index.html">← 返回课程首页</a>
+    <a class="btn" href="#video">▶ 演示视频</a>
+  </div>
+</div>
+
+<header class="hero">
+  <div>
+    <span class="eyebrow">XLeRobot · OPEN SOURCE</span>
+    <h1>XLeRobot <span class="grad">开源双臂移动机器人</span></h1>
+    <p>一个面向家庭与教学场景的双臂移动操作平台。构建在 Hugging Face 的 LeRobot 生态之上，联合 SO-100/SO-101 机械臂与 LeKiwi 全向底盘，用约 90% 的 3D 打印件实现整机复现，总组装时间不足 4 小时。</p>
+    <span class="sku">XL + LeRobot ＝ 开源 · 可复现 · 易升级</span>
+  </div>
+  <figure>
+    <img src="./images/xlerobot-hero.jpg" alt="XLeRobot 双臂移动机器人整机实拍" width="1407" height="1055">
+    <figcaption>XLeRobot 双臂移动机器人整机</figcaption>
+  </figure>
+</header>
+
+<section class="hl reveal">
+  <div class="item"><div class="num">&lt;4<small> h</small></div><div class="lbl">整机总组装时间<br>双 SO-101 臂 67 分钟</div></div>
+  <div class="item"><div class="num c">90<small>%</small></div><div class="lbl">3D 打印件占比<br>材料易得、便于复现</div></div>
+  <div class="item"><div class="num b">2<small> 臂</small></div><div class="lbl">双臂协同 + 全向底盘<br>单臂负载 600~1000 g</div></div>
+  <div class="item"><div class="num a">3<small> 种</small></div><div class="lbl">头部视觉可选<br>单目 / 双目 / RGBD</div></div>
+</section>
+
+<!-- ============ 01 产品定位 ============ -->
+<section class="section" id="position">
+  <div class="section-head">
+    <h2><span class="idx">01</span>产品定位</h2>
+    <span class="sub">POSITIONING</span>
+  </div>
+  <p class="desc">家庭操控研究长期被高成本商业平台把持，学生、爱好者和小型团队几乎无法进入。XLeRobot 做的事情很直接：把一台能跑模仿学习、能遥操作、能进仿真训练的双臂移动机器人，做成一个普通实验室能自行复现的开源平台。</p>
+  <div class="grid2">
+    <div class="card reveal">
+      <h3><span class="ico">🧩</span>为什么叫 LeRobot</h3>
+      <p>底盘之上沿用 Hugging Face LeRobot 的技术栈：即插即用的 <code>pip</code> 安装、几行代码即可跑通、大量预训练 VLA 模型与公开数据集可直接下载。你训练好的策略，和全世界 LeRobot 用户用的是同一套格式。</p>
+    </div>
+    <div class="card reveal">
+      <h3><span class="ico">🏠</span>为什么需要 XL</h3>
+      <p>LeRobot 生态擅长桌面单臂/双臂，但缺一台能移动、能进家庭的双臂平台。传统 3D 打印底盘在耐久性、稳定性和负载上都撑不住日常使用，DIY 移动底盘的供电又是一团乱线——「XL」补的正是这块。</p>
+    </div>
+  </div>
+  <div class="chain reveal">
+    <span class="node">LeRobot 生态</span><span class="arr">+</span>
+    <span class="node">SO-101 双臂</span><span class="arr">+</span>
+    <span class="node">LeKiwi 全向底盘</span><span class="arr">+</span>
+    <span class="node">宜家 RÅSKOG 推车</span><span class="arr">+</span>
+    <span class="node">移动电源</span><span class="arr">=</span>
+    <span class="node" style="background:#f5f3ff;border-color:#ede9fe;color:var(--accent-violet)">XLeRobot</span>
+  </div>
+</section>
+
+<!-- ============ 02 核心优势 ============ -->
+<section class="section" id="value">
+  <div class="section-head">
+    <h2><span class="idx">02</span>核心优势</h2>
+    <span class="sub">KEY ADVANTAGES</span>
+  </div>
+  <p class="desc">官方文档列出的四条主要优势，都围绕「学生能不能自己做出来、做出来能不能用」展开。</p>
+  <div class="vals">
+    <div class="val reveal">
+      <div class="ico">💴</div>
+      <h4>成本可控</h4>
+      <p>90% 的零件为 3D 打印件，配合经济型电机与电子元件，整机可用常见材料与器件自行复现。</p>
+    </div>
+    <div class="val reveal">
+      <div class="ico">⏫</div>
+      <h4>平滑升级</h4>
+      <p>硬件无需修改电机 ID；软件与桌面单臂/双臂设置完全一致，SO-101 上训练好的策略可直接迁移。</p>
+    </div>
+    <div class="val reveal">
+      <div class="ico">💪</div>
+      <h4>实用可靠</h4>
+      <p>可完成许多日常任务，任务演示见 LeRobot 全球黑客松；底盘稳定，适合长期在教室内使用。</p>
+    </div>
+    <div class="val reveal">
+      <div class="ico">📕</div>
+      <h4>开源资源</h4>
+      <p>LeRobot 的即插即用代码与模型库，加上活跃的贡献者社区，硬件 CAD、3D 打印文件全部开放。</p>
+    </div>
+  </div>
+  <div class="info notice reveal">
+    <b>安全设计：</b>XLeRobot 采用低扭矩电机、短臂长（约 40 cm 臂展）与轮式底盘，物理上几乎不具备伤害人的能力，同时仍能完成多数家庭任务。这不是宣传话术，而是这类教学平台敢让学生上手的前提。
+  </div>
+</section>
+
+<!-- ============ 03 硬件规格 ============ -->
+<section class="section" id="spec">
+  <div class="section-head">
+    <h2><span class="idx">03</span>硬件构成与规格</h2>
+    <span class="sub">HARDWARE SPEC</span>
+  </div>
+  <p class="desc">核心部件均为成熟开源模块，任意一件损坏都能单独采购替换，这也是它适合进课堂的原因。</p>
+  <div class="spec reveal">
+    <div class="row"><span class="k">机械臂</span><span class="v">2 × SO-100 / SO-101</span></div>
+    <div class="row"><span class="k">底盘</span><span class="v">LeKiwi 全向轮 ×3</span></div>
+    <div class="row"><span class="k">伺服电机</span><span class="v">STS3215 × 17</span></div>
+    <div class="row"><span class="k">主控</span><span class="v">树莓派 5（4 GB）</span></div>
+    <div class="row"><span class="k">头部相机</span><span class="v">单 RGB / 双目 RGB / RealSense RGBD</span></div>
+    <div class="row"><span class="k">机架</span><span class="v">宜家 RÅSKOG 推车</span></div>
+    <div class="row"><span class="k">供电</span><span class="v">安克 SOLIX C300 移动电源</span></div>
+    <div class="row"><span class="k">固定夹具</span><span class="v">桌面夹具 ×4</span></div>
+    <div class="row"><span class="k">打印件</span><span class="v">约 90%，PLA 等材料</span></div>
+    <div class="row"><span class="k">单臂负载</span><span class="v">600 ~ 1000 g</span></div>
+    <div class="row"><span class="k">臂展</span><span class="v">约 40 cm</span></div>
+    <div class="row"><span class="k">整机形态</span><span class="v">双臂 + 全向轮式底盘</span></div>
+  </div>
+</section>
+
+<!-- ============ 04 演示视频 ============ -->
+<section class="section" id="video">
+  <div class="section-head">
+    <h2><span class="idx">04</span>演示视频</h2>
+    <span class="sub">DEMO · ACT / SmolVLA / π0.5</span>
+  </div>
+  <p class="desc">同一套硬件、同一批木块，分别用 ACT、SmolVLA、π0.5 三种策略做复现。四段视频都是板端实拍（720×1280 竖屏），可以直接对比不同模型在颜色分辨、抓取稳定性和数据效率上的差别。</p>
+
+  <div class="vgrid">
+    <figure class="vcard reveal">
+      <div class="vhead"><span class="vtag act">ACT</span><span class="vres">720 × 1280</span></div>
+      <div class="vframe">
+        <video controls preload="metadata" playsinline
+               src="../../media/products/xlerobot/videos/act.mp4" width="720" height="1280">
+          你的浏览器不支持视频播放，请下载 <a href="../../media/products/xlerobot/videos/act.mp4">act.mp4</a> 观看。
+        </video>
+      </div>
+      <figcaption>
+        <b>ACT · 颜色识别受限</b>
+        <p>采集数据时用了红、粉、蓝三种木块，但复现只有红色稳定成功，粉色与蓝色难以分辨。适合作为「数据集覆盖不足会怎样」的反面案例。</p>
+      </figcaption>
+    </figure>
+
+    <figure class="vcard reveal">
+      <div class="vhead"><span class="vtag smol">SmolVLA</span><span class="vres">720 × 1280</span></div>
+      <div class="vframe">
+        <video controls preload="metadata" playsinline
+               src="../../media/products/xlerobot/videos/smolvla.mp4" width="720" height="1280">
+          你的浏览器不支持视频播放，请下载 <a href="../../media/products/xlerobot/videos/smolvla.mp4">smolvla.mp4</a> 观看。
+        </video>
+      </div>
+      <figcaption>
+        <b>SmolVLA · 依赖顶部视角</b>
+        <p>无顶部摄像头时复现效果明显下降：颜色分辨困难，多次抓取方块失败。可据此说明「视角配置本身就是模型输入的一部分」。</p>
+      </figcaption>
+    </figure>
+
+    <figure class="vcard reveal">
+      <div class="vhead"><span class="vtag pi">π0.5</span><span class="vres">720 × 1280</span></div>
+      <div class="vframe">
+        <video controls preload="metadata" playsinline
+               src="../../media/products/xlerobot/videos/pi05.mp4" width="720" height="1280">
+          你的浏览器不支持视频播放，请下载 <a href="../../media/products/xlerobot/videos/pi05.mp4">pi05.mp4</a> 观看。
+        </video>
+      </div>
+      <figcaption>
+        <b>π0.5 · 抓取任务</b>
+        <p>三种策略里复现效果最好：操作成功率最高，红、粉、蓝各色方块都能正确识别，且所需数据量最小。</p>
+      </figcaption>
+    </figure>
+
+    <figure class="vcard reveal">
+      <div class="vhead"><span class="vtag pi">π0.5</span><span class="vres">720 × 1280</span></div>
+      <div class="vframe">
+        <video controls preload="metadata" playsinline
+               src="../../media/products/xlerobot/videos/pi05-desk.mp4" width="720" height="1280">
+          你的浏览器不支持视频播放，请下载 <a href="../../media/products/xlerobot/videos/pi05-desk.mp4">pi05-desk.mp4</a> 观看。
+        </video>
+      </div>
+      <figcaption>
+        <b>π0.5 · 桌面整理</b>
+        <p>同一策略换到更长的任务链：识别散落物品、逐件拿起、放回固定位置，完整跑通一个桌面整理场景。</p>
+      </figcaption>
+    </figure>
+  </div>
+
+  <div class="info notice reveal">
+    <b>三组对比的结论：</b>数据量不是唯一的决定因素。ACT 采了三种颜色的数据却只认得红色，说明采集覆盖与颜色分布更关键；SmolVLA 在缺少顶部视角时失效，说明相机配置必须与训练时一致；π0.5 用最少的数据拿到了最高的成功率与最全的颜色识别，这也是它更适合作为教学主线的原因。
+  </div>
+</section>
+
+<!-- ============ 05 软件与训练 ============ -->
+<section class="section" id="software">
+  <div class="section-head">
+    <h2><span class="idx">05</span>软件栈与训练方式</h2>
+    <span class="sub">SOFTWARE &amp; TRAINING</span>
+  </div>
+  <p class="desc">这是 XLeRobot 最适合做教学的一条线：控制、遥操作、仿真、训练、部署，每一步都有现成的开源入口。</p>
+  <div class="grid2">
+    <div class="card reveal">
+      <h3><span class="ico">🎮</span>多种控制方式</h3>
+      <p>键盘、Xbox 手柄、Switch Joy-Con（蓝牙直连，无需 WiFi、无延迟）、Quest 3 VR 遥操作，以及训练好的自主策略。教学时先用普通手柄做数据采集，再用 VR 做精细示教。</p>
+    </div>
+    <div class="card reveal">
+      <h3><span class="ico">🖥️</span>仿真环境</h3>
+      <p>提供 URDF 与 ManiSkill 仿真支持，含深度、分割、触觉等多种传感器，可用于 RL / IL / VLA 训练。官方称 15 分钟可跑通第一个仿真环境。</p>
+    </div>
+    <div class="card reveal">
+      <h3><span class="ico">🧠</span>模仿学习与 VLA</h3>
+      <p>基于 LeRobot 的 ACT、Diffusion Policy 等策略训练流程，训练好的模型可导出并在真机部署；Sim2real 迁移在 ManiSkill / Mujoco 中完成。</p>
+    </div>
+    <div class="card reveal">
+      <h3><span class="ico">🔌</span>即插即用</h3>
+      <p>一条 <code>pip install</code> 加几行代码即可让机器人动起来。软件接口与桌面 SO-101 双臂完全一致，学生学到的操作可以平移到大平台。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 06 适用人群 ============ -->
+<section class="section" id="who">
+  <div class="section-head">
+    <h2><span class="idx">06</span>适用人群</h2>
+    <span class="sub">TARGET USERS</span>
+  </div>
+  <p class="desc">官方给出六类用户画像，其中教育与自研是主要落点。</p>
+  <div class="scenes">
+    <div class="scene reveal"><h4>🎓 高校教师</h4><p>机器人 / AI 课程的经济型平台。整班配置压力小，且硬件可逐台独立维修。</p></div>
+    <div class="scene reveal"><h4>📚 学生</h4><p>从初学者到研究者都能用：先跑通遥操作，再学数据采集，最后训自己的策略。</p></div>
+    <div class="scene reveal"><h4>🚀 初创公司与实验室</h4><p>用模块化平台快速搭原型，验证算法再决定是否上大平台。</p></div>
+    <div class="scene reveal"><h4>👩‍🔬 自研人员</h4><p>把精力全放在算法上，硬件部分用现成开源方案解决。</p></div>
+    <div class="scene reveal"><h4>🏫 高中 STEM</h4><p>把前沿机器人技术带进课堂。低扭矩 + 短臂展，安全性适合未成年学生操作。</p></div>
+    <div class="scene reveal"><h4>🤖 DIY 爱好者</h4><p>植物养护、物品递送、家庭自动化——室内项目几乎都能接。</p></div>
+  </div>
+</section>
+
+<!-- ============ 07 局限性 ============ -->
+<section class="section" id="limit">
+  <div class="section-head">
+    <h2><span class="idx">07</span>局限性</h2>
+    <span class="sub">LIMITATIONS</span>
+  </div>
+  <p class="desc">官方文档自己列出的限制，选型时必须正视，否则会在课堂上踩坑。</p>
+  <div class="list reveal">
+    <div class="li"><span class="k">固定高度</span><span class="d">加装稳定升降平台会显著增加成本与组装难度</span></div>
+    <div class="li"><span class="k">工作空间较小</span><span class="d">相比 Aloha 等平台，SO-101 臂展约 40 cm 是硬约束</span></div>
+    <div class="li"><span class="k">单臂负载有限</span><span class="d">600 ~ 1000 g，超过 1 kg 的重物不适合</span></div>
+    <div class="li"><span class="k">不支持灵巧手内操作</span><span class="d">当前不适用于 in-hand dexterity 类任务</span></div>
+    <div class="li"><span class="k">不支持高动态动作</span><span class="d">如接球等需要高速运动的场景</span></div>
+  </div>
+</section>
+
+<!-- ============ 08 项目信息与来源 ============ -->
+<section class="section" id="contact">
+  <div class="section-head">
+    <h2><span class="idx">08</span>项目信息与来源</h2>
+    <span class="sub">PROJECT INFO</span>
+  </div>
+  <div class="info reveal">
+    <b>项目名称：</b>XLeRobot　·　<b>性质：</b>开源项目<br>
+    <b>主要贡献者：</b>Zhuoyi Lu（RL Sim2real 部署、真机遥操作）· Nicole Yue（文档站点）· Yuesong Wang（MuJoCo 仿真资源）<br>
+    <b>技术基座：</b>LeRobot · SO-100 / SO-101 · LeKiwi · Bambot<br>
+    <b>官方文档：</b><a href="https://xlerobot.readthedocs.io/zh-cn/latest/" target="_blank" rel="noopener">xlerobot.readthedocs.io（中文）</a><br>
+    <b>代码仓库：</b><a href="https://github.com/Vector-Wangel/XLeRobot" target="_blank" rel="noopener">github.com/Vector-Wangel/XLeRobot</a><br>
+    <b>引用格式：</b>Wang, Gaotian and Lu, Zhuoyi. <i>XLeRobot: A Practical Low-cost Household Dual-Arm Mobile Robot Design for General Manipulation</i>, 2025.
+  </div>
+  <div class="info notice reveal">
+    <b>免责声明（引自官方）：</b>若您基于此仓库构建、购买或开发 XLeRobot，您将对其对您或他人造成的所有物理和精神损害负全部责任。本页仅作教学选型参考，具体配置与获取方式以官方文档最新公布为准。
+  </div>
+</section>
+
+<div class="cta reveal">
+  <a class="btn" href="../../courses/index.html">← 返回课程首页</a>
+  <a class="btn" href="#video">▶ 演示视频</a>
+  <a class="btn" href="../ldt-01/index.html">查看 LDT-01 平台 →</a>
+  <a class="btn" href="../b2-box/index.html">查看 B2 实验箱 →</a>
+</div>
+
+<footer>
+  XLeRobot 开源双臂移动机器人 · 产品介绍页<br>
+  内容整理自官方文档与代码仓库（截至 2026-10）· 具体配置以官方最新公布为准 · 图片与视频仅用于教学展示
+</footer>
+
+</body>
+</html>

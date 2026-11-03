@@ -1,0 +1,34 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp003-ros2-application/exp-12-dds/diagrams/fig-12-4-qos-match-flow.html
+TITLE: 图 12-4 · QoS 实验：三门撮合判定
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+图 12-4 · QoS 实验：三门撮合判定
+图 12-4 · QoS 实验：三门撮合判定流程
+本图回答的问题：改了哪个 QoS 参数会导致"连不上"，报错为什么看不见？
+发现对端 Publisher / Subscriber
+门①
+同一 ROS_DOMAIN_ID ?
+同楼才可能对话
+否
+互不可见
+话题列表无对端
+是
+话题名 + 类型都相同 ?
+Type: std_msgs/msg/String
+否
+不撮合
+各发各的
+是
+QoS 请求 ≤ 提供 ?
+reliability · durability · history
+否 · 例：订 RELIABLE / 发 BEST_EFFORT
+count: 0
+仅 WARN 提示
+是
+撮合成功 · 数据送达
+B-1 积压 5 条 = TRANSIENT_LOCAL 命中
+三门是依次短路的：任何一门不过，后面根本不判 —— 所以"连不上"往往一声不吭
+✅ 结论：同域 → 同话题类型 → QoS 兼容，三门全过才建链
+⚠️ 风险：门③失败无报错，只有 topic info -v 的 count: 0
+🔍 验证：04 节 B-1（收历史）与 B-2（WARN + count: 0）
+EXP-12 · DDS 通信中间件剖析

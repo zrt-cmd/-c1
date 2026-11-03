@@ -1,0 +1,360 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/industry/ind05-industrial-inspection/exp-02-lidar-slam/index.html
+TITLE: EXP-02 · 3D 激光建图 | IND-05 工业巡检应用场景
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+EXP-02 · 3D 激光建图 | IND-05 工业巡检应用场景
+课程
+巡检
+本页目录 · 五星学习法
+00 课程节奏 · 8 段微课
+01 学习目标 ①聚焦问题
+02 原理 ①聚焦 ②激活
+03 硬件与材料 ③示证新知
+04 操作步骤 ④应用新知
+05 关键命令 ④应用新知
+06 动画 ③示证新知
+07 互动 ④应用新知
+08 常见问题 ⑤融会贯通
+09 拓展 ⑤融会贯通
+10 思考题 ⑤融会贯通
+兄弟实验
+EXP-01 控制与巡检准备
+EXP-03 定位与多点导航
+EXP-04 视觉巡检闭环
+EXP-02 · 8 学时
+3D 激光建图
+启动 Go2 的 3D 激光与建图节点，遥控遍历场地，实时拼出 3D 点云与栅格地图（Mid-360 / XT16 等多线激光）。验收标准：生成可供 EXP-03 使用的巡检地图（map.yaml / .pgm + 序列化地图）；关键技巧：闭合回路提升建图质量。
+实践
+go2_ros2_sdk
+slam_toolbox
+点云→栅格
+00
+课程节奏：五星学习法 · 8 段微课（每段 ≤ 15 min）
+本实验按
+五星学习法
+组织：先用一个真实故障
+聚焦问题
+，再
+激活旧知
+（坐标系 + 激光测距 + 累积误差），接着
+示证新知
+（三级流水线 + 回环动画），然后动手
+应用新知
+完成一键启动到绕场存图，最后借排障与拓展
+融会贯通
+。全程切成
+8 段微课、每段不超过 15 分钟
+，段间停顿 1~2 分钟消化；纯讲授合计约 100 分钟，其余课时用于动手实操与个别辅导。
+① 聚焦问题
+课段 1 · 12 min
+"建图回来墙重影"故障现场，带着问题开课
+② 激活旧知
+课段 2 · 8 min
+坐标系/TF · 激光测距 · 累积误差直觉
+③ 示证新知
+课段 3~4 · 27 min
+三级流水线 + 点云逐帧/回环动画
+④ 应用新知
+课段 5~7 · 40 min
+一键启动→绕场闭合回路→存图双产物
+⑤ 融会贯通
+课段 8 · 13 min
+排障口诀 · 拓展阅读 · 思考题
+课段
+五星阶段
+时长
+对应章节
+本段任务
+课段 1
+聚焦问题
+12 min
+§01 + §02 前半
+抛出现场故障"建图回来墙重影"，明确本课要解决的目标
+课段 2
+激活旧知
+8 min
+§02 后半
+用坐标系/TF、激光测距、累积误差三条旧知解释故障成因
+课段 3
+示证新知
+15 min
+§03
+认识 3D 激光雷达/机载算力/DDS 链路与建图场地要求
+课段 4
+示证新知
+12 min
+§06
+看懂点云逐帧累积与回环校正动画
+课段 5
+应用新知
+15 min
+§04 S1~S3 + §05 ①②
+粒子检查 + 一键启动 robot.launch.py（边讲边演）
+课段 6
+应用新知
+15 min
+§04 S4~S5 + §05 ③④⑤
+遥控绕场闭合回路 + Save/Serialize 存图——课段 1 的故障就此根除
+课段 7
+应用新知
+10 min
+§07
+建图质量沙盘自测，全通方可进入下一实验
+课段 8
+融会贯通
+13 min
+§08~§10
+排障口诀收口，挑战题与思考题拔高迁移
+讲课提示：课段 1/2 以讲授 + 提问为主；课段 3~6 边讲边演（实物 / 动画 / 命令行）；课段 7 学员独立完成；课段 8 答疑拔高。段与段之间停顿 1~2 分钟，确认学员跟上再进下一段。
+01
+学习目标
+课段 1 · 聚焦问题 · 12 min
+用自己的话讲清 SLAM：机器人一边「看」一边「画地图」，同时记住自己走到哪。
+说清 3D 点云到 2D 栅格地图的降维链路：utlidar/cloud → pointcloud_to_laserscan → slam_toolbox。
+用 go2_ros2_sdk 一键拉起雷达、建图、RViz，并用键盘/遥控探索整个场地。
+掌握 Start At Dock → 遥控探索 → Save Map → Serialize Map 建图工作流。
+理解「回环」为什么能纠正累积漂移，掌握绕场一周闭合回路的实操技巧。
+素材说明：
+本课无视频素材——动态演示采用官方仓库 README 的演示动图（GIF）与自制 SVG 原理动画，不虚构实拍录像。
+02
+原理：3D 点云建图（SLAM）讲透
+课段 1 收尾 + 课段 2 · 激活旧知 · 8 min
+❓ 聚焦问题（课段 1）
+学员现场最常遇到的怪事：
+绕场一圈存了图，重载发现同一面墙画出两条线
+，起点和终点错开半米——这就是"漂移"。问题出在哪？带着这个故障听完全课——到课段 6 你会亲手用回环把它拉直。
+把建图想象成「蒙眼画房间」：
+你被蒙着眼在房间里走，手里的一根激光笔每毫秒向四周量一次距离——右手边 2.3 米有面墙、正前方 4.1 米是柜子……把这些「距离点」按你的走位反投影到空间里，点越攒越多，房间的轮廓就浮现了。这就是
+3D 点云建图
+。难点有两个：一是
+你不知道自己走到哪
+（得边走边定位，即 SLAM = Simultaneous Localization And Mapping，同步定位与建图）；二是
+每一步的定位误差会累加
+，走一圈回来发现「起点和终点对不上」——这就是漂移。
+Go2 上的三级流水线
+① 传感器出点云
+3D 激光雷达（Mid-360 / XT16 级多线激光）旋转扫描，发布 utlidar/cloud（sensor_msgs/PointCloud2，frame_id=utlidar_lidar）。
+② 3D 压成 2D
+pointcloud_to_laserscan 把点云裁剪压平成一束「虚拟单线激光」——因为巡检地图按楼层平面画就够用，算力省一个量级。
+③ SLAM 拼图
+slam_toolbox online_async 拿激光束做scan匹配：找最优位姿把新扫描「贴」进地图，同时输出自己在哪。
+④ 出两种图
+Save Map 出 map.yaml + map.pgm（给 Nav2/AMCL 用的 2D 栅格）；Serialize Map 出序列化点云图（供 slam_toolbox 二次精修）。
+回环：让地图「拉链对齿」的唯一办法
+scan 匹配每一步都有一点点误差，走 100 米可能错出半米——地图里的墙会「重影」。但若你
+绕场一圈回到起点
+，建图算法会认出「这面墙我见过！」（回环检测），把首尾强行对齐并把误差摊销到整条轨迹上，墙立刻变直。这就是培训方案强调的技巧：
+闭合回路提升建图质量
+。
+生活化类比：
+slam_toolbox 像「接力描图纸」：每次扫描是一张半透明硫酸纸，按最佳角度叠上去；回环就是把第一张和最后一张用夹子对齐——中间所有纸的错位一起被修正。
+↺ 激活旧知（课段 2）
+回忆三条旧知：①
+坐标系与 TF
+（EXP-01 已通链路，雷达有 frame_id）；②
+激光测距原理
+（每束激光返回一个距离值，攒成点云）；③
+累积误差
+（每步小错累加成大错）。三条合起来，正好解释课段 1 那个故障。
+图 2-1｜Go2 实时 3D 点云建图效果（来自 abizovnuralem/go2_ros2_sdk 仓库 README 演示动图）：随着机器人移动，房间点云被逐帧拼接成完整轮廓——本实验要复现的正是这个过程。
+03
+硬件与材料
+课段 3 · 示证新知 · 15 min
+项
+规格 / 要求
+说明
+3D 激光雷达
+多线激光（Mid-360 / XT16 级别）
+建图主传感器，话题 utlidar/cloud，先 echo --no-arr 查 frame_id
+机载/实训机
+Jetson Orin 40 TOPS + Ubuntu 22.04 / ROS2 Humble
+go2_ros2_sdk 在 ROS2 Humble 下编译运行
+DDS 链路
+网卡 192.168.123.x + rmw_cyclonedds_cpp
+沿用 EXP-01 配网成果
+遥控手段
+teleop_twist_keyboard / 遥控器 / joy
+探索走位用，低速慢走防止点云拉花
+建图场地
+3×5m 以上、特征丰富（墙、柱、货架）
+空旷无特征的走廊最难匹配，多留参照物
+开始前检查
+ros2 topic hz /utlidar/cloud 有稳定频率；rviz 能看到点云滚动。
+场地动线规划
+先沿墙绕一圈（回环），再补中间盲区；不要上来就冲刺式乱走。
+速度控制
+建图时保持慢速：走太快激光帧间重叠不足，匹配会「跳变」。
+产物清单
+map.yaml + map.pgm + serialize 序列化文件 + 一张全景点云截图。
+图 2-2｜RViz 中查看 utlidar/cloud 点云（来自 unitreerobotics/unitree_ros2 仓库 README）：Fixed Frame 设为雷达 frame 后，点云应在机器人四周实时刷新——建图前的第一道体检。
+04
+操作步骤
+课段 5~6 · 应用新知 · 2×15 min
+S1
+粒子检查
+点云频率 + frame_id 正常
+→
+S2
+一键启动
+robot.launch.py 拉起雷达/建图/RViz
+→
+S3
+Start At Dock
+SlamToolboxPlugin 设定建图原点
+→
+S4
+遥控探索
+沿墙绕圈闭合回路 → 补盲区
+→
+S5
+保存地图
+Save Map + Serialize Map 双产物
+粒子检查：
+ros2 topic echo --no-arr /utlidar/cloud
+确认 frame_id=utlidar_lidar，
+ros2 topic hz /utlidar/cloud
+看频率稳定。
+一键启动：
+设置 ROBOT_IP 与 CONN_TYPE 后
+ros2 launch go2_robot_sdk robot.launch.py
+——该 launch 内置 pointcloud_to_laserscan、slam_toolbox online_async、Nav2、RViz、Foxglove 全套。
+切到建图视角：
+RViz 左侧 SlamToolbox（SlamToolboxPlugin）面板，点击
+Start At Dock
+开始建图，把起始位姿定在充电桩（Dock）处——与 EXP-04 的回充闭环呼应。
+遥控探索：
+键盘或遥控器低速起步，
+先沿场地外围绕一整圈回到起点触发回环
+，再走中间区域补盲；途中观察点云是否与墙体贴合、有无重影。
+保存地图：
+面板
+Save Map
+输出 map.yaml / map.pgm，再点
+Serialize Map
+序列化工匠文件——两种都交作业。
+质量自检：
+重新加载地图，墙线笔直无重影、门口/柱子轮廓闭合、起终点一致即达标。
+图 2-3｜俯视视角下点云勾勒出场地边界（来自 unitreerobotics/unitree_ros2 仓库 README）：理想状态是墙面呈细线状；若墙变「雾团」，说明走太快或匹配漂移，需减速重走。
+05
+关键命令
+随课段 5 / 6 对照使用
+命令来自 go2_ros2_sdk 与 unitree_ros2 官方 README；IP 按实机替换。
+# ① 预检：点云话题与坐标系（EXP-01 已通链路）
+ros2 topic hz /utlidar/cloud
+ros2 topic echo --no-arr /utlidar/cloud
+# frame_id 应为 utlidar_lidar
+# ② 一键启动（内置 pointcloud_to_laserscan + slam_toolbox + Nav2 + RViz + Foxglove）
+export ROBOT_IP=192.168.123.161
+export CONN_TYPE=cyclonedds
+# 网线直连；webrtc 可走 WiFi
+ros2 launch go2_robot_sdk robot.launch.py
+# ③ 键盘遥控探索（若 launch 未带遥控，可另开终端）
+ros2 run teleop_twist_keyboard teleop_twist_keyboard
+# ④ RViz 操作（SlamToolboxPlugin 面板，鼠标点击，无命令行）
+#    Start At Dock → 慢速绕场一圈闭合回路 → Save Map → Serialize Map
+# ⑤ 也可用 slam_toolbox 官方 CLI 存图（标准功能）
+ros2 run slam_toolbox save_map -f ~/maps/patrol_site
+验收闸门：
+map.yaml / map.pgm 存在且 RViz 重载无重影；序列化文件同目录保留。没走出回环就保存的地图一律返工——这是本实验唯一「技巧型」硬指标。
+为啥压成 2D
+巡检按平面路网走位，2D 栅格足够 AMCL/Nav2 用，内存与算力都降一个量级。
+为啥是 online_async
+建图放后台线程跑，前台遥控不卡顿——实时性与质量的折中。
+地图存哪
+Save Map 产 map.yaml(metdata+分辨率)+map.pgm(灰度像素)；Serialize 存 slam_toolbox 内部结构供再编辑。
+下次实验怎么用
+EXP-03 的 AMCL 直接吃 map.yaml；序列化图留给想修改地图结构的同学。
+06
+动画：点云逐帧建图与回环
+课段 4 · 示证新知 · 12 min
+逐帧累积：点越攒越多
+黄块=Go2　绿点=逐帧写入的点云　虚线=探索轨迹（绕场一周）
+无回环：累积漂移 → 首尾错开（墙体重影）
+起点 ≠ 终点，错位 ≈ 每步误差 × 步数
+有回环：检测到旧景 → 对齐首尾、摊销误差
+黄圈=回环检测命中「这面墙我见过」→ 整条轨迹拉直
+动画 2-1：左图机器人绕场一周，绿点逐帧累积出房间轮廓；右上是「不回头」的代价——首尾错开的红墙；右下是回环校正后首尾咬合的绿线（黄圈脉冲=回环命中瞬间）。
+go2_ros2_sdk 建图工作流（RViz SlamToolboxPlugin）
+Start At Dock
+建图原点=充电桩
+遥控探索
+沿墙绕圈闭合回路
+Save Map
+map.yaml + map.pgm
+Serialize
+序列化存档
+交给 EXP-03
+AMCL 载入
+黄点巡游 = 课堂实操顺序；每一步的产物都存档，缺一项验收不通过
+技巧：不绕回起点就开始存图 = 白做（回环没闭合，误差没收敛）
+动画 2-2：五步工作流泳道——从定原点、探索、双格式存图到交付 EXP-03；黄点按课堂实际点击顺序巡游，任何一步产物缺失都无法进入下一步。
+观察
+动画 2-1 中绿点不是均匀铺满的：机器人
+走过近处点密、远处点稀
+——所以盲区补扫时要「贴着走」；而回环黄圈出现的瞬间整条绿线会抖一下并拉直，那就是误差摊销。
+07
+互动：建图质量沙盘
+课段 7 · 应用新知 · 10 min
+设定探索覆盖率与步数，开关回环，预测地图质量等级
+场地覆盖率
+累计走位步数
+绕场闭合回路（回环）
+重置
+把滑杆推到「高步数 + 不回环」，误差会冲破红线——这正是
+「闭合回路提升建图质量」
+的定量直觉：漂移 ≈ 单步误差 × 步数，只有回环能把这笔账一笔勾销。
+08
+常见问题
+课段 8 · 融会贯通 · 13 min
+Q RViz 里没有点云？
+先 echo --no-arr /utlidar/cloud 查 frame_id，再把 Fixed Frame 改成该 frame；话题没数据则回 EXP-01 查 DDS 链路。
+Q 点云「拉花」重影？
+走太快或机身晃动过大：降低速度、保持匀速直线；地面打滑时等步态稳定再走。
+Q 启动 launch 报找不到包？
+没 source go2_ros2_sdk 工作空间：source install/setup.bash 后重开；确认 CONN_TYPE 与网线/WiFi 匹配（cyclonedds | webrtc）。
+Q 地图墙体错位重影？
+回环没闭合或闭合时匹配失败：沿特征丰富的墙体重走一圈，起点终点重叠 2~3 米再存图。
+Q Save / Serialize 都要吗？
+Save 产 2D 栅格（AMCL 必需）；Serialize 产可再编辑的序列化工件——验收两个都要交。
+Q 空旷走廊建不了图？
+特征太少 scan 匹配无从下手：临时摆放纸箱/锥桶造特征，或沿有货架、柱子的一侧行走。
+Q launch 太重卡顿？
+该 launch 默认连 Nav2/RViz/Foxglove 全开：先只留建图调通，再逐步打开其余节点。
+Q 地图坐标和充电桩对不上？
+务必用 Start At Dock 定原点；后期随手重启建图会让位姿原点漂移，EXP-04 回充就找不到桩。
+09
+拓展阅读
+课段 8 · 融会贯通
+宇树机载 unitree_slam / mid360_driver
+：官方建图服务，App 里点一点即可出图，效果好但
+闭源、不可随课分发
+——与本课 slam_toolbox 开源链路对照理解「能演示 ≠ 能二次开发」。
+FAST-LIO
+（HKU-Mars）：高性能 LIO 框架，工程界常用其替代方案——
+拓展阅读：https://github.com/hku-mars/FAST-LIO （命令与兼容性请自行核验后再用）
+。
+slam_toolbox 调参
+：loop_search_minimum_linear_distance（回环搜索距离）、ceres 线性求解器参数——地图重影时的第二把钥匙。
+点云进阶玩法
+：go2_ros2_sdk 同时发布点云与 TF，配合 Foxglove 可回放建图全程，交作业时附回放比截图更有说服力。
+3D→2D 的取舍
+：多层建筑需要分层建图；本课场景（单层厂区）以栅格为主，3D 点云留存作碰撞与货架核查的底档。
+10
+思考题 · 自测
+课段 8 · 融会贯通
+✅ 完成成果
+产出 map.yaml + map.pgm + 序列化地图，RViz 重载墙体笔直无重影，起终点闭合。
+🧠 原理收获
+用「蒙眼画房间」讲清点云累积、scan 匹配与回环摊销误差三件事。
+🛠 技能收获
+独立跑通 robot.launch.py + SlamToolboxPlugin 五步工作流并完成质量自检。
+📐 评分速览
+地图质量 40% + 回环证据 30% + 动画互动 30%。
+思考 1
+为什么把 3D 点云压成 2D 栅格是「划算」的？举一个 2D 栅格
+不够用
+的巡检场景（提示：想想立体障碍物），并说明补救思路。
+思考 2
+如果建图中途狗被人抱起来换了位置，地图会发生什么？你会在回放里看到什么现象？该如何处置（提示：与「回环」的区别）？
+IND-05 · 工业巡检应用场景 · EXP-02 3D 激光建图
+8 学时 · 实践 · 基于 培训方案"课程5" + go2_ros2_sdk 改编

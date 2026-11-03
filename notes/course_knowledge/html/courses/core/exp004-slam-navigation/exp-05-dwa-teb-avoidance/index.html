@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-05 · DWA/TEB 局部避障 — 机器人 SLAM 与自主导航</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+:root{--theme:#2563eb;--theme-deep:#1d4ed8;--theme-bg:#dbeafe;--theme-bd:#bfdbfe}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit" title="返回课程首页">🧠 具身智能课程 · <i>教程首页</i></a>
+  <div class="crumb"><a href="../../../index.html#core">核心课程</a> / <a href="../index.html">SLAM 与自主导航</a> / EXP-05</div>
+</div>
+<div class="wrap">
+<aside class="side">
+  <h4>本页目录</h4>
+  <a href="#s1" class="now">01 问题引入</a>
+  <a href="#s2">02 原理通俗讲解</a>
+  <a href="#s3">03 关联知识点</a>
+  <a href="#s4">04 实验目标</a>
+  <a href="#s5">05 实验环境与准备</a>
+  <a href="#s6">06 动画讲解</a>
+  <a href="#s7">07 互动讲解</a>
+  <a href="#s8">08 实操步骤</a>
+  <a href="#s9">09 重点与易错点</a>
+  <a href="#s10">10 总结与思考</a>
+  <h4>CH1 · 建模与建图</h4>
+  <a href="../exp-01-slam-urdf/index.html">EXP-01 原理与 URDF</a>
+  <a href="../exp-02-slam-toolbox/index.html">EXP-02 SLAM Toolbox 建图</a>
+  <h4>CH2 · 定位与导航</h4>
+  <a href="../exp-03-nav2-navigation/index.html">EXP-03 Nav2 导航</a>
+  <a href="../exp-04-amcl-localization/index.html">EXP-04 AMCL 定位</a>
+  <a href="../exp-05-dwa-teb-avoidance/index.html">EXP-05 DWA/TEB 避障</a>
+  <h4>CH3 · 任务调度与三维进阶</h4>
+  <a href="../exp-06-radar-multiwaypoint/index.html">EXP-06 多点导航</a>
+  <a href="../exp-07-rtabmap-3d/index.html">EXP-07 RTAB-Map 3D</a>
+</aside>
+<main class="content">
+<div class="exp-head">
+  <span class="code">EXP-05 · 第 2 章 · 综合性 · 8 学时</span>
+  <h1>DWA/TEB 局部避障</h1>
+  <p class="desc">一句话读懂：实验 3 里小车会"看地图走大路"，但路上突然滚来一个球、放下一只箱子怎么办？这节课专门练"开车时的随机应变"——用 DWB 局部规划器，让小车在行驶中实时躲开动态障碍，绕不过去还会自己转圈、后退重新想办法。</p>
+  <div class="meta"><span class="tag hl">难度 ⭐⭐⭐ · 8 学时</span><span class="tag">综合性</span><span class="tag">DWA / DWB / TEB</span><span class="tag">前置：EXP-03 + EXP-04</span></div>
+</div>
+
+<section class="blk" id="s1">
+  <h2><span class="no">01</span>问题引入：静态地图挡不住滚动的球</h2>
+  <div class="tip amber"><span class="lab">情境</span>
+    你在手机导航里看到一条"完美路线"，开到半路发现前面临时放了个水马——导航没让你重查地图，你也不会停下来重新规划整条路线，而是<strong>打一把方向绕过去，再并回原路</strong>。机器人也一样：EXP-03 的全局规划管"走哪条大路"，但大路上突然出现的纸箱、滚动的泡沫球，需要一套"边开边躲"的本地反应机制——这就是<strong>局部路径规划</strong>。
+  </div>
+  <p>本项目的全局路径（ThetaStar）给出的是一条"战略路线"，真正把轮子转起来的是局部规划器（controller_server 里的 DWB）。它每 50 ms（控制器 20 Hz）就重新采样"接下来 1.5 秒怎么走"，一旦发现当前轨迹前有障碍，就地换一条——所以障碍物根本不需要出现在静态地图里。</p>
+</section>
+
+<section class="blk" id="s2">
+  <h2><span class="no">02</span>原理通俗讲解：先想"刹得住"，再打分挑最优</h2>
+  <div class="tip tealb"><span class="lab">白话比喻</span>
+    开车时你不会考虑"200 km/h 冲过去"——先看<strong>能不能刹住</strong>（动态窗口），再从敢踩的速度里挑一条最好的路线。DWA（Dynamic Window Approach）就是这个思路：只在"当前速度出发、靠最大加减速在下一拍能够到"的速度集合里采样，每对 (vx, ω) 推演出一条短轨迹，再让一排"教练"给每条轨迹打分，总分最高者执行。
+  </div>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">两道闸门</div><div class="kt">动态窗口怎么来</div><p>① 速度必须在 acc_lim（acc_lim_x 1.0 m/s²、acc_lim_theta 1.5 rad/s²）约束下"下一拍可达"；② 以它刹车必须能在撞上障碍前停住。过了两道闸门的 (vx, ω) 才进入采样范围——这就是"刹得住"的数学表达。</p></div>
+    <div class="kcard"><div class="kd">采样规模</div><div class="kt">20 × 40 = 最多 800 条</div><p>vx_samples: 20 个线速度 × vtheta_samples: 40 个角速度 = 上限 800 条候选轨迹（vy_samples 为 0，麦轮横移未启用）；每条用 sim_time: 1.5 推演未来 1.5 秒，在局部代价地图上逐点查代价。</p></div>
+    <div class="kcard"><div class="kd">评委团</div><div class="kt">7 个 critics 加权打分</div><p>DWB 把 DWA 模块化成可插拔 critics，本项目启用了 7 个：RotateToGoal / Oscillation / BaseObstacle / GoalAlign / PathAlign / PathDist / GoalDist——每项先归一化再乘 scale，总分最高的轨迹被执行。</p></div>
+    <div class="kcard"><div class="kd">邻居方案</div><div class="kt">TEB 弹性带</div><p>TEB 把路径看成一根弹性带，用图优化同时调整轨迹点位置和到达时间（贴路径+避障+时间最短+平滑四目标）。DWA 快而糙只看眼前 1.5 秒；TEB 平滑可加时间约束但算力高。<b>本项目默认 DWB，TEB 未安装</b>，属知识扩展。</p></div>
+  </div>
+  <p>避障全链路：<strong>雷达 → voxel_layer 标记障碍 → 局部代价地图 5 Hz 更新 → controller（20 Hz）发现当前轨迹撞了 → 重采样绕行轨迹 → 绕过后按 PathDist 重新贴回全局路径</strong>。全程无需重新规划全局路径——就像高速上遇事故，现场变道绕过再并回原车道。</p>
+</section>
+
+<section class="blk" id="s3">
+  <h2><span class="no">03</span>关联知识点</h2>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">知识点 1</div><div class="kt">DWA 速度窗口</div><p>只考虑当前刹得住的速度组合——这是它"安全"的根本；acc_lim 直接决定窗口大小。</p></div>
+    <div class="kcard"><div class="kd">知识点 2</div><div class="kt">DWB 评价函数</div><p>PathDist / GoalDist / BaseObstacle / RotateToGoal 等 critics 加权打分，plugin 为 dwb_core::DWBLocalPlanner。</p></div>
+    <div class="kcard"><div class="kd">知识点 3</div><div class="kt">局部代价地图</div><p>3 m×3 m 滚动窗口 + voxel 层（z_voxels 16）+ inflation 层（0.18 m），5 Hz 更新，动态避障全靠它。</p></div>
+    <div class="kcard"><div class="kd">知识点 4</div><div class="kt">代价数值含义</div><p>0=空闲；1-252=离障碍越近代价越高（按 cost_scaling_factor 4.0 衰减）；254=障碍本体；255=致命不可入。</p></div>
+    <div class="kcard"><div class="kd">知识点 5</div><div class="kt">全局 vs 局部</div><p>全局路径是"目标线路"（长，行为树 1 Hz 触发重规划）；局部轨迹是"接下来 1.5 秒怎么走"（短，20 Hz 重算）——别混。</p></div>
+    <div class="kcard"><div class="kd">知识点 6</div><div class="kt">行为树兜底</div><p>障碍堵死通道时，controller 一直报失败，行为树转入恢复：清代价地图 → Spin 1.57 rad → Wait 5 s，重试 6 次仍不行则 ABORTED。（本车麦轮可横移，未配 backup）</p></div>
+  </div>
+</section>
+
+<section class="blk" id="s4">
+  <h2><span class="no">04</span>实验目标</h2>
+  <ul class="check">
+    <li>理解 DWA/DWB 速度窗口思想与评价函数（critics）加权机制 —— <strong>原理理解</strong></li>
+    <li>理解 TEB 时间弹性带原理及其与 DWA 的差异 —— <strong>原理理解</strong></li>
+    <li>掌握 local_costmap（滚动窗口 / voxel / inflation）配置与 RViz 可视化 —— <strong>流程掌握</strong></li>
+    <li>独立完成"正前方放纸箱"动态避障三重复试验 —— <strong>独立完成</strong></li>
+    <li>通过单变量调参改善避障表现并记录"参数→现象"对照表 —— <strong>独立完成</strong></li>
+  </ul>
+</section>
+
+<section class="blk" id="s5">
+  <h2><span class="no">05</span>实验环境与准备</h2>
+  <table>
+    <tr><th>类别</th><th>配置</th></tr>
+    <tr><td>硬件</td><td>具身智能实验箱 B2 / 小车 C1 + COIN-D6 雷达；<strong>地图（EXP-02）+ 定位（EXP-04）可用</strong></td></tr>
+    <tr><td>系统</td><td>Ubuntu 22.04 + ROS 2 Humble</td></tr>
+    <tr><td>核心库</td><td>Nav2 dwb_controller、nav2_costmap_2d</td></tr>
+    <tr><td>障碍物</td><td>纸箱 / 泡沫块（低矮安全，便于测试）</td></tr>
+    <tr><td>主入口</td><td><span class="io dim">navigation/car1_navigation/config/nav2_params.yaml</span>（controller_server / local_costmap / behavior_server 段）</td></tr>
+  </table>
+  <div class="tip amber"><span class="lab">准备清单</span>① 确认 EXP-03 导航 launch 正常、EXP-04 定位已收敛；② 记住车体外廓 footprint = 0.36 m（长）× 0.27 m（宽），通道测试要用；③ 障碍物只用低矮纸箱/泡沫，禁用易碎沉重物；④ 调参前备份 nav2_params.yaml。</div>
+</section>
+
+<section class="blk" id="s6">
+  <h2><span class="no">06</span>动画讲解：采样轨迹打分与代价地图膨胀</h2>
+  <div class="anim-box">
+    <svg viewBox="0 0 640 300" width="100%" height="300" xmlns="http://www.w3.org/2000/svg">
+      <rect width="640" height="300" fill="#f8fafc"></rect>
+      <!-- 全局路径 -->
+      <path d="M40 230 C 200 230, 380 150, 600 70" stroke="#2563eb" stroke-width="4" stroke-dasharray="10 7" fill="none">
+        <animate attributeName="stroke-dashoffset" values="34;0" dur="1.2s" repeatCount="indefinite"></animate>
+      </path>
+      <!-- 膨胀层光晕 -->
+      <circle cx="360" cy="150" r="46" fill="#2563eb" opacity="0.14">
+        <animate attributeName="r" values="46;52;46" dur="2.4s" repeatCount="indefinite"></animate>
+      </circle>
+      <!-- 障碍物 254 -->
+      <rect x="336" y="126" width="48" height="48" rx="6" fill="#334155"></rect>
+      <text x="360" y="118" font-size="13" fill="#334155" text-anchor="middle" font-family="monospace">cost 254</text>
+      <!-- 候选采样轨迹（20x40 中的代表性若干条） -->
+      <g fill="none" stroke-width="3" stroke-linecap="round">
+        <path d="M90 230 Q 240 226 330 176" stroke="#94a3b8">
+          <animate attributeName="opacity" values="0.15;0.9;0.15" dur="2s" repeatCount="indefinite"></animate>
+        </path>
+        <path d="M90 230 Q 250 250 350 205" stroke="#f59e0b"></path>
+        <path d="M90 230 Q 240 270 330 215" stroke="#dc2626" stroke-dasharray="6 5"></path>
+        <path d="M90 230 Q 250 190 360 118" stroke="#16a34a" stroke-width="5">
+          <animate attributeName="opacity" values="0.4;1;0.4" dur="1.4s" repeatCount="indefinite"></animate>
+        </path>
+        <path d="M90 230 Q 235 175 320 130" stroke="#94a3b8">
+          <animate attributeName="opacity" values="0.15;0.8;0.15" dur="2s" begin="-0.6s" repeatCount="indefinite"></animate>
+        </path>
+      </g>
+      <!-- 机器人 -->
+      <g>
+        <rect x="68" y="212" width="44" height="36" rx="7" fill="#2563eb"></rect>
+        <text x="90" y="266" font-size="13" fill="#1d4ed8" text-anchor="middle">小车 (执行中)</text>
+      </g>
+      <!-- 选中轨迹动画：小车沿绿色轨迹绕行再回主线 -->
+      <circle r="9" fill="#16a34a">
+        <animateMotion dur="4.5s" repeatCount="indefinite" path="M90 230 Q 250 190 360 118 Q 470 70 600 70"></animateMotion>
+      </circle>
+      <!-- 打分气泡 -->
+      <g font-family="monospace" font-size="12">
+        <text x="300" y="262" fill="#16a34a">✔ 绿：绕行+对齐 → 总分最高</text>
+        <text x="300" y="282" fill="#dc2626">✘ 红：穿过膨胀区 → BaseObstacle 否决</text>
+        <text x="46" y="196" fill="#64748b">最多 800 条候选 / 1.5s 推演</text>
+      </g>
+    </svg>
+  </div>
+  <p class="anim-cap">图 5-1：蓝虚线是全局路径；灰色小车按 sim_time 1.5 推演出多条候选轨迹，穿过膨胀圈（inflation 0.18）的轨迹被 BaseObstacle 打上天文数字代价直接淘汰，"绕行且与原路对齐"的绿轨迹总分最高被选中——绕过后 PathDist 又把它拉回全局路径。障碍本体 cost 254（黑块），周围灰蓝渐变是膨胀出的 1-252 代价区。</p>
+</section>
+
+<section class="blk" id="s7">
+  <h2><span class="no">07</span>互动讲解：膨胀半径 × 代价权重调参台</h2>
+  <div class="ix-panel">
+    <div class="ix-title">🎛 选一组参数，预测小车过纸箱的表现</div>
+    <div class="ctl-row">
+      <button class="btn ghost" onclick="tune('base')">A · BaseObstacle 0.02（默认）</button>
+      <button class="btn ghost" onclick="tune('close')">B · BaseObstacle 0.1</button>
+      <button class="btn ghost" onclick="tune('slow')">C · max_vel_x 0.3→0.2</button>
+      <button class="btn" onclick="tune('edge')">D · inflation 0.18→0.35</button>
+    </div>
+    <div class="io dim" id="tuneIo">↑ 点击 A/B/C/D：对照源讲义"调优方向表"预测现象，再动手实测验证（每改必重启 navigation.launch！）。</div>
+  </div>
+  <table>
+    <tr><th>critic</th><th>作用</th><th>本项目 scale</th></tr>
+    <tr><td>PathDist</td><td>离全局路径的横向偏差</td><td><strong>32.0</strong></td></tr>
+    <tr><td>PathAlign</td><td>轨迹方向与全局路径对齐程度</td><td><strong>32.0</strong></td></tr>
+    <tr><td>GoalDist</td><td>离目标点的距离</td><td>24.0</td></tr>
+    <tr><td>GoalAlign</td><td>轨迹方向与目标朝向对齐</td><td>24.0</td></tr>
+    <tr><td>BaseObstacle</td><td>轨迹是否撞障碍（查代价地图原始 cost）</td><td><strong>0.02</strong></td></tr>
+    <tr><td>RotateToGoal</td><td>到目标时转正的效率</td><td>32.0</td></tr>
+    <tr><td>Oscillation</td><td>惩罚来回震荡（防抖动）</td><td>未单独设 scale，靠默认参数生效</td></tr>
+  </table>
+  <p class="anim-cap" style="text-align:left;color:#64748b">上表 7 项与本项目 nav2_params.yaml 的 <code>critics</code> 列表一一对应；顺序即打分顺序，顺序本身不影响总分但影响短路的判定时机。</p>
+  <div class="tip violet"><span class="lab">为什么 0.02 拦得住撞墙</span>权重是<strong>相对关系</strong>：撞墙轨迹的 BaseObstacle 项取的是代价地图原始 cost（可达 254），乘 0.02 之后依然远大于其他项的正常取值——权重只需区分"远/近"，否决撞墙靠的是 cost 本身的量级。PathDist 给到 32，是因为"贴不贴路径"需要精细排序。</div>
+</section>
+
+<section class="blk" id="s8">
+  <h2><span class="no">08</span>实操步骤：纸箱前方 1 m 动态避障三重复试验</h2>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>启动导航并用 "2D Pose Estimate" 定位，下发一个<strong>穿过房间中部</strong>的长距离目标</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>小车行驶途中，把纸箱放到它<strong>正前方约 1 m</strong> 处保持不动，记录：减速时机、绕行最大横向距离、是否回到原路径</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>重复 3 次记录避障成功率与"最小安全距离"；移开箱子再测一次，观察恢复直线</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span>挑战测试：两箱摆 50 cm 窄通道（车宽 0.27 m，两侧各留 11.5 cm）；直线行驶中 0.5 m 处突然放箱观察急刹</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">5</span>调优 A：BaseObstacle.scale 0.02→0.1 重启复测；调优 B：max_vel_x 0.3→0.2 对比成功率与耗时</div>
+  </div>
+  <pre><span class="c"># ① 启动导航（含定位），map 指向 EXP-02 保存的地图名</span>
+ros2 launch car1_navigation navigation.launch.py map:=map_01
+
+<span class="c"># ② 命令行下发穿过房间的目标（也可用 RViz 工具栏 Nav2 Goal）</span>
+ros2 action send_goal /navigate_to_pose nav2_msgs/action/NavigateToPose \
+  "{pose: {header: {frame_id: 'map'}, pose: {position: {x: 2.0, y: 1.0}, orientation: {w: 1.0}}}}"
+
+<span class="c"># ③ 实时观察速度变化（减速→绕行→回升；平滑后的名字是 controller/cmd_vel）</span>
+ros2 topic echo /controller/cmd_vel
+
+<span class="c"># ④ RViz 添加 Display → By topic → /local_costmap/costmap（Color 显示）</span>
+<span class="c">#    放纸箱后应看到障碍处黑圈（254）与周围 1-252 渐变</span>
+
+<span class="c"># ⑤ 调参：改 nav2_params.yaml 的 controller_server / local_costmap 段后必须整栈重启</span>
+ros2 launch car1_navigation navigation.launch.py map:=map_01</pre>
+  <div class="tip tealb"><span class="lab">预期现象</span>避障时速度先降后升（voxel 层感知 → controller 减速）；绕行轨迹平滑无急转弯，绕过后重新贴合全局路径；若障碍堵死通道，小车会清代价地图、原地转 1.57 rad 找路、再等 5 秒重试，始终不行才 ABORTED——不会硬闯。</div>
+</section>
+
+<section class="blk" id="s9">
+  <h2><span class="no">09</span>重点与易错点</h2>
+  <div class="tip amber"><span class="lab">重点</span>① 动态窗口 = "刹得住"的速度集合；② critics 权重的相对关系；③ 局部代价地图数值语义（0/1-252/254/255）；④ "现象→参数"调优方向判断。</div>
+  <table>
+    <tr><th>坑</th><th>现象</th><th>解决</th></tr>
+    <tr><td>以为 DWA 考虑所有速度</td><td>误解安全来源</td><td>只考虑刹得住的（acc_lim 决定窗口），这是安全根本</td></tr>
+    <tr><td>避障时撞上箱子</td><td>擦到纸箱</td><td>箱子离机器人太近（进局部窗口才被发现）或速度太快刹不住；放远一点 / 降 max_vel_x</td></tr>
+    <tr><td>绕过后"迷路"乱转</td><td>回不到原路径</td><td>PathDist 权重不足；调大 PathDist.scale / PathAlign.scale</td></tr>
+    <tr><td>行驶抖动左右摆</td><td>原地哆嗦</td><td>调大 Oscillation 惩罚；降低 sim_time；降速</td></tr>
+    <tr><td>贴障碍太近</td><td>擦边走</td><td>调大 inflation_radius（默认 0.18 已比半宽 0.135 多留 4.5 cm，再大窄道会判不可行）</td></tr>
+    <tr><td>改参没重启</td><td>调了没效果</td><td>controller_server 参数启动时读取，改后必须重启 navigation.launch</td></tr>
+    <tr><td>一次改多个参数</td><td>无法归因</td><td>单变量对比，每轮记录"当前参数→当前现象"</td></tr>
+    <tr><td>窄通道过不去</td><td>50 cm 通不过</td><td>车宽 0.27 m + 两侧各 0.18 m 膨胀 ≈ 需要 0.63 m 净宽——属正常不可行，换宽通道或改小 inflation_radius</td></tr>
+  </table>
+  <ul class="check">
+    <li>全程人站开阔侧、手远离小车路径，随时准备按急停</li>
+    <li>0.5 m 突现测试留够刹车距离：acc_lim_x 1.0 决定减速能力，小车不是无限刹车性能</li>
+    <li>每次调参前记录"参数→现象"，便于对比与回退</li>
+  </ul>
+</section>
+
+<section class="blk" id="s10">
+  <h2><span class="no">10</span>总结与思考：DWA 与 TEB 的取舍</h2>
+  <div class="tip tealb"><span class="lab">本课收获</span>掌握了 DWA 动态窗口思想、DWB 七大 critics 打分机制、local_costmap 滚动窗口配置，以及"正前方/窄通道/突然出现"三类避障试验与单变量调参法。本项目 nav2_params.yaml 的 controller_plugins 为 FollowPath → DWB；<strong>TEB 未启用，属知识扩展</strong>（DWA 快而糙只看眼前 1.5 秒；TEB 优化整条局部路径、平滑可加时间约束，代价是算力）。</div>
+  <div class="tip violet"><span class="lab">思考 1</span>为什么 BaseObstacle 权重只有 0.02 却仍能阻止撞墙轨迹？如果把 PathDist 也调成 0.02，小车行为会怎么变？（提示：cost 量级 × 权重的乘积关系）</div>
+  <div class="tip violet"><span class="lab">思考 2</span>项目默认选 DWB 而非 TEB 的理由是什么？请列出至少两组你的"现象→参数"对照记录，并说明若小车要在密集人群中穿行，你会倾向哪种局部规划器、为什么。</div>
+</section>
+
+<nav class="expnav">
+  <a href="../index.html"><span class="lb">← 返回</span>课程目录 · SLAM 与自主导航</a>
+  <a class="next" href="../exp-06-radar-multiwaypoint/index.html"><span class="lb">下一个实验 →</span>EXP-06 激光雷达多点导航避障</a>
+</nav>
+<footer>
+  <span>CORE-04 · 机器人 SLAM 与自主导航 · EXP-05 DWA/TEB 局部避障</span>
+  <span>8 学时 · 综合性 · 基于 slam_practice 实验讲义改编</span>
+</footer>
+</main></div>
+<script>
+function tune(k){
+  var io=document.getElementById('tuneIo'),h='';
+  if(k==='base'){
+    h='<span class="dim">A · 默认组：stationary 纸箱在正前方 1 m</span>\n'+
+      '<span class="ok">✔ 提前减速 → 平滑绕行 → 回贴全局路径，成功率高</span>\n'+
+      '<span class="warn">绕行最小安全距离约 0.2-0.3m（inflation 0.18 + footprint）</span>\n'+
+      '<span class="dim">这张就是你的"基准线"，后面每组都跟它比</span>';
+  }else if(k==='close'){
+    h='<span class="warn">⚠ B · BaseObstacle.scale 0.02→0.1：障碍惩罚放大 5 倍</span>\n'+
+      '<span class="ok">✔ 绕行更果断、离箱子更远（最小安全距离变大）</span>\n'+
+      '<span class="warn">⚠ 代价：对靠近路径的容忍度下降，窄处可能"宁停不绕"</span>\n'+
+      '<span class="dim">重启后重复正前方放箱 ×3，记成功率与最小距离</span>';
+  }else if(k==='slow'){
+    h='<span class="ok">✔ C · max_vel_x 0.3→0.2：更慢 = 刹得住</span>\n'+
+      '<span class="ok">✔ 0.5m 突现测试刹停更从容，避障成功率上升</span>\n'+
+      '<span class="warn">⚠ 到达耗时变长（0.3 时 3 秒走 1 米，0.2 要 5 秒）</span>\n'+
+      '<span class="dim">对比两组"成功率 / 总耗时"，找你场景的平衡点</span>';
+  }else{
+    h='<span class="warn">⚠ D · inflation_radius 0.18→0.35：膨胀圈几乎翻倍</span>\n'+
+      '<span class="ok">✔ 贴障碍更远，心理安全感↑</span>\n'+
+      '<span class="bad">✘ 高代价区侵占路面：原本能过的窄通道被判"不可行"，规划直接失败</span>\n'+
+      '<span class="dim">膨胀半径是"安全距离"与"可通过性"的拉扯，默认 0.18 = 半宽 0.135 + 4.5 cm 余量的工程折中</span>';
+  }
+  io.innerHTML=h;
+}
+</script>
+<script src="../shared/tutorial.js" defer></script>
+</body>
+</html>

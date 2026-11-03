@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-06 · VLM 描述选目标 — 通用目标追踪综合项目</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+:root{--theme:#0e7490;--theme-deep:#155e75;--theme-bg:#cffafe;--theme-bd:#a5f3fc}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit" title="返回课程首页">🎓 具身智能课程 · <i>通用目标追踪</i></a>
+  <div class="crumb"><a href="../../../index.html#case">综合项目</a> / <a href="../index.html">通用目标追踪</a> / EXP-06</div>
+</div>
+
+<div class="wrap">
+
+<aside class="side">
+  <h4>本页目录</h4>
+  <a href="#s1" class="now">01 问题引入：说颜色怎么锁 ID</a>
+  <a href="#s2">02 原理通俗讲解：先看缩略图再放大</a>
+  <a href="#s3">03 关联知识点</a>
+  <a href="#s4">04 实验目标</a>
+  <a href="#s5">05 实验环境与准备</a>
+  <a href="#s6">06 动画讲解：切格 → 选格 → 锁 ID</a>
+  <a href="#s7">07 互动讲解：网格选格演练台</a>
+  <a href="#s8">08 实操步骤：dump 网格与 VLM 选车</a>
+  <a href="#s9">09 重点与易错点</a>
+  <a href="#s10">10 总结与思考</a>
+  <h4>CH1 · 需求与架构</h4>
+  <a href="../exp-01-requirements/index.html">EXP-01 需求分析</a>
+  <a href="../exp-02-track-engine/index.html">EXP-02 单状态机架构</a>
+  <a href="../exp-03-config/index.html">EXP-03 配置详解</a>
+  <h4>CH2 · 感知与交互</h4>
+  <a href="../exp-04-deepsort-tracking/index.html">EXP-04 DeepSORT 底座</a>
+  <a href="../exp-05-llm-gating/index.html">EXP-05 LLM 门控</a>
+  <a href="../exp-06-vlm-selection/index.html">EXP-06 VLM 选目标</a>
+  <h4>CH3 · 语音与验收</h4>
+  <a href="../exp-07-voice-interrupt/index.html">EXP-07 语音与 TTS 打断</a>
+  <a href="../exp-08-events-degrade/index.html">EXP-08 事件与降级</a>
+  <a href="../exp-09-full-verify/index.html">EXP-09 全功能验证</a>
+</aside>
+
+<main class="content">
+
+<div class="exp-head">
+  <span class="code">EXP-06 · 第 2 章 · 综合性 · 4 学时</span>
+  <h1>VLM 描述选目标：一句「追踪红色小轿车」如何变成一个 ID</h1>
+  <p class="desc">用户不会总记得 ID。当门控传回「有描述、无 id」时，VLM 网格登场：把当前帧切成带编号的缩略图网格、让 <b>Qwen3.5-0.8B_vision</b> 只答一个数字、再用 <code>cell_ids[k-1]</code> 把格子映射回追踪 ID。<b>cell_cap=16 的硬上限、0/99 拒答、三路径 fail-closed</b> 共同保证"选不准就不锁"。</p>
+  <div class="meta">
+    <span class="tag hl">难度 ⭐⭐⭐ · 4 学时</span>
+    <span class="tag">build_grid L175-213</span><span class="tag">cell_cap=16</span>
+    <span class="tag">cell_ids[k-1]</span><span class="tag">_vlm_none</span>
+  </div>
+</div>
+
+<!-- 01 -->
+<section class="blk" id="s1">
+  <h2><span class="no">01</span>问题引入：说颜色怎么锁 ID</h2>
+  <p>你说「追踪红色小轿车」，可系统内部流通的只有 <b>DeepSORT 的数字 ID</b>（id18、id24…）。颜色词与 ID 之间隔着一道翻译鸿沟——LLM 只负责听懂并吐出 <code>track_vlm</code>（EXP-05 第③口），真正"看图认车"的活落在 VLM 头上：</p>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>门控判定「描述有、id 无」→ track_vlm</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>dump_track_grids 给当前帧打上编号标签、切网格</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>VLM 只答一个数字（或 0 = 没找到）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span>cell_ids[k-1] 映回真实 ID → submit_effect 锁定</div>
+  </div>
+  <div class="tip amber"><span class="lab">💡 为什么不直接报 ID</span>端侧 0.8B 视觉模型读小目标数字 ID 极易看错；网格化把它简化成<b>"选第几格"</b>的四选一选择题——正确率高得多，还天然可校验。</div>
+</section>
+
+<!-- 02 -->
+<section class="blk" id="s2">
+  <h2><span class="no">02</span>原理通俗讲解：先看缩略图再放大</h2>
+  <p><b>VLM 网格就像先看缩略图再放大细节</b>——监控室值班员不是把每辆车放大数车牌，而是先在九宫格缩略图上圈"红色那格"，再看该格里的具体目标。</p>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">比喻一</div><div class="kt">切网格 = 贴号码牌的缩略图</div><p>build_grid（vlm_real.py L175-213）把帧切成 rows×cols 网格，每格标 1..n 的大号数字、空位标 <code>?</code>，统一压到 448×448。<b>格子编号是给模型看的"座位号"。</b></p></div>
+    <div class="kcard"><div class="kd">比喻二</div><div class="kt">_pick_grid = 先排座再定座数</div><p>L170-185 按排序键 <code>(|r-c|, 格子数, min(r,c), r)</code> 在候选布局中挑一个——让网格尽量方正、优先 2×2 这类小布局，候选多了才升 4×4。</p></div>
+    <div class="kcard"><div class="kd">比喻三</div><div class="kt">PROMPT = 只许报座位号的考规</div><p>「图片是 R 行 C 列的网格…只答数字 1..N，找不到答 0」（grid_select_prompt L215-240）；<b>故意不提供 99 这个"逃生口"</b>（L218 注释）——模型答 0/99/越界一律按拒答处理。</p></div>
+    <div class="kcard"><div class="kd">比喻四</div><div class="kt">cell_ids[k-1] = 座位号换真人 ID</div><p>_parse_tile（L241-263）把「3」还原成 k=3，select_crops（L433-473）在 L471 取 <code>cell_ids[k-1]</code>。<b>座位号 ≠ 追踪 ID</b>，这一步才是换算。</p></div>
+  </div>
+  <div class="tip tealb"><span class="lab">🔍 fail-closed 三路径</span>①VLM 懒加载失败 → None；②解析出 0/99/越界 → None；③候选目标 > 16（cell_cap=16）→ None。三条路殊途同归到 <code>_vlm_none</code>（track_app.py L402-405，打 WARN + 引导话术、<b>绝不 submit</b>）——拿不准宁不放行。</div>
+</section>
+
+<!-- 03 -->
+<section class="blk" id="s3">
+  <h2><span class="no">03</span>关联知识点</h2>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">上游</div><div class="kt">EXP-05 门控第③口</div><p>「描述有、id 无」才走 track_vlm；有 id 走 ID 对齐、纯清除走 clear_track——VLM 只接门控筛剩下的那一类话。</p></div>
+    <div class="kcard"><div class="kd">下游</div><div class="kt">submit_effect 入队</div><p>选中的 ID 经门控放行后进 maxsize=8 队列 → 主循环 apply → DeepSORT 按 min_confidence=0.3 等规则继续跟（EXP-04）。</p></div>
+    <div class="kcard"><div class="kd">模型</div><div class="kt">Qwen3.5-0.8B_vision 链</div><p>llm_mgr 拉起日志 <code>Qwen3.5-0.8B_w4a16_g128_rk3576.rkllm … --port 8080</code>，首载 30-60s；VLM 懒加载，首次选车前才实例化。</p></div>
+    <div class="kcard"><div class="kd">测试锚点</div><div class="kt">三个测试 + 配置假件</div><p>test_vlm_grid / test_vlm_real / test_vlm_fake；track_config.yaml L33 <code>fake_result_id=3</code> → FakeVLMSelect（vlm_fake.py L14-18）无真模型也能全链路回归。</p></div>
+  </div>
+</section>
+
+<!-- 04 -->
+<section class="blk" id="s4">
+  <h2><span class="no">04</span>实验目标</h2>
+  <ul class="check">
+    <li>用 dump_track_grids 生成带标签网格图，读懂 JSON 里的 cell_cap / order / cells / 448×448</li>
+    <li>跑 test_vlm_select 传入 <code>--color 红</code>，核对 frame200（2×2，4 id）与 frame400（4×4，11 id）的选格结果</li>
+    <li>手推公式 <code>cell_px=⌊448/max(rows,cols)⌋</code>、<code>k=r×cols+c+1</code>、<code>id=cell_ids[k-1]</code></li>
+    <li>复现一段成功链路日志：[cmd] 描述指令 → track_vlm → [track_vlm] 锁定目标 ID</li>
+    <li>构造一个失败场景（候选 > 16 或模型答 0），确认走 _vlm_none 引导话术、ID 不被锁定</li>
+  </ul>
+</section>
+
+<!-- 05 -->
+<section class="blk" id="s5">
+  <h2><span class="no">05</span>实验环境与准备</h2>
+  <p>用视频 + 文本模式即可复现全链路（摄像头模式同理，只是帧源不同）。测试可先走 fake_result_id 假件，再换真 VLM：</p>
+  <pre><span class="c"># ① 测试（假件链，不依赖真模型）</span>
+<span class="g">python3</span> -m pytest tests/ -q -k "vlm"
+
+<span class="c"># ② 启动文本模式（llm_server 由 ensure_running 自动拉起）</span>
+<span class="g">python3</span> apps/track_app.py \
+  --video /home/iflytek/ros2_ws/src/xflz_eai_car1/vision/07_multi_object_tracking/test.mp4 \
+  --text --mjpeg
+
+<span class="c"># ③ 配置确认（fake_result_id 位置）</span>
+<span class="g">grep</span> -n "fake_result_id" config/track_config.yaml   <span class="y"># L33 默认 3</span></pre>
+  <div class="tip"><span class="lab">💡 真假模型切换</span>真 VLM 走 llm_mgr 懒加载、首载 30-60s；跑批量回归时留 <code>fake_result_id</code>（FakeVLMSelect 固定返回该 ID）——把"映射逻辑对不对"与"模型认得准不准"分成两件事验证。</div>
+</section>
+
+<!-- 06 -->
+<section class="blk" id="s6">
+  <h2><span class="no">06</span>动画讲解：切格 → 选格 → 锁 ID</h2>
+  <p class="lead">一笔动画看完三步：帧先被切成带编号的 2×2 网格，VLM 只答一个座位号，最后换算成追踪 ID。<b>红色虚线出口代表 fail-closed</b>——任何一步拿不准都滑向那里：</p>
+  <div class="anim-box">
+    <svg viewBox="0 0 720 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="VLM 网格选目标动画">
+      <rect x="8" y="8" width="704" height="304" rx="12" fill="#111827" stroke="#334155"/>
+      <text x="360" y="34" text-anchor="middle" font-size="14" font-weight="700" fill="#67e8f9">track_vlm：帧 → 448×448 编号网格 → 选格 → cell_ids[k-1]</text>
+
+      <!-- ① 切网格 -->
+      <rect x="26" y="58" width="128" height="128" rx="8" fill="#1e293b" stroke="#22d3ee" stroke-width="1.6"/>
+      <text x="90" y="76" text-anchor="middle" font-size="11" fill="#67e8f9" font-weight="700">① build_grid L175-213</text>
+      <g stroke="#475569" stroke-width="1.4" fill="#0f172a">
+        <rect x="38" y="88" width="52" height="42"/><rect x="94" y="88" width="52" height="42"/>
+        <rect x="38" y="134" width="52" height="42"/><rect x="94" y="134" width="52" height="42"/>
+      </g>
+      <g font-size="14" fill="#fbbf24" font-weight="700" text-anchor="middle">
+        <text x="102" y="94">?</text><text x="64" y="94">1</text>
+        <text x="120" y="94">2</text><text x="64" y="140">3</text><text x="120" y="140">4</text>
+      </g>
+      <text x="90" y="196" text-anchor="middle" font-size="9.5" fill="#94a3b8">cell_px=⌊448/max(r,c)⌋=224 · 空位标 ?</text>
+
+      <!-- ② VLM 选格 -->
+      <rect x="238" y="72" width="130" height="70" rx="9" fill="#1e293b" stroke="#a78bfa" stroke-width="1.8"/>
+      <text x="303" y="94" text-anchor="middle" font-size="11" fill="#c4b5fd" font-weight="700">② VLM 只答数字</text>
+      <text x="303" y="112" text-anchor="middle" font-size="10" fill="#94a3b8">「只答 1..N，找不到答 0」</text>
+      <text x="303" y="130" text-anchor="middle" font-size="11" fill="#fbbf24" font-weight="700">答：3（_parse_tile L241-263）</text>
+      <g stroke="#38bdf8" stroke-width="2" stroke-dasharray="8 6">
+        <line x1="154" y1="122" x2="238" y2="110"><animate attributeName="stroke-dashoffset" values="0;-28" dur="1s" repeatCount="indefinite"/></line>
+        <line x1="368" y1="107" x2="430" y2="107"><animate attributeName="stroke-dashoffset" values="0;-28" dur="1s" repeatCount="indefinite"/></line>
+      </g>
+      <g font-size="9.5" fill="#94a3b8" text-anchor="middle">
+        <text x="196" y="146">cell_cap=16 上限</text>
+        <text x="196" y="160">候选&gt;16 → None</text>
+      </g>
+
+      <!-- ③ 座位号→ID -->
+      <rect x="430" y="72" width="118" height="70" rx="9" fill="#1e293b" stroke="#4ade80" stroke-width="1.8"/>
+      <text x="489" y="94" text-anchor="middle" font-size="11" fill="#86efac" font-weight="700">③ 映射 L471</text>
+      <text x="489" y="112" text-anchor="middle" font-size="10.5" fill="#e2e8f0">id = cell_ids[3-1]</text>
+      <text x="489" y="130" text-anchor="middle" font-size="11" fill="#4ade80" font-weight="700">→ id32</text>
+      <line x1="548" y1="107" x2="612" y2="107" stroke="#4ade80" stroke-width="2"/>
+
+      <!-- ④ 锁定 -->
+      <rect x="612" y="78" width="80" height="58" rx="9" fill="#1e293b" stroke="#4ade80" stroke-width="2"/>
+      <text x="652" y="100" text-anchor="middle" font-size="11" fill="#86efac" font-weight="700">✔ 锁定</text>
+      <text x="652" y="118" text-anchor="middle" font-size="9.5" fill="#94a3b8">[track_vlm]</text>
+      <text x="652" y="158" text-anchor="middle" font-size="9.5" fill="#4ade80">submit_effect 入队</text>
+
+      <!-- fail-closed 出口 -->
+      <rect x="238" y="214" width="310" height="62" rx="9" fill="#1e293b" stroke="#f87171" stroke-width="1.8" stroke-dasharray="5 4"/>
+      <text x="393" y="238" text-anchor="middle" font-size="11.5" fill="#fca5a5" font-weight="700">✘ 三条拒答路 → _vlm_none（L402-405）</text>
+      <text x="393" y="256" text-anchor="middle" font-size="10" fill="#94a3b8">VLM 加载失败 / 答 0·99·越界 / 候选 &gt; 16</text>
+      <text x="393" y="271" text-anchor="middle" font-size="10" fill="#f87171">WARN + 引导话术，绝不 submit</text>
+      <line x1="303" y1="142" x2="330" y2="214" stroke="#f87171" stroke-width="1.6" stroke-dasharray="5 4"/>
+      <line x1="489" y1="142" x2="470" y2="214" stroke="#f87171" stroke-width="1.4" stroke-dasharray="4 4"/>
+
+      <!-- 选格动点 -->
+      <circle r="5" fill="#fbbf24">
+        <animate attributeName="cx" values="64;303;303;489;652" dur="6s" repeatCount="indefinite"/>
+        <animate attributeName="cy" values="140;70;110;107;107" dur="6s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="1;1;1;1;0" keyTimes="0;0.3;0.55;0.8;1" dur="6s" repeatCount="indefinite"/>
+      </circle>
+      <!-- 蓝框高亮选中格 -->
+      <rect x="38" y="134" width="52" height="42" fill="none" stroke="#38bdf8" stroke-width="2" opacity="0.9">
+        <animate attributeName="opacity" values="0.2;1;0.2" dur="6s" repeatCount="indefinite"/>
+      </rect>
+    </svg>
+  </div>
+  <div class="anim-cap">动画 6-1｜蓝框格子每 6 秒被"点名"一次（选中 3 号格 → cell_ids[2] → id32 锁定）；两条红色虚线是三条拒答路汇聚到 _vlm_none——拿不准宁不放行</div>
+</section>
+
+<!-- 07 -->
+<section class="blk" id="s7">
+  <h2><span class="no">07</span>互动讲解：网格选格演练台</h2>
+  <p class="lead">扮演 VLM 做一遍选择题：给定网格布局与候选 ID，选一格看映射结果，再故意触发一次 fail-closed：</p>
+  <div class="ix-panel">
+    <div class="ix-title">网格选格演练台 · Grid Pick Lab</div>
+    <div class="ctl-row">
+      <button class="btn" onclick="vlmPick(0)">🖼 2×2 选 3 号格</button>
+      <button class="btn" onclick="vlmPick(1)">🖼 4×4 选 11 号格</button>
+      <button class="btn" onclick="vlmPick(2)">🚫 模型答 0</button>
+      <button class="btn" onclick="vlmPick(3)">🧮 候选 17 个超 cap</button>
+      <button class="btn ghost" onclick="vlmReset()">↺ 复位</button>
+    </div>
+    <div class="io" id="vlmIo"><span class="dim">// 选一格开始：k=r×cols+c+1，最终 id=cell_ids[k-1]</span>
+<span class="ok">提示：座位号永远不等于追踪 ID，最后那步减一换算是全实验最大陷阱</span></div>
+  </div>
+  <div class="tip"><span class="lab">💡 公式三连</span><code>cell_px=⌊448/max(rows,cols)⌋</code>（2×2 → 224）→ <code>k=r×cols+c+1</code>（第 2 行第 1 列 → 3）→ <code>id=cell_ids[k-1]</code>。三步任一错位，锁到的就是旁边那辆车。</div>
+</section>
+
+<!-- 08 -->
+<section class="blk" id="s8">
+  <h2><span class="no">08</span>实操步骤：dump 网格与 VLM 选车</h2>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>dump_track_grids 抽帧切格，生成 grid_f200 图与 JSON（40 分钟）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>test_vlm_select --color 红 跑真/假模型，核对选格与 cell_ids（40 分钟）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>文本模式完整说「追踪红色小轿车」，抓五段成功链路日志（60 分钟）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span>换"画面里没有的描述"触发 _vlm_none，确认不锁定（40 分钟）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">5</span>grep 行号锚点 + 整理三路径 fail-closed 表（40 分钟）</div>
+  </div>
+  <pre><span class="c"># ① 抽帧切网格（frame-step 200 → 第 200/400 帧）</span>
+<span class="g">python3</span> apps/dump_track_grids.py \
+  --video /home/iflytek/ros2_ws/src/xflz_eai_car1/vision/07_multi_object_tracking/test.mp4 \
+  --frame-step 200
+<span class="y">→ runs/vlm_frames/grid_f200_rx2c2.jpg / .json（含 cell_cap、order、cells、448×448）</span>
+
+<span class="c"># ② 指定颜色选格</span>
+<span class="g">python3</span> apps/test_vlm_select.py \
+  --image runs/vlm_frames/grid_f200_rx2c2.jpg \
+  --json  runs/vlm_frames/grid_f200_rx2c2.json --color 红
+<span class="y">frame200 n=4 ids=[29,30,32,33] grid 2×2 → PROMPT → 答 '3'（5s）→ cell_ids[2]=32</span>
+<span class="y">frame400 n=11 → 4×4 网格（仍 ≤ cell_cap=16）</span>
+
+<span class="c"># ③ 完整链路成功日志（--text 模式逐句验证）</span>
+<span class="y">[cmd] 追踪红色小轿车 → native tool=track_vlm</span>
+<span class="y">[cmd] track_ids 无 id 但含描述，改 VLM 选车</span>
+<span class="y">[track_vlm] dump 带标签网格 → [track_vlm] 锁定目标 ID 24</span>
+
+<span class="c"># ④ 失败链路（如「追踪火车」画面中不存在）</span>
+<span class="y">[cmd] track_ids 无可用 id，回引导 —— 不锁定任何 ID</span>
+
+<span class="c"># ⑤ 行号锚点</span>
+<span class="g">grep</span> -n "def build_grid\|def _pick_grid\|def _parse_tile" vision/.../vlm_real.py
+<span class="g">grep</span> -n "_vlm_none" apps/track_app.py        <span class="y"># L402-405</span>
+<span class="g">grep</span> -n "cell_cap" apps/track_app.py config/track_config.yaml</pre>
+  <div class="tip amber"><span class="lab">⚠️ 拒答口只有一个</span>PROMPT 只教模型答 1..N 或 0，<b>没有 99 这个口</b>（L218 注释特意说明）——解析端仍防御性处理 99，因为老模型/幻觉可能自己发明数字。</div>
+</section>
+
+<!-- 09 -->
+<section class="blk" id="s9">
+  <h2><span class="no">09</span>重点与易错点</h2>
+  <ul class="check">
+    <li><b>座位号 ≠ 追踪 ID</b>：格子 k 是给模型看的，真正 ID 必须经 <code>cell_ids[k-1]</code>；直接把 k 当 ID 会锁错目标</li>
+    <li>cell_cap=16 是硬上限：候选框超过 16 个直接 None——宁可让用户换个描述，也不让模型在 16+ 格里盲选</li>
+    <li>0/99/越界一律拒答：_parse_tile 的宽容解析不是"尽力猜"，而是把所有歧义都送进同一条 fail-closed 路</li>
+    <li>VLM 是懒加载：第一次说颜色指令才实例化模型，首载 30-60s 内"没反应"是正常加载，不是卡死</li>
+    <li>实验完确认锁定状态再收尾：失败链路必须停在引导话术，锁定了 ID 说明门控或映射有漏</li>
+  </ul>
+  <table>
+    <thead><tr><th>⚠️ 常见坑</th><th>现象 → 解法</th></tr></thead>
+    <tbody>
+      <tr><td>选中格却锁了隔壁车</td><td>k 与 cell_ids 下标错位 → 核对 cell_ids[k-1] 与 _pick_grid 的 order 顺序是否一致</td></tr>
+      <tr><td>n=11 却仍是 2×2</td><td>先看 _pick_grid 排序键 (|r-c|, 格子数, …) 的输出 → 必要时读 dump JSON 的 order 字段</td></tr>
+      <tr><td>模型回了长句子不给数字</td><td>_parse_tile 解析不到 1..N → 按拒答处理进 _vlm_none，检查 PROMPT 是否完整下发</td></tr>
+      <tr><td>测试与真机结果不一致</td><td>fake_result_id=3 固定返回 → 跑真链路先清掉/留档假件再验</td></tr>
+      <tr><td>首载 60s 以为挂了</td><td>llm_mgr 30-60s 属正常 → 看「Qwen3.5-0.8B…--port 8080」拉起日志</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 10 -->
+<section class="blk" id="s10">
+  <h2><span class="no">10</span>总结与思考</h2>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">✅ 完成成果</div><div class="kt">网格 JSON + 选格记录</div><p>grid_f200/*.json 在手，color=红 的选格结果与 cell_ids 换算过程可完整复述。</p></div>
+    <div class="kcard"><div class="kd">🧠 原理收获</div><div class="kt">选择题化繁为简</div><p>把"从图里找 ID"降维成"四选一选格"，模型小也能做对——这是端侧 VLM 的工程智慧。</p></div>
+    <div class="kcard"><div class="kd">🛠 技能收获</div><div class="kt">真假件分层验证</div><p>FakeVLMSelect 验映射逻辑，真模型验识别能力，两层分开跑，归因不慌。</p></div>
+    <div class="kcard"><div class="kd">❓ 排障思路</div><div class="kt">看 [track_vlm] 三段日志</div><p>dump 带标签网格 → 锁定目标 ID / 无法识别——三段日志把"切、选、映"拆开定位。</p></div>
+  </div>
+  <div class="tip violet"><span class="lab">📝 思考题 1</span>如果把格子编号从 1..N 改成 0..N-1（Python 下标友好），_parse_tile 与 cell_ids[k-1] 要怎么改才不出错？为什么原设计偏要用 1 起始——对 PROMPT 的歧义性有什么好处？</div>
+  <div class="tip violet"><span class="lab">📝 思考题 2</span>当候选恰好 17 个时直接 fail-closed，是不是太保守了？结合"锁错目标的代价"与"cell_cap=16 的 RAM/显存预算"，谈谈你会怎么设计渐进策略（提示：两轮缩略？局部放大？）。</div>
+</section>
+
+<nav class="expnav">
+  <a href="../exp-05-llm-gating/index.html"><span class="lb">← 上一个</span>EXP-05 LLM 指令门控</a>
+  <a class="next" href="../exp-07-voice-interrupt/index.html"><span class="lb">下一个实验 →</span>EXP-07 语音交互（流式 TTS 打断）</a>
+</nav>
+
+<footer>
+  <span>CASE-04 · 通用目标追踪综合项目 · EXP-06 VLM 描述选目标</span>
+  <span>4 学时 · 综合性 · 基于 object_tracking 实验讲义改编</span>
+</footer>
+
+</main>
+</div>
+
+<script>
+// 网格选格演练台
+var VLM_CASES = [
+  [
+    '<span class="dim">// 布局 2×2 · cell_px=⌊448/max(2,2)⌋=224 · cell_ids=[29,30,32,33]</span>',
+    '<span class="dim">// PROMPT：只答 1..4，找不到答 0</span>',
+    '<span class="ok">VLM 答「3」→ _parse_tile 解析 k=3（L241-263，合法 1..4）</span>',
+    '<span class="ok">换算 r=1,c=0 → 验算 k=r×cols+c+1=3 ✓</span>',
+    '<span class="ok">select_crops L471：id = cell_ids[3-1] = 32</span>',
+    '<span class="ok">✔ [track_vlm] 锁定目标 ID 32 → submit_effect 入队</span>'
+  ],
+  [
+    '<span class="dim">// 布局 4×4（n=11 候选）· cell_ids 十一个 ID · 仍 ≤ cell_cap=16</span>',
+    '<span class="ok">VLM 答「11」→ k=11 合法（1..16 范围内且未超实际格数）</span>',
+    '<span class="ok">id = cell_ids[11-1] → 取第 11 个候选的真实 ID</span>',
+    '<span class="warn">⚠ 若把 11 直接当追踪 ID → 锁到完全不相干的 track</span>',
+    '<span class="ok">✔ 映射正确才放行；_pick_grid 顺序就是 cell_ids 顺序</span>'
+  ],
+  [
+    '<span class="dim">// 模型拒答场景：答「0」</span>',
+    '<span class="warn">_parse_tile：0 视为拒答（PROMPT 教的"找不到答 0"）→ 返回 None</span>',
+    '<span class="warn">路径② fail-closed 触发</span>',
+    '<span class="bad">✘ → _vlm_none（track_app.py L402-405）</span>',
+    '<span class="dim">播报：画面里没识别到该描述的目标（引导换个描述/直接给 id）</span>',
+    '<span class="ok">verify：锁定集不变——绝不猜、绝不锁</span>'
+  ],
+  [
+    '<span class="dim">// 检出 17 个候选目标，超过 cell_cap=16</span>',
+    '<span class="ok">build_grid 前置检查：17 &gt; 16 → 连网格都不生成</span>',
+    '<span class="warn">路径③ fail-closed 触发（候选上限是硬约束）</span>',
+    '<span class="bad">✘ → _vlm_none 同一条出口</span>',
+    '<span class="dim">此时更优解是让用户补限定词（"左边那辆"），缩小候选</span>',
+    '<span class="dim">三路径殊途同归：模型缺席/答非所限/题量超纲，一律不放行</span>'
+  ]
+];
+function vlmPick(i){
+  document.getElementById('vlmIo').innerHTML = VLM_CASES[i].join('\n');
+}
+function vlmReset(){
+  document.getElementById('vlmIo').innerHTML =
+    '<span class="dim">// 已复位。选一格开始：k=r×cols+c+1，最终 id=cell_ids[k-1]</span>\n' +
+    '<span class="ok">提示：座位号永远不等于追踪 ID，最后那步减一换算是全实验最大陷阱</span>';
+}
+</script>
+<script src="../shared/tutorial.js" defer></script>
+</body>
+</html>

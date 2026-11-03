@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>磁编码器演示：位置 → 磁场方向 → 解角度</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:transparent;
+  font-family:'Noto Sans CJK SC','Microsoft YaHei',sans-serif;color:#334155;-webkit-font-smoothing:antialiased}
+.wrap{padding:8px 6px 6px;display:flex;flex-direction:column;align-items:center;gap:6px}
+.hint{font-size:12.5px;color:#64748b;line-height:1.55;text-align:center;max-width:400px}
+.hint b{color:#b91c1c}
+svg{display:block;width:100%;max-width:400px}
+svg.mag{cursor:crosshair}
+.cap{font-size:11.5px;color:#64748b;text-align:center;line-height:1.65;max-width:400px}
+.cap b{color:#334155}
+.cap .n1{color:#b91c1c;font-weight:800}
+.slider-row{display:flex;align-items:center;gap:8px;width:100%;max-width:400px;font-size:12px;color:#475569}
+.slider-row input[type=range]{flex:1;accent-color:#7c3aed}
+.slider-row .sv{font-family:Consolas,monospace;font-weight:700;color:#6d28d9;min-width:58px;text-align:right}
+.readout{width:100%;max-width:400px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;
+  padding:6px 10px;font-family:Consolas,'Courier New',monospace;font-size:12.5px;line-height:1.65;color:#334155}
+.readout .b{color:#6d28d9;font-weight:700}
+.readout .ok{color:#15803d;font-weight:700}
+.lesson{font-size:12.5px;font-weight:700;color:#0f172a;text-align:center;line-height:1.5}
+.legend{font-size:11.5px;color:#64748b;text-align:center;line-height:1.6;max-width:400px;
+  background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;padding:5px 9px}
+.legend b{color:#334155}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hint">四步看懂"磁铁转、芯片知道角度"：① <b>位置</b> → ② <b>霍尔效应</b>（磁场变电压）→ ③ <b>两根元件测分量</b> → ④ <b>atan2 算角度</b>（往下拖磁铁试）</div>
+
+  <!-- ① 位置：侧视图 -->
+  <svg viewBox="0 0 400 150" aria-label="磁铁在轴尾，芯片隔空固定在正下方">
+    <!-- 输出轴 -->
+    <rect x="192" y="4" width="16" height="66" rx="3" fill="#b45309"/>
+    <text x="214" y="20" font-size="10" fill="#92400e">输出轴</text>
+    <!-- 磁铁（径向充磁，N 右 / S 左，跟轴转） -->
+    <rect x="168" y="70" width="32" height="22" fill="#2563eb"/>
+    <rect x="200" y="70" width="32" height="22" fill="#dc2626"/>
+    <rect x="168" y="70" width="64" height="22" fill="none" stroke="#334155" stroke-width="1.5"/>
+    <text x="184" y="85" text-anchor="middle" font-size="12" font-weight="800" fill="#fff">S</text>
+    <text x="216" y="85" text-anchor="middle" font-size="12" font-weight="800" fill="#fff">N</text>
+    <text x="240" y="77" font-size="10" fill="#64748b">磁铁</text>
+    <text x="240" y="89" font-size="10" fill="#64748b">（跟轴转）</text>
+    <!-- 空气间隙 -->
+    <line x1="200" y1="92" x2="200" y2="116" stroke="#94a3b8" stroke-width="1" stroke-dasharray="3 3"/>
+    <text x="240" y="107" font-size="10" fill="#94a3b8">隔空 ≈2mm</text>
+    <!-- 芯片（固定） -->
+    <rect x="172" y="116" width="56" height="16" rx="3" fill="#166534"/>
+    <text x="200" y="127" text-anchor="middle" font-size="10" fill="#fff">芯片（固定）</text>
+    <!-- 磁力线：从 N 出发、扫过芯片、回到 S -->
+    <path d="M 232 82 Q 200 140 168 82" fill="none" stroke="#7c3aed" stroke-width="1.6" marker-end="url(#arrS)"/>
+    <path d="M 230 80 Q 200 120 170 80" fill="none" stroke="#7c3aed" stroke-width="1" opacity="0.45"/>
+    <defs>
+      <marker id="arrS" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#7c3aed"/>
+      </marker>
+    </defs>
+    <text x="120" y="118" font-size="10" fill="#7c3aed">磁场</text>
+  </svg>
+  <div class="cap"><span class="n1">① 位置：</span>磁铁（红 N / 蓝 S）贴在轴尾<b>跟轴一起转</b>；芯片<b>隔空固定</b>不动。磁铁周围有一圈<b>看不见的磁场</b>，磁铁转，磁场方向就跟着转。</div>
+
+  <!-- ② 霍尔效应：磁场怎么变成电压 -->
+  <svg viewBox="0 0 400 120" aria-label="霍尔效应：磁场把电流推歪，产生电压">
+    <!-- 霍尔片 -->
+    <rect x="150" y="45" width="100" height="30" rx="4" fill="#d1fae5" stroke="#0f766e" stroke-width="1.5"/>
+    <text x="200" y="66" text-anchor="middle" font-size="10" fill="#0f766e">通电的霍尔片</text>
+    <!-- 电流：从左进，被磁场推得下弯 -->
+    <line x1="96" y1="60" x2="148" y2="60" stroke="#2563eb" stroke-width="2"/>
+    <polygon points="96,55 96,65 86,60" fill="#2563eb"/>
+    <path d="M 148 60 Q 200 76 252 60" fill="none" stroke="#2563eb" stroke-width="2"/>
+    <polygon points="258,55 258,65 268,60" fill="#2563eb"/>
+    <text x="94" y="48" font-size="11" fill="#2563eb" font-weight="700">I 电流</text>
+    <!-- 磁场：从上往下垂直穿过 -->
+    <g stroke="#7c3aed" stroke-width="1.8">
+      <line x1="180" y1="10" x2="180" y2="38"/><polygon points="180,44 175,36 185,36" fill="#7c3aed"/>
+      <line x1="200" y1="10" x2="200" y2="38"/><polygon points="200,44 195,36 205,36" fill="#7c3aed"/>
+      <line x1="220" y1="10" x2="220" y2="38"/><polygon points="220,44 215,36 225,36" fill="#7c3aed"/>
+    </g>
+    <text x="236" y="24" font-size="11" fill="#7c3aed" font-weight="700">B 磁场</text>
+    <text x="236" y="38" font-size="9.5" fill="#94a3b8">（垂直穿过）</text>
+    <!-- 两边积攒电荷 -->
+    <text x="190" y="42" font-size="13" font-weight="800" fill="#b91c1c">＋</text>
+    <text x="190" y="90" font-size="13" font-weight="800" fill="#b91c1c">−</text>
+    <!-- 引线到电压表 -->
+    <line x1="190" y1="42" x2="190" y2="30" stroke="#64748b" stroke-width="1"/>
+    <line x1="190" y1="90" x2="190" y2="104" stroke="#64748b" stroke-width="1"/>
+    <line x1="190" y1="30" x2="298" y2="30" stroke="#64748b" stroke-width="1"/>
+    <line x1="190" y1="104" x2="298" y2="104" stroke="#64748b" stroke-width="1"/>
+    <!-- 电压表 -->
+    <circle cx="308" cy="67" r="17" fill="#fff" stroke="#334155" stroke-width="1.5"/>
+    <text x="308" y="72" text-anchor="middle" font-size="14" font-weight="800" fill="#0f172a">V</text>
+    <text x="308" y="96" text-anchor="middle" font-size="10" fill="#64748b">霍尔电压</text>
+    <text x="330" y="50" font-size="10" fill="#64748b">∝ B</text>
+  </svg>
+  <div class="cap"><span class="n1">② 霍尔效应（磁场怎么变成电）：</span>芯片里有一小片通电的<b>霍尔元件</b>。电流本来直着走，磁场穿过时把电荷<b>往一边推</b>，于是片子两边一边电子多、一边电子少，冒出一个<b>电压</b>——磁场越强、推得越狠，电压越大。磁场就这样被翻译成了电信号。</div>
+
+  <!-- ③ 顶视图：磁铁转，磁场方向转，芯片测分量 -->
+  <svg class="mag" id="magSvg" viewBox="0 0 400 200" aria-label="径向磁铁随轴转，芯片读 Bx By">
+    <line x1="30" y1="100" x2="250" y2="100" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="4 4"/>
+    <line x1="140" y1="4" x2="140" y2="196" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="4 4"/>
+    <text x="250" y="94" font-size="11" fill="#94a3b8">X（Bx）</text>
+    <text x="148" y="12" font-size="11" fill="#94a3b8">Y（By）</text>
+    <rect x="298" y="66" width="88" height="46" rx="8" fill="#e7f6ef" stroke="#0f766e"/>
+    <text x="342" y="85" text-anchor="middle" font-size="11" fill="#0f766e" font-weight="700">芯片（俯视）</text>
+    <text x="342" y="101" text-anchor="middle" font-size="10" fill="#64748b">X 测 Bx · Y 测 By</text>
+    <line x1="298" y1="89" x2="206" y2="94" stroke="#0f766e" stroke-width="1" stroke-dasharray="3 3"/>
+    <g transform="translate(140,100)">
+      <g id="magG">
+        <path d="M0,0 L0,-56 A56,56 0 0 1 0,56 Z" fill="#dc2626"/>
+        <path d="M0,0 L0,-56 A56,56 0 0 0 0,56 Z" fill="#2563eb"/>
+        <circle r="56" fill="none" stroke="#334155" stroke-width="2"/>
+        <text x="30" y="5" fill="#fff" font-size="14" font-weight="800" text-anchor="middle">N</text>
+        <text x="-30" y="5" fill="#fff" font-size="14" font-weight="800" text-anchor="middle">S</text>
+        <line x1="6" y1="0" x2="43" y2="0" stroke="#7c3aed" stroke-width="3"/>
+        <polygon points="52,-6 52,6 61,0" fill="#7c3aed"/>
+      </g>
+    </g>
+    <circle cx="140" cy="100" r="4" fill="#334155"/>
+    <text x="150" y="190" font-size="11" fill="#64748b">磁铁（红 N / 蓝 S，跟着轴转）</text>
+  </svg>
+  <div class="cap"><span class="n1">③ 一个元件只能测一个方向，所以要两根：</span>单个霍尔片只对"垂直它的那个磁场方向"敏感，测不到另一方向。芯片里 <b>X、Y 两根互相垂直</b>：磁铁转到 θ，X 读 <b>cosθ</b>、Y 读 <b>sinθ</b>。</div>
+
+  <svg viewBox="0 0 400 130" aria-label="Bx 与 By 随角度变化的两条正弦曲线">
+    <line x1="30" y1="70" x2="390" y2="70" stroke="#cbd5e1" stroke-width="1"/>
+    <line x1="30" y1="16" x2="30" y2="124" stroke="#cbd5e1" stroke-width="1"/>
+    <text x="20" y="24" font-size="10" fill="#94a3b8" text-anchor="end">+1</text>
+    <text x="20" y="74" font-size="10" fill="#94a3b8" text-anchor="end">0</text>
+    <text x="20" y="124" font-size="10" fill="#94a3b8" text-anchor="end">−1</text>
+    <g font-size="10" fill="#94a3b8" text-anchor="middle">
+      <text x="30" y="128">0°</text><text x="120" y="128">90°</text><text x="210" y="128">180°</text><text x="300" y="128">270°</text><text x="390" y="128">360°</text>
+    </g>
+    <polyline id="cosCurve" points="" fill="none" stroke="#dc2626" stroke-width="2"/>
+    <polyline id="sinCurve" points="" fill="none" stroke="#2563eb" stroke-width="2"/>
+    <line id="thetaLine" x1="90" y1="16" x2="90" y2="124" stroke="#94a3b8" stroke-width="1" stroke-dasharray="3 3"/>
+    <circle id="dotCos" r="5" fill="#dc2626"/>
+    <circle id="dotSin" r="5" fill="#2563eb"/>
+    <text x="36" y="30" font-size="11" font-weight="700" fill="#dc2626">Bx = cosθ</text>
+    <text x="36" y="114" font-size="11" font-weight="700" fill="#2563eb">By = sinθ</text>
+  </svg>
+
+  <div class="slider-row">角度 θ
+    <input type="range" id="ang" min="0" max="360" step="1" value="60">
+    <span class="sv" id="angv">60°</span>
+  </div>
+
+  <div class="readout" id="rd">
+    <span class="dim">// 芯片解码：两分量 → atan2：</span><br>
+    <span class="b">Bx = cos60° = 0.500　By = sin60° = 0.866</span> → atan2(By,Bx) = <span class="ok">60.0°</span>
+  </div>
+
+  <div class="lesson"><span style="color:#b91c1c">④ 结算：</span>拿到 Bx、By，用 atan2 一算就回到角度——方向就这样变成了度数。</div>
+  <div class="legend">绝对式：转到哪读到哪，<b>断电也记得住位置</b>，不用从头数圈。磁铁不碰芯片，<b>不磨损、耐脏</b>。</div>
+</div>
+
+<script>
+(function(){
+'use strict';
+var theta = 60;                 /* 当前磁铁角（度） */
+var CX = 140, CY = 100;         /* 磁铁盘心（magSvg 坐标） */
+
+var magG = document.getElementById('magG');
+var magSvg = document.getElementById('magSvg');
+var slider = document.getElementById('ang');
+var angv = document.getElementById('angv');
+var rd = document.getElementById('rd');
+
+var cosCurve = document.getElementById('cosCurve');
+var sinCurve = document.getElementById('sinCurve');
+var thetaLine = document.getElementById('thetaLine');
+var dotCos = document.getElementById('dotCos');
+var dotSin = document.getElementById('dotSin');
+
+function px(d){ return 30 + d; }
+function py(v){ return 70 - v * 50; }
+
+(function buildCurves(){
+  var c = [], s = [], d;
+  for(d = 0; d <= 360; d += 3){
+    c.push(px(d).toFixed(1) + ',' + py(Math.cos(d*Math.PI/180)).toFixed(1));
+    s.push(px(d).toFixed(1) + ',' + py(Math.sin(d*Math.PI/180)).toFixed(1));
+  }
+  cosCurve.setAttribute('points', c.join(' '));
+  sinCurve.setAttribute('points', s.join(' '));
+})();
+
+function norm360(d){ d = d % 360; return d < 0 ? d + 360 : d; }
+
+function render(){
+  var rad = theta * Math.PI / 180;
+  var bx = Math.cos(rad), by = Math.sin(rad);
+  magG.setAttribute('transform', 'rotate(' + (-theta) + ')');   /* SVG rotate 正值=顺时针，取负让磁场箭头朝数学角 +θ */
+  thetaLine.setAttribute('x1', px(theta)); thetaLine.setAttribute('x2', px(theta));
+  dotCos.setAttribute('cx', px(theta)); dotCos.setAttribute('cy', py(bx));
+  dotSin.setAttribute('cx', px(theta)); dotSin.setAttribute('cy', py(by));
+  var dec = norm360(Math.atan2(by, bx) * 180 / Math.PI);
+  angv.textContent = Math.round(theta) + '\u00B0';
+  rd.innerHTML = '<span class="dim">// 芯片解码：两分量 → atan2：</span><br>' +
+    '<span class="b">Bx = cos' + Math.round(theta) + '\u00B0 = ' + bx.toFixed(3) +
+    '\u2003By = sin' + Math.round(theta) + '\u00B0 = ' + by.toFixed(3) + '</span> → atan2(By,Bx) = ' +
+    '<span class="ok">' + dec.toFixed(1) + '\u00B0</span>';
+}
+
+function setTheta(d){ theta = norm360(d); slider.value = theta; render(); }
+
+slider.addEventListener('input', function(){ setTheta(+slider.value); });
+
+var dragging = false;
+function setFromEvent(e){
+  var r = magSvg.getBoundingClientRect();
+  var scale = 400 / r.width;
+  var x = (e.clientX - r.left) * scale;
+  var y = (e.clientY - r.top) * scale;
+  setTheta(Math.atan2(CY - y, x - CX) * 180 / Math.PI);
+}
+magSvg.addEventListener('pointerdown', function(e){ dragging = true; setFromEvent(e); });
+magSvg.addEventListener('pointermove', function(e){ if(dragging) setFromEvent(e); });
+window.addEventListener('pointerup', function(){ dragging = false; });
+
+render();
+})();
+</script>
+</body>
+</html>

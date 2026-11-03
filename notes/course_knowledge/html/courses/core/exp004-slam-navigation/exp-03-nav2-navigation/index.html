@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-03 · Nav2 机器人导航 — 机器人 SLAM 与自主导航</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+:root{--theme:#2563eb;--theme-deep:#1d4ed8;--theme-bg:#dbeafe;--theme-bd:#bfdbfe}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit" title="返回课程首页">🧠 具身智能课程 · <i>教程首页</i></a>
+  <div class="crumb"><a href="../../../index.html#core">核心课程</a> / <a href="../index.html">SLAM 与自主导航</a> / EXP-03</div>
+</div>
+
+<div class="wrap">
+
+<aside class="side">
+  <h4>本页目录</h4>
+  <a href="#s1" class="now">01 问题引入：给了地图，它怎么自己走</a>
+  <a href="#s2">02 原理通俗讲解：五大服务器与代价地图</a>
+  <a href="#s3">03 关联知识点</a>
+  <a href="#s4">04 实验目标</a>
+  <a href="#s5">05 实验环境与准备</a>
+  <a href="#s6">06 动画讲解：全局路径与膨胀绕障</a>
+  <a href="#s7">07 互动讲解：全局规划 vs 局部控制对比台</a>
+  <a href="#s8">08 实操步骤：navigation.launch 与 2D Goal</a>
+  <a href="#s9">09 重点与易错点（故障排查）</a>
+  <a href="#s10">10 总结与思考</a>
+  <h4>CH1 · 建模与建图</h4>
+  <a href="../exp-01-slam-urdf/index.html">EXP-01 原理与 URDF</a>
+  <a href="../exp-02-slam-toolbox/index.html">EXP-02 SLAM Toolbox 建图</a>
+  <h4>CH2 · 定位与导航</h4>
+  <a href="../exp-03-nav2-navigation/index.html">EXP-03 Nav2 导航</a>
+  <a href="../exp-04-amcl-localization/index.html">EXP-04 AMCL 定位</a>
+  <a href="../exp-05-dwa-teb-avoidance/index.html">EXP-05 DWA/TEB 避障</a>
+  <h4>CH3 · 进阶</h4>
+  <a href="../exp-06-radar-multiwaypoint/index.html">EXP-06 多点导航</a>
+  <a href="../exp-07-rtabmap-3d/index.html">EXP-07 RTAB-Map 3D</a>
+</aside>
+
+<main class="content">
+
+<div class="exp-head">
+  <span class="code">EXP-03 · 第 2 章 · 综合性 · 8 学时</span>
+  <h1>Nav2 机器人导航</h1>
+  <p class="desc">实验 2 我们给了小车一张地图。这节课让小车"学会看地图自己走路"——你在 RViz 里点一个目标点，它自己规划路线、自己转弯、自己躲开静态障碍，安全到达。这背后是 Nav2 导航栈在工作。</p>
+  <div class="meta">
+    <span class="tag hl">难度 ⭐⭐⭐ · 8 学时</span>
+    <span class="tag">Nav2</span><span class="tag">代价地图</span>
+    <span class="tag">行为树</span><span class="tag">Lifecycle</span>
+  </div>
+</div>
+
+<!-- 01 -->
+<section class="blk" id="s1">
+  <h2><span class="no">01</span>问题引入：给了地图，它怎么自己走</h2>
+  <p>地图存好了（map_01.yaml），目标也明确了（"从这走到那"），但中间一系列决策没人替小车做：</p>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>从 A 到 B 有好几条路，走哪条又短又好又不贴墙？（路径规划）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>路线是"理想的线"，车有宽度、会打滑，轮子不能压线就走（控制）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>走到一半被椅子挡了、卡住了、快撞了——谁负责转个身、退一步？（恢复行为）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span>Nav2 把这些拆成五个专职服务器，用一棵"行为树"当总指挥串起来</div>
+  </div>
+  <div class="tip amber"><span class="lab">💡 一句话读懂</span>导航 = 地图 + 定位 + 全局规划（看大路）+ 局部控制（握方向盘）+ 恢复行为（遇事不慌）。地图差一点、定位歪一点，后面全白搭——这就是"导航三要素"。</div>
+</section>
+
+<!-- 02 -->
+<section class="blk" id="s2">
+  <h2><span class="no">02</span>原理通俗讲解：五大服务器与代价地图</h2>
+  <div class="tip tealb"><span class="lab">🚚 快递车队的分工</span>把 Nav2 想成一支车队：<b>planner（导航员）</b>摊开地图画出"大路"；<b>controller（司机）</b>握着方向盘盯着眼前 3 米，随时微调别压线；<b>bt_navigator（总调度）</b>是对讲机里的队长，按行为树剧本指挥"先规划、再开、偏了就转正"；<b>behavior（救援队）</b>处理事故——被堵了原地转一圈看清、原地等一等；<b>velocity_smoother（安全员）</b>把司机的猛踩油门抹平成平顺的速度曲线，防止急动打滑。</div>
+  <table>
+    <thead><tr><th>服务器</th><th>白话类比</th><th>本项目配置</th></tr></thead>
+    <tbody>
+      <tr><td>planner_server</td><td>导航员（画大路）</td><td>ThetaStarPlanner，期望 20 Hz 出图（行为树按 1 Hz 触发重规划）</td></tr>
+      <tr><td>controller_server</td><td>司机（握方向）</td><td>DWB（FollowPath），<b>20 Hz</b> 控制循环</td></tr>
+      <tr><td>bt_navigator</td><td>总调度（对讲机）</td><td>navigate_to_pose_without_backup.xml / navigate_through_poses_without_backup.xml</td></tr>
+      <tr><td>behavior_server</td><td>救援队</td><td>spin / drive_on_heading / assisted_teleop / wait（<b>未启用 backup</b>）</td></tr>
+      <tr><td>velocity_smoother</td><td>安全员（抹平速度）</td><td>max_velocity [0.4, 0, 3.0]，输出到 controller/cmd_vel</td></tr>
+    </tbody>
+  </table>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">代价地图一</div><div class="kt">全局 costmap（看大路）</div><p>坐标系 map，覆盖整张地图：static 静态层 + obstacle 障碍层 + inflation 膨胀层（inflation_radius 0.18 m），1.0 Hz 更新。</p></div>
+    <div class="kcard"><div class="kd">代价地图二</div><div class="kt">局部 costmap（看眼前）</div><p>坐标系 odom，3 m × 3 m 滚动窗口跟着车跑：voxel_layer 体素层（z_voxels 16）+ inflation 层，<b>5 Hz</b> 刷新，装实时雷达点。</p></div>
+    <div class="kcard"><div class="kd">膨胀的含义</div><div class="kt">离墙越近代价越高</div><p>像地图周围撒一圈"热力晕"：0=空闲、1~252 按 cost_scaling_factor 4.0 衰减、254 障碍、255 未知。规划宁愿绕远也不进红区，车就不贴墙。</p></div>
+    <div class="kcard"><div class="kd">Lifecycle</div><div class="kt">节点也有待机</div><p>unconfigured → inactive（已配置未出力）→ active（干活）：两个 lifecycle_manager（localization / navigation）autostart 一键把 map_server、amcl 与五个服务器逐个激活。</p></div>
+    <div class="kcard"><div class="kd">速度链路</div><div class="kt">谁在真正驱动车</div><p>controller_server 发 cmd_vel_nav → velocity_smoother 平滑 → 改名 controller/cmd_vel → 底盘 odom_publisher 收。teleop 走的才是 /cmd_vel。</p></div>
+  </div>
+</section>
+
+<!-- 03 -->
+<section class="blk" id="s3">
+  <h2><span class="no">03</span>关联知识点</h2>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">知识点 1</div><div class="kt">导航三要素</div><p>地图质量、定位准确、速度约束——任何一环掉链子，症状都是"走歪/撞墙/乱转"。</p></div>
+    <div class="kcard"><div class="kd">知识点 2</div><div class="kt">goal 容差</div><p>到点判定 xy 0.10 m、yaw 0.1 rad：不是"毫米级必须踩点"，留了合理误差带。</p></div>
+    <div class="kcard"><div class="kd">知识点 3</div><div class="kt">footprint 车形轮廓</div><p>[[0.18,0.135],…] 底盘真实外廓（半长 0.18 m、半宽 0.135 m）参与碰撞检测——比圆形近似更贴墙也不剐蹭。</p></div>
+    <div class="kcard"><div class="kd">知识点 4</div><div class="kt">进度检查 progress_checker</div><p>required_movement_radius 0.1、movement_time_allowance 10.0 s：10 秒挪不到 10 cm 就喊"卡了"，交给行为树恢复分支处理。</p></div>
+    <div class="kcard"><div class="kd">知识点 5</div><div class="kt">两个 Action 接口</div><p>navigate_to_pose 单点；navigate_through_poses 一串点（EXP-06 用它）。两者由同一颗 bt_navigator 注册提供。</p></div>
+    <div class="kcard"><div class="kd">知识点 6</div><div class="kt">map 与 odom 的分工</div><p>map 系"绝对世界"（AMCL 修正会跳变），odom 系"平滑里程"（局部控制用）——机器人导航标准双系。</p></div>
+    <div class="kcard"><div class="kd">知识点 7</div><div class="kt">为什么没有 backup</div><p>本车是麦轮可横移，行为树文件名直接叫 without_backup，恢复只做"清代价地图 → 转 1.57 rad 找路 → 等 5 秒"，不后退。</p></div>
+  </div>
+</section>
+
+<!-- 04 -->
+<section class="blk" id="s4">
+  <h2><span class="no">04</span>实验目标</h2>
+  <ul class="check">
+    <li>跑通 <span class="ok">navigation.launch.py map:=map_01</span>，五个服务器全部 active</li>
+    <li>RViz 中手动给初始位姿与目标点，小车<span class="ok">自主规划、自主到达</span>（误差 &lt; 0.10 m）</li>
+    <li>读懂全局 / 局部两张 costmap 的帧系、尺寸、层数与刷新率差异</li>
+    <li>用命令行 <span class="ok">action send_goal</span> 发一次目标，观察 feedback</li>
+    <li>独立排查三类故障：贴墙走、原地转、规划失败</li>
+  </ul>
+</section>
+
+<!-- 05 -->
+<section class="blk" id="s5">
+  <h2><span class="no">05</span>实验环境与准备</h2>
+  <table>
+    <thead><tr><th>项目</th><th>要求</th></tr></thead>
+    <tbody>
+      <tr><td>地图</td><td>EXP-02 产出的 map_01.pgm + map_01.yaml（通过四标准验收的图）；放在 <code>slam/car1_slam/maps/</code> 下</td></tr>
+      <tr><td>软件包</td><td>car1_navigation（navigation.launch.py + config/nav2_params.yaml + 两棵行为树 XML）</td></tr>
+      <tr><td>硬件</td><td>小车 C1 满电、3 m × 3 m 以上空旷平整场地、人在旁监护</td></tr>
+      <tr><td>前置实验</td><td>EXP-02 建图验收通过；理解 AMCL 默认初始位姿（0,0,0）</td></tr>
+      <tr><td>RViz</td><td>launch 自带 navigation.rviz：Map / Path / 两张 Costmap / PoseArray（/particle_cloud）/ LaserScan 已配好</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 06 -->
+<section class="blk" id="s6">
+  <h2><span class="no">06</span>动画讲解：全局路径与膨胀绕障</h2>
+  <p class="lead">青色折线 = planner 画的全局路径（避开膨胀热区）；小车沿线前进，到障碍近前被<b>膨胀层（橙色晕圈）</b>顶着走"外圈"，绝不贴死墙。</p>
+  <div class="anim-box">
+    <svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="全局路径规划与膨胀层绕障动画">
+      <rect x="8" y="8" width="704" height="284" rx="12" fill="#111827" stroke="#334155"/>
+      <text x="360" y="34" text-anchor="middle" font-size="14" font-weight="700" fill="#93c5fd">全局路径（青线）× 膨胀层（橙晕）× 机器人跟踪</text>
+
+      <!-- 场地与墙 -->
+      <rect x="60" y="56" width="600" height="212" rx="8" fill="#0b1220" stroke="#475569" stroke-width="3"/>
+      <!-- 障碍 + 膨胀 -->
+      <rect x="330" y="130" width="80" height="80" rx="6" fill="#f8fafc"/>
+      <rect x="306" y="106" width="128" height="128" rx="16" fill="#f97316" opacity="0.28" stroke="#f97316" stroke-dasharray="6 5"/>
+      <rect x="470" y="70" width="66" height="66" rx="6" fill="#f8fafc"/>
+      <rect x="450" y="50" width="106" height="106" rx="14" fill="#f97316" opacity="0.24" stroke="#f97316" stroke-dasharray="6 5"/>
+      <text x="370" y="176" text-anchor="middle" font-size="12" font-weight="700" fill="#0f172a">纸箱(254)</text>
+      <text x="370" y="100" text-anchor="middle" font-size="10.5" fill="#fdba74">膨胀 0.18m · 代价渐变 1~252</text>
+
+      <!-- 全局路径 -->
+      <path id="gpath" d="M 110 240 C 220 240 250 200 300 150 C 330 118 420 210 470 170 C 520 132 560 110 610 90"
+            fill="none" stroke="#22d3ee" stroke-width="3.5" stroke-dasharray="10 7" stroke-linecap="round"/>
+      <path d="M 110 240 C 220 240 250 200 300 150 C 330 118 420 210 470 170 C 520 132 560 110 610 90"
+            fill="none" stroke="#22d3ee" stroke-width="3.5" stroke-dasharray="10 7" stroke-linecap="round" opacity=".9">
+        <animate attributeName="stroke-dashoffset" values="0;-34" dur="1.1s" repeatCount="indefinite"/>
+      </path>
+      <text x="150" y="266" font-size="11.5" fill="#67e8f9">planner · ThetaStar 全局路径</text>
+
+      <!-- 起点 / 目标 -->
+      <circle cx="110" cy="240" r="9" fill="none" stroke="#4ade80" stroke-width="3"/>
+      <text x="110" y="222" text-anchor="middle" font-size="11" fill="#86efac">起点</text>
+      <g stroke="#f472b6" stroke-width="3">
+        <circle cx="610" cy="90" r="9" fill="none"/>
+        <line x1="610" y1="72" x2="610" y2="108"/><line x1="592" y1="90" x2="628" y2="90"/>
+      </g>
+      <text x="610" y="132" text-anchor="middle" font-size="11" fill="#f9a8d4">目标 · 容差0.10m</text>
+
+      <!-- 小车沿路径移动 -->
+      <g>
+        <rect x="-13" y="-9" width="26" height="18" rx="5" fill="#1e293b" stroke="#60a5fa" stroke-width="2.5"/>
+        <circle cx="4" cy="0" r="3.5" fill="#38bdf8"/>
+        <animateMotion dur="7s" repeatCount="indefinite"
+          path="M 110 240 C 220 240 250 200 300 150 C 330 118 420 210 470 170 C 520 132 560 110 610 90"/>
+        <animateTransform attributeName="transform" type="rotate" values="-10;20;-30;15;0" dur="7s" repeatCount="indefinite" additive="sum"/>
+      </g>
+      <text x="360" y="266" text-anchor="middle" font-size="11.5" fill="#94a3b8">DWB controller 20Hz 跟线（局部代价地图 5Hz 刷新） · 轮子永不进入橙色热区</text>
+    </svg>
+  </div>
+  <div class="anim-cap">动画 3-1｜全局路径绕开膨胀圈（7 秒循环）：代价高的橙区是规划器的"此路不通"，晕圈宽度 = inflation_radius</div>
+</section>
+
+<!-- 07 -->
+<section class="blk" id="s7">
+  <h2><span class="no">07</span>互动讲解：全局规划 vs 局部控制对比台</h2>
+  <p class="lead">同样一个"卡住"症状，两层的职责完全不同——点按钮切换场景，看各层该背锅还是该出手：</p>
+  <div class="ix-panel">
+    <div class="ix-title">双层职责对照台 · Planner vs Controller</div>
+    <div class="ctl-row">
+      <button class="btn" onclick="navCase('reach')">✅ 正常到达</button>
+      <button class="btn ghost" onclick="navCase('wall')">🧱 症状：贴墙走</button>
+      <button class="btn ghost" onclick="navCase('spin')">🌀 症状：原地转圈</button>
+      <button class="btn ghost" onclick="navCase('nopath')">🚫 症状：规划失败</button>
+    </div>
+    <div class="io" id="navIo"><span class="dim">// 选择一个场景，对照"全局层 / 局部层 / 定位层"三方会诊</span>
+<span class="ok">正常流：bt_navigator 收 goal → planner 全图寻路 → controller 跟线 → 到点误差 &lt; 0.10m</span></div>
+  </div>
+  <div class="tip"><span class="lab">💡 排障口诀</span>"走没走对看全局（膨胀/规划），走没走稳看局部（DWB/平滑），走没走歪看定位（AMCL/初始位姿）。"<b>先分层、再猜参数，比瞎改快十倍。</b></div>
+</section>
+
+<!-- 08 -->
+<section class="blk" id="s8">
+  <h2><span class="no">08</span>实操步骤：navigation.launch 与 2D Goal</h2>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>终端 1：带地图启动导航栈；AutoStart 把五个服务器从 inactive 拉到 active</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>RViz：先用「2D Pose Estimate」给初始位姿，再用「2D Goal Pose」点目标——小车出发</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>观察全局/局部 costmap、绿色全局线与本地轨迹；用命令行接口复核</div>
+  </div>
+  <pre><span class="c"># ① 启动导航（map 参数是 maps/ 目录下的地图名，不含 .yaml 后缀）</span>
+<span class="g">ros2</span> launch car1_navigation navigation.launch.py map:=map_01
+
+<span class="c"># ② 自检五大服务器与定位节点是否就位</span>
+<span class="g">ros2</span> node list | <span class="g">grep</span> -E <span class="y">"planner|controller|bt_navigator|behavior|amcl|map_server|velocity_smoother"</span>
+
+<span class="c"># ③ 查看某服务器生命周期状态（预期 active）</span>
+<span class="g">ros2</span> lifecycle get /planner_server
+
+<span class="c"># ④ 命令行发一个目标（与 RViz 点目标等价）</span>
+<span class="g">ros2</span> action send_goal /navigate_to_pose nav2_msgs/action/NavigateToPose \
+  <span class="y">"{pose: {header: {frame_id: 'map'}, pose: {position: {x: 1.0, y: 1.0}, orientation: {w: 1.0}}}}"</span>
+
+<span class="c"># ⑤ 看速度有没有真的下发到车（注意：平滑后的名字是 controller/cmd_vel）</span>
+<span class="g">ros2</span> topic echo /controller/cmd_vel
+<span class="c"># 现场手势：rviz 顶部工具栏 2D Pose Estimate → Nav2 Goal（若配置里是 2D Goal Pose 同理）</span></pre>
+  <div class="tip tealb"><span class="lab">🔍 一个容易误解的细节</span>navigation.launch.py <b>并没有</b>用 TimerAction 延迟拉 rviz，而是按 bringup → lidar → localization（map_server + amcl）→ navigation（五个服务器）→ rviz 的顺序同时拉起，谁先就绪由 lifecycle_manager 的 autostart 与 bond 机制保证。真正带 <code>TimerAction(period=10.0)</code> 的是建图用的 slam.launch.py。</div>
+</section>
+
+<!-- 09 -->
+<section class="blk" id="s9">
+  <h2><span class="no">09</span>重点与易错点（故障排查）</h2>
+  <table>
+    <thead><tr><th>症状</th><th>可能原因 → 解法</th></tr></thead>
+    <tbody>
+      <tr><td>A · 贴墙走/蹭墙</td><td>膨胀半径太小或没生效 → 查 inflation_layer 与 inflation_radius（0.18），确认 footprint 已设</td></tr>
+      <tr><td>B · 原地打转不走</td><td>局部最小值/定位漂了 → 给准初始位姿（2D Pose Estimate），看 ParticleCloud 是否聚拢</td></tr>
+      <tr><td>C · 规划失败"No valid plan"</td><td>目标落在障碍/未知区、地图过期 → 重新点目标；确认用的是最新保存的 map_01</td></tr>
+      <tr><td>到点差一截就报成功</td><td>goal 容差 xy 0.10 m 是正常范围；要更准调 goal_checker</td></tr>
+      <tr><td>速度一冲一冲</td><td>velocity_smoother 未起 → node list 查 /velocity_smoother，看 max_velocity 限幅</td></tr>
+      <tr><td>卡在 inactive</td><td>lifecycle_manager 未 autostart 或 bond 断了 → <code>ros2 lifecycle set /xxx activate</code> 手动激活并查该节点日志</td></tr>
+    </tbody>
+  </table>
+  <ul class="check">
+    <li>五大服务器 <span class="ok">全部 active</span>，/map 正常加载 map_01</li>
+    <li>RViz 点目标后小车 <span class="ok">自主到达</span>，全局路径自动绕开障碍热区</li>
+    <li>能指着两张 costmap 说出 <span class="ok">map vs odom 帧系、尺寸、频率</span>差异</li>
+    <li>能画清速度链路 <span class="ok">cmd_vel_nav → velocity_smoother → controller/cmd_vel → 底盘</span></li>
+    <li>三个安全习惯：满电出发、<span class="ok">人跟车</span>、改参数先重启导航栈</li>
+    <li>记住红线：<span class="ok">导航不与建图（slam.launch）同开</span>——定位靠 AMCL 吃静态地图</li>
+  </ul>
+  <div class="tip amber"><span class="lab">⚠️ 安全底线</span>小车是实体：每次发目标前先扫一眼场地；窄道测试时手悬停在急停 Ctrl+C 上；改完参数必须整栈重启再验证。</div>
+</section>
+
+<!-- 10 -->
+<section class="blk" id="s10">
+  <h2><span class="no">10</span>总结与思考</h2>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">✅ 完成成果</div><div class="kt">点一下，车就到</div><p>navigation.launch 跑通，RViz 与命令行双通道发目标均成功到点。</p></div>
+    <div class="kcard"><div class="kd">🧠 原理收获</div><div class="kt">五服务器 + 双 costmap</div><p>规划/控制/调度/恢复/平滑各司其职，全局看大路、局部看眼前。</p></div>
+    <div class="kcard"><div class="kd">🛠 技能收获</div><div class="kt">导航栈自省与发目标</div><p>node list 过滤、lifecycle get、action send_goal 带 frame_id 的完整姿势。</p></div>
+    <div class="kcard"><div class="kd">❓ 排障思路</div><div class="kt">三层会诊法</div><p>全局层（膨胀/规划）→ 局部层（DWB/平滑）→ 定位层（AMCL/初始位姿），对症下药。</p></div>  </div>
+  <div class="tip violet"><span class="lab">📝 思考题 1</span>全局 costmap 在 map 帧、局部 costmap 在 odom 帧，为什么这样分工？假如把局部窗口也挂到 map 帧，AMCL 一次位置跳变会造成什么后果？</div>
+  <div class="tip violet"><span class="lab">📝 思考题 2</span>goal 容差设成 xy 0.10 m、yaw 0.1 rad——对"送到快递柜前 10 cm"来说够用吗？对"把饮料放进格子"呢？不同任务该怎么重新定这组容差？</div>
+</section>
+
+<nav class="expnav">
+  <a href="../index.html"><span class="lb">← 返回</span>课程目录 · SLAM 与自主导航</a>
+  <a class="next" href="../exp-04-amcl-localization/index.html"><span class="lb">下一个实验 →</span>EXP-04 AMCL 自适应蒙特卡洛定位</a>
+</nav>
+
+<footer>
+  <span>CORE-04 · 机器人 SLAM 与自主导航 · EXP-03 Nav2 机器人导航</span>
+  <span>8 学时 · 综合性 · 基于 slam_practice 实验讲义改编</span>
+</footer>
+
+</main>
+</div>
+
+<script>
+// 双层职责对照台
+function navCase(k){
+  var io=document.getElementById('navIo'),h='';
+  if(k==='reach'){
+    h='<span class="dim">// 正常到达</span>\n'+
+      '<span class="ok">全局层：ThetaStar 绕开 254 障碍与橙色膨胀热区，给出最优折线</span>\n'+
+      '<span class="ok">局部层：DWB 20Hz 跟线，smoother 抹平到 max 0.4 m/s</span>\n'+
+      '<span class="ok">定位层：AMCL 粒子聚拢，map→odom 稳定 → 到点误差 0.06m ✔</span>';
+  }else if(k==='wall'){
+    h='<span class="dim">// 症状：贴墙走、险些蹭墙</span>\n'+
+      '<span class="warn">定位层：先排除！/particle_cloud 散成一锅粥 → 先重给 2D Pose Estimate</span>\n'+
+      '<span class="warn">全局层：查 inflation_layer 是否加载、inflation_radius 是否 0.18、footprint 是否为空</span>\n'+
+      '<span class="dim">局部层：BaseObstacle 权重过低也会贴太近（下一实验深入）</span>';
+  }else if(k==='spin'){
+    h='<span class="dim">// 症状：原地转圈不前进</span>\n'+
+      '<span class="warn">定位层最常见：初始位姿没给或给歪 → 小车以为自己在别处，怎么走都是"错"</span>\n'+
+      '<span class="warn">局部层：陷入局部极小（环形障碍正中央），行为树会清代价地图 + Spin 1.57rad + Wait 5s 自救</span>\n'+
+      '<span class="dim">进度检查：10 秒挪不到 10cm 触发 Failed to make progress → 重试 6 次仍无效则 ABORTED</span>';
+  }else{
+    h='<span class="dim">// 症状：规划失败 No valid plan</span>\n'+
+      '<span class="bad">✘ 目标点本身在障碍里或未知区(-1) → 挪一下目标重发</span>\n'+
+      '<span class="warn">地图过期：EXP-02 之后家具挪过 → 返回 EXP-02 重建图，别硬调参数</span>\n'+
+      '<span class="warn">起点也在障碍里：定位漂进墙 → 重新 2D Pose Estimate 后再规划</span>';
+  }
+  io.innerHTML=h;
+}
+</script>
+<script src="../shared/tutorial.js" defer></script>
+</body>
+</html>

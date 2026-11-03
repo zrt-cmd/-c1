@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>图 11-5 · 仿真接管流程</title>
+<style>
+:root{--bg-page:#ffffff;--text:#0f172a;--text2:#475569;--muted:#94a3b8;--border:#e2e8f0;
+  --teal:#0891b2;--green:#059669;--purple:#7c3aed;--orange:#ea580c;--red:#e11d48;--gray:#64748b;
+  --teal-bg:rgba(8,145,178,.08);--green-bg:rgba(5,150,105,.08);--purple-bg:rgba(124,58,237,.08);
+  --orange-bg:rgba(234,88,12,.10);--red-bg:rgba(225,29,72,.08);--gray-bg:rgba(100,116,139,.08)}
+*{box-sizing:border-box}
+body{margin:0;background:#fff;color:var(--text);font-family:system-ui,"PingFang SC","Microsoft YaHei",sans-serif;padding:16px 14px 12px}
+.hd h1{font-size:15px;margin:0 0 4px}
+.hd .q{font-size:12px;color:var(--text2);margin:0}
+svg{width:100%;height:auto;display:block}
+.t{font:600 12.5px system-ui,sans-serif;fill:var(--text)}
+.s{font:400 10.5px system-ui,sans-serif;fill:var(--text2)}
+.l{font:600 10.5px ui-monospace,Consolas,monospace;fill:var(--text2)}
+.ln{font:600 11px ui-monospace,Consolas,monospace;fill:var(--text)}
+.dock{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.dock span{font-size:11.5px;border-radius:999px;padding:3px 10px;line-height:1.6}
+.ok{background:#ecfdf5;color:#047857;border:1px solid #a7f3d0}
+.warn{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca}
+.evid{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}
+.ft{font-size:10.5px;color:var(--muted);margin-top:8px;text-align:right}
+</style>
+</head>
+<body>
+<div class="hd">
+  <h1>图 11-5 · 仿真接管流程：从"假死"到"复活"</h1>
+  <p class="q">本图回答的问题：use_sim_time=true 后节点卡在哪一步，/clock 一来为什么立刻复活？</p>
+</div>
+<svg viewBox="0 0 760 560" role="img" aria-label="仿真接管状态流程图">
+  <!-- 起 -->
+  <rect x="195" y="20" width="370" height="46" rx="23" fill="#fff"/>
+  <rect x="195" y="20" width="370" height="46" rx="23" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1.5"/>
+  <text class="ln" x="380" y="48" text-anchor="middle" font-size="11.5">python3 time_demo_node.py -p use_sim_time:=true</text>
+  <line x1="380" y1="66" x2="380" y2="98" stroke="var(--teal)" stroke-width="1.5" marker-end="url(#at)"/>
+
+  <!-- 判断 -->
+  <polygon points="380,102 530,142 380,182 230,142" fill="var(--purple-bg)" stroke="var(--purple)" stroke-width="1.5"/>
+  <text class="t" x="380" y="138" text-anchor="middle">有人发 /clock 吗？</text>
+  <text class="s" x="380" y="157" text-anchor="middle">Clock 阻塞等首条消息</text>
+
+  <!-- 否 → 卡死 -->
+  <line x1="230" y1="142" x2="146" y2="142" stroke="var(--red)" stroke-width="1.5" marker-end="url(#ar)"/>
+  <text class="l" x="176" y="134">否</text>
+  <rect x="30" y="112" width="118" height="62" rx="6" fill="#fff"/>
+  <rect x="30" y="112" width="118" height="62" rx="6" fill="var(--red-bg)" stroke="var(--red)" stroke-width="1.5"/>
+  <text class="t" x="89" y="138" text-anchor="middle" font-size="11.5">永久等待</text>
+  <text class="s" x="89" y="158" text-anchor="middle">进程活着 · 零输出</text>
+  <text class="l" x="89" y="196" text-anchor="middle" fill="#b91c1c">（假死）</text>
+
+  <!-- 旁路：终端B 发钟 -->
+  <line x1="380" y1="182" x2="380" y2="220" stroke="var(--green)" stroke-width="1.5" marker-end="url(#ag)"/>
+  <text class="l" x="390" y="206">是 / 复活</text>
+  <rect x="470" y="96" width="260" height="46" rx="6" fill="#fff"/>
+  <rect x="470" y="96" width="260" height="46" rx="6" fill="var(--orange-bg)" stroke="var(--orange)" stroke-width="1.5" stroke-dasharray="6,4"/>
+  <text class="t" x="600" y="118" text-anchor="middle">终端 B · 手动扮演仿真器</text>
+  <text class="s" x="600" y="135" text-anchor="middle">ros2 topic pub /clock … --rate 1</text>
+  <path d="M 470 142 C 420 160, 400 170, 396 184" fill="none" stroke="var(--orange)" stroke-width="1.5" marker-end="url(#ao)"/>
+
+  <!-- 复活后 -->
+  <rect x="245" y="224" width="270" height="62" rx="6" fill="#fff"/>
+  <rect x="245" y="224" width="270" height="62" rx="6" fill="var(--green-bg)" stroke="var(--green)" stroke-width="1.5"/>
+  <text class="t" x="380" y="250" text-anchor="middle">收到首条 /clock · 时间轴跳到仿真时间</text>
+  <text class="s" x="380" y="270" text-anchor="middle">stamp 从 sec=100 起步并逐条递增</text>
+  <line x1="380" y1="286" x2="380" y2="318" stroke="var(--green)" stroke-width="1.5" marker-end="url(#ag)"/>
+
+  <rect x="245" y="320" width="270" height="62" rx="6" fill="#fff"/>
+  <rect x="245" y="320" width="270" height="62" rx="6" fill="var(--green-bg)" stroke="var(--green)" stroke-width="1.5"/>
+  <text class="t" x="380" y="346" text-anchor="middle">按 /clock 节拍盖 stamp 发布</text>
+  <text class="s" x="380" y="366" text-anchor="middle">一行业务代码未改</text>
+  <line x1="380" y1="382" x2="380" y2="414" stroke="var(--green)" stroke-width="1.5" marker-end="url(#ag)"/>
+
+  <!-- 变速分支 -->
+  <polygon points="380,418 500,454 380,490 260,454" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1.5"/>
+  <text class="t" x="380" y="450" text-anchor="middle">换 --rate 0.5 ？</text>
+  <text class="s" x="380" y="468" text-anchor="middle">改 pub 参数即可</text>
+
+  <line x1="260" y1="454" x2="186" y2="454" stroke="var(--purple)" stroke-width="1.5" marker-end="url(#ap)"/>
+  <text class="l" x="216" y="446">是</text>
+  <rect x="30" y="424" width="156" height="62" rx="6" fill="#fff"/>
+  <rect x="30" y="424" width="156" height="62" rx="6" fill="var(--purple-bg)" stroke="var(--purple)" stroke-width="1.5"/>
+  <text class="t" x="108" y="450" text-anchor="middle">0.5× 变速</text>
+  <text class="s" x="108" y="470" text-anchor="middle">真实 1s = 仿真 0.5s</text>
+
+  <line x1="500" y1="454" x2="574" y2="454" stroke="var(--gray)" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#agr)"/>
+  <text class="l" x="524" y="446">否</text>
+  <rect x="576" y="424" width="150" height="62" rx="6" fill="#fff"/>
+  <rect x="576" y="424" width="150" height="62" rx="6" fill="var(--gray-bg)" stroke="var(--gray)" stroke-width="1.5"/>
+  <text class="t" x="651" y="450" text-anchor="middle">保持 1×</text>
+  <text class="s" x="651" y="470" text-anchor="middle">仿真秒 ≈ 真实秒</text>
+
+  <!-- 回环到盖 stamp -->
+  <path d="M 108 486 C 108 530, 500 536, 508 390" fill="none" stroke="var(--purple)" stroke-width="1.5" stroke-dasharray="6,4" marker-end="url(#ap)"/>
+  <path d="M 651 486 C 651 530, 520 536, 512 384" fill="none" stroke="var(--gray)" stroke-width="1.5" stroke-dasharray="6,4" marker-end="url(#agr)"/>
+
+  <defs>
+    <marker id="ag" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="var(--green)"/></marker>
+    <marker id="ap" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="var(--purple)"/></marker>
+    <marker id="at" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="var(--teal)"/></marker>
+    <marker id="ar" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="var(--red)"/></marker>
+    <marker id="ao" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="var(--orange)"/></marker>
+    <marker id="agr" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="var(--gray)"/></marker>
+  </defs>
+</svg>
+<div class="dock">
+  <span class="ok">✅ 结论：卡死点在"等首条 /clock"，业务代码始终未动</span>
+  <span class="warn">⚠️ 风险：真机误开 true = 节点假死，先查 /clock 再查代码</span>
+  <span class="evid">🔍 验证：04 节实操 A（假死）/ 实操 B（pub 复活 + 0.5× 变速）</span>
+</div>
+<div class="ft">EXP-11 · 时间 API 与双时钟体系</div>
+</body>
+</html>

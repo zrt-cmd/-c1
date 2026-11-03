@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-01 · 需求分析（R1-R10） — 智慧工厂装货分拣码垛综合项目</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+:root{--theme:#ea580c;--theme-deep:#c2410c;--theme-bg:#ffedd5;--theme-bd:#fed7aa}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit" title="返回课程首页">🧠 具身智能课程 · <i>教程首页</i></a>
+  <div class="crumb"><a href="../../../index.html#case">综合项目</a> / <a href="../index.html">智慧工厂装货分拣码垛</a> / EXP-01</div>
+</div>
+
+<div class="wrap">
+
+<aside class="side">
+  <h4>本页目录</h4>
+  <a href="#s1" class="now">01 问题引入：一句话需求做不成系统</a>
+  <a href="#s2">02 原理通俗讲解：先定菜单再排工位</a>
+  <a href="#s3">03 关联知识点：R1-R10 与两大打断</a>
+  <a href="#s4">04 实验目标</a>
+  <a href="#s5">05 实验环境与准备</a>
+  <a href="#s6">06 动画讲解：物流链与打断分层</a>
+  <a href="#s7">07 互动讲解：需求裁剪实验台</a>
+  <a href="#s8">08 实操步骤：五步吃透需求文档</a>
+  <a href="#s9">09 重点与易错点</a>
+  <a href="#s10">10 总结与思考</a>
+  <h4>CASE-01 · 智慧工厂</h4>
+  <a href="../exp-01-requirements/index.html">EXP-01 需求分析</a>
+  <a href="../exp-02-architecture/index.html">EXP-02 五节点系统架构</a>
+  <a href="../exp-03-interface-design/index.html">EXP-03 接口设计</a>
+  <a href="../exp-04-voice-integration/index.html">EXP-04 语音交互集成</a>
+  <a href="../exp-05-visual-loading/index.html">EXP-05 视觉自适应装货</a>
+  <a href="../exp-06-sorting/index.html">EXP-06 智能分拣</a>
+  <a href="../exp-07-palletizing/index.html">EXP-07 自主码垛</a>
+  <a href="../exp-08-emergency-stop/index.html">EXP-08 危险检测与急停</a>
+  <a href="../exp-09-full-verification/index.html">EXP-09 全功能快速验证</a>
+</aside>
+
+<main class="content">
+
+<div class="exp-head">
+  <span class="code">EXP-01 · 第 1 章 · 验证性 · 4 学时</span>
+  <h1>需求分析：把用户的话变成 R1-R10 工程条款</h1>
+  <p class="desc">"让机器人在工厂里装货、分拣、码垛，还要听得懂话、保得了命"——这样一句话怎么做成交付系统？本实验从<b>需求的模糊性</b>出发，逐条吃透 <b>R1-R10 需求体系</b>，画出三大任务的物流链，厘清 <b>R8 语音打断</b>与 <b>R9 雷达急停</b>的优先级分层，并完成一份结构化需求阅读笔记。</p>
+  <div class="meta">
+    <span class="tag hl">难度 ⭐ · 4 学时</span>
+    <span class="tag">R1-R10</span><span class="tag">三大任务流程</span>
+    <span class="tag">R8/R9 打断分层</span><span class="tag">纯文档阅读</span>
+  </div>
+</div>
+
+<!-- 01 -->
+<section class="blk" id="s1">
+  <h2><span class="no">01</span>问题引入：一句话需求为什么做不成系统</h2>
+  <p>项目启动会上，需求往往只有一句话："做一个会装货、分拣、码垛的智能工厂机器人，能语音控制，要注意安全。"把它直接交给程序员会发生什么？</p>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>"语音控制"——喊哪几句？喊破喉咙没反应算谁的 bug？（<b>唤醒词集合未定义</b>）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>"装货"——从哪抓、放到哪、抓几次？每次都要重新教一遍吗？（<b>任务流程未定义</b>）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>"注意安全"——离多近算危险？碰到就停还是持续 0.5 秒才停？（<b>安全阈值未量化</b>）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span>于是项目组把口径固化为 <b>R1-R10 十条需求</b>：每条都可量化、可验收、可指派到具体节点</div>
+  </div>
+  <div class="tip amber"><span class="lab">💡 一句话认知</span>需求文档只回答两个问题：<b>系统要做什么</b>（功能边界）与<b>边界在哪里</b>（约束与阈值）。凡是"差不多、看着办"的表述，都要么变成量化参数（60°/20cm/0.5s），要么显式标注<b>【待定】</b>留待后续确认——绝不允许含糊地进入编码。</div>
+</section>
+
+<!-- 02 -->
+<section class="blk" id="s2">
+  <h2><span class="no">02</span>原理通俗讲解：开餐厅，先定菜单再排厨房工位</h2>
+  <p>需求工程听起来抽象，其实和<b>开一家餐厅</b>一模一样——没有人先买锅碗瓢盆再想卖什么菜：</p>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">🍳 菜单 = R1-R10 条款</div><div class="kt">先定"卖什么菜"</div><p>菜单没定就采购，食材全浪费。<b>菜单就是需求边界</b>：装货、分拣、码垛三道"菜品"（R4-R6），点菜方式是"语音"（R1-R3）。</p></div>
+    <div class="kcard"><div class="kd">🧑‍🍳 厨房工位 = 五节点架构</div><div class="kt">再排"谁干什么活"</div><p>切配、掌勺、传菜各司其职（EXP-02 的五节点）。<b>工位安排错了，再好的菜单也出不了菜</b>——这就是"先需求后架构"的顺序。</p></div>
+    <div class="kcard"><div class="kd">📋 传菜条 = 接口设计</div><div class="kt">工位之间怎么说话</div><p>传菜条上写什么（口味、桌号）就是接口的消息字段（EXP-03）。写模糊了，传错菜是常态。</p></div>
+    <div class="kcard"><div class="kd">🔔 传菜叫号 = 固定播报</div><div class="kt">对顾客只说标准话术</div><p>R3/R7 约束：<b>大模型只负责把"顾客的话"翻译成点菜动作</b>，"您的菜好了"永远是固定话术——后厨不即兴发挥，上错的风险就小。</p></div>
+    <div class="kcard"><div class="kd">🛑 后厨急停阀 = 安全联锁</div><div class="kt">出事先断力，再讲道理</div><p>R9：有人靠近灶台 20cm 内停留 0.5 秒，整锅立刻停火——<b>来不及请示，量化阈值才是保命的</b>。</p></div>
+    <div class="kcard"><div class="kd">🧪 试营业 = 全功能验证</div><div class="kt">验收表就是试吃单</div><p>EXP-09 按 TS 测试用例逐条过——菜单、工位、急停全部演练一遍，才敢开门迎客。</p></div>
+  </div>
+  <div class="tip tealb"><span class="lab">🔍 工程化思路主线</span>本课程九个实验就是这条主线的展开：<b>需求（菜单）→ 架构（工位）→ 接口（传菜条）→ 功能实现（出菜）→ 验证（试营业）</b>。顺序不可颠倒：菜单没定就炒菜，炒出来的没人点；接口没定先写节点，联调时对不上暗号。</div>
+</section>
+
+<!-- 03 -->
+<section class="blk" id="s3">
+  <h2><span class="no">03</span>关联知识点：R1-R10 体系与两大打断</h2>
+  <p><b>知识点 1.1.1 · R1-R10 需求体系</b>（前置：ROS 2 话题/服务/参数基础）。按四个维度分组，逐条标注"可量化约束"：</p>
+  <table>
+    <thead><tr><th>分组</th><th>条款</th><th>一句话要点</th><th>可量化约束</th></tr></thead>
+    <tbody>
+      <tr><td>交互</td><td>R1-R3</td><td>单轮语音闭环：唤醒→ASR→LLM 意图→执行→播报</td><td>意图枚举 load/sort/palletize；<b>一律走大模型意图解析、不用关键词匹配</b>；大模型只做功能映射，播报用固定文案</td></tr>
+      <tr><td>任务</td><td>R4-R6</td><td>装货 / 分拣 / 码垛三大任务</td><td>R4.1：每步操作完成后<b>必须先回 work 姿态</b>才能进行下一步</td></tr>
+      <tr><td>播报打断</td><td>R7-R8</td><td>固定文案播报；语音唤醒打断四步复位</td><td>中断动作 → 回 work → 流水线停止 → 取消任务</td></tr>
+      <tr><td>安全</td><td>R9-R9.1</td><td>雷达危险检测释放力矩；打断分层</td><td>前方 <b>60°</b>（0° 为中心 ±30° 跨 0° 环绕）+ <b>20cm</b> 内 + 持续 <b>0.5s</b> → 释放 <b>6 个</b>总线舵机力矩 + danger=true；<b>雷达打断 &gt; 语音打断</b></td></tr>
+      <tr><td>工程</td><td>R10</td><td>工程组织与文档结构</td><td>docs/01 需求总览等文档行号可追溯</td></tr>
+    </tbody>
+  </table>
+  <p><b>知识点 1.1.2 · 三大任务流程</b>——物流链总览（<code>docs/05_流程与安全.md</code>）：</p>
+  <pre><span class="c"># 物流链（每个阶段收尾都有"回 work"这一步安全握手）</span>
+装货区  →  分拣区  →  流水线（定点停靠）  →  码垛区
+ R4 视觉抓取    R5 抓取放流水线   送料+光电定点停      R6 定点取料码放
+        ⟳ 回work        ⟳ 回work        ⟳ 回work        ⟳ 回work  <span class="c">(R4.1)</span></pre>
+  <p><b>知识点 1.1.3 · 安全联锁</b>：R9 检测基于激光雷达自身坐标系 laser_link（不依赖车身 TF），触发动作是<b>话题直发</b>释放力矩（最快路径）；危险解除后恢复力矩 + 调 <code>/arm_controller/go_work</code> + danger=false，随后需<b>重新唤醒</b>才执行任务。R8 是用户主动打断的四步复位，两者优先级不同。</p>
+  <div class="tip violet"><span class="lab">🧩 记忆锚点</span>R1-R3 管"怎么点菜"，R4-R6 管"做什么菜"，R7-R8 管"怎么报菜名/换菜"，R9-R9.1 管"后厨安全阀"，R10 管"开店手续"。</div>
+</section>
+
+<!-- 04 -->
+<section class="blk" id="s4">
+  <h2><span class="no">04</span>实验目标</h2>
+  <ul class="check">
+    <li><b>理解</b> R1-R10 需求体系，能逐条复述每个需求的约束要点（唤醒词集合、任务指令集合、安全阈值等）</li>
+    <li><b>掌握</b>装货/分拣/码垛三大任务的物流走向与执行顺序，能独立绘制含"回 work"状态的任务流程图</li>
+    <li><b>理解</b>安全联锁机制（雷达危险检测 → 释放机械臂总线舵机力矩），以及 R8 语音打断与 R9 雷达打断的分层关系</li>
+    <li><b>理解</b>语音 + 大模型驱动的单轮闭环（唤醒 → ASR → LLM 意图 → 执行 → 播报），并解释"大模型只做功能映射、不生成应答文案"的设计理由</li>
+    <li><b>独立完成</b>一份结构化需求阅读笔记，能标注【待定】项与隐含约束</li>
+    <li><b>迁移</b>："需求总览 → 流程梳理 → 安全约束"的分析方法可迁移到其他具身智能/智能制造场景</li>
+  </ul>
+</section>
+
+<!-- 05 -->
+<section class="blk" id="s5">
+  <h2><span class="no">05</span>实验环境与准备</h2>
+  <table>
+    <thead><tr><th>类别</th><th>内容</th></tr></thead>
+    <tbody>
+      <tr><td>硬件</td><td>B2 麦克纳姆底盘、C1 五自由度机械臂 + 夹爪（<b>本实验仅阅读文档，无需上电</b>）；涉及传感器：激光雷达、RGB-D 深度相机、语音阵列麦克风、光电传感器、AprilTag 标签（tag36h11）</td></tr>
+      <tr><td>OS / ROS</td><td>Ubuntu 22.04 + ROS 2 Humble</td></tr>
+      <tr><td>Python</td><td>3.10（语音/视觉/抓取节点运行时使用 /home/iflytek/ros2_venv 虚拟环境；本实验仅需理解概念）</td></tr>
+      <tr><td>核心库</td><td>rclpy、std_msgs、std_srvs、geometry_msgs、sensor_msgs（仅需理解消息类型概念）</td></tr>
+      <tr><td>阅读对象</td><td><code>app/eai_factory/</code> 包内 <code>docs/01_需求总览.md</code>、<code>docs/05_流程与安全.md</code>、<code>README.md</code></td></tr>
+    </tbody>
+  </table>
+  <div class="tip amber"><span class="lab">⚠️ 准备提示</span>本实验<b>不执行任何 ros2 命令、无硬件操作</b>；若在工程机以外阅读，注意 README 中的路径（/home/iflytek/ros2_ws/...）为实机路径，不要照搬。准备好笔记工具（draw.io / PlantUML / mermaid 任选）即可开始。</div>
+</section>
+
+<!-- 06 -->
+<section class="blk" id="s6">
+  <h2><span class="no">06</span>动画讲解：物流链与打断分层</h2>
+  <p class="lead">上半部分：货物流经四个工区，<b>每一步收尾都先回 work 再进入下一步</b>（R4.1）；下半部分：两类打断的分层仲裁——<b>雷达打断（R9）优先级高于语音打断（R8）</b>，危险期间语音的"回 work"被抑制。</p>
+  <div class="anim-box">
+    <svg viewBox="0 0 720 310" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="物流链回 work 状态与 R8/R9 打断分层动画">
+      <rect x="8" y="8" width="704" height="150" rx="12" fill="#111827" stroke="#334155"/>
+      <text x="360" y="32" text-anchor="middle" font-size="13.5" font-weight="700" fill="#fdba74">物流链 · 每步收尾先回 work（R4.1 安全握手）</text>
+      <!-- 四工区 -->
+      <g fill="#1e293b" stroke="#ea580c" stroke-width="1.8">
+        <rect x="30" y="62" width="140" height="46" rx="10"/>
+        <rect x="205" y="62" width="140" height="46" rx="10"/>
+        <rect x="380" y="62" width="150" height="46" rx="10"/>
+        <rect x="555" y="62" width="140" height="46" rx="10"/>
+      </g>
+      <g font-size="12.5" fill="#ffedd5" text-anchor="middle" font-weight="700">
+        <text x="100" y="82">装货区</text><text x="275" y="82">分拣区</text>
+        <text x="455" y="82">流水线（定点停靠）</text><text x="625" y="82">码垛区</text>
+      </g>
+      <g font-size="10.5" fill="#fdba74" text-anchor="middle">
+        <text x="100" y="100">R4 视觉抓取</text><text x="275" y="100">R5 放上传送</text>
+        <text x="455" y="100">光电传感器定点停</text><text x="625" y="100">R6 定点码放</text>
+      </g>
+      <!-- 回 work 检查点 -->
+      <g fill="#052e16" stroke="#4ade80" stroke-width="1.6">
+        <rect x="164" y="122" width="42" height="24" rx="7"/>
+        <rect x="339" y="122" width="42" height="24" rx="7"/>
+        <rect x="524" y="122" width="42" height="24" rx="7"/>
+      </g>
+      <g font-size="10.5" fill="#86efac" text-anchor="middle">
+        <text x="185" y="138">⟳work</text><text x="360" y="138">⟳work</text><text x="545" y="138">⟳work</text>
+      </g>
+      <g stroke="#64748b" stroke-width="1.6" stroke-dasharray="6 5">
+        <line x1="170" y1="108" x2="185" y2="120"><animate attributeName="stroke-dashoffset" values="0;-22" dur="1.1s" repeatCount="indefinite"/></line>
+        <line x1="345" y1="108" x2="360" y2="120"><animate attributeName="stroke-dashoffset" values="0;-22" dur="1.1s" repeatCount="indefinite"/></line>
+        <line x1="530" y1="108" x2="545" y2="120"><animate attributeName="stroke-dashoffset" values="0;-22" dur="1.1s" repeatCount="indefinite"/></line>
+      </g>
+      <!-- 货物沿链移动 -->
+      <g fill="#fbbf24">
+        <rect x="0" y="46" width="14" height="14" rx="3">
+          <animate attributeName="x" values="30;205;380;555;686" dur="8s" repeatCount="indefinite"/>
+        </rect>
+      </g>
+      <text x="360" y="150" text-anchor="middle" font-size="10.5" fill="#64748b">任务之间靠"回 work"握手 · 漏画 = 流程图经典错误</text>
+
+      <!-- 下半：打断分层 -->
+      <rect x="8" y="170" width="704" height="132" rx="12" fill="#111827" stroke="#334155"/>
+      <text x="360" y="194" text-anchor="middle" font-size="13.5" font-weight="700" fill="#fdba74">打断分层 · 雷达 &gt; 语音（R9.1）</text>
+      <!-- 两入口 -->
+      <rect x="40" y="210" width="150" height="40" rx="9" fill="#1e293b" stroke="#60a5fa" stroke-width="1.8"/>
+      <text x="115" y="235" text-anchor="middle" font-size="12" fill="#bfdbfe">R8 语音唤醒打断</text>
+      <rect x="40" y="258" width="150" height="40" rx="9" fill="#1e293b" stroke="#f87171" stroke-width="1.8"/>
+      <text x="115" y="283" text-anchor="middle" font-size="12" fill="#fecaca">R9 雷达危险打断</text>
+      <!-- 仲裁 -->
+      <rect x="255" y="230" width="130" height="46" rx="9" fill="#26160a" stroke="#ea580c" stroke-width="2"/>
+      <text x="320" y="250" text-anchor="middle" font-size="12" font-weight="700" fill="#fdba74">优先级仲裁</text>
+      <text x="320" y="267" text-anchor="middle" font-size="10.5" fill="#fed7aa">危险期间抑制语音</text>
+      <g stroke="#64748b" stroke-width="1.6" stroke-dasharray="6 5">
+        <line x1="190" y1="230" x2="255" y2="244"><animate attributeName="stroke-dashoffset" values="0;-22" dur="1.1s" repeatCount="indefinite"/></line>
+        <line x1="190" y1="278" x2="255" y2="262"><animate attributeName="stroke-dashoffset" values="0;-22" dur="1.1s" repeatCount="indefinite"/></line>
+      </g>
+      <!-- 动作 -->
+      <rect x="450" y="210" width="235" height="40" rx="9" fill="#1e293b" stroke="#60a5fa" stroke-width="1.8"/>
+      <text x="567" y="234" text-anchor="middle" font-size="11.5" fill="#bfdbfe">四步复位：中断动作→回work→停流水线→取消任务</text>
+      <rect x="450" y="258" width="235" height="40" rx="9" fill="#1e293b" stroke="#f87171" stroke-width="2">
+        <animate attributeName="stroke" values="#f87171;#fca5a5;#f87171" dur="1.5s" repeatCount="indefinite"/>
+      </rect>
+      <text x="567" y="276" text-anchor="middle" font-size="11.5" fill="#fecaca">释放 6 舵机力矩 + danger=true</text>
+      <text x="567" y="291" text-anchor="middle" font-size="10" fill="#fca5a5">解除→恢复力矩+go_work→需重新唤醒</text>
+      <g stroke="#94a3b8" stroke-width="1.6" stroke-dasharray="6 5">
+        <line x1="385" y1="244" x2="450" y2="230"><animate attributeName="stroke-dashoffset" values="0;-22" dur="1.1s" repeatCount="indefinite"/></line>
+        <line x1="385" y1="262" x2="450" y2="278"><animate attributeName="stroke-dashoffset" values="0;-22" dur="1.1s" repeatCount="indefinite"/></line>
+      </g>
+    </svg>
+  </div>
+  <div class="anim-cap">动画 1-1｜上：货物沿物流链流动，绿色 ⟳work 是每步之间强制的安全握手；下：R9 雷达打断优先进入仲裁，危险期间语音的回 work 被抑制</div>
+</section>
+
+<!-- 07 -->
+<section class="blk" id="s7">
+  <h2><span class="no">07</span>互动讲解：需求裁剪实验台</h2>
+  <p class="lead">假设你是项目经理，想"砍掉"某条需求省成本——点击按钮看看<b>裁掉它会坏什么</b>：</p>
+  <div class="ix-panel">
+    <div class="ix-title">需求裁剪实验台 · Requirement Trim Lab</div>
+    <div class="ctl-row">
+      <button class="btn" onclick="trimReq('r41')">✂️ 裁掉 R4.1 每步回 work</button>
+      <button class="btn" onclick="trimReq('r3')">✂️ 裁掉 R3 改回关键词匹配</button>
+      <button class="btn" onclick="trimReq('r9')">✂️ 裁掉 R9 雷达安全联锁</button>
+      <button class="btn ghost" onclick="resetTrim()">↺ 复位</button>
+    </div>
+    <div class="io" id="trimIo"><span class="dim">// 点击裁剪按钮，评估被砍条款的连锁后果</span>
+<span class="ok">R4.1 ✓ 每步回 work：任务间安全握手存在</span>
+<span class="ok">R3 ✓ LLM 意图解析：换个说法也能听懂</span>
+<span class="ok">R9 ✓ 60°/20cm/0.5s 雷达联锁：安全底线在</span></div>
+  </div>
+  <div class="tip"><span class="lab">💡 换个角度想</span>需求裁剪台演示的是<b>需求间的耦合</b>：R4.1 一断，任务流程图的显式状态全塌；R3 一改，N1 语音节点的实现方式与 intent_hints 配置全变；R9 一砍，系统从"允许上人车间"降级为"演示玩具"。<b>每条需求都锚着下游设计，砍需求 = 连锁改版。</b></div>
+</section>
+
+<!-- 08 -->
+<section class="blk" id="s8">
+  <h2><span class="no">08</span>实操步骤：五步吃透需求文档</h2>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>在 eai_factory 包目录用 grep 快速定位 R1-R10 与 R8/R9 章节行号（60min）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>绘制装货/分拣/码垛三大任务流程图，<b>每张必须画出"回 work"状态</b>（60min）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>在 docs/05 中标注 R8 四步复位与 R9 触发/解除动作，画打断分层箭头图（60min）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span>读 README 架构速览与关键决策，建立"需求编号 → 模块 → 关键决策"三层映射（30min）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">5</span>按"交互/任务/安全/工程组织"四节撰写需求阅读笔记，标注【待定】项（30min）</div>
+  </div>
+  <pre><span class="c"># ① 在 eai_factory 包目录下：快速定位各条款行号</span>
+<span class="g">ls</span> docs/
+<span class="g">grep</span> -n "R[0-9]" docs/01_需求总览.md      <span class="c"># 定位 R1-R10 各条款</span>
+<span class="g">grep</span> -n "R8\|R9" docs/05_流程与安全.md    <span class="c"># 定位打断与安全章节</span>
+<span class="y"># L62-L68(R8)  L70-L78(R9)  L80-L88(R9.1) ...</span>
+
+<span class="c"># ② 架构速览与关键决策（只记录，不执行）</span>
+<span class="g">head</span> -50 README.md
+<span class="y"># 架构速览：N1 语音 / N2 调度器 / N-grasp 双模式 / N3 安全 / N-conveyor 流水线</span>
+<span class="y"># 复用清单：car1_bringup / car1_arm_controller / car1_peripherals / apriltag_detector</span>
+
+<span class="c"># ③ 一键启动命令（本实验仅记录语法，7 个开关 EXP-02 展开）</span>
+ros2 launch eai_factory eai_factory.launch.py
+<span class="c"># 7 开关：start_base / start_viz / start_voice / start_vision</span>
+<span class="c">#         / start_grasp / start_conveyor / start_radar</span></pre>
+  <div class="tip tealb"><span class="lab">🔍 笔记的及格线</span>每条需求必须提炼出<b>可量化约束</b>（唤醒词集合、60°/20cm/0.5s、6 舵机）与<b>设计含义</b>（对哪个模块、影响什么实现），并附文档行号——只抄条款不做归纳的是无效笔记。</div>
+</section>
+
+<!-- 09 -->
+<section class="blk" id="s9">
+  <h2><span class="no">09</span>重点与易错点</h2>
+  <div class="tip amber"><span class="lab">⚠️ 三大经典易错</span>R8 语音打断 ≠ R9 雷达急停（触发源不同）；流程图漏掉"回 work"（R4.1 是显式需求）；把文档里【待定】的坐标当成已实现值（坐标以 EXP-03 的 <code>config/eai_factory.yaml</code> 为准）。</div>
+  <table>
+    <thead><tr><th>⚠️ 常见坑</th><th>现象 → 解法</th></tr></thead>
+    <tbody>
+      <tr><td>分不清 R8 与 R9</td><td>两类打断都叫"打断"但触发源不同 → 按<b>触发源 / 动作 / 解除条件</b>三列做对比表：语音唤醒→复位动作；雷达危险→释放力矩</td></tr>
+      <tr><td>流程图漏掉回 work</td><td>未注意到 R4.1 是显式需求 → 用 <code>docs/01_需求总览.md</code> L52-L55 的适用清单逐项核对每个任务的收尾</td></tr>
+      <tr><td>把【待定】坐标当实现值</td><td>需求文档与配置文档混读 → 以【待定】标记为准，坐标类数值以 <code>config/eai_factory.yaml</code> 为准</td></tr>
+      <tr><td>误以为危险解除会自动续跑</td><td>漏读 R9.1 → 危险解除进 work 后需<b>等待重新唤醒</b>再执行任务，不会自动继续</td></tr>
+      <tr><td>把复用节点记成自家模块</td><td>README 已给出复用清单 → car1_bringup / car1_arm_controller / car1_peripherals / apriltag_detector / visual_grasp 是"复用不改"</td></tr>
+    </tbody>
+  </table>
+  <ul class="check">
+    <li>能列出 R1-R10 每条一句话要点，并说出哪几条属于<b>交互 / 任务 / 安全</b>分组</li>
+    <li>能画出 <span class="ok">装货区 → 分拣区 → 流水线(定点停靠) → 码垛区</span> 物流链，并标注每阶段的回 work（R4.1）</li>
+    <li>能说出雷达危险触发三个量化条件（<span class="ok">60° 扇区、20cm、0.5s</span>）与触发动作（<span class="ok">释放 6 个总线舵机力矩 + 发 danger</span>）</li>
+    <li>能说出语音打断（R8）四步复位：<span class="ok">中断动作 → 回 work → 流水线停止 → 取消任务</span></li>
+    <li>需求笔记含文档行号引用、【待定】标注与需求→模块映射</li>
+  </ul>
+</section>
+
+<!-- 10 -->
+<section class="blk" id="s10">
+  <h2><span class="no">10</span>实验总结与思考</h2>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">✅ 完成成果</div><div class="kt">需求梳理表 + 三图一笔记</div><p>R1-R10 梳理表（含量化约束与【待定】）、三大任务流程图（含回 work）、R8/R9 分层时序图、需求阅读笔记（含行号引用）。</p></div>
+    <div class="kcard"><div class="kd">🧠 原理收获</div><div class="kt">四维分组 + 优先级分层</div><p>交互/任务/播报打断/安全/工程五组结构；雷达打断 &gt; 语音打断的仲裁逻辑与"危险期间抑制回 work"边界。</p></div>
+    <div class="kcard"><div class="kd">🛠 技能收获</div><div class="kt">结构化需求梳理方法</div><p>分组 → 量化约束 → 待定项三步法；流程图显式画安全状态；grep 行号定位文档条款。</p></div>
+    <div class="kcard"><div class="kd">📐 评分速览</div><div class="kt">40 / 30 / 20 / 10</div><p>梳理表 40 分、流程图 30 分、打断分层分析 20 分、笔记规范与行号引用 10 分，合计 100。</p></div>
+  </div>
+  <div class="tip violet"><span class="lab">📝 思考题 1</span>为什么 R3 要求"一律走大模型意图解析，不用关键词匹配"，而 R7 却用固定文案播报？请结合"大模型只做功能映射"的设计约束说明其理由。</div>
+  <div class="tip violet"><span class="lab">📝 思考题 2</span>R9 的检测有三个量化参数（60°、20cm、0.5s），分析每个参数的作用；若把 persist_time 从 0.5s 改为 0.1s 会带来什么问题？（提示：与源讲义实测的抖动/误触发有关）</div>
+</section>
+
+<nav class="expnav">
+  <a href="../index.html"><span class="lb">← 返回</span>课程目录 · 智慧工厂装货分拣码垛</a>
+  <a class="next" href="../exp-02-architecture/index.html"><span class="lb">下一个实验 →</span>EXP-02 五节点系统架构</a>
+</nav>
+
+<footer>
+  <span>CASE-01 · 智慧工厂装货分拣码垛 · EXP-01 需求分析（R1-R10）</span>
+  <span>4 学时 · 验证性 · 基于 llm_practice 实验讲义改编</span>
+</footer>
+
+</main>
+</div>
+
+<script>
+// 需求裁剪实验台
+function trimReq(which){
+  var io = document.getElementById('trimIo');
+  if(which === 'r41'){
+    io.innerHTML =
+'<span class="bad">✂️ 已裁掉 R4.1「每步操作后回 work 姿态」</span>\n' +
+'<span class="bad">✘ 三大任务流程的显式状态全部消失 —— 流程图与状态机对不上</span>\n' +
+'<span class="warn">⚠ 机械臂可能带着上一任务的残余姿态直接进入下一任务</span>\n' +
+'<span class="bad">✘ R8 打断复位的第 2 步「回 work」失去依据，打断后臂位不可预期</span>\n' +
+'<span class="bad">影响面：R4-R6 任务流程 + R8 打断复位 + 后续 grasp_node 实现</span>';
+  }else if(which === 'r3'){
+    io.innerHTML =
+'<span class="bad">✂️ 已裁掉 R3「一律走大模型意图解析」，退回关键词匹配</span>\n' +
+'<span class="warn">⚠ 「帮我装一下货」「装货开始吧」等变体全部识别失败</span>\n' +
+'<span class="bad">✘ 字符串匹配不对齐语义 —— 点菜全靠顾客背菜名</span>\n' +
+'<span class="warn">⚠ N1 语音节点 LLM 分类链路与 intent_hints 配置全部作废</span>\n' +
+'<span class="bad">影响面：R1 单轮闭环 + voice_node 意图识别 + yaml intents 映射</span>';
+  }else if(which === 'r9'){
+    io.innerHTML =
+'<span class="bad">✂️ 已裁掉 R9 雷达安全联锁</span>\n' +
+'<span class="bad">✘ 60°/20cm/0.5s 三重判定消失 —— 手伸进工作区不会释放力矩</span>\n' +
+'<span class="bad">✘ R9.1「雷达打断 &gt; 语音打断」失去存在意义，分层仲裁塌一半</span>\n' +
+'<span class="bad">✘ N3 safety 节点、danger 联锁话题、conveyor 急停链全部悬空</span>\n' +
+'<span class="bad">影响面：安全底线 —— 系统降级为「只能演示、不能上人」</span>';
+  }
+}
+function resetTrim(){
+  document.getElementById('trimIo').innerHTML =
+'<span class="dim">// 已复位。点击裁剪按钮重新评估</span>\n' +
+'<span class="ok">R4.1 ✓ 每步回 work：任务间安全握手存在</span>\n' +
+'<span class="ok">R3 ✓ LLM 意图解析：换个说法也能听懂</span>\n' +
+'<span class="ok">R9 ✓ 60°/20cm/0.5s 雷达联锁：安全底线在</span>';
+}
+</script>
+<script src="../shared/tutorial.js" defer></script>
+</body>
+</html>

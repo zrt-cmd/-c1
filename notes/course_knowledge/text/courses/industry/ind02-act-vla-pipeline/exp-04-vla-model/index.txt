@@ -1,0 +1,482 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/industry/ind02-act-vla-pipeline/exp-04-vla-model/index.html
+TITLE: EXP-04 VLA 大模型路线与对比 · IND-02 双臂采训推全流程
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+EXP-04 VLA 大模型路线与对比 · IND-02 双臂采训推全流程
+🧠 双臂采训推全流程 ·
+教程首页
+📚 开发者教程首页
+›
+IND-02 课程首页
+›
+EXP-04 VLA 大模型路线与对比
+实验目录 · 五星学习法
+00 课程节奏 · 8 段微课
+§1 实验目标 ①聚焦问题
+§2 核心原理 ①聚焦 ②激活
+§3 环境与材料 ③示证新知
+§4 实操步骤 ④应用新知
+§5 关键命令 ④应用新知
+§6 动画演示 ③示证新知
+§7 互动练习 ④应用新知
+§8 常见问题 ⑤融会贯通
+§9 拓展阅读 ⑤融会贯通
+§10 思考题 ⑤融会贯通
+本课其他实验
+EXP-01 遥操作与数据采集
+EXP-02 ACT 模型训练
+EXP-03 云服务器与推理
+EXP-04 · VLA & COMPARISON
+VLA 大模型路线与对比
+同一批示范数据，换一条路线：把自然语言变成 token，让视觉-语言大模型（SmolVLA）看着"指令"动手。本实验跑通 VLA 微调，并把 ACT 与 VLA 的差异讲透、算清、比明白。
+8 学时
+难度 ★★★
+对比 · 拓展
+对应指导文档第 13 章
+00
+课程节奏：五星学习法 · 8 段微课（每段 ≤ 15 min）
+本实验按
+五星学习法
+组织：先用一个真实故障
+聚焦问题
+，再
+激活旧知
+（ACT 专职小模型 + NLP 的 token 化），接着
+示证新知
+（VLA 的语言 token → VLM 底座 → 动作专家三段结构），然后动手
+应用新知
+完成安装、rename_map、微调与推理，最后借 ACT vs VLA 对比
+融会贯通
+。全程切成
+8 段微课、每段不超过 15 分钟
+，段间停顿 1~2 分钟消化；纯讲授合计约 100 分钟，其余课时用于动手实操与个别辅导。
+① 聚焦问题
+课段 1 · 12 min
+"换任务得重训 ACT/VLA 显存爆/rename_map 报错"故障
+② 激活旧知
+课段 2 · 8 min
+ACT 无语言 52M · tokenizer 切词查表变向量
+③ 示证新知
+课段 3~4 · 27 min
+VLA 三段结构 + ACT vs VLA 两路对比动画
+④ 应用新知
+课段 5~7 · 40 min
+安装 → rename_map → 微调 → 推理 + 特性辨析
+⑤ 融会贯通
+课段 8 · 13 min
+配置红线 · 四维对比 · 思考题
+课段
+五星阶段
+时长
+对应章节
+本段任务
+课段 1
+聚焦问题
+12 min
+§01 + §02 前半
+抛出"换任务得重训 ACT/VLA 显存爆/rename_map 报错"故障，明确本课目标
+课段 2
+激活旧知
+8 min
+§02 后半
+用 ACT 无语言 52M 与 NLP token 化两条旧知解释 VLA 原理
+课段 3
+示证新知
+15 min
+§03
+对照依赖、镜像、数据、对比模板认识 VLA 物料与配置红线
+课段 4
+示证新知
+12 min
+§06（回看 §02 流程）
+看懂"ACT 无语言直连 vs VLA 先 token 化再跨模态"两路差异
+课段 5
+应用新知
+15 min
+§04 Step1~3 + §5 命令①②③
+安装 SmolVLA 依赖、配 rename_map、启动训练（边讲边演）
+课段 6
+应用新知
+15 min
+§04 Step4~6 + §5 命令④
+读参数账本 100M/450M、盯 loss 双降、改指令文本推理
+课段 7
+应用新知
+10 min
+§07
+ACT vs VLA 特性辨析自测，四题锁定路线差异
+课段 8
+融会贯通
+13 min
+§08~§10
+配置红线收口，四维对比与思考题拔高迁移
+讲课提示：课段 1/2 以讲授 + 提问为主；课段 3~4 用对比表 + 动画；课段 5~6 边讲边演命令与日志；课段 7 学员独立完成；课段 8 答疑拔高。段间停顿 1~2 分钟。
+01
+实验目标
+课段 1 · 聚焦问题 · 12 min
+目标 A
+安装 SmolVLA 扩展依赖（
+pip install -e ".[smolvla]"
++ 锁定
+transformers==4.54.1
+），配置
+HF_ENDPOINT
+镜像拉取预训练底座。
+目标 B
+用
+--policy.path=lerobot/smolvla_base
+在同一数据集上微调 VLA，理解
+rename_map
+为什么必须改写摄像头键名，读懂 100M/450M 参数日志。
+目标 C
+从参数量、指令能力、数据需求、算力开销四个维度完成 ACT vs VLA 对比报告，能说清"什么时候选哪条路"。
+验收
+VLA 训练 loss 持续下降并产出 checkpoint；推理时用语言指令（single_task 文本）切换任务；交付一份四维对比表。
+方法论
+用"同一数据、两条路线、同一验收任务"的控制变量法做技术选型对比，结论才经得起追问。
+02
+核心原理：语言如何变成"动作指令"
+课段 1 收尾 + 课段 2 · 激活旧知 · 8 min
+❓ 聚焦问题（课段 1）
+用 ACT 跑了一个抓方块的任务，现在
+想换个任务"掀盖子"
+——按 ACT 的路子得重新采数、重训一个模型。而 VLA 号称"改一句话就能换任务"，可一跑起来
+batch_size=16
+直接
+CUDA out of memory
+，还报
+Missing observation.images.camera2
+。问题出在哪？带着这三个故障听完全课，到课段 6 你会亲手让一句话切换任务。
+通俗类比
+：ACT 像一个只学会一道菜的学徒——你指指红方块和盘子，他就上手干，全程不说话；VLA 像一位看得懂菜谱的大厨——你说"把红方块放进盘子"或"把盖子掀开"，他先读懂话、再看灶台、然后动手。
+那句话怎么进入模型？
+① 语言指令 token 化
+——文本先被 tokenizer 切成 token 序列（本例
+tokenizer_max_length=48
+，最多 48 个 token，装得下一句完整任务）。每个 token 查词表变成数字向量——就像把汉字转成电报码，模型才能算。指导文件里的
+dataset.single_task="Put red cube into plate"
+正是这条被 token 化的指令。
+② 视觉-语言底座（VLM）
+——SmolVLA 站在
+HuggingFaceTB/SmolVLM2-500M-Video-Instruct
+（450M 总参数）肩上：图像走视觉编码器（训练时
+freeze_vision_encoder=True
+冻结，省显存），文本与图像特征在 16 层 VLM 层里做跨模态注意力——"指令里的 red cube 对应画面里那块红色"就是在这层对上的（日志
+Reducing the number of VLM layers to 16
+）。
+③ 动作专家（expert）
+——VLM 输出的融合特征交给动作专家解码出 50 步动作块（
+chunk_size=50
+；
+train_expert_only=True
+表示只微调专家与接口层，
+num_learnable_params=99880992 (100M)
+，其余 3.5 亿参数冻结）。损失仍是重建 + KL 的回归范式，只是"看和想"的部分换成了大模型。
+ACT vs VLA 一览
+：ACT——无语言、52M 专职小模型、数据要多但专精、一步到位快；VLA——语言驱动、100M 可学/450M 底座、预训练常识可迁移、一条指令切换任务，但更吃显存（batch 16 OOM 就减半）、建议至少 10000 步（示例日志仅测 1000 步）。
+自回归 vs 并行
+：VLM 的语言理解部分本质是自回归建模（token 逐个生成的思维链），而动作输出仍走并行块——VLA 是"慢想 + 快动"的组合。
+↺ 激活旧知（课段 2）
+回忆两条旧知：① EXP-02 的 ACT 是
+无语言
+、52M 专职小模型，靠"图像+状态"直连动作；② NLP 里
+tokenizer
+把文本切成 token、查词表变成数字向量——大模型才能"算"一句话。VLA 就是把②这条旧知接到①上：语言先 token 化、再与视觉特征跨模态对齐，最后由动作专家出手。
+VLA 安装
+安装 VLA 扩展依赖（第 13 章）：在 lerobot 环境中执行
+pip install -e ".[smollvla]"
+，安装 SmolVLM2 底座与分词器组件，完成后即可用
+--policy.type=smolvla
+启动训练。
+一句话总结
+ACT 是"肌肉记忆"，VLA 是"看得菜谱的肌肉记忆"。语言给了模型一个可插拔的任务入口。
+03
+环境与材料
+课段 3 · 示证新知 · 15 min
+✓
+LeRobot 源码目录（
+pip install -e ".[smolvla]"
+）+
+transformers==4.54.1
+锁版
+✓
+网络可达 HF 镜像：
+export HF_ENDPOINT=https://hf-mirror.com
+（下载 SmolVLM2 底座约数百 MB～1GB）
+✓
+EXP-02 同款数据集
+liming/put_cube_plate
+（VLA 微调复用，不需新采集）
+✓
+≥24GB 显存显卡（batch_size=16 为文档示例，OOM 即减小）
+✓
+对照材料：EXP-02 的 ACT 日志与检查点（用于四维对比）
+✓
+磁盘预算：VLA 底座缓存 + 检查点合计预留 ≥5GB（
+~/.cache/huggingface/
+与 outputs 分开算）
+✓
+对比模板：EXP-04 的四维对比表模板（参数量 / 指令能力 / 数据需求 / 算力开销）
+✓
+同一份数据：VLA 与 ACT 对比必须用同一 repo_id、同一 episode 划分，否则"数据需求"与"指令能力"两项对比会失真
+配置红线速查（VLA 与 ACT 差异最大的四处）：
+配置项
+ACT（EXP-02）
+VLA（本实验）
+图像尺寸
+(3, 480, 640)
+(3, 256, 256)
+可学习 / 总参数
+52M / 52M（全学）
+100M / 450M（底座冻结）
+动作块 chunk_size
+100
+50
+键名与指令
+left / right / side，无语言入口
+camera1/2/3（需 rename_map），single_task 指令进 tokenizer
+04
+实操步骤
+课段 5~6 · 应用新知 · 2×15 min
+Step 1
+安装（§5 第一条）：smolvla 扩展 + transformers 锁版 + HF 镜像环境变量。
+Step 2
+核对数据摄像头键名：VLA 期望
+observation.images.camera1/2/3
+，原数据为
+right/side/left
+——用
+rename_map
+重定向（§5 第二条）。
+Step 3
+启动训练：观察日志关键行——job_name smolvla、camera1/2/3 (3,256,256)、freeze_vision_encoder True、tokenizer_max_length 48、Auto-scaling LR scheduler。
+Step 4
+读参数账本：
+num_learnable_params=99880992 (100M)
+/
+num_total_params=450046176 (450M)
+——只有约 22% 在学。
+Step 5
+盯 loss：step 100 loss 0.081 → step 1000 loss 0.022，grdn 从 1.069 降到 0.332；文档建议正式训练至少 10000 步。
+Step 6
+Checkpoint policy after step 1000 / End of training
+后，仿照 EXP-03 以
+--policy.path
+推理，改 single_task 文本观察指令切换效果。
+读日志时按"配置 → 账本 → 曲线"三层核对，任何一层对不上就先停下排查：
+层级
+关键行示例
+核对要点
+配置层
+pretrained_path: lerobot/smolvla_base
+、
+tokenizer_max_length: 48
+底座与 48 token 上限是否符合预期
+账本层
+num_learnable_params=99880992 (100M)
+/
+num_total_params=450046176 (450M)
+只有专家与接口层在学，底座冻结
+曲线层
+step:100 loss:0.081
+→
+step:1000 loss:0.022
+loss / grdn 双降才算健康
+配置层细节
+启动日志 dump 全量配置：数据增强含
+ColorJitter
+/
+SharpnessJitter
+（默认 enable:false，可开实验）；优化器
+AdamW lr=1e-4
+，warmup 1000 步后接 30000 步余弦衰减调度——比 ACT 的 1e-5 大十倍，因可学参数仅 100M 且底座已冻结（第 13 章）。
+启动日志要点
+VLA 训练启动时核对三行：①
+pretrained_path: lerobot/smolvla_base
+（底座已加载）→ ②
+freeze_vision_encoder=True
+（视觉编码器冻结）→ ③ 图像尺寸
+image_size: (224, 224)
+（VLM 标准分辨率）——三行齐备即表示进入正式训练循环（第 13 章）。
+loss 曲线
+示例日志 1000 步内
+loss:0.081 → 0.022
+，
+grdn
+同步下降——双降才算健康；VLA 的 loss 绝对值远低于 ACT（8.0 量级）是因为预训练底座已提供良好初始化，不可直接与 ACT 跨模型比绝对 loss（第 13 章）。
+训练完成
+看到
+Checkpoint policy after step 1000
+与
+End of training
+后，检查点位于
+outputs/…/checkpoints/last/pretrained_model
+，参数账本打印
+num_learnable_params=99880992 (100M)
+/
+num_total_params=450046176 (450M)
+——确认可学参数占比正确即完成（第 13 章）。
+05
+关键命令
+随课段 5 / 6 对照使用
+# ── 1) 安装 SmolVLA 依赖（第 13 章原文）
+pip install -e ".[smolvla]" -i https://pypi.tuna.tsinghua.edu.cn/simple
+pip install "transformers==4.54.1" -i https://pypi.tuna.tsinghua.edu.cn/simple
+# ── 2) HF 镜像（下载 SmolVLM2 底座用）
+export HF_ENDPOINT=https://hf-mirror.com
+# ── 3) VLA 微调（第 13 章原文命令）
+lerobot-train --dataset.repo_id=liming/put_cube_plate --policy.path=lerobot/smolvla_base --policy.repo_id=put_cube_plate_vla --batch_size=16 --steps=1000 --output_dir=/home/lz-xl01/lerobot-0.4.1/outputs/put_cube_plate_smolvla --policy.device=cuda --num_workers=4 --wandb.enable=false --log_freq=100 --save_freq=1000 --eval_freq=1000 --rename_map='{"observation.images.right":"observation.images.camera1", "observation.images.side":"observation.images.camera2"}'
+# ── 4) 健康日志（step 100 → 1000）
+step:100  … loss:0.081 grdn:1.069 lr:8.4e-05
+# 权重 accum_to_1000
+step:1000 … loss:0.022 grdn:0.332 lr:3.3e-06
+Checkpoint policy after step 1000
+End of training
+✓
+batch_size=16
+：显存 OOM 时直接减小（8 → 4）。
+✓
+steps=1000 是文档示例
+：VLA 正式训练建议 ≥10000 步（LR 调度 decay 到 30000 步）。
+✓
+rename_map 必须给
+：VLA 的图像通道名为 camera1/2/3，不重定向会因键名对不上而报错。
+✓
+save_freq=1000
+：保存间隔；步数少时每个检查点都要，步数多时可放大。
+06
+动画演示：触发 → 推理 → 执行的两路对比（ACT 无语言 vs VLA 语言指令）
+课段 4 · 示证新知 · 12 min
+同一个任务，两种"点单方式"
+路 A · ACT：无语言，视觉+状态直连
+触发
+开始推理
+推理
+CNN+Trans 52M
+执行
+动作块 100
+执行者内心：训练时见过的唯一套路
+换任务 = 换数据重训一个 ACT
+路 B · VLA：语言指令参与推理
+触发
++ 语言指令
+推理
+VLM 16层 + 专家
+执行
+动作块 50
+执行者内心：先读懂话，再看画面
+换任务 = 改 single_task 文本
+"Put red cube into plate" → tokens（≤48）→ 词向量
+与视觉特征跨模态对齐 → 动作专家解码
+图 6-1｜两路对比动画：上路 ACT 视觉+状态直连出动作；下路 VLA 先把语言 token 化、跨模态对齐，再由动作专家出手
+差异凝练成三点：
+入口
+（有无语言）→
+脑容量
+（52M 专职 vs 450M 底座/100M 可学）→
+换任务方式
+（重训 vs 改一句话）。选择标准：任务固定、算力有限选 ACT；任务多变、要语义泛化、底座可复用选 VLA。
+路 B 多出的虚线框就是"token 化 + 跨模态对齐"：语言被切成 ≤48 个 token 后与视觉特征一起送进 VLM——这也解释了 §8 里超长指令会撞上
+tokenizer_max_length=48
+的原因。
+两条路的"执行"端都在循环消费动作块前缀，块长 100（ACT）与 50（VLA）的差别决定了两次推理之间能"续航"多久——动画里两路圆点的节拍差，就是 chunk 差的直观体现。
+07
+互动练习：ACT vs VLA 特性辨析
+课段 7 · 应用新知 · 10 min
+下面每条描述属于哪条路线？选完立即判分
+1.
+输入不含语言指令，模型靠"看+状态"直接输出动作。
+A · VLA
+B · ACT
+2.
+需要
+rename_map
+把摄像头键名对齐到 camera1/2/3。
+A · VLA
+B · ACT
+3.
+num_learnable_params 约 52M，启动快、显存门槛低。
+A · VLA
+B · ACT
+4.
+换任务只需改
+dataset.single_task
+的一句话，常理知识来自预训练底座。
+A · VLA
+B · ACT
+得分：
+0 / 4
+逐题作答，选错会提示原因
+判分说明：每题锁定后不可更改，防止靠试探刷满分；4 道题恰好覆盖 §2 的四个对比维度（输入方式 / 键名约定 / 规模 / 换任务成本），全错请带着错题回看 §2 与 §6 动画。
+08
+常见问题
+课段 8 · 融会贯通 · 13 min
+✓
+显存不足（OOM）
+：VLA 比 ACT 吃显存，
+batch_size
+16 → 8 → 4；确认 freeze_vision_encoder 与 train_expert_only 仍为 True（全量微调 450M 极易爆）。
+✓
+底座下载失败
+：先
+export HF_ENDPOINT=https://hf-mirror.com
+；transformers 版本漂移就重装
+transformers==4.54.1
+。
+✓
+数据集键名对不上
+：报 missing key observation.images.cameraX 时，检查
+rename_map
+JSON 引号（必须用单引号包 JSON），确认 left/right/side 三路都映射齐。
+✓
+loss 几乎不动
+：steps=1000 对 VLA 太少（文档明确建议 ≥10000）；检查 lr 是否 1e-4 且走了 warmup。
+✓
+图像尺寸不一致
+：VLA 日志为 (3,256,256)，与 ACT 的 (3,480,640) 不同，检查点与数据管线不要混用。
+✓
+换了指令却没效果
+：先确认
+single_task
+文本确实随推理命令传入，再核对加载的是 VLA 检查点（参数账本约 450M）而不是 EXP-02 的 ACT。
+日志 / 报错
+含义
+处置
+Reducing the number of VLM layers to 16
+瘦身底座层到 16
+正常，省显存
+freeze_vision_encoder True
+视觉编码器冻结
+正常；除非图像域差异极大才解冻
+Missing observation.images.camera2
+rename_map 漏映射
+补齐 right/side → camera1/2
+CUDA out of memory
+显存不足
+batch 减半，避免全量微调
+配置红线
+transformers 锁 4.54.1、HF 镜像先设好、rename_map 必须配、steps 别停在 1000。
+09
+拓展阅读
+课段 8 · 融会贯通
+深入
+① LeRobot 中 SmolVLA 配置项
+vlm_model_name
+、
+tokenizer_max_length=48
+、
+num_vlm_layers
+是调成本/性能的三根杠杆；② 官方
+lerobot/smolvla_base
+底座经过多机器人数据预训练——"常识"来自哪里一目了然；③ 进一步对比三大范式：ACT（分块回归）、Diffusion Policy（迭代去噪出块）、VLA（预训练 VLM + 动作头），从生成视角理解"怎么把场景变成动作"；④ 关注 MoT（Mixture-of-Transformers）类结构与 CoT 推理在机器人策略中的最新进展。
+延伸
+⑤ 把 ACT 与 VLA 的启动日志各截一张，参数量、图像尺寸（480×640 vs 256×256）、chunk（100 vs 50）三项差异便一目了然，直接构成对比报告的图表素材；⑥ 尝试把 single_task 改写成同义句（"put the red block on the plate"）再推理，观察语义扰动下的行为稳定性——这是语言鲁棒性的最小实验。
+10
+思考题
+课段 8 · 融会贯通
+思考 1
+同一批 50 组双臂数据，ACT 和 VLA 谁更可能学会？如果把数据扩到 1000 组并加 5 种不同指令的混合任务，结论会反转吗？从"预训练知识 vs 从零学习"的角度论证。
+思考 2
+tokenizer_max_length=48 意味着指令最多约 48 个 token。若产品要支持"把左边第二个红方块放到盘子边缘"这类超长指令，除了改大这个参数，还需要在数据采集（EXP-01 的 single_task 写法）上做什么配合？
+IND-02 · 双臂采训推全流程（ACT / VLA）· EXP-04 VLA 大模型路线与对比
+8 学时 · 对比拓展实验 · 基于 LZ-XL01 指导文档第 13 章《LZ-XL01 的 VLA 模型》改编

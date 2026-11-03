@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-04 逆运动学基础与 IK 解算 · 机器人机械臂应用与开发</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+:root{--theme:#dc2626;--theme-deep:#b91c1c;--theme-bg:#fee2e2;--theme-bd:#fecaca}
+
+/* 交互演示面板 */
+.jacdemo{margin:1.1rem 0 .4rem;padding:1rem 1.1rem;background:#fffbeb;border:1px solid #fde68a;border-radius:14px}
+.jacdemo .jd-head{display:flex;align-items:baseline;gap:.6rem;flex-wrap:wrap;margin-bottom:.55rem}
+.jacdemo .jd-head b{font-size:.98rem;color:#92400e}
+.jacdemo .jd-head .lab{font-size:.72rem;font-weight:700;color:#fff;background:#d97706;border-radius:999px;padding:2px 9px}
+.jacdemo .jd-body{display:flex;gap:1rem;align-items:center;flex-wrap:wrap}
+.jacdemo .jd-svg{flex:none;background:#fefce8;border:1px solid #fde68a;border-radius:10px}
+.jacdemo .jd-side{flex:1;min-width:235px}
+.jacdemo .jd-row{display:flex;align-items:center;gap:.55rem;font-size:.8rem;color:#78350f;margin:.35rem 0}
+.jacdemo .jd-row input[type=range]{flex:1;accent-color:#d97706}
+.jacdemo .jd-val{font-family:monospace;font-weight:700;width:3.4em;text-align:right}
+.jacdemo .bar{height:9px;background:#fde68a;border-radius:99px;overflow:hidden;margin:.3rem 0 .55rem}
+.jacdemo .bar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#16a34a,#d97706);transition:width .15s}
+
+/* 3D 交互模型（iframe 嵌入） */
+.frame-embed{margin:1.1rem 0 .5rem;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden;background:#f8fafc}
+.frame-embed iframe{display:block;width:100%;border:0}
+
+/* 行内 code 的浅灰底包进深色 pre 会糊成一片 —— 还原成纯文字 */
+pre code{background:none;border:0;border-radius:0;padding:0;color:inherit;font-size:13.5px;line-height:1.85}
+pre{font-size:13.5px;line-height:1.85}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit" title="返回课程首页">🤖 具身智能课程 · <i>教程首页</i></a>
+  <div class="crumb"><a href="../../../index.html#core">核心课程</a> / <a href="../index.html">机械臂应用与开发</a> / EXP-04</div>
+</div>
+
+<div class="wrap">
+<aside class="side">
+  <h4>本页目录</h4>
+  <nav>
+    <a class="now" href="#s0">00 · IK 是什么</a>
+    <a href="#s1">01 · 问题与路线图</a>
+    <a href="#s2">02 · 台阶① 先转底座</a>
+    <a href="#s3">03 · 台阶② 两杆怎么弯</a>
+    <a href="#s4">04 · 台阶③ 两组解选一个</a>
+    <a href="#s5">05 · 台阶④ 完整反解</a>
+    <a href="#s6">06 · 台阶⑤ 雅可比</a>
+    <a href="#s7">07 · 台阶⑥ 数值法与奇异</a>
+    <a href="#s8">08 · 台阶⑦ 上真机</a>
+    <a href="#s9">09 · 动手验证</a>
+    <a href="#s10">10 · 总结与思考</a>
+  </nav>
+
+  <h4>本课程实验</h4>
+  <nav>
+    <a href="../exp-01-urdf-simulation/index.html">EXP-01 URDF 模型与仿真控制</a>
+    <a href="../exp-02-serial-pwm/index.html">EXP-02 串口协议与 PWM</a>
+    <a href="../exp-03-kinematics/index.html">EXP-03 正运动学基础</a>
+    <a class="now" href="../exp-04-ik-solver/index.html">EXP-04 逆运动学与 IK 解算</a>
+    <a href="../exp-05-action-replay/index.html">EXP-05 ROS2 架构与动作回放</a>
+    <a href="../exp-06-fixed-grasp/index.html">EXP-06 逆运动学固定抓取</a>
+    <a href="../exp-07-visual-grasp/index.html">EXP-07 视觉动态抓取</a>
+  </nav>
+</aside>
+
+<main class="content">
+
+<div class="exp-head">
+  <span class="code">EXP-04 · 第 2 章 · 综合性 · 4 学时</span>
+  <h1>逆运动学基础与 IK 解算</h1>
+  <p class="desc">这一章把上一章倒过来：<b>给定指尖要到的位置和姿态，反推五个关节角该是多少。</b>听起来只是把公式反过来用，实际上难得多，答案可能有两组，也可能根本没有。下面同样拆成七级台阶：前四级用余弦定理把答案解出来，让你真的懂；第五、六级换成数值迭代，让程序什么情况都能算；第七级上真机，看看解出来的角到底能不能让指尖到位。</p>
+  <div class="meta">
+    <span class="tag hl">⭐⭐⭐ 较难</span>
+    <span class="tag">4 学时</span>
+    <span class="tag">atan2 · 余弦定理 · 雅可比</span>
+  </div>
+</div>
+
+<section class="blk" id="s0">
+<h2><span class="no">00</span>先认识一下这个名字</h2>
+
+<p>上一章你学会了：知道关节转了多少，把指尖在哪算出来。这一章要反过来回答另一个问题：<b>我想让指尖到某个地方，五个关节各该转多少？</b></p>
+
+<p>这个学问叫 <b>Inverse Kinematics</b>，中文译作「逆运动学」，平时叫 <b>IK</b>。名字里的「逆」，是说它的方向和 FK 相反。FK 是摆好姿势看手在哪，IK 是手要放这、姿势该怎么摆。</p>
+
+<p>真机上你天天在做这件事。想让夹爪去抓桌上的杯子，你脑子里想的是那个杯子的位置，不是五个舵机的角度。把「杯子在哪」翻译成「五个角各多少」，就是 IK 干的活。</p>
+
+<h3>为什么 IK 比 FK 难</h3>
+<p>FK 是一路乘下去，答案唯一。IK 不一样，它有三个麻烦，这一章会一个一个处理：</p>
+<table>
+  <tr><th>麻烦</th><th>说人话</th><th>在第几级遇到</th></tr>
+  <tr><td>可能有两组答案</td><td>手肘朝上或者朝下，都能摸到同一个点</td><td>第 3 级</td></tr>
+  <tr><td>可能根本没有答案</td><td>那个点太远，手臂够不着</td><td>第 2 级</td></tr>
+  <tr><td>某些姿势下算不动</td><td>手臂完全伸直时，怎么转弯都只会朝一个方向</td><td>第 6 级</td></tr>
+</table>
+
+<h3>要动用的数学</h3>
+<p>和 FK 用的不太一样。FK 一路是乘法和三角函数，IK 更像在做几何题：</p>
+<table>
+  <tr><th>数学</th><th>在这儿干什么用</th><th>第几级</th></tr>
+  <tr><td>atan2</td><td>已知一个点的横竖两个分量，反算它的方向角</td><td>第 1 级</td></tr>
+  <tr><td>余弦定理</td><td>三角形三条边都知道，反算夹角</td><td>第 2 级</td></tr>
+  <tr><td>反三角函数</td><td>arccos、arcsin，正弦余弦反过来求角度</td><td>第 2、3 级</td></tr>
+  <tr><td>雅可比矩阵</td><td>关节动一点点，指尖跟着动多少，用来指路</td><td>第 5 级</td></tr>
+</table>
+<p>要注意的是，<b>这一章几乎不出现矩阵连乘</b>。解析法的核心是几何，把手臂拆成三角形，用余弦定理直接算。矩阵要到第 5 级讲雅可比时才回来。</p>
+</section>
+
+<section class="blk" id="s1">
+<h2><span class="no">01</span>问题与路线图</h2>
+
+<p>先把要解决的问题说具体。教学模型的尺寸你还记得：大臂 0.126 米、小臂 0.126 米、工具段 0.151 米，J2 离地 0.189 米。</p>
+
+<div class="tip violet"><b>现在的问题是：</b>我想让指尖落在 (0.157, 0, 0.342)，而且工具段要水平朝前。五个关节角分别是多少？</div>
+
+<p>这组数据的答案你其实见过，上一章默认姿态就是它：q2 = −50°、q3 = 105°、q4 = 35°。但那是已知角去算位置。现在要求的是反方向：<b>只看目标，把角解出来。</b></p>
+
+<h3>七级台阶</h3>
+<p>还是同样的思路：先把几何解打通，让你真的懂；再用数值法让程序不挑情况。</p>
+<div class="frame-embed">
+  <iframe src="_build/fk-roadmap.html" height="660" title="IK 讲解路径路线图"></iframe>
+</div>
+<p class="embed-cap">图 1-1｜七级台阶怎么排队。第 1~3 级把手臂拆成三角形，用几何算出答案，第 4 级串成完整链路，走到这儿你就能自己反解。第 5、6 级讲雅可比和数值迭代，几何法失效时靠它兜底，程序里两套都实现了。第 7 级上真机验证解出来的角准不准。</p>
+
+<h3>几个会反复出现的词</h3>
+<table>
+  <tr><th>词</th><th>说的是什么</th></tr>
+  <tr><td>解析法</td><td>用公式直接算出来，一次到位。快，但只对特定构型有效</td></tr>
+  <tr><td>数值法</td><td>先猜一个答案，再一点点往目标挪。慢，但什么情况都能试</td></tr>
+  <tr><td>多解</td><td>同一个目标，有两组甚至更多组关节角都能到</td></tr>
+  <tr><td>奇异位形</td><td>手臂伸直或完全折叠时，某个方向上动不了</td></tr>
+  <tr><td>可达性</td><td>目标点离底座的距离，要在手臂能伸到的范围内</td></tr>
+</table>
+
+<h3>先约定两件事</h3>
+<p>第一件，角度还是从竖直的 Z 轴量起，跟上一章一致。零位时整条臂笔直竖着，q=0 表示和竖直线重合。</p>
+<p>第二件，这一章为了讲得清楚，<b>先把三维问题压到二维平面里</b>。因为 J2、J3、J4 三根轴都沿 Y 方向，它们只能让手臂在 X-Z 竖直平面里动。所以做法永远是：先用 J1 转到目标朝向，之后就在这个平面里解两杆问题。俯视图定方向，侧视图定形状。</p>
+<div class="tip amber"><span class="lab">⚠️ 但有一个"降维损失"要提前知道</span>把 5 关节压成 4 自由度（x, y, z, pitch）是要付代价的：<b>J5 的解恒为 0</b>。因为 J1 与 J5 共轴，在"末端俯仰已由 J2/J3/J4 定死"的前提下，J5 再怎么转都不能改变工具的朝向和位置——它是<b>冗余</b>的，所以解析解里直接取 0。后果是：<b>这台机器不能只靠 IK 把夹爪绕自身轴摆成任意角度</b>，需要在 <code>solution_to_dict()</code> 之外单独给 q5 赋值。想实现"夹爪换个朝向再抓"，得在解完之后手工设 q5，而不是指望 <code>solve_analytical_ik</code> 帮你解出来。</div>
+<div class="tip tealb"><span class="lab">🔍 限位到底是多少，两处说法要分清</span>解析器 <code>config.py</code> 的 <code>jointLimits</code> 写的是 <b>±π（±180°）</b>，这是 URDF 名义行程；真正执行的是 <code>arm_controller.py</code> 的 <code>JOINT_LIMITS_RAD = ±2.356（±135°）</code>，来自 270° 舵机的物理行程。所以：<b>解算器认为合法的角，控制器仍可能拒收</b>。写代码时两边都要过，别只信一边。</div>
+</section>
+
+<section class="blk" id="s2">
+<h2><span class="no">02</span>台阶一：先转底座，对准方向</h2>
+
+<p>IK 的第一步最简单。目标点在水平面上的哪个方向，J1 就转到哪。</p>
+
+<p>俯视图上看：目标的 x 和 y 两个坐标，决定了它相对于底座的方向。用 <code>atan2(y, x)</code> 一算就出来。这个函数和 <code>atan(y/x)</code> 的区别是它能分清四个象限，右边偏上是正的，左边偏下也是对的，不会算反。</p>
+
+<div class="flow">
+  <div class="step"><span class="n">1</span>q1 = atan2(y, x)　<span style="color:#64748b;font-size:13px">目标在水平面上的方向角</span></div>
+  <div class="step"><span class="n">2</span>剩下的问题就变成二维的了：在这个方向上，距离多远、抬多高</div>
+</div>
+
+<div class="jacdemo">
+  <div class="jd-head"><span class="lab">动画</span><b>拖一下，看 J1 怎么对准目标</b></div>
+  <div class="jd-body">
+    <svg class="jd-svg" id="ikYawSvg" viewBox="0 0 300 250" width="300" height="250">
+      <g id="ikYawG"></g>
+    </svg>
+    <div class="jd-side">
+      <div class="jd-row"><span>目标 x</span><input type="range" id="txR" min="0" max="250" value="157" step="1"><span class="jd-val" id="txV">0.157</span></div>
+      <div class="jd-row"><span>目标 y</span><input type="range" id="tyR" min="-250" max="250" value="0" step="1"><span class="jd-val" id="tyV">0.000</span></div>
+      <p style="font-size:12.5px;margin:10px 0 4px;color:#78350f">算出来的 q1 = <code id="q1Out">0.00°</code></p>
+      <p style="font-size:12.5px;color:#78350f">水平距离 r = <code id="rOut">0.157</code> m</p>
+      <p style="font-size:12px;color:#94a3b8;margin-top:8px">拖 y 滑块，看红色箭头跟着转。q1 只负责对准方向，不管抬多高、伸多远。</p>
+    </div>
+  </div>
+</div>
+
+<p>这一步的答案是唯一的，因为它不涉及手臂的形状，只涉及朝向。真正的难题在后面：对准方向之后，手臂该怎么弯，才能让指尖正好落在那个距离和高度上。</p>
+
+<p>顺带说一句，代码里 q1 的公式还多减了一个小项 <code>asin(Y_TCP/r)</code>，用来补偿真机上指尖那一丁点横向偏移。教学模型没有这个偏移，可以完全忽略；等你上真机时会看到它为什么需要。</p>
+</section>
+
+<section class="blk" id="s3">
+<h2><span class="no">03</span>台阶二：两杆怎么弯，余弦定理上场</h2>
+
+<p>方向对准了，问题就变成：<b>两节杆，从起点出发，怎么弯才能让末端落到指定的一点？</b>这是初中就学过的几何题。</p>
+
+<p>把起点、中间那个关节、末端连成一个三角形。三条边你都知道：两条是杆长（0.126 和 0.126），第三条是起点到目标的直线距离 <code>d</code>。三条边都知道，求夹角，这就是<b>余弦定理</b>：</p>
+<pre><code>cos(夹角) = (d² − L1² − L2²) / (2 · L1 · L2)</code></pre>
+
+<p>算出来的余弦值，反手用 <code>arccos</code> 一按，夹角就出来了。</p>
+
+<h3>手算一个例子</h3>
+<p>假设对准方向之后，目标离起点的直线距离是 <b>d = 0.2154 米</b>。代进去：</p>
+<table>
+  <tr><th>步骤</th><th>算式</th><th>结果</th></tr>
+  <tr><td>算 d²</td><td>0.2154²</td><td>0.046400</td></tr>
+  <tr><td>算 L1² + L2²</td><td>0.12614² × 2</td><td>0.031823</td></tr>
+  <tr><td>算 2·L1·L2</td><td>2 × 0.12614 × 0.12614</td><td>0.031823</td></tr>
+  <tr><td>代余弦定理</td><td>(0.046400 − 0.031823) ÷ 0.031823</td><td><b>0.457994</b></td></tr>
+  <tr><td>反算角度</td><td>arccos(0.457994)</td><td><b>62.74°</b></td></tr>
+</table>
+
+<div class="jacdemo">
+  <div class="jd-head"><span class="lab">动画</span><b>拖滑块改目标距离，看三角怎么变</b></div>
+  <div class="jd-body">
+    <svg class="jd-svg" id="ikTriSvg" viewBox="0 0 300 250" width="300" height="250">
+      <g id="ikTriG"></g>
+    </svg>
+    <div class="jd-side">
+      <div class="jd-row"><span>目标距离 d</span><input type="range" id="dR" min="20" max="251" value="215" step="1"><span class="jd-val" id="dV">0.215</span></div>
+      <p style="font-size:12.5px;margin:10px 0 4px;color:#78350f">cos(夹角) = <code id="cosOut">0.458</code></p>
+      <p style="font-size:12.5px;color:#78350f">夹角 = <code id="angOut">62.7°</code></p>
+      <p style="font-size:12px;color:#94a3b8;margin-top:8px">拖到最右边（0.252 m）时两杆完全伸直，夹角是 0。往回拖，夹角变大。超过 0.252 就够不着了。</p>
+    </div>
+  </div>
+</div>
+
+<p>有一个边界要记住：<b>两杆加起来最远能伸 0.2523 米</b>。超过这个距离，余弦定理算出来的值会小于 −1，<code>arccos</code> 没有答案，这就相当于够不着。</p>
+
+<div class="tip amber"><span class="lab">⚠️ 这里藏着一个真问题：源码把越界值"夹"掉了，而不是报错</span>
+看 <code>ik_analytical.py</code> 第 125-127 行：
+<pre style="margin:.5rem 0 .4rem"><code>cosQ3rel = (distSq - L1² - L2²) / (2·L1·L2)
+cosQ3rel = max(-1.0, min(1.0, cosQ3rel))   # ← 超界值被静默夹到 ±1
+q3rel_mag = math.acos(cosQ3rel)</code></pre>
+后果是：目标离得太远时，余弦值本该 &lt; −1，却被夹成 −1，<code>arccos(−1) = 180°</code>，程序<b>照样返回一组"解"</b>，一声不吭。它的 q3 停在 ±0.17° 附近（整条臂几乎伸直），<b>既不报 "Out of reach"，也不返回错误</b>。<br>
+实测复现（本章第 09 节就是让你自己跑出来）：<code>(0.25, 0, 0.15)</code>、<code>(0.22, 0.03, 0.12)</code>、<code>(0.18, 0.05, 0.10)</code> 三个点位全部超界，回代 FK 后误差 <b>18.4 / 22.9 / 21.7 mm</b>；而工作空间<b>内</b>的 <code>(0.20, −0.03, 0.18)</code> 误差是 <b>0.00 mm</b>。<br>
+<b>这就是"求解成功 ≠ 解准确"。</b>注意源码里其实有一个可达性检查（<code>dist &gt; maxReach + 1e-5</code> 就返回 "Out of reach"），但它<b>拦不住这种情况</b>——因为 <code>maxReach</code> 只算到 J4（<code>L1+L2</code>），而 <code>dist</code> 是到 J4 的距离，判据本身没写错；真正漏掉的是：<b>夹紧发生在更后面，把一次本该失败的求解粉饰成了一次成功</b>。
+</div>
+
+<div class="tip tealb"><span class="lab">🔍 工程上该怎么防</span>两条防线缺一不可：<b>① 求解前</b>按 <code>L1+L2 = 0.2523 m</code> 先算一遍可达性，超界就直接拒绝，别把选择权交给 arccos；<b>② 求解后</b>永远做一次 FK 回代、比对误差（这正是下一节"闭环验证"的由来）。只看 <code>error is None</code> 就认为解对了，是本课程最容易踩的坑。</div>
+</section>
+
+<section class="blk" id="s4">
+<h2><span class="no">04</span>台阶三：两组解，选一个</h2>
+
+<p>刚才算出来 62.74°。但仔细想想，这个角可以是正的，也可以是负的：</p>
+
+<ul>
+  <li><b>+62.74°</b>：肘部朝上弯，手臂呈「∧」形</li>
+  <li><b>−62.74°</b>：肘部朝下弯，手臂呈「∨」形</li>
+</ul>
+
+<p>两组都让末端落到同一个点。这就是 IK 的第一个特点：<b>答案不唯一</b>。</p>
+
+<h3>把两组都算出来，验一遍</h3>
+<p>还是 d = 0.2154 米那个位置，目标是让末端落在 (0.080, 0.200)：</p>
+<table>
+  <tr><th></th><th>解 1（肘上）</th><th>解 2（肘下）</th></tr>
+  <tr><td>大臂倾角</td><td>−9.57°</td><td>+53.17°</td></tr>
+  <tr><td>肘部相对角 q3</td><td>+62.74°</td><td>−62.74°</td></tr>
+  <tr><td>小臂倾角</td><td>+53.17°</td><td>−9.57°</td></tr>
+  <tr><td>末端落在（回代 FK）</td><td>(0.0800, 0.2000)</td><td>(0.0800, 0.2000)</td></tr>
+</table>
+<p>两组解算出来的末端位置完全一样，都是目标点。<b>这不是误差，是真实存在的两个姿势。</b></p>
+
+<div class="jacdemo">
+  <div class="jd-head"><span class="lab">动画</span><b>同一个目标点，两种姿势都摸得到</b></div>
+  <div class="jd-body">
+    <svg class="jd-svg" id="ikBranchSvg" viewBox="0 0 300 250" width="300" height="250">
+      <g id="ikBranchG"></g>
+    </svg>
+    <div class="jd-side">
+      <div class="jd-row"><span>q3 角度</span><input type="range" id="q3R" min="-180" max="180" value="62.74" step="0.5"><span class="jd-val" id="q3V">+62.7°</span></div>
+      <p style="font-size:12.5px;margin:10px 0 4px;color:#78350f">大臂倾角 = <code id="t1Out">−9.6°</code></p>
+      <p style="font-size:12.5px;color:#78350f">小臂倾角 = <code id="t2Out">+53.2°</code></p>
+      <p style="font-size:12.5px;color:#78350f">末端落在 = <code id="endOut">(0.080, 0.200)</code></p>
+      <p style="font-size:12px;color:#94a3b8;margin-top:8px">只有 q3 = ±62.7° 这两种情况，末端才正好落在黄色目标点上。其它角度都落不到那儿，试试看。</p>
+    </div>
+  </div>
+</div>
+
+<div class="tip tealb"><b>实际怎么选：</b>看哪种姿势不会撞到东西、不会超出关节限位、离当前姿势更近（转过去更省时间）。源码里默认优先肘上，因为这样工作空间更大，不容易碰到桌面。</div>
+</section>
+
+<section class="blk" id="s5">
+<h2><span class="no">05</span>台阶四：完整反解，一串起来就通了</h2>
+
+<p>前面三步解决了"在平面里怎么把末端送到一个点"。但真机上的目标不是"末端的位置"，而是"指尖的位置 + 工具的朝向"。所以还差一步换算：</p>
+
+<div class="flow">
+  <div class="step"><span class="n">1</span><b>目标：</b>指尖在 (0.157, 0.342)，工具段水平朝前</div>
+  <div class="arr"></div>
+  <div class="step"><span class="n">2</span><b>倒推 J4：</b>指尖减去工具那段 <code>0.151 × (sin90°, cos90°)</code>，得到 (0.0067, 0.3424)</div>
+  <div class="arr"></div>
+  <div class="step"><span class="n">3</span><b>对两杆逆解：</b>相对 J2（高度 0.189）算出 (0.0067, 0.1534)，距离 0.1535</div>
+  <div class="arr"></div>
+  <div class="step"><span class="n">4</span><b>补 q4：</b>工具的目标俯仰角减去小臂的倾角</div>
+</div>
+
+<h3>手算一遍</h3>
+<table>
+  <tr><th>步骤</th><th>算式</th><th>结果</th></tr>
+  <tr><td>① 倒推 J4</td><td>(0.1573, 0.3424) − 0.1506 × (1, 0)</td><td>(0.0067, 0.3424)</td></tr>
+  <tr><td>② 相对 J2</td><td>z 减去 0.1890</td><td>(0.0067, 0.1534)</td></tr>
+  <tr><td>③ 距离</td><td>√(0.0067² + 0.1534²)</td><td>0.1535</td></tr>
+  <tr><td>④ 余弦定理求 q3</td><td>(0.1535² − 0.0318) ÷ 0.0318</td><td>cos = −0.2591 → <b>±105.02°</b></td></tr>
+  <tr><td>⑤ 大臂倾角</td><td>atan2 再减去中间那个偏角</td><td><b>−50.02°</b> / +55.00°</td></tr>
+  <tr><td>⑥ 补 q4</td><td>90° − 小臂倾角</td><td><b>35.00°</b> / 140.02°</td></tr>
+</table>
+
+<p>两组解都能让指尖落在目标点上，回代 FK 验证误差为零：</p>
+<pre><code>解 1：q2 = −50.024°   q3 = +105.019°   q4 = +35.004°
+解 2：q2 = +54.996°   q3 = −105.019°   q4 = +140.024°</code></pre>
+
+<p>注意解 1 完全是上一章默认姿态那组数：q2 = −50°、q3 = 105°、q4 = 35°。<b>这说明反解真的把正解倒回来了。</b>两组都回代 FK，指尖都落在 (0.157, 0.342)，误差为零。</p>
+
+<div class="tip tealb"><b>走到这里你就真的会了：</b>一支笔、一张纸、一个计算器，就能从"指尖要到哪"算出"五个角该多少"。下面两级是为了让程序也能算，而且不挑情况。</div>
+</section>
+
+<section class="blk" id="s6">
+<h2><span class="no">06</span>台阶五：雅可比，抖一下看反应</h2>
+
+<p>前面用的余弦定理，只对"两节杆"这种结构好使。如果手臂有七个关节、或者形状不规则呢？那就没法硬套公式了。这时候得换个思路：<b>先猜一个姿势，看看差多远，然后往差得少的方向挪一点，反复几次。</b></p>
+
+<p>要"往差得少的方向挪"，得先知道一件事：<b>每个关节动一点点，指尖会跟着动多少？</b>这张换算表就是雅可比矩阵。</p>
+
+<div class="flow">
+  <div class="step"><span class="n">1</span>J 的每一列，回答"这个关节单独动一下，指尖往哪动、动多远"</div>
+  <div class="step"><span class="n">2</span>所以 指尖的变化量 = J × 关节的变化量</div>
+  <div class="step"><span class="n">3</span>反过来：想让指尖动到某处，关节该动多少 = 用 J 反算</div>
+</div>
+
+<div class="jacdemo">
+  <div class="jd-head"><span class="lab">动画</span><b>只动 J3 一点点，看指尖跳多远</b></div>
+  <div class="jd-body">
+    <svg class="jd-svg" id="ikJacSvg" viewBox="0 0 300 250" width="300" height="250">
+      <g id="ikJacG"></g>
+    </svg>
+    <div class="jd-side">
+      <div class="jd-row"><span>q3</span><input type="range" id="jq3R" min="-175" max="175" value="90" step="1"><span class="jd-val" id="jq3V">90°</span></div>
+      <p style="font-size:12.5px;margin:10px 0 4px;color:#78350f">指尖位移 / 关节位移 = <code id="jRatOut">0.126</code> m/rad</p>
+      <div class="bar"><i id="jBar" style="width:80%"></i></div>
+      <p style="font-size:12px;color:#94a3b8;margin-top:6px">这条"换算比例"就是雅可比那一项的大小。它随姿势变，不是常数。</p>
+    </div>
+  </div>
+</div>
+
+<p>有个细节值得注意：这个比例<b>不是固定的</b>。同样是 J3 转 1°，手臂伸直时指尖几乎不动，手臂直角时指尖动得最多。等到 q3 接近 0°，比例掉到零——这就引出了下一级的问题。</p>
+</section>
+
+<section class="blk" id="s7">
+<h2><span class="no">07</span>台阶六：数值迭代与奇异</h2>
+
+<p>有了雅可比，就能用"猜 + 修"的办法解 IK：</p>
+
+<pre><code>猜一组关节角 q
+重复：
+    算出当前指尖在哪  →  和目标差多少 e
+    用雅可比反算：关节该挪多少 Δq
+    q = q + Δq
+    差得够小了就停</code></pre>
+
+<p>这就是数值法。它的好处是<b>通用</b>：不管几个关节、什么形状，只要雅可比能算，就能试。代价是要迭代很多次，比解析法慢几十上百倍。</p>
+
+<h3>但有一种姿势会卡住</h3>
+<p>还记得台阶五里那个"比例"吗？它正比于 <code>sin(q3)</code>。当 q3 接近 0° 或 180°，手臂完全伸直或完全折叠，这个比例趋近于零：</p>
+
+<table>
+  <tr><th>q3</th><th>|sin q3|</th><th>状态</th></tr>
+  <tr><td>0°</td><td>0.0000</td><td><b>奇异</b>，完全伸直</td></tr>
+  <tr><td>3°</td><td>0.0523</td><td>接近奇异</td></tr>
+  <tr><td>10°</td><td>0.1736</td><td>正常</td></tr>
+  <tr><td>90°</td><td>1.0000</td><td>最灵活</td></tr>
+  <tr><td>180°</td><td>0.0000</td><td><b>奇异</b>，完全折叠</td></tr>
+</table>
+
+<p>这时候迭代会要一个"无穷大的关节角位移"去补一点点指尖误差，程序直接崩或者疯狂抖动。工程上的解法是给它加一个阻尼项（就是源码里的 DLS 阻尼最小二乘），让"无穷大"变成"很大但有限"，慢慢磨过去。</p>
+
+<div class="tip amber"><b>源码里两套都有：</b><code>ik_analytical.py</code> 是解析法，一次算出答案，快但不通用；数值法在 <code>ik-numerical.js</code> 里用 DLS 迭代。真机上默认走解析法，遇到解不出来才切数值法。</div>
+</section>
+
+<section class="blk" id="s8">
+<h2><span class="no">08</span>台阶七：上真机，解出来的角真的准吗</h2>
+
+<p>解出一组角，代回 FK 算指尖位置，如果和目标是同一个点，说明数学没错。但真机上还有另一层：<b>这组角发给舵机之后，指尖真的会到那儿吗？</b></p>
+
+<h3>先做闭环测试</h3>
+<pre><code>目标点 → IK → 一组关节角 → FK → 算出来的指尖位置
+                                      ↓
+                              和目标点比，差多少？</code></pre>
+<p>这一步在源码里是 <code>test_fk_ik.py</code>，用内置的几个点位跑一遍。如果差得远，说明模型或参数有问题。</p>
+
+<h3>差得远的时候，先分清是哪一种</h3>
+<p>这是这一章最容易走错的地方。误差有两个来源，处理方式完全不同：</p>
+<table>
+  <tr><th>误差类型</th><th>表现</th><th>怎么处理</th></tr>
+  <tr><td><b>模型误差</b></td><td>同一组角，算出来的位置和实际差一截，而且每次差得差不多</td><td>改尺寸参数，重新标定</td></tr>
+  <tr><td><b>求解误差</b></td><td>解出来的角代回 FK 就对不上目标</td><td>算法问题，看是不是多解选错、或者迭代没收敛</td></tr>
+</table>
+<p>判断方法很简单：<b>先只比"解出来的角代回 FK"和"目标"</b>。这一步只有数学，不涉及真机。如果这里就差了，跟装配无关；如果这里对得上，真机上却差，那才是装配和标定的问题。</p>
+
+<h3>往真机下发</h3>
+<p>解出来的角要换成 PWM 才能发给舵机，换算关系在上一章讲过：<code>PWM = rad ÷ 0.002356 + 1500</code>。源码里 <code>solution_to_pwm()</code> 做这件事，然后通过串口发出去。</p>
+<p>把它和别的可能的错因分清楚，是本章唯一需要背下来的一张表：</p>
+<table>
+  <tr><th>现象</th><th>该怀疑谁</th><th>怎么验证</th></tr>
+  <tr><td>解出来的角代回 FK，<b>就</b>和目标差了十几毫米，但仍返回"成功"</td><td><b>求解器 bug</b>（本章那个夹紧问题）</td><td>只跑纯数学、不接真机；换一个工作空间内的点做对照，误差立刻归零</td></tr>
+  <tr><td>代回 FK <b>完全对得上</b>，但真机指尖差几厘米</td><td><b>机械 / 标定</b>：零位、TCP、装配公差</td><td>卷尺量、四点法复验（见<a href="../calibration/index.html#s2">标定专题 第 2 部分</a>）</td></tr>
+  <tr><td>真机动作方向反了、或某个关节明显超范围</td><td><b>PWM↔弧度方向 / 限位</b></td><td>发单个关节 <code>s 1 1520</code> 看是不是只动 1 号；查 <code>SERVO_CONFIG</code> 的 <code>direction</code></td></tr>
+  <tr><td>同一个点在两次运行里误差不同</td><td><b>没有闭环或没有回代 FK</b></td><td>把 FK 回代误差打进日志，每次都看</td></tr>
+</table>
+
+<h3>想上真机？先走 --direct</h3>
+<p>本章的最高配是"跳过 ROS2、直连串口下发"，用来把算法误差和架构误差彻底分开：<code>interactive_ik_test.py --direct</code> 会直接打开串口（和 EXP-02 完全同一条链路），你输入的 x/y/z/pitch 在本地解完 IK 立刻变成 PWM 发下去——<b>中间没有节点、没有话题、没有 launch</b>。它跑通了却和 ROS2 路线结果不同，问题就一定出在架构层（话题没接上、参数没加载、TF 不同步），而不是算法。</p>
+<div class="tip amber"><span class="lab">⚠️ 用 --direct 前必须做的事</span>和 EXP-02 一模一样的清场：<b>先停掉 bringup / arm_controller</b>，否则两边抢 <code>/dev/stm32</code>。而且这条路径<b>绕过了 arm_controller 的软限位检查</b>（<code>JOINT_LIMITS_RAD = ±2.356</code>），防越界只能靠你自己看 <code>solution_to_pwm()</code> 打出来的 5 路 PWM 有没有贴到 500/2500。</div>
+<p>这一章不接实机也能做，只要闭环测试跑通就算达标。想上真机验证的，按实操步骤里的命令来。</p>
+</section>
+
+<section class="blk" id="s9">
+<h2><span class="no">09</span>动手验一遍</h2>
+
+<h3>先用 3D 模型手动试</h3>
+<p>下面这个就是上一章的模型，它现在能拖关节角。你可以这样验证 IK：先在纸上用余弦定理算出一组角，再把它拖到模型上，看指尖是不是落在预期的位置。</p>
+<div class="frame-embed">
+  <iframe src="../exp-03-kinematics/_build/card-fk3d.html" height="640" title="3D 机械臂 FK 验证"></iframe>
+</div>
+<p class="embed-cap">互动 9-1｜用 IK 算出来的角，拖进这个模型验证。比如目标 (0.157, 0.342)，解是 q2=−50°、q3≈105°、q4=35°，拖过去读数应该对得上。</p>
+
+<h3>再跑闭环测试</h3>
+<ol>
+  <li>进入 <code>ros2_ws/src/xflz_eai_car1/arm/kinematics/kinematics/</code></li>
+  <li>运行 <code>python3 test_fk_ik.py</code></li>
+  <li>看每个点位：IK 解出的角代回 FK，误差多大？</li>
+  <li>如果某点误差大，先算清楚是"解不对"还是"模型不对"</li>
+</ol>
+
+<h3>做完了自检</h3>
+<ul class="check">
+  <li>能说清 IK 和 FK 的方向差别，以及 IK 为什么会多解</li>
+  <li>能用余弦定理手算出两杆的夹角</li>
+  <li>能解释"手臂伸直时算不动"的原因（sin q3 → 0）</li>
+  <li>能分清模型误差和求解误差</li>
+  <li>闭环测试能跑通，误差记在报告里</li>
+</ul>
+</section>
+
+<section class="blk" id="s10">
+<h2><span class="no">10</span>回头看看走过的这七步</h2>
+
+<table>
+  <tr><th>台阶</th><th>用了什么</th><th>得到了什么</th></tr>
+  <tr><td>一、先转底座</td><td>atan2</td><td>q1，方向定了</td></tr>
+  <tr><td>二、两杆怎么弯</td><td>余弦定理</td><td>肘部相对角，两组取正负</td></tr>
+  <tr><td>三、两组解选一个</td><td>多解判断</td><td>肘上 / 肘下，都到得了</td></tr>
+  <tr><td>四、完整反解</td><td>倒推 J4 + 补 q4</td><td>五个角全算出来，FK 回代误差为零</td></tr>
+  <tr><td>五、雅可比</td><td>换算比例</td><td>知道每个关节动一点，指尖动多少</td></tr>
+  <tr><td>六、数值法与奇异</td><td>迭代 + 阻尼</td><td>几何法失效时也能算；知道哪儿会卡</td></tr>
+  <tr><td>七、上真机</td><td>闭环测试</td><td>解出来的角真的能让指尖到位</td></tr>
+</table>
+
+<p>如果只能记住一句，记住台阶四：<b>IK 的完整链路是"先倒推 J4，再解两杆，最后补工具角"</b>。前面那些几何公式，都是为了这一步服务的。</p>
+
+<h3>几道题</h3>
+<div class="tip violet"><b>1.</b> 目标距离正好等于 0.2523 米时，q3 是多少？为什么这时候只有一个解？</div>
+<div class="tip violet"><b>2.</b> 如果把 J1 转到 90°，同一个目标点的 q2、q3、q4 会不会变？为什么？</div>
+<div class="tip violet"><b>3.</b> 两组解里，一组 q3 = 62.7°，另一组 q3 = −62.7°。它们在物理上分别是什么姿势？</div>
+<div class="tip violet"><b>4.</b> 闭环测试里，如果所有点位的误差都是同一个方向、同一个大小，你最该怀疑什么？</div>
+<div class="tip violet"><b>5.</b> 数值法迭代到一个奇异位形会怎样？加阻尼之后为什么能绕过？</div>
+
+<h3>下一章</h3>
+<p>这一章把 IK 解出来了，但解出来不等于抓得到。下一章开始做<b>固定抓取</b>：给定一个已知位置的物体，怎么让夹爪对准它、张开、合上、抬起来。那是个完整的动作序列，IK 只是其中的一环。</p>
+</section>
+
+<nav class="expnav">
+  <a href="../exp-03-kinematics/index.html"><span class="lb">上一节</span>EXP-03 正运动学基础</a>
+  <a class="next" href="../exp-06-fixed-grasp/index.html"><span class="lb">下一节</span>EXP-06 逆运动学固定抓取</a>
+</nav>
+
+<footer>
+  <span>具身智能课程 · 机械臂应用与开发</span>
+  <span>EXP-04 逆运动学与 IK 解算</span>
+</footer>
+
+</main>
+</div>
+
+<script src="../shared/tutorial.js" defer></script>
+<script>
+/* ============ 四个小动画（纯 2D，原生 SVG） ============ */
+(function () {
+  var D = Math.PI / 180;
+  var L1 = 0.12614, L2 = 0.12614, PX = 620;   /* 1 m = 620 px */
+
+  function svgEl(tag, attrs) {
+    var el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    for (var k in attrs) el.setAttribute(k, attrs[k]);
+    return el;
+  }
+  function add(g, tag, attrs, text) {
+    var e = svgEl(tag, attrs);
+    if (text !== undefined) e.textContent = text;
+    g.appendChild(e);
+    return e;
+  }
+
+  /* ---------- 台阶① 航向 ---------- */
+  (function () {
+    var g = document.getElementById('ikYawG');
+    if (!g) return;
+    var OX = 150, OY = 130, R = 88;
+
+    function draw(tx, ty) {
+      g.innerHTML = '';
+      /* 坐标轴 */
+      add(g, 'line', { x1: OX - 115, y1: OY, x2: OX + 115, y2: OY, stroke: '#e2e8f0', 'stroke-width': 1.2 });
+      add(g, 'line', { x1: OX, y1: OY - 110, x2: OX, y2: OY + 105, stroke: '#e2e8f0', 'stroke-width': 1.2 });
+      add(g, 'text', { x: OX + 100, y: OY - 7, 'font-size': 10, fill: '#dc2626', 'font-weight': 700 }, '+X 前');
+      add(g, 'text', { x: OX + 5, y: OY + 100, 'font-size': 10, fill: '#16a34a', 'font-weight': 700 }, '+Y 左');
+
+      /* 可达圆（两杆最大伸展） */
+      add(g, 'circle', { cx: OX, cy: OY, r: 0.2523 * PX, fill: 'none', stroke: '#f1f5f9', 'stroke-width': 1, 'stroke-dasharray': '3 4' });
+      /* 底座 */
+      add(g, 'circle', { cx: OX, cy: OY, r: 13, fill: '#e2e8f0', stroke: '#94a3b8' });
+
+      /* 目标方向 */
+      var r = Math.hypot(tx, ty);
+      var ang = Math.atan2(ty, tx);
+      var ex = OX + r * PX * Math.cos(ang);
+      var ey = OY - r * PX * Math.sin(ang);
+
+      add(g, 'line', { x1: OX, y1: OY, x2: ex, y2: ey, stroke: '#dc2626', 'stroke-width': 3.4, 'stroke-linecap': 'round' });
+      add(g, 'circle', { cx: ex, cy: ey, r: 6, fill: '#dc2626' });
+      /* 水平分量（用于看 atan2） */
+      add(g, 'line', { x1: OX, y1: OY, x2: ex, y2: OY, stroke: '#f87171', 'stroke-width': 1.2, 'stroke-dasharray': '4 3', opacity: .6 });
+      add(g, 'line', { x1: ex, y1: OY, x2: ex, y2: ey, stroke: '#4ade80', 'stroke-width': 1.2, 'stroke-dasharray': '4 3', opacity: .6 });
+
+      /* 角度弧 */
+      var ar = 38;
+      if (Math.abs(ang) > 0.001) {
+        var large = Math.abs(ang) > Math.PI ? 1 : 0;
+        add(g, 'path', {
+          d: 'M ' + (OX + ar) + ' ' + OY +
+             ' A ' + ar + ' ' + ar + ' 0 ' + large + ' ' + (ang > 0 ? 1 : 0) + ' ' +
+             (OX + ar * Math.cos(ang)) + ' ' + (OY - ar * Math.sin(ang)),
+          fill: 'none', stroke: '#d97706', 'stroke-width': 1.8
+        });
+      }
+      add(g, 'text', {
+        x: OX + (ar + 16) * Math.cos(ang / 2),
+        y: OY - (ar + 16) * Math.sin(ang / 2) + 4,
+        'font-size': 11, 'font-weight': 700, fill: '#b45309', 'text-anchor': 'middle'
+      }, Math.round(ang / D) + '°');
+
+      document.getElementById('q1Out').textContent = (ang / D).toFixed(2) + '°';
+      document.getElementById('rOut').textContent = r.toFixed(3);
+    }
+
+    function read() {
+      var tx = +document.getElementById('txR').value / 1000;
+      var ty = +document.getElementById('tyR').value / 1000;
+      document.getElementById('txV').textContent = tx.toFixed(3);
+      document.getElementById('tyV').textContent = ty.toFixed(3);
+      draw(tx, ty);
+    }
+    ['txR', 'tyR'].forEach(function (id) {
+      document.getElementById(id).addEventListener('input', read);
+    });
+    read();
+  })();
+
+  /* ---------- 台阶② 余弦定理 ---------- */
+  (function () {
+    var g = document.getElementById('ikTriG');
+    if (!g) return;
+    var OY = 205, OX = 70;
+
+    function draw(d) {
+      g.innerHTML = '';
+      var reach = L1 + L2;
+      var ok = d <= reach;
+      var dd = Math.min(d, reach * 0.999);
+      var c3 = (dd * dd - L1 * L1 - L2 * L2) / (2 * L1 * L2);
+      c3 = Math.max(-1, Math.min(1, c3));
+      var q3 = Math.acos(c3);
+
+      /* 把目标点放平（沿 X 轴），两杆对称张开 */
+      var tx = OX + dd * PX * 0.42;
+      /* 两个连杆长度按比例缩放（不按真实比例，否则画不进画布） */
+      var sL = Math.min(PX * 0.42, 105);
+      var half = sL * Math.cos(q3 / 2);
+      var h = sL * Math.sin(q3 / 2);
+      var mx = OX + half, my = OY - h;
+
+      /* 目标点 */
+      add(g, 'circle', { cx: tx, cy: OY, r: 6, fill: '#d97706' });
+      add(g, 'text', { x: tx, y: OY + 20, 'font-size': 10, fill: '#b45309', 'text-anchor': 'middle' }, '目标');
+
+      /* 两杆 */
+      add(g, 'line', { x1: OX, y1: OY, x2: mx, y2: my, stroke: '#f87171', 'stroke-width': 7, 'stroke-linecap': 'round' });
+      add(g, 'line', { x1: mx, y1: my, x2: OX + 2 * half, y2: OY, stroke: '#fbbf24', 'stroke-width': 7, 'stroke-linecap': 'round' });
+
+      /* 起点、肘 */
+      add(g, 'circle', { cx: OX, cy: OY, r: 5, fill: '#334155' });
+      add(g, 'circle', { cx: mx, cy: my, r: 5, fill: '#fff', stroke: '#16a34a', 'stroke-width': 2 });
+
+      /* d 虚线 */
+      add(g, 'line', { x1: OX, y1: OY, x2: OX + 2 * half, y2: OY, stroke: '#94a3b8', 'stroke-width': 1.4, 'stroke-dasharray': '5 4' });
+      add(g, 'text', { x: OX + half, y: OY - 6, 'font-size': 9.5, fill: '#64748b', 'text-anchor': 'middle' }, 'd');
+
+      /* 夹角弧（在肘部） */
+      var ar = 22;
+      add(g, 'path', {
+        d: 'M ' + (mx - ar) + ' ' + my + ' A ' + ar + ' ' + ar + ' 0 0 0 ' + mx + ' ' + (my + ar),
+        fill: 'none', stroke: '#7c3aed', 'stroke-width': 1.6
+      });
+      add(g, 'text', { x: mx - 6, y: my + 30, 'font-size': 10, 'font-weight': 700, fill: '#6d28d9', 'text-anchor': 'end' },
+          Math.round(q3 / D) + '°');
+
+      /* 读数 */
+      document.getElementById('cosOut').textContent = ok ? c3.toFixed(3) : '超出范围';
+      document.getElementById('angOut').textContent = ok ? (q3 / D).toFixed(1) + '°' : '无解';
+    }
+
+    var dR = document.getElementById('dR');
+    dR.addEventListener('input', function () {
+      var d = +dR.value / 1000;
+      document.getElementById('dV').textContent = d.toFixed(3);
+      draw(d);
+    });
+    draw(0.215);
+  })();
+
+  /* ---------- 台阶③ 两组解 ---------- */
+  (function () {
+    var g = document.getElementById('ikBranchG');
+    if (!g) return;
+    var OX = 80, OY = 200, SC = 470;
+    var TX = 0.080, TZ = 0.200;    /* 目标（相对起点） */
+
+    function draw(q3deg) {
+      g.innerHTML = '';
+      var q3 = q3deg * D;
+      var d = Math.hypot(TX, TZ);
+      var c3 = Math.max(-1, Math.min(1, (d * d - L1 * L1 - L2 * L2) / (2 * L1 * L2)));
+
+      /* 参考线 */
+      add(g, 'line', { x1: OX, y1: OY, x2: OX + 200, y2: OY, stroke: '#e2e8f0', 'stroke-width': 1 });
+      add(g, 'line', { x1: OX, y1: OY, x2: OX, y2: OY - 180, stroke: '#e2e8f0', 'stroke-width': 1 });
+
+      /* 目标点 */
+      var tgx = OX + TX * SC, tgy = OY - TZ * SC;
+      add(g, 'circle', { cx: tgx, cy: tgy, r: 7, fill: 'none', stroke: '#d97706', 'stroke-width': 2.5 });
+      add(g, 'text', { x: tgx + 10, y: tgy - 8, 'font-size': 10, fill: '#b45309', 'font-weight': 700 }, '目标');
+
+      /* 由 q3 反推大臂倾角：末端要落在目标，所以 α 固定 */
+      var alpha = Math.atan2(TX, TZ);
+      var beta = Math.atan2(L2 * Math.sin(q3), L1 + L2 * Math.cos(q3));
+      var t1 = alpha - beta;
+      var t2 = t1 + q3;
+
+      var mx = OX + L1 * Math.sin(t1) * SC;
+      var my = OY - L1 * Math.cos(t1) * SC;
+      var ex = OX + (L1 * Math.sin(t1) + L2 * Math.sin(t2)) * SC;
+      var ey = OY - (L1 * Math.cos(t1) + L2 * Math.cos(t2)) * SC;
+
+      var near = Math.abs(Math.abs(q3deg) - Math.acos(c3) / D) < 4;
+      var col = near ? '#16a34a' : '#94a3b8';
+
+      add(g, 'line', { x1: OX, y1: OY, x2: mx, y2: my, stroke: '#f87171', 'stroke-width': 7, 'stroke-linecap': 'round' });
+      add(g, 'line', { x1: mx, y1: my, x2: ex, y2: ey, stroke: '#fbbf24', 'stroke-width': 7, 'stroke-linecap': 'round' });
+      add(g, 'circle', { cx: OX, cy: OY, r: 5, fill: '#334155' });
+      add(g, 'circle', { cx: mx, cy: my, r: 5, fill: '#fff', stroke: '#16a34a', 'stroke-width': 2 });
+      add(g, 'circle', { cx: ex, cy: ey, r: 5, fill: col });
+
+      document.getElementById('t1Out').textContent = (t1 / D).toFixed(1) + '°';
+      document.getElementById('t2Out').textContent = (t2 / D).toFixed(1) + '°';
+      document.getElementById('endOut').textContent =
+        '(' + ((ex - OX) / SC).toFixed(3) + ', ' + ((OY - ey) / SC).toFixed(3) + ')';
+    }
+
+    var r = document.getElementById('q3R');
+    r.addEventListener('input', function () {
+      document.getElementById('q3V').textContent = (+r.value).toFixed(1) + '°';
+      draw(+r.value);
+    });
+    draw(62.74);
+  })();
+
+  /* ---------- 台阶⑤ 雅可比 ---------- */
+  (function () {
+    var g = document.getElementById('ikJacG');
+    if (!g) return;
+    var OX = 60, OY = 200, SC = 430;
+
+    function draw(q3deg) {
+      g.innerHTML = '';
+      var q3 = q3deg * D;
+      /* 固定大臂竖直（t1=0），只让 q3 变 */
+      var t1 = 0, t2 = t1 + q3;
+
+      add(g, 'line', { x1: OX, y1: OY, x2: OX + 210, y2: OY, stroke: '#e2e8f0', 'stroke-width': 1 });
+      add(g, 'line', { x1: OX, y1: OY, x2: OX, y2: OY - 210, stroke: '#e2e8f0', 'stroke-width': 1 });
+
+      var mx = OX + L1 * Math.sin(t1) * SC;
+      var my = OY - L1 * Math.cos(t1) * SC;
+      var ex = OX + (L1 * Math.sin(t1) + L2 * Math.sin(t2)) * SC;
+      var ey = OY - (L1 * Math.cos(t1) + L2 * Math.cos(t2)) * SC;
+
+      /* 再算 q3 + 1° 的位置，用来显示"动多少" */
+      var q3b = (q3deg + 1) * D;
+      var t2b = t1 + q3b;
+      var exb = OX + (L1 * Math.sin(t1) + L2 * Math.sin(t2b)) * SC;
+      var eyb = OY - (L1 * Math.cos(t1) + L2 * Math.cos(t2b)) * SC;
+
+      add(g, 'line', { x1: OX, y1: OY, x2: mx, y2: my, stroke: '#f87171', 'stroke-width': 7, 'stroke-linecap': 'round' });
+      add(g, 'line', { x1: mx, y1: my, x2: ex, y2: ey, stroke: '#fbbf24', 'stroke-width': 7, 'stroke-linecap': 'round' });
+      add(g, 'line', { x1: mx, y1: my, x2: exb, y2: eyb, stroke: '#fcd34d', 'stroke-width': 3, 'stroke-linecap': 'round', opacity: .8 });
+      add(g, 'circle', { cx: ex, cy: ey, r: 5, fill: '#334155' });
+      add(g, 'circle', { cx: exb, cy: eyb, r: 5, fill: 'none', stroke: '#94a3b8', 'stroke-width': 1.5 });
+
+      /* 位移箭头 */
+      add(g, 'line', { x1: ex, y1: ey, x2: exb, y2: eyb, stroke: '#dc2626', 'stroke-width': 2 });
+
+      var ratio = L2 * Math.abs(Math.sin(q3));   /* dP/dq3 的模 */
+      document.getElementById('jRatOut').textContent = ratio.toFixed(3) + ' m/rad';
+      document.getElementById('jBar').style.width = Math.min(100, ratio / L2 * 100) + '%';
+    }
+
+    var r = document.getElementById('jq3R');
+    r.addEventListener('input', function () {
+      document.getElementById('jq3V').textContent = r.value + '°';
+      draw(+r.value);
+    });
+    draw(90);
+  })();
+})();
+</script>
+</body>
+</html>

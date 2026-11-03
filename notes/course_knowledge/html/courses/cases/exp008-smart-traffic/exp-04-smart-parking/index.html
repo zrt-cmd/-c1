@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-04 · 智慧泊车与综合路测 | CASE-05 机器人小车智慧交通综合案例</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+  :root{
+    --theme:#4f46e5;
+    --theme-deep:#4338ca;
+    --theme-bg:#eef2ff;
+    --theme-bd:#c7d2fe;
+  }
+  .tag.hl{background:var(--theme-bg);border-color:var(--theme-bd);color:var(--theme-deep)}
+  figure.fig img{max-height:360px;object-fit:contain}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="bar-in" style="display:flex;align-items:center;justify-content:space-between;width:100%">
+    <a class="logo" href="../index.html"><b>CASE-05</b>智慧交通</a>
+    <nav class="crumb"><a href="../../../index.html#case">总首页</a> / <a href="../index.html#case">CASE-05 机器人小车智慧交通综合案例</a> / EXP-04</nav>
+  </div>
+</header>
+
+<div class="wrap">
+  <aside class="side">
+    <h4>本页目录</h4>
+    <a href="#s1">01 本节目标</a>
+    <a href="#s2">02 核心原理</a>
+    <a href="#s3">03 硬件与场景</a>
+    <a href="#s4">04 操作步骤</a>
+    <a href="#s5">05 关键命令</a>
+    <a href="#s6">06 原理动画</a>
+    <a href="#s7">07 互动实验</a>
+    <a href="#s8">08 常见问题</a>
+    <a href="#s9">09 拓展阅读</a>
+    <a href="#s10">10 思考题</a>
+    <h4>兄弟实验</h4>
+    <a href="../exp-01-sandbox-mapping/index.html">EXP-01 沙盘认知与建图导航</a>
+    <a href="../exp-02-traffic-vision/index.html">EXP-02 交通标志与红绿灯识别</a>
+    <a href="../exp-03-lane-signal/index.html">EXP-03 车道保持与路口通行</a>
+  </aside>
+
+  <main class="content">
+    <div class="exp-head">
+      <div class="code">EXP-04 · 8 学时（2 理论 + 6 实践）</div>
+      <h1>智慧泊车与综合路测</h1>
+      <p class="desc">收口实验：先让小车"看懂车位"（标线四点检测 + 可用性判定），再"一把倒进去"（两段圆弧几何轨迹或 Nav2 精点导航），最后跑全流程综合任务——巡游 → 按标志改道 → 红灯停等 → 斑马线礼让 → 寻位泊车 → 语音播报成绩，形成一张可量化的验收评分表。</p>
+      <div class="meta"><span class="tag hl">理论2+实践6</span><span class="tag">车位检测</span><span class="tag">轨迹泊车</span><span class="tag">Nav2 精点导航</span><span class="tag">全流程计分</span></div>
+    </div>
+
+    <section class="blk" id="s1">
+      <h2><span class="no">01</span>本节目标</h2>
+      <ul class="check">
+        <li>完成车位标线检测：下视/前视 ROI 中提取车位四角点，区分平行车位与垂直（直角）车位模型。</li>
+        <li>完成可用性判定：净空高度/占据色块 + 几何余量双判据，输出 occupied / free。</li>
+        <li>完成入库执行：任选其一——几何两段圆弧轨迹（可控、可解释）或 Nav2 <code>/navigate_to_pose</code> 精点导航（复用建图成果）。</li>
+        <li>串联全流程综合任务六阶段，全部由 <code>/traffic/*</code>、巡线、泊车三个已验证模块驱动，中途零人工干预。</li>
+        <li>接入 car1_speech：任务结束 ASR 起评、TTS 播报总分，形成闭环反馈。</li>
+        <li>牢记两句话：<b>入库先留侧隙（≥2cm）再回正</b>；<b>全流程跑前必设初始位姿、必用低速起步</b>。</li>
+      </ul>
+      <div class="tip amber"><b>素材说明：</b>本实验无沙盘实拍素材，示意图与交互动画为准；s3 中小车为 C1 官方产品图。沙盘元素按同类教学沙盘典型规格设计，<b>以现场沙盘实际元素为准</b>。</div>
+    </section>
+
+    <section class="blk" id="s2">
+      <h2><span class="no">02</span>核心原理：认车位 → 判空位 → 算轨迹——泊车三连</h2>
+      <p><b>第一步"认车位"：</b>相机 ROI 里只有白色标线，车位 = 三条边组成的开口矩形（平行车位沿路缘、垂直车位垂直路缘）。对预处理后的二值图做轮廓提取与多边形逼近，拿到四角点后与两种模板匹配：长宽比 ≈ 45:35 判平行车位、短边朝路判垂直车位。<b>第二步"判空位"</b>：标线在 ≠ 有位可用——用深度图/色块占据检测算净空：车位框内障碍高度 &lt; 阈值且角点完整，才发布 <code>available=true</code>；被占用则跳过继续巡游。<b>第三步"算轨迹"</b>：平行车位用<b>两段圆弧入库</b>——45° 切入角起手，R1、R2 两段相切圆弧加一次回正，全程曲率连续；车长固定的 C1 若车位长 ≥ 车长 + 15cm 即可一把进。垂直车位更简单：外摆拉开横向间距 → 90° 切弧直入。</p>
+      <p>两种执行器二选一：<b>几何轨迹</b>按时间开环发 <code>/cmd_vel</code>，路径完全可预测、便于逐段录像复盘；<b>Nav2 精点导航</b>把终点位姿发给 <code>/navigate_to_pose</code>，AMCL 负责把 map 下的目标点换算成车体动作——复用 EXP-01 的 slam_map，代价是要保证初始位姿已设置、定位误差 ≤5cm。教学建议：<b>先几何轨迹过"能进"，再换 Nav2 过"停得正"</b>。</p>
+      <figure class="fig">
+        <svg viewBox="0 0 720 300" role="img" aria-label="平行泊车两段圆弧轨迹自制示意图">
+          <defs><marker id="e04a1" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#818cf8"/></marker></defs>
+          <g font-family="Noto Sans CJK SC, sans-serif" font-size="12" text-anchor="middle">
+            <text x="360" y="24" fill="#c7d2fe" font-weight="bold">平行车位两段圆弧入库几何（示意比例，以现场沙盘为准）</text>
+            <line x1="40" y1="56" x2="680" y2="56" stroke="#64748b" stroke-width="4"/>
+            <text x="76" y="46" fill="#94a3b8" font-size="11">路缘</text>
+            <rect x="250" y="76" width="340" height="118" fill="none" stroke="#c7d2fe" stroke-width="3" stroke-dasharray="10 6"/>
+            <text x="420" y="70" fill="#a5b4fc" font-size="11">平行车位 45cm × 35cm</text>
+            <rect x="606" y="76" width="76" height="118" rx="8" fill="#1e293b" stroke="#475569" stroke-width="2"/>
+            <text x="644" y="140" fill="#94a3b8" font-size="11">前车</text>
+            <rect x="40" y="238" width="70" height="44" rx="8" fill="#fbbf24"/>
+            <text x="75" y="265" fill="#0f172a" font-size="12" font-weight="bold">C1</text>
+            <path d="M116,260 H540" fill="none" stroke="#a5b4fc" stroke-width="2.5" stroke-dasharray="8 6" marker-end="url(#e04a1)"/>
+            <text x="330" y="294" fill="#94a3b8" font-size="11">① 沿路驶过车位（对齐起始参考）</text>
+            <path d="M540,260 C536,214 520,186 470,172 C410,156 386,135 386,112" fill="none" stroke="#4ade80" stroke-width="3.5"/>
+            <text x="576" y="216" fill="#4ade80" font-size="11">② R1 切入弧（45°）</text>
+            <path d="M386,112 C386,96 420,92 460,92 C500,92 516,100 516,120" fill="none" stroke="#f59e0b" stroke-width="3.5"/>
+            <text x="452" y="140" fill="#fbbf24" font-size="11">③ R2 回正弧 → ④ 摆正居中</text>
+            <circle cx="540" cy="260" r="5" fill="#818cf8"/><circle cx="386" cy="112" r="5" fill="#818cf8"/>
+            <line x1="420" y1="196" x2="420" y2="226" stroke="#f87171" stroke-width="2" stroke-dasharray="4 4"/>
+            <text x="472" y="216" fill="#f87171" font-size="11" text-anchor="start">侧隙 ≥2cm</text>
+            <rect x="60" y="76" width="196" height="76" rx="8" fill="#0b0f17" stroke="#1e293b"/>
+            <text x="70" y="98" fill="#a5b4fc" font-size="11" text-anchor="start">判据：车位长 ≥ 车长+15cm</text>
+            <text x="70" y="118" fill="#94a3b8" font-size="11" text-anchor="start">切入角 45° · 曲率连续</text>
+            <text x="70" y="138" fill="#94a3b8" font-size="11" text-anchor="start">入库全程 v ≤ 0.10 m/s</text>
+          </g>
+        </svg>
+        <figcaption>图 4-1｜<b>自制示意图</b>：平行泊车两段圆弧——驶过、切弧、回正、摆正四段分解，标注侧隙与曲率约束，对应 s4 步骤与 s7 互动拖拽。</figcaption>
+      </figure>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">车位线怎么提</div><div class="kt">二值化 → 形态学闭运算补断线 → findContours → minAreaRect：长宽比与开口方向决定车位类型。</div></div> <div class="kcard"><div class="kd">空位怎么判</div><div class="kt">双判据：角点完整度 ≥80% 且框内占据高度/色块面积低于阈值，才 free——防"有线有车"误入。</div></div> <div class="kcard"><div class="kd">两段弧为何相切</div><div class="kt">相切保证曲率不跳变，麦克纳姆轮低速下无侧滑；不相切会在衔接点出现横向甩尾。</div></div> <div class="kcard"><div class="kd">几何 vs Nav2</div><div class="kt">几何轨迹开环可控、复盘直观；Nav2 闭环精停但依赖 AMCL 初值——先几何后 Nav2 两步走。</div></div>
+      </div>
+    </section>
+
+    <section class="blk" id="s3">
+      <h2><span class="no">03</span>硬件与场景</h2>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">HP60C 前视 + 下视</div><div class="kt">前视找车位开口、下视复核边线；0.5m 近盲区恰是"车头顶到线"的距离——入库末端改看侧向雷达兜底。</div></div> <div class="kcard"><div class="kd">2D 激光雷达侧隙</div><div class="kt">入库横向间隙用雷达近距点云校核，&lt;2cm 硬停；弥补相机近距失焦。</div></div> <div class="kcard"><div class="kd">麦克纳姆轮横移</div><div class="kt">垂直车位"平移入格"是麦轮独有能力；平行车位仍走两段弧以贴近真实驾驶教学。</div></div> <div class="kcard"><div class="kd">slam_map 复用</div><div class="kt">EXP-01 语义标注中的车位点位直接作为候选搜索区，不必从全图盲找。</div></div>
+      </div>
+      <figure class="fig">
+        <img src="../../../../products/c1-car/images/fig-c1-angle.png" alt="具身智能机器人小车 C1 斜视图">
+        <figcaption>图 4-2｜小车 C1 官方产品图：麦克纳姆轮全向底盘 + 顶部深度相机，泊车实验的执行本体。</figcaption>
+      </figure>
+      <table>
+        <thead><tr><th>练习科目</th><th>通过标准</th><th>常见失败</th></tr></thead>
+        <tbody>
+          <tr><td>平行车位检出</td><td>三种光照下检出率 ≥9/10，类型不误判</td><td>ROI 盖太窄漏角点；反光处断线</td></tr>
+          <tr><td>可用性判定</td><td>有车/空位各 10 例全对</td><td>只看标线不看占据 → 撞"幽灵空位"</td></tr>
+          <tr><td>几何轨迹入库</td><td>10/10 不压线，侧隙 ≥2cm，一次进</td><td>切入角过小蹭前车；速度过快甩尾</td></tr>
+          <tr><td>Nav2 精点入库</td><td>停位偏差 ≤3cm、航向 ≤5°，3/3 成功</td><td>AMCL 初值没设 → 目标点整体平移</td></tr>
+          <tr><td>全流程综合路测</td><td>6 阶段评分 ≥85 分，零人工干预</td><td>任一前序模块话题断流未接 fail-safe</td></tr>
+        </tbody>
+      </table>
+      <div class="tip tealb"><b>生活化类比：</b>认车位像超市找车位：先看划线（几何），再看有没有车（占据），最后才是打方向进去（轨迹）——<b>三步顺序错一步就是事故</b>。</div>
+    </section>
+
+    <section class="blk" id="s4">
+      <h2><span class="no">04</span>操作步骤</h2>
+      <div class="flow">
+        <div class="step"><b class="n">S1</b>车位感知<br><small>ROI 标线提取 → 四角点 → 平行/垂直分类</small></div> <div class="arr">→</div>
+        <div class="step"><b class="n">S2</b>可用性判定<br><small>占据高度 + 角点完整度 → free/occupied</small></div> <div class="arr">→</div>
+        <div class="step"><b class="n">S3</b>轨迹规划<br><small>两段圆弧（平行）/ 外摆切弧（垂直）</small></div> <div class="arr">→</div>
+        <div class="step"><b class="n">S4</b>入库执行<br><small>几何轨迹 或 Nav2 精点 → 侧隙校核回正</small></div> <div class="arr">→</div>
+        <div class="step"><b class="n">S5</b>全流程路测<br><small>巡游→改道→红灯→礼让→泊车 计分</small></div> <div class="arr">→</div>
+        <div class="step"><b class="n">S6</b>语音播报<br><small>car1_speech 汇报总分与扣分项</small></div>
+      </div>
+      <ol style="margin:14px 0 6px;padding-left:22px;line-height:1.9">
+        <li><b>车位感知标定：</b>依次在三种光照下采集空位/有车各 5 帧，调二值化阈值与最小轮廓面积（太小=噪声标线，太大=车位+车道粘连），保存 <code>slot_vision.yaml</code>——<b>光照变化重新标定</b>是硬规矩。</li>
+        <li><b>可用性判定：</b>发布 <code>/parking/slot {type, corners[], available}</code>；故意在车位放入障碍模型复测 10 例，"有车误判为空"按不通过处理。</li>
+        <li><b>几何入库：</b>v ≤ 0.10m/s，R1/R2 按车长自动生成；每 10cm 记录一次横向间隙，<b>低速起步、途中间隙 &lt;2cm 立即停</b>。</li>
+        <li><b>Nav2 精点版：</b>先 RViz2 设初始位姿（2D Pose Estimate）对齐地图，再发目标位姿入库——AMCL 误差直接进停位误差，<b>初始位姿必设</b>。</li>
+        <li><b>全流程联调：</b>按图 4-3 检查点逐站通过后再连跑；任务节点订阅 /traffic/*、巡线偏差、泊车状态，统一计时计分，任一阶段超时 FAIL 并记扣分项。</li>
+        <li><b>播报与留痕：</b>任务结束调 car1_speech TTS 播报（"任务完成，得分 95"）；录 rosbag + 评分表截图交作业。</li>
+      </ol>
+      <figure class="fig">
+        <svg viewBox="0 0 720 200" role="img" aria-label="全流程综合任务检查点路线自制示意图">
+          <defs><marker id="e04a2" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#818cf8"/></marker></defs>
+          <g font-family="Noto Sans CJK SC, sans-serif" font-size="12" text-anchor="middle">
+            <text x="360" y="24" fill="#c7d2fe" font-weight="bold">全流程综合任务六检查点（可量化验收路线）</text>
+            <rect x="40" y="40" width="640" height="146" rx="16" fill="none" stroke="#334155" stroke-width="2" stroke-dasharray="8 6"/>
+            <path d="M80,132 H300 L360,74 H470 L530,132 H634" fill="none" stroke="#818cf8" stroke-width="3" marker-end="url(#e04a2)"/>
+            <g font-size="11">
+              <circle cx="80" cy="132" r="14" fill="#4f46e5"/><text x="80" y="136" fill="#fff">P1</text><text x="80" y="168" fill="#a5b4fc">巡游 ≤±2cm</text>
+              <circle cx="190" cy="132" r="14" fill="#4f46e5"/><text x="190" y="136" fill="#fff">P2</text><text x="190" y="168" fill="#a5b4fc">改道 ≤0.5s</text>
+              <circle cx="300" cy="132" r="14" fill="#ef4444"/><text x="300" y="136" fill="#fff">P3</text><text x="300" y="168" fill="#fca5a5">红灯 10/10</text>
+              <circle cx="360" cy="74" r="14" fill="#f59e0b"/><text x="360" y="78" fill="#fff">P4</text><text x="360" y="58" fill="#fcd34d">礼让 10/10</text>
+              <circle cx="530" cy="132" r="14" fill="#22c55e"/><text x="530" y="136" fill="#052e16">P5</text><text x="530" y="168" fill="#86efac">泊车 不压线</text>
+              <circle cx="634" cy="132" r="14" fill="#818cf8"/><text x="634" y="136" fill="#fff">P6</text><text x="634" y="168" fill="#a5b4fc">播报得分</text>
+            </g>
+          </g>
+        </svg>
+        <figcaption>图 4-3｜<b>自制示意图</b>：六检查点即计分点——P1~P6 分别对应 s5 评分表扣分项，任一站不达标当场 FAIL。</figcaption>
+      </figure>
+      <div class="tip amber"><b>写入 s4 的验收速查（总分 100）：</b>巡线 20 + 改道 15 + 红灯 15 + 礼让 15 + 泊车 25 + 播报 10；<b>≥85 分且零人工干预为通过</b>。易错点：初始位姿没设（Nav2 停位整体偏移）、光照换了没重标（车位漏检）、入库中间停车导致轨迹断点、播报时机早于评分结算。</div>
+    </section>
+
+    <section class="blk" id="s5">
+      <h2><span class="no">05</span>关键命令</h2>
+      <p class="dim">车位/任务节点为本实验新增，其余沿用 xlsx 命令风格；评分表与话题契约见 s4。</p>
+      <pre><span class="c"># ① 起相机 + 车位检测节点（标线参数包 slot_vision.yaml）</span>
+ros2 launch ascamera hp60c.launch.py
+python3 src/parking/perception.py --config config/slot_vision.yaml
+ros2 topic echo /parking/slot                  <span class="c"># type/corners/available</span>
+
+<span class="c"># ② 目标位姿换算（map→车体变换，核对 TF 链）</span>
+ros2 run tf2_ros tf2_echo map base_link
+ros2 run tf2_tools view_frames                 <span class="c"># out/frames.pdf 查 map→odom→base_link</span>
+
+<span class="c"># ③-A 几何轨迹入库（两段圆弧，开环 /cmd_vel）</span>
+ros2 run car1_parking arc_park_node.py --ros-args \
+  --params-file src/car1_parking/config/arc_park.yaml
+ros2 topic echo /parking/status                <span class="c"># IDLE/PLANNING/DONE + 实时侧隙</span>
+
+<span class="c"># ③-B Nav2 精点入库（先在 RViz2 用 2D Pose Estimate 设初始位姿！）</span>
+ros2 launch car1_navigation navigation.launch.py map:=slam_map
+ros2 action send_goal /navigate_to_pose nav2_msgs/action/NavigateToPose \
+  <span class="y">"{pose: {header: {frame_id: map}, pose: {position: {x: 3.42, y: -1.08}, orientation: {z: 0.0, w: 1.0}}}}"</span>
+
+<span class="c"># ④ 全流程任务节点（六阶段计分）+ car1_speech 语音播报</span>
+ros2 launch car1_speech speech.launch.py
+ros2 run car1_mission route_mission.py --ros-args -p mode:=full
+ros2 topic pub --once /speech/tts std_msgs/String <span class="y">"{data: '任务完成，总分95，泊车满分'}"</span>
+ros2 bag record -a -o smart_route_bag          <span class="c"># 全程留痕回放复盘</span></pre>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">验收判据 ①</div><div class="kt">车位检出 9/10、类型零误判；可用性 20 例全对（含 10 例有车）。</div></div> <div class="kcard"><div class="kd">验收判据 ②</div><div class="kt">几何入库 10/10 不压线、侧隙 ≥2cm；Nav2 精点 3/3 停位 ≤3cm/≤5°。</div></div> <div class="kcard"><div class="kd">验收判据 ③</div><div class="kt">全流程 6 阶段 ≥85 分、零人工干预，/parking/status 全程无 FAIL 跳变。</div></div> <div class="kcard"><div class="kd">验收判据 ④</div><div class="kt">TTS 播报分数与评分表一致（结算后 ≤2s 播出），rosbag 可回放核对。</div></div>
+      </div>
+    </section>
+
+    <section class="blk" id="s6">
+      <h2><span class="no">06</span>原理动画：两段圆弧入库与全流程时序</h2>
+      <div class="anim-box">
+        <svg viewBox="0 0 720 250" width="100%" role="img" aria-label="平行泊车两段圆弧入库动画">
+          <g font-family="Noto Sans CJK SC, sans-serif" font-size="12" text-anchor="middle">
+            <text x="360" y="26" fill="#c7d2fe" font-weight="bold">驶过车位 → 倒车切弧 → 回正摆正（8s 循环）</text>
+            <line x1="30" y1="54" x2="690" y2="54" stroke="#64748b" stroke-width="4"/>
+            <text x="66" y="44" fill="#94a3b8" font-size="11">路缘</text>
+            <rect x="250" y="72" width="340" height="96" fill="none" stroke="#c7d2fe" stroke-width="2.5" stroke-dasharray="9 6"/>
+            <text x="420" y="66" fill="#a5b4fc" font-size="11">平行车位</text>
+            <rect x="612" y="72" width="66" height="96" rx="7" fill="#1e293b" stroke="#475569" stroke-width="2"/>
+            <text x="645" y="124" fill="#94a3b8" font-size="11">前车</text>
+            <path id="parkPath" d="M70,214 H560 C556,178 540,156 496,144 C436,128 402,112 402,96 C402,84 440,80 480,80 C516,80 534,88 534,104" fill="none" stroke="#334155" stroke-width="2.5" stroke-dasharray="7 6"/>
+            <g>
+              <rect x="-24" y="-13" width="48" height="26" rx="6" fill="#fbbf24"/>
+              <text x="0" y="5" fill="#0f172a" font-size="11" font-weight="bold">C1</text>
+              <animateMotion dur="8s" repeatCount="indefinite" rotate="auto" path="M70,214 H560 C556,178 540,156 496,144 C436,128 402,112 402,96 C402,84 440,80 480,80 C516,80 534,88 534,104"/>
+            </g>
+            <rect x="30" y="196" width="150" height="42" rx="8" fill="#0b0f17" stroke="#1e293b"/>
+            <text x="40" y="213" fill="#94a3b8" font-size="10" text-anchor="start">① 0~3s 沿路驶过对齐</text>
+            <text x="40" y="230" fill="#a5b4fc" font-size="10" text-anchor="start">② 3~6s 倒车切 R1/R2 双弧</text>
+            <text x="400" y="230" fill="#4ade80" font-size="10" text-anchor="start">③ 6~8s 摆正，侧隙 ≥2cm 判 DONE</text>
+            <circle r="6" fill="#4ade80">
+              <animateMotion dur="8s" begin="3s" repeatCount="indefinite" path="M560,214 C556,178 540,156 496,144 C436,128 402,112 402,96 C402,84 440,80 480,80 C516,80 534,88 534,104"/>
+            </circle>
+          </g>
+        </svg>
+        <div class="anim-cap">动画 4-1：黄块小车沿灰色虚线"驶过 → 倒车切双弧 → 摆正"，绿点标记倒车入库段；衔接点处两弧相切，曲率不跳变。</div>
+      </div>
+      <div class="anim-box">
+        <svg viewBox="0 0 720 250" width="100%" role="img" aria-label="全流程六阶段任务时序动画">
+          <g font-family="Noto Sans CJK SC, sans-serif" font-size="12" text-anchor="middle">
+            <text x="360" y="26" fill="#c7d2fe" font-weight="bold">全流程六阶段：每个方块是一个已验证模块的复用</text>
+            <g>
+              <rect x="30" y="52" width="104" height="64" rx="10" fill="#1e1b4b" stroke="#818cf8" stroke-width="2"><animate attributeName="opacity" values="1;1;0.35;1" keyTimes="0;0.15;0.2;1" dur="12s" repeatCount="indefinite"/></rect>
+              <text x="82" y="80" fill="#c7d2fe" font-weight="bold">P1 巡游</text><text x="82" y="100" fill="#a5b4fc" font-size="10">EXP-03 巡线 20分</text>
+              <rect x="146" y="52" width="104" height="64" rx="10" fill="#1e1b4b" stroke="#818cf8" stroke-width="2"><animate attributeName="opacity" values="1;0.35;1;1;0.35;1" keyTimes="0;0.15;0.2;0.32;0.37;1" dur="12s" repeatCount="indefinite"/></rect>
+              <text x="198" y="80" fill="#c7d2fe" font-weight="bold">P2 改道</text><text x="198" y="100" fill="#a5b4fc" font-size="10">EXP-02 标志 15分</text>
+              <rect x="262" y="52" width="104" height="64" rx="10" fill="#422006" stroke="#f59e0b" stroke-width="2"><animate attributeName="opacity" values="1;0.35;1;1;0.35;1" keyTimes="0;0.32;0.37;0.5;0.55;1" dur="12s" repeatCount="indefinite"/></rect>
+              <text x="314" y="80" fill="#fcd34d" font-weight="bold">P3 红灯停</text><text x="314" y="100" fill="#fbbf24" font-size="10">/traffic/light 15分</text>
+              <rect x="378" y="52" width="104" height="64" rx="10" fill="#422006" stroke="#f59e0b" stroke-width="2"><animate attributeName="opacity" values="1;0.35;1;1;0.35;1" keyTimes="0;0.5;0.55;0.66;0.71;1" dur="12s" repeatCount="indefinite"/></rect>
+              <text x="430" y="80" fill="#fcd34d" font-weight="bold">P4 礼让</text><text x="430" y="100" fill="#fbbf24" font-size="10">行人 ROI 15分</text>
+              <rect x="494" y="52" width="104" height="64" rx="10" fill="#052e16" stroke="#4ade80" stroke-width="2"><animate attributeName="opacity" values="1;0.35;1;1;0.35;1" keyTimes="0;0.66;0.71;0.88;0.93;1" dur="12s" repeatCount="indefinite"/></rect>
+              <text x="546" y="80" fill="#86efac" font-weight="bold">P5 泊车</text><text x="546" y="100" fill="#4ade80" font-size="10">本实验 ⭐25分</text>
+              <rect x="610" y="52" width="86" height="64" rx="10" fill="#1e1b4b" stroke="#818cf8" stroke-width="2"><animate attributeName="opacity" values="1;0.35;1;1;0.35" keyTimes="0;0.88;0.93;0.98;1" dur="12s" repeatCount="indefinite"/></rect>
+              <text x="653" y="80" fill="#c7d2fe" font-weight="bold">P6 播报</text><text x="653" y="100" fill="#a5b4fc" font-size="10">car1_speech 10分</text>
+            </g>
+            <path d="M82,140 H653" fill="none" stroke="#818cf8" stroke-width="2.5" marker-end="url(#e04a2)"/>
+            <text x="368" y="132" fill="#94a3b8" font-size="11">12s 压缩演示（实车约 3~5min 单圈）</text>
+            <rect x="30" y="160" width="666" height="74" rx="10" fill="#0b0f17" stroke="#1e293b"/>
+            <text x="44" y="184" fill="#a5b4fc" font-size="11" text-anchor="start">评分器日志：</text>
+            <text x="44" y="204" fill="#94a3b8" font-size="11" text-anchor="start">阶段通过 → 累加分数；话题断流 ≥2s → 该阶段 FAIL 扣全部分（fail-safe 不放行）</text>
+            <text x="44" y="224" fill="#4ade80" font-size="11" text-anchor="start">全部阶段结算 → /score → car1_speech TTS："任务完成，总分 XX"</text>
+          </g>
+        </svg>
+        <div class="anim-cap">动画 4-2：高亮方块沿时间轴推进 = 当前执行阶段；任一阶段失败即扣该模块分值——综合路测的"可量化"就落在这张表上。</div>
+      </div>
+      <div class="tip violet"><span class="lab">观察</span>动画 4-1 中倒车段（绿点）比驶过段慢得多——<b>泊车不败在规划，败在速度</b>：v 从 0.18 降到 0.10 以下，才有足够时间窗发现侧隙过小并刹停。全流程复用模块同理：接口对了，剩下的都是参数问题。</div>
+    </section>
+
+    <section class="blk" id="s7">
+      <h2><span class="no">07</span>互动实验：泊车轨迹拖拽仿真 + 六阶段评分器</h2>
+      <div class="ix-panel">
+        <div class="ix-title">拖动起始点与切入角，看两段圆弧能不能一把进库</div>
+        <div class="ctl-row">
+<label class="ctl">起始纵向位置 y0 <span id="y0Lab">214</span> <input type="range" id="y0N" min="180" max="250" value="214" step="2" oninput="parkGo()"> </label>
+<label class="ctl">切入角 θ° <span id="thLab">45</span> <input type="range" id="thN" min="25" max="70" value="45" step="1" oninput="parkGo()"> </label>
+<label class="ctl">车位可用性 <span id="avLab">空位</span> <input type="range" id="avN" min="0" max="1" value="0" step="1" oninput="parkGo()"> </label>
+          <button class="btn ghost" onclick="parkPreset(1)">推荐参数</button>
+          <button class="btn ghost" onclick="parkPreset(0)">复位</button>
+        </div>
+        <svg viewBox="0 0 720 240" width="100%" role="img" aria-label="泊车轨迹拖拽仿真画布">
+          <defs><marker id="e04a3" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#818cf8"/></marker></defs>
+          <g font-family="Noto Sans CJK SC, sans-serif" font-size="11">
+            <rect x="20" y="16" width="680" height="208" rx="10" fill="#0b0f17" stroke="#1e293b"/>
+            <line x1="30" y1="44" x2="690" y2="44" stroke="#64748b" stroke-width="4"/>
+            <text x="40" y="36" fill="#94a3b8">路缘</text>
+            <rect x="320" y="58" width="300" height="78" fill="none" stroke="#c7d2fe" stroke-width="2.5" stroke-dasharray="9 6"/>
+            <text x="470" y="52" fill="#a5b4fc" text-anchor="middle">平行车位 45cm×35cm</text>
+            <g id="ghostCar"><rect x="634" y="58" width="56" height="78" rx="7" fill="#1e293b" stroke="#475569"/><text x="662" y="102" fill="#94a3b8" text-anchor="middle">前车</text></g>
+            <rect id="tgtSlot" x="330" y="62" width="280" height="70" rx="4" fill="#4ade80" opacity="0.14"/>
+            <path id="parkTrack" d="" fill="none" stroke="#fbbf24" stroke-width="3"/>
+            <circle id="startDot" cx="60" cy="214" r="7" fill="#818cf8"/>
+            <text id="startLab" x="60" y="234" fill="#a5b4fc" text-anchor="middle">y0=214</text>
+            <text x="40" y="70" fill="#64748b">入库区</text>
+          </g>
+        </svg>
+        <div class="io" id="parkIo"></div>
+      </div>
+      <p style="margin-top:10px">玩法：① 切入角拉到 25° → 弧太缓，车尾压路缘线判 FAIL；拉到 70° → 急切，中段侧隙 &lt;2cm；<b>45° 附近一把进</b>。② 起始点太靠前（y0 小于 180）→ 没有足够摆正距离。③ 可用性切到"占用" → 评分器应直接判 NO-GO，<b>"有位不进"才是正确行为</b>。</p>
+      <div class="ix-panel" style="margin-top:14px">
+        <div class="ix-title">全流程评分器：勾选六阶段通过情况，实时算总分（≥85 过关）</div>
+        <div class="ctl-row" id="scoreRow">
+          <label class="ctl"><input type="checkbox" checked onchange="scoreGo()"> P1 巡游 20</label> <label class="ctl"><input type="checkbox" checked onchange="scoreGo()"> P2 改道 15</label> <label class="ctl"><input type="checkbox" checked onchange="scoreGo()"> P3 红灯 15</label> <label class="ctl"><input type="checkbox" onchange="scoreGo()"> P4 礼让 15</label> <label class="ctl"><input type="checkbox" checked onchange="scoreGo()"> P5 泊车 25</label> <label class="ctl"><input type="checkbox" checked onchange="scoreGo()"> P6 播报 10</label>
+        </div>
+        <svg viewBox="0 0 720 74" width="100%" role="img" aria-label="总分进度条">
+          <rect x="30" y="18" width="660" height="30" rx="15" fill="#0b0f17" stroke="#1e293b"/>
+          <rect id="scoreBar" x="30" y="18" width="581" height="30" rx="15" fill="#4f46e5"/>
+          <line x1="594" y1="10" x2="594" y2="56" stroke="#f59e0b" stroke-width="3"/>
+          <text x="594" y="70" fill="#fbbf24" text-anchor="middle">85 分过关线</text>
+          <text id="scoreLab" x="360" y="39" fill="#fff" font-size="15" font-weight="bold" text-anchor="middle">100 / 100 · PASS</text>
+        </svg>
+        <div class="io" id="scoreIo"></div>
+      </div>
+    </section>
+
+    <section class="blk" id="s8">
+      <h2><span class="no">08</span>常见问题</h2>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">Q 车位检出忽有忽无？</div><div class="kt">反光/光照变化：ROI 内先做灰度归一化，阈值按 s4-1 三种光照分别标定；轮廓面积上下限同时约束。</div></div> <div class="kcard"><div class="kd">Q 把有车车位判成空位？</div><div class="kt">只看标线没看占据：启用双判据（角点完整 + 占据高度），障碍模型复测 10 例全对才放行。</div></div> <div class="kcard"><div class="kd">Q 入库总蹭前车？</div><div class="kt">切入角偏大或起始点太近：θ 回 45°、起始点后移到 y0≥200；雷达侧隙 &lt;2cm 硬停逻辑必须挂上。</div></div> <div class="kcard"><div class="kd">Q Nav2 停位整体偏移？</div><div class="kt">初始位姿没设或设歪了——<b>每次导航前 RViz2 2D Pose Estimate 必设</b>；查 AMCL 粒子收敛云图。</div></div> <div class="kcard"><div class="kd">Q 几何轨迹开环走偏？</div><div class="kt">地面打滑轮差累积：全程每 10cm 用雷达/下视复核一次横向间隙，偏差 &gt;2cm 就小幅修正而非全程盲走。</div></div> <div class="kcard"><div class="kd">Q 全流程中途卡死？</div><div class="kt">订阅的 /traffic/* 或巡线话题断流：任务节点设 2s 看门狗，断流即 FAIL + 语音报错，别无限等待。</div></div> <div class="kcard"><div class="kd">Q 播报分数对不上？</div><div class="kt">播报早于结算：TTS 必须订阅 score 的 final 事件触发；连续播报需排队，避免两句话叠音。</div></div> <div class="kcard"><div class="kd">Q 麦轮横移时压线？</div><div class="kt">垂直车位别贪横移：横移只做微调（±3cm 内），大位移用转弯弧完成——横移量越大航向漂移越大。</div></div>
+      </div>
+    </section>
+
+    <section class="blk" id="s9">
+      <h2><span class="no">09</span>拓展阅读</h2>
+      <ul class="check">
+        <li><b>《自动泊车中的路径规划方法综述》</b>：几何弧线法 vs 样条/搜索法的取舍——本课两段弧是工程教学的最小完备解。</li>
+        <li><b>Nav2 costmap 与精点停位</b>：inflation 层半径设大会让目标点"停不进去"，调小又擦线——对照 s5 的 3cm 判据理解权衡。</li>
+        <li><b>ROS 2 QoS 与任务编排</b>：里程碑评分器本质是 topics 编排（BPMN/状态机之辩），可对照 EXP-03 的优先级 FSM 看分层。</li>
+        <li><b>失败注入测试</b>：主动拔话题、遮相机、放障碍——可靠课程系统靠 fail-safe 而不是靠运气。</li>
+        <li><b>上下文</b>：<a href="../exp-01-sandbox-mapping/index.html">EXP-01 语义标注</a>提供车位地图点位，<a href="../exp-03-lane-signal/index.html">EXP-03 状态机</a>提供 P1~P4 执行器——本实验只做编排与收口。</li>
+      </ul>
+    </section>
+
+    <section class="blk" id="s10">
+      <h2><span class="no">10</span>思考题 · 自测</h2>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">✅ 完成成果</div><div class="kt">车位检出 9/10、入库 10/10 不压线、全流程 ≥85 分零干预、TTS 播报一致，rosbag 留痕。</div></div> <div class="kcard"><div class="kd">🧠 原理收获</div><div class="kt">讲清"检测→判定→规划→执行"四步链与几何/Nav2 两条执行路线的适用边界。</div></div> <div class="kcard"><div class="kd">🛠 技能收获</div><div class="kt">独立完成车位标定、两段弧参数整定、AMCL 初值设置、评分节点联调。</div></div> <div class="kcard"><div class="kd">📐 评分速览</div><div class="kt">感知 30% + 入库 30% + 全流程 30% + 播报留痕 10%。</div></div>
+      </div>
+      <div class="tip violet"><span class="lab">思考 1</span>如果沙盘只有一个垂直车位而没有平行车位，图 4-1 的两段弧几何哪一步要改？写出新轨迹的分段（提示：外摆段 + 单弧段 + 直行段）。</div>
+      <div class="tip violet"><span class="lab">思考 2</span>全流程评分器为什么必须"断流即 FAIL"而不是"断流保持上一次通过"？用一次真实事故链（遮挡相机 → 灯态丢失 → 抢红灯）说明 fail-safe 的价值。</div>
+    </section>
+
+    <nav class="expnav">
+      <a class="prev" href="../exp-03-lane-signal/index.html">← 上一个：EXP-03 车道保持与路口信号通行</a>
+      <a class="next" href="../index.html#case">返回课程目录 →</a>
+    </nav>
+    <footer>
+      <div>CASE-05 · 机器人小车智慧交通综合案例（小车 C1）· EXP-04 智慧泊车与综合路测</div>
+      <div>8 学时 · 2 理论 + 6 实践 · 示意图与交互动画为准（图为 C1 官方产品图），沙盘元素以现场实际为准</div>
+    </footer>
+  </main>
+</div>
+
+<script>
+var PARK_TRACK="M60,214 H560 C556,178 540,156 496,144 C436,128 402,112 402,96 C402,84 440,80 480,80 C516,80 534,88 534,104";
+function parkRender(){
+  var y0=parseInt(document.getElementById('y0N').value,10);
+  var th=parseInt(document.getElementById('thN').value,10);
+  var av=parseInt(document.getElementById('avN').value,10);
+  document.getElementById('y0Lab').textContent=y0;
+  document.getElementById('thLab').textContent=th;
+  document.getElementById('avLab').textContent=av?'占用':'空位';
+  document.getElementById('startDot').setAttribute('cy',y0);
+  document.getElementById('startLab').setAttribute('y',Math.min(236,y0+22));
+  // 起点 x 随角微调，轨迹整体形变近似：角越小弧越平缓
+  var dy=Math.max(-40,Math.min(40,(214-y0))),
+      sag=(th-45)*1.6;
+  var d="M60,"+y0+" H560 C"+(556-sag*0.5)+","+(178+dy*0.5)+" "+(540-sag)+","+(156+dy*0.4)+" "+(496-sag*0.8)+","+(144+dy*0.3)
+      +" C"+(436-sag*0.6)+","+(128+dy*0.2)+" 402,"+(112+dy*0.15)+" 402,96"
+      +" C402,84 440,80 480,80 C516,80 534,88 534,104";
+  document.getElementById('parkTrack').setAttribute('d',d);
+  // 判定
+  var clearance=2+Math.abs(th-45)*0.18, tailOK=(y0<=236)&&(th>=30&&th<=62);
+  var verdict;
+  if(av===1){ verdict='<span class="bad">NO-GO：车位被占 —— 正确行为是跳过继续巡游，不强行入库</span>'; }
+  else if(th<30){ verdict='<span class="bad">FAIL：切入角过小('+th+'°)，车尾压路缘线，摆不正</span>'; }
+  else if(th>62){ verdict='<span class="bad">FAIL：切入角过大('+th+'°)，中段侧隙约 '+clearance.toFixed(1)+'cm，蹭前车风险</span>'; }
+  else if(y0>236){ verdict='<span class="warn">WARN：起始点太靠前，摆正距离不足，末段需倒一把</span>'; }
+  else { verdict='<span class="ok">PASS：侧隙约 '+clearance.toFixed(1)+'cm · 切入角 '+th+'° · 一把进库</span>'; }
+  document.getElementById('parkIo').innerHTML=
+    'y0='+y0+' θ='+th+'° → '+verdict+'\n'
+  + '<span class="dim">目标：侧隙 2~4cm 且一次进；对应实车验收——10/10 不压线、v ≤ 0.10 m/s。</span>';
+}
+function parkGo(){parkRender();}
+function parkPreset(p){
+  document.getElementById('y0N').value=p?214:214;
+  document.getElementById('thN').value=p?45:45;
+  document.getElementById('avN').value=0;
+  parkRender();
+}
+var SCORE_W=[20,15,15,15,25,10];
+function scoreGo(){
+  var boxes=document.getElementById('scoreRow').querySelectorAll('input');
+  var s=0; for(var i=0;i<boxes.length;i++){ if(boxes[i].checked){s+=SCORE_W[i];} }
+  document.getElementById('scoreBar').setAttribute('width',Math.max(0,660*s/100));
+  document.getElementById('scoreBar').setAttribute('fill',s>=85?'#4f46e5':(s>=60?'#f59e0b':'#ef4444'));
+  document.getElementById('scoreLab').textContent=s+' / 100 · '+(s>=85?'PASS':'FAIL');
+  var miss=[]; var names=['P1','P2','P3','P4','P5','P6'];
+  for(var j=0;j<boxes.length;j++){ if(!boxes[j].checked){miss.push(names[j]);} }
+  document.getElementById('scoreIo').innerHTML=
+    (s>=85? '<span class="ok">过关：'+s+' 分 ≥85 分线，可由 car1_speech 播报</span>'
+          : '<span class="bad">未过关：'+s+' 分，缺 '+miss.join(' ')+' —— 对应模块 fail-safe 已扣全分</span>')
+  + '\n<span class="dim">实测口径：评分表与 /score 话题必须同源，播报不得早于 final 结算事件。</span>';
+}
+parkRender();
+scoreGo();
+</script>
+<script src="../shared/tutorial.js" defer></script>
+</body>
+</html>

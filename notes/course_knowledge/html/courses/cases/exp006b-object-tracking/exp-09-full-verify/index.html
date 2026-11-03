@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-09 · 全功能验证 — 通用目标追踪综合项目</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+:root{--theme:#0e7490;--theme-deep:#155e75;--theme-bg:#cffafe;--theme-bd:#a5f3fc}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit" title="返回课程首页">🎓 具身智能课程 · <i>通用目标追踪</i></a>
+  <div class="crumb"><a href="../../../index.html#case">综合项目</a> / <a href="../index.html">通用目标追踪</a> / EXP-09</div>
+</div>
+
+<div class="wrap">
+
+<aside class="side">
+  <h4>本页目录</h4>
+  <a href="#s1" class="now">01 问题引入：最后一步为什么最难过</a>
+  <a href="#s2">02 原理通俗讲解：三档驾照与出车体检</a>
+  <a href="#s3">03 关联知识点：三模式与全链路验收</a>
+  <a href="#s4">04 实验目标</a>
+  <a href="#s5">05 实验环境与准备</a>
+  <a href="#s6">06 动画讲解：三级开发与五步验收</a>
+  <a href="#s7">07 互动讲解：五步验收步进台</a>
+  <a href="#s8">08 实操步骤：五步验证全链路</a>
+  <a href="#s9">09 重点与易错点</a>
+  <a href="#s10">10 总结与思考</a>
+  <h4>CASE-04 · 通用目标追踪</h4>
+  <a href="../exp-01-requirements/index.html">EXP-01 需求分析</a>
+  <a href="../exp-02-track-engine/index.html">EXP-02 TrackEngine 架构</a>
+  <a href="../exp-03-config/index.html">EXP-03 配置详解</a>
+  <a href="../exp-04-deepsort-tracking/index.html">EXP-04 DeepSORT 底座</a>
+  <a href="../exp-05-llm-gating/index.html">EXP-05 LLM 门控</a>
+  <a href="../exp-06-vlm-selection/index.html">EXP-06 VLM 选目标</a>
+  <a href="../exp-07-voice-interrupt/index.html">EXP-07 语音与 TTS</a>
+  <a href="../exp-08-events-degrade/index.html">EXP-08 日志与降级</a>
+  <a href="../exp-09-full-verify/index.html">EXP-09 全功能验证</a>
+</aside>
+
+<main class="content">
+
+<div class="exp-head">
+  <span class="code">EXP-09 · 第 3 章 · 综合性 · 8 学时</span>
+  <h1>全功能验证：五步验收，让整条链路闭环</h1>
+  <p class="desc">前八个实验各验证一段，本实验把整条链路合起来验：<b>三模式入口</b> <code>--video/--image/--camera</code> → <code>cfg["source"]["mode"]</code>（_merge_args L74-93）由 FrameSource 统一 <code>read()→(ok,frame)</code> 契约，None 帧绝不流入 pipeline（engine L88-95）；<b>三级开发</b>文本→语音→摄像头每级只叠一层硬件；<b>五步验收</b> pytest 全绿回归 → 离线文本全链路 → ROS 相机节点 → 实时摄像头 + MJPEG（<code>http://&lt;IP&gt;:8088/track.mjpg</code>）→ 五步核对 + pkill 清理，产出"完整链路闭环 + 事件日志/标注帧完整"的验收证据。</p>
+  <div class="meta">
+    <span class="tag hl">难度 ⭐⭐⭐ · 8 学时</span>
+    <span class="tag">三模式入口</span><span class="tag">三级开发</span>
+    <span class="tag">MJPEG :8088</span><span class="tag">pytest 回归</span>
+  </div>
+</div>
+
+<!-- 01 -->
+<section class="blk" id="s1">
+  <h2><span class="no">01</span>问题引入：最后一步为什么最难过</h2>
+  <p>每个模块单测都过了，合成验收时却常遇到：</p>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>pytest 全绿，一上实机就挂——<b>是框架缺陷还是环境/硬件问题？</b>不分清楚会修错方向</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>离线视频一切正常，切 <code>--camera</code> 推流出黑屏——<b>相机话题没起？8088 被占？还是 stream_name 不对？</b></div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>昨天实验收尾没清理，今天启动直接失败——<b>llm_server 还占着 8080、aplay 独占播放设备</b></div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span>实时画面 ID 乱跳——<b>是运动模糊的低分噪声检测，还是门控参数被改坏了？</b></div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">5</span>验收出了异常，从头到尾整链路跑一次要半小时——<b>没有"缩小→复现→日志定位"的排查地图</b></div>
+  </div>
+  <div class="tip amber"><span class="lab">⚠️ 两条验收红线</span>① 全功能验证前 regression 必须全绿，否则框架缺陷会混进功能问题；② 验收判据是<b>"完整链路闭环 + 日志/帧完整 + 无残留进程"</b>三项同时满足，任何一步失败先回退上一步排查。</div>
+</section>
+
+<!-- 02 -->
+<section class="blk" id="s2">
+  <h2><span class="no">02</span>原理通俗讲解：三档驾照与出车体检</h2>
+  <div class="kgrid">
+    <div class="kcard">
+      <div class="kd">比喻 1</div>
+      <div class="kt">三级开发 = 先操场后公路的三档驾照</div>
+      <p>文本模式（stdin 喂 feed_text，无任何外设）→ 语音模式（+麦克风喇叭）→ 摄像头模式（+ROS 相机话题）——<b>每级只叠加一层硬件依赖，前一级全部可回归</b>。就像考驾照先场地再路考：逻辑先行、硬件后置，哪层出问题就退回到上一档复跑。</p>
+    </div>
+    <div class="kcard">
+      <div class="kd">比喻 2</div>
+      <div class="kt">三模式入口 = 同一间后厨接三种订单</div>
+      <p>堂食（--image 单帧）、外卖（--video 离线视频）、现做（--camera 实时流）——<b>门脸不同，进的是同一间后厨</b>。三种模式只换 FrameSource 输入源，下游 engine/pipeline/门控全部复用，所以换模式不会换出新 bug。</p>
+    </div>
+    <div class="kcard">
+      <div class="kd">比喻 3</div>
+      <div class="kt">read() 契约 = 传送带上的空箱不上线</div>
+      <p>输入源统一返回 <code>(ok, frame)</code>，EOF/断流返回 <code>(False, None)</code>——engine 主循环<b>"读到一帧才进 pipeline"</b>，None 帧绝不流入算法层。就像传送带上没货的空箱不往下游送，下游永远见不到"空数据"这种脏输入。</p>
+    </div>
+    <div class="kcard">
+      <div class="kd">比喻 4</div>
+      <div class="kt">MJPEG = 行车记录仪开直播</div>
+      <p>浏览器打开 <code>http://&lt;IP&gt;:8088/track.mjpg</code> 看到的不是一张张刷新的图片，而是<b>JPEG 帧连发的 HTTP 持续流</b>（engine 每帧 _publish → mjpeg.set_frame，L84-85）。它不需要 X11/显卡，正适合 SSH 远程的 headless 板端——"看不见屏幕也能验收画面"。</p>
+    </div>
+    <div class="kcard">
+      <div class="kd">比喻 5</div>
+      <div class="kt">pytest 回归 = 出车前的固定体检</div>
+      <p>tests/ 覆盖 tools/门控/VLM 虚测/单帧 pipeline/录音自愈，<b>x86 可跑、无 RKNN/ROS 依赖</b>。vlm_fake 固定返回 fake_result_id=3，和 vlm_real 共用同一 select_crops 契约——就像替身演员按同一剧本走位，排练不烧真模型的油。</p>
+    </div>
+    <div class="kcard">
+      <div class="kd">比喻 6</div>
+      <div class="kt">故障排查 = 缩小地图再找路</div>
+      <p>异常出现先缩到最小复现（单一模式/单一指令），再按分层日志定位：[diag] 录音 50 帧/5s 查音频层、[ASR 实时] 查识别层、[cmd] 查指令层、events.jsonl 查状态层——<b>每层有专属锚点</b>，例如 pause_timeout 指向 LLM（pending 卡 30s）、camera_stall 指向相机（30 次读帧失败）。</p>
+    </div>
+  </div>
+  <div class="tip tealb"><span class="lab">🎯 一句话本质</span>全功能验证 = <b>分层解除硬件依赖</b>（三级开发保证逻辑可回归）+ <b>统一输入契约</b>（三模式只换输入源）+ <b>递进式验收</b>（五步各有通过判据，环环回退）。它验证的不是某个算法，而是"这套系统敢不敢交付"。</div>
+</section>
+
+<!-- 03 -->
+<section class="blk" id="s3">
+  <h2><span class="no">03</span>关联知识点：三模式与全链路验收</h2>
+  <table>
+    <thead><tr><th>知识点</th><th>内容</th><th>位置/判据</th></tr></thead>
+    <tbody>
+      <tr><td>三模式入口</td><td>--video/--image/--camera → cfg["source"]["mode"]</td><td>apps/track_app.py _merge_args L74-93</td></tr>
+      <tr><td>输入契约</td><td>FrameSource.read() → (ok, frame)，EOF/断流返回 (False, None)</td><td>common/source.py L34-80；engine L88-95 不放行 None</td></tr>
+      <tr><td>实时相机</td><td>Ros2Camera 订阅 /ascamera_hp60c/camera_publisher/rgb0/image（rclpy 惰性导入）</td><td>ros2 launch car1_peripherals depth_camera.launch.py</td></tr>
+      <tr><td>MJPEG 推流</td><td>持续 MJPEG 流，stream_name 默认 track.mjpg，端口 8088 预检占用即报错退出</td><td>mjpeg_server.py；config_schema L63</td></tr>
+      <tr><td>ID 稳定双闸</td><td>min_confidence=0.3 只放行 ≥0.3 检测 + class_filter:[car] 过滤非车类</td><td>track_config.yaml；压制实时噪声 ID 跳变</td></tr>
+      <tr><td>标注帧完整性</td><td>--save → cfg["save"]["enabled"]（L88-89）落盘 runs/out（fps=10）；_compute_draw 按 follow 过滤</td><td>有 follow 只画锁定 ID，落盘帧须与锁定状态一致</td></tr>
+      <tr><td>事件日志分工</td><td>events.jsonl 记状态变化（结构化可追责）；[diag]/[cmd] 日志记过程行为</td><td>先 jsonl 看"发生了什么"，再按时间戳回看日志查"为什么"</td></tr>
+      <tr><td>headless</td><td>display.show 默认关 → 无 X11 窗口，帧绘制走 MJPEG 输出，吞吐更高</td><td>SSH 远程验收别强开 --show</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 04 -->
+<section class="blk" id="s4">
+  <h2><span class="no">04</span>实验目标</h2>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">目标 1</div><div class="kt">掌握三模式启动</div><p>会用 --video/--image/--camera 启动 track_app，理解三级开发（文本→语音→摄像头）的分层思想。</p></div>
+    <div class="kcard"><div class="kd">目标 2</div><div class="kt">完成全链路验证</div><p>唤醒→追踪→指令→选车→清除→事件日志，离线视频与实时摄像头各闭环一次。</p></div>
+    <div class="kcard"><div class="kd">目标 3</div><div class="kt">掌握故障排查</div><p>用"缩小→复现→日志定位"方法排查异常，并用 pkill 正确清理残留进程。</p></div>
+    <div class="kcard"><div class="kd">目标 4</div><div class="kt">独立完成推流与回归</div><p>MJPEG 推流验证（浏览器可见出流）+ pytest 全量回归全绿确认。</p></div>
+    <div class="kcard"><div class="kd">目标 5</div><div class="kt">迁移部署方法论</div><p>把"三级开发 + 五步验收 + 资源清理"迁移到其他具身智能项目的部署中。</p></div>
+  </div>
+</section>
+
+<!-- 05 -->
+<section class="blk" id="s5">
+  <h2><span class="no">05</span>实验环境与准备</h2>
+  <table>
+    <thead><tr><th>类别</th><th>内容</th></tr></thead>
+    <tbody>
+      <tr><td>硬件</td><td>具身智能实验箱 B2 / 小车 C1 + 深度相机 HP60C（实时模式必需）</td></tr>
+      <tr><td>系统</td><td>Ubuntu 22.04 + ROS 2 Humble，Python 3.10</td></tr>
+      <tr><td>核心库</td><td>RKNN（YOLO/ReID）、RKLLM（LLM/VLM）、sherpa_onnx（ASR/KWS）、Matcha-TTS</td></tr>
+      <tr><td>关键命令</td><td><code>python3 -m pytest tests/ -v</code>、<code>track_app --video … --text</code>、<code>ros2 launch car1_peripherals depth_camera.launch.py</code>、<code>track_app --camera --mjpeg</code></td></tr>
+      <tr><td>参考文档</td><td>README（常用命令）、docs/03_开发模式与验证.md（五步验证 Step1-5）</td></tr>
+    </tbody>
+  </table>
+  <p><b>实验前确认没有残留进程</b>——8080/播放设备/串口都是独占资源，被占会直接启动失败：</p>
+  <pre><span class="g">cd ~/ros2_ws/src/xflz_eai_car1/app/object_tracking</span>
+<span class="g">ps aux | grep -E "track_app|llm_server|aplay" | grep -v grep</span>   <span class="c"># 基线：应无残留</span>
+<span class="c"># 若有残留：pkill -f llm_server; pkill -9 aplay 后再进实验</span></pre>
+</section>
+
+<!-- 06 -->
+<section class="blk" id="s6">
+  <h2><span class="no">06</span>动画讲解：三级开发与五步验收</h2>
+  <div class="anim-box">
+    <svg viewBox="0 0 720 310" xmlns="http://www.w3.org/2000/svg" font-family="monospace">
+      <rect x="0" y="0" width="720" height="310" fill="#0b1220"/>
+      <text x="20" y="24" fill="#7dd3fc" font-size="14">三级开发（台阶上行）× 五步验收（顶部灯逐盏点亮）× 数据流（底部光点）</text>
+      <!-- 三级台阶 -->
+      <rect x="60" y="200" width="170 " height="60" rx="8" fill="#122033" stroke="#38bdf8" stroke-width="2"/>
+      <text x="145" y="226" fill="#e2e8f0" font-size="13" text-anchor="middle">① 文本模式</text>
+      <text x="145" y="246" fill="#94a3b8" font-size="11" text-anchor="middle">stdin · 无外设</text>
+      <rect x="265 " y="150" width="170" height="70" rx="8" fill="#122033" stroke="#38bdf8" stroke-width="2"/>
+      <text x="350" y="180" fill="#e2e8f0" font-size="13" text-anchor="middle">② 语音模式</text>
+      <text x="350" y="200" fill="#94a3b8" font-size="11" text-anchor="middle">+ 麦克风 · 喇叭</text>
+      <rect x="470" y="90" width="170" height="80" rx="8" fill="#122033" stroke="#38bdf8" stroke-width="2"/>
+      <text x="555" y="124" fill="#e2e8f0" font-size="13" text-anchor="middle">③ 摄像头模式</text>
+      <text x="555" y="144" fill="#94a3b8" font-size="11" text-anchor="middle">+ ROS 相机话题</text>
+      <!-- 上行箭头 -->
+      <path d="M232 205 L262 185" stroke="#4ade80" stroke-width="2.5" fill="none"/>
+      <polygon points="266,183 254,182 260,192" fill="#4ade80"/>
+      <text x="215" y="176" fill="#4ade80" font-size="10">+麦克风喇叭</text>
+      <path d="M437 155 L467 130" stroke="#4ade80" stroke-width="2.5" fill="none"/>
+      <polygon points="471,127 459,128 465,137" fill="#4ade80"/>
+      <text x="418" y="122" fill="#4ade80" font-size="10">+ROS 相机</text>
+      <!-- 回归虚线 -->
+      <path d="M555 172 C 470 250, 300 268, 148 264" stroke="#fbbf24" stroke-width="2" fill="none" stroke-dasharray="7 5">
+        <animate attributeName="stroke-dashoffset" values="24;0" dur="1.6s" repeatCount="indefinite"/>
+      </path>
+      <text x="300" y="284" fill="#fbbf24" font-size="11">任一级出故障 → 退回上一档复跑（前级全部可回归）</text>
+      <!-- 五盏验收灯 -->
+      <g font-size="10">
+        <circle cx="260" cy="48" r="9" fill="#334155"><animate attributeName="fill" values="#334155;#4ade80" dur="5s" repeatCount="indefinite" calcMode="discrete" keyTimes="0;0.2"/></circle>
+        <circle cx="320" cy="48" r="9" fill="#334155"><animate attributeName="fill" values="#334155;#4ade80" dur="5s" repeatCount="indefinite" calcMode="discrete" keyTimes="0;0.4"/></circle>
+        <circle cx="380" cy="48" r="9" fill="#334155"><animate attributeName="fill" values="#334155;#4ade80" dur="5s" repeatCount="indefinite" calcMode="discrete" keyTimes="0;0.6"/></circle>
+        <circle cx="440" cy="48" r="9" fill="#334155"><animate attributeName="fill" values="#334155;#4ade80" dur="5s" repeatCount="indefinite" calcMode="discrete" keyTimes="0;0.8"/></circle>
+        <circle cx="500" cy="48" r="9" fill="#334155"><animate attributeName="fill" values="#334155;#4ade80" dur="5s" repeatCount="indefinite" calcMode="discrete" keyTimes="0;1"/></circle>
+        <text x="260" y="72" fill="#94a3b8" text-anchor="middle">pytest</text>
+        <text x="320" y="72" fill="#94a3b8" text-anchor="middle">离线</text>
+        <text x="380" y="72" fill="#94a3b8" text-anchor="middle">相机</text>
+        <text x="440" y="72" fill="#94a3b8" text-anchor="middle">MJPEG</text>
+        <text x="500" y="72" fill="#94a3b8" text-anchor="middle">清理</text>
+      </g>
+      <!-- 底部数据流 -->
+      <path d="M70 296 L650 296" stroke="#334155" stroke-width="2"/>
+      <circle r="5" fill="#38bdf8">
+        <animateMotion dur="4s" repeatCount="indefinite" path="M70 296 L650 296"/>
+      </circle>
+      <circle r="4" fill="#facc15">
+        <animateMotion dur="4s" begin="1.4s" repeatCount="indefinite" path="M70 296 L650 296"/>
+      </circle>
+      <circle r="3" fill="#f472b6">
+        <animateMotion dur="4s" begin="2.8s" repeatCount="indefinite" path="M70 296 L650 296"/>
+      </circle>
+      <text x="70" y="288" fill="#64748b" font-size="10">帧/事件/日志同链流动</text>
+    </svg>
+  </div>
+  <p class="anim-cap">图：三档台阶逐级加硬件（绿箭头），顶部五盏验收灯按 Step1-5 顺序点亮（discrete 循环），黄色回退虚线 = 三级开发"前级永远可回归"的安全网，底部光点 = 数据在同一条链路上持续流动。</p>
+</section>
+
+<!-- 07 -->
+<section class="blk" id="s7">
+  <h2><span class="no">07</span>互动讲解：五步验收步进台</h2>
+  <div class="ix-panel">
+    <div class="ix-title">🎛️ 五步验收步进台 — 按 Step1→5 顺序点亮验收灯（跳步会被拒绝），也可注入两类常见失败</div>
+    <div class="ctl-row">
+      <button class="btn" onclick="vstep(1)">Step1 pytest 回归</button>
+      <button class="btn" onclick="vstep(2)">Step2 离线文本链路</button>
+      <button class="btn" onclick="vstep(3)">Step3 启动相机节点</button>
+      <button class="btn" onclick="vstep(4)">Step4 实时+MJPEG</button>
+      <button class="btn" onclick="vstep(5)">Step5 五步核对+清理</button>
+      <button class="btn ghost" onclick="vstep('a')">注入：8088 被占</button>
+      <button class="btn ghost" onclick="vstep('b')">注入：推流出黑屏</button>
+      <button class="btn ghost" onclick="vstep(0)">重置</button>
+    </div>
+    <pre id="vs-io" class="io"><span class="y">← 从 Step1 开始按序点亮；验收灯 0/5，当前未开始</span></pre>
+  </div>
+  <p>五步的通过判据（docs/03 Step1-5）：<b>pytest 全绿 → 离线日志闭环 → 相机话题在线 → MJPEG 出流且 ID 稳定 → 事件完整且无残留进程</b>。任何一步失败都回退到上一步，而不是往下硬闯。两个注入按钮演示最常见的两条失败分支及其定位路径。</p>
+  <div class="tip amber"><span class="lab">⚠️ 别跳步</span>没跑 Step1 的回归就直接上实机，框架缺陷会被误判成硬件问题；没清理 8088 就重试推流，端口预检会直接报错退出——顺序本身就是排查效率。</div>
+</section>
+
+<!-- 08 -->
+<section class="blk" id="s8">
+  <h2><span class="no">08</span>实操步骤：五步验证全链路</h2>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>pytest 全量回归（约 1h30m）：tests/ 纯逻辑层全绿，建立"框架无缺陷"基线</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>离线文本全链路（约 1h30m）：--video + --text，唤醒→追踪 id3→出画 lost→清除 unlock_all→日志齐全</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>另终端启动 ROS 相机节点：depth_camera.launch.py 提供 /ascamera_hp60c/.../rgb0/image</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span>实时摄像头 + MJPEG + --save（约 2h30m）：浏览器看出流、ID 稳定（0.3 + [car]）、runs/out 落盘标注帧</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">5</span>五步核对 + 清理（约 1h）：docs/03 Step1-5 打勾，pkill 清残留，事件日志完整性最终确认</div>
+  </div>
+
+  <p><b>步骤 1 · pytest 全量回归</b>（x86 可跑、无 RKNN/ROS 依赖）：</p>
+  <pre><span class="g">cd ~/ros2_ws/src/xflz_eai_car1/app/object_tracking</span>
+<span class="g">python3 -m pytest tests/ -v</span>
+<span class="c"># 覆盖 tools/ 门控 / VLM 虚测(vlm_fake 固定 fake_result_id=3) / 单帧 pipeline / 录音自愈</span>
+<span class="c"># 全绿才继续；实机出问题时也先复跑本回归，把框架缺陷与环境问题分开</span></pre>
+
+  <p><b>步骤 2 · 离线视频文本全链路</b>（三模式之一 --video，与音频同一状态机）：</p>
+  <pre><span class="g">python3 apps/track_app.py --video /home/iflytek/ros2_ws/src/xflz_eai_car1/vision/07_multi_object_tracking/test.mp4 --text</span>
+<span class="y">小飞小飞</span>          <span class="c"># stdin 首行唤醒词才进 DIALOG（--text 已关 KWS/硬件唤醒）</span>
+<span class="y">追踪 id3</span>          <span class="c"># 观察：唤醒 → 追踪锁定 → 出画 lost → 清除 unlock_all</span>
+<span class="c"># 核对 runs/logs/events.jsonl：command/lost/unlock_all 条目齐全；--text 走 feed_text 同一回调链</span></pre>
+
+  <p><b>步骤 3-4 · 实时摄像头 + MJPEG 推流 + 标注帧落盘</b>：</p>
+  <pre><span class="c"># 另一终端提供相机话题：</span>
+<span class="g">source /opt/ros/humble/setup.bash && source ~/ros2_ws/install/setup.bash</span>
+<span class="g">ros2 launch car1_peripherals depth_camera.launch.py</span>
+<span class="c"># 主终端（--save 落盘标注帧，frames:1920 fps:10）：</span>
+<span class="g">python3 apps/track_app.py --camera --mjpeg --save</span>
+浏览器打开 <span class="y">http://&lt;IP&gt;:8088/track.mjpg</span>   <span class="c"># 持续 MJPEG 流，ID 稳定由 min_confidence=0.3 + [car] 双闸压噪</span>
+<span class="y">小飞小飞</span> → <span class="y">追踪红色皮卡</span> → <span class="y">解除</span>         <span class="c"># 语音链路闭环；headless 下 display.show 默认关，别强开 --show</span></pre>
+
+  <p><b>步骤 5 · 五步核对 + 资源清理 + 排查锚点</b>：</p>
+  <pre><span class="c"># 分层排查锚点：[diag] 录音 50 帧/5s（音频层）· [ASR 实时]（识别层）· [cmd] 逐分支（指令层）· jsonl（状态层）</span>
+<span class="c">#   pause_timeout → 查 LLM（pending 超 30s）；camera_stall → 查相机（连续 30 次读帧失败）</span>
+<span class="g">tail -f runs/logs/events.jsonl</span>   <span class="c"># 收尾：状态变化齐全；runs/out 标注帧带 follow 过滤不空</span>
+<span class="g">pkill -f llm_server; pkill -9 aplay</span>   <span class="c"># 独占资源：8080 / 播放设备 / 串口必须释放</span>
+<span class="g">ps aux | grep -E "track_app|llm_server|aplay" | grep -v grep</span>   <span class="c"># 应无残留；回滚 git revert 前同样先 pkill</span></pre>
+</section>
+
+<!-- 09 -->
+<section class="blk" id="s9">
+  <h2><span class="no">09</span>重点与易错点</h2>
+  <ul class="check">
+    <li><b>回归先于实机</b>：全功能验证前 pytest 必须全绿，否则框架缺陷会混入功能问题，排查方向直接跑偏。</li>
+    <li><b>stdin 首行是唤醒词</b>：文本模式先输入"小飞小飞"才进 DIALOG；--text 已自动关闭 kws.enabled/hardware_wakeup.enabled。</li>
+    <li><b>None 帧不进 pipeline</b>：EOF/断流时 read() 返回 (False, None)，engine 只在成功读帧时才处理——这是输入层与算法层的隔离边界，改造代码时别绕过它。</li>
+    <li><b>相机话题必须在线</b>：--camera 依赖 /ascamera_hp60c/camera_publisher/rgb0/image（rclpy 惰性导入），没起 depth_camera.launch.py 就会读帧失败累计出 camera_stall。</li>
+    <li><b>MJPEG 是持续流不是图片</b>：stream_name 默认 track.mjpg（name 不带 .mjpg 会自动补全）；端口 8088 预检被占用会明确报错退出，先清理再起。</li>
+    <li><b>ID 跳变先查双闸</b>：min_confidence=0.3 + class_filter:[car] 是实机 tuned 值——调低引入噪声 ID，调高漏检小车；别在验收阶段随手改。</li>
+    <li><b>事件日志/标注帧完整性是验收关键</b>：产生的事件都要追加写入 jsonl；--save 落盘帧按 follow 过滤，锁定目标没画出来说明过滤链路出错。</li>
+    <li><b>收尾必清理</b>：llm_server(8080)/aplay(播放设备)/XFM 串口都是独占资源，不清会直接害死下一次实验；回滚代码前也要先 pkill，避免旧进程旧逻辑混淆排查。</li>
+  </ul>
+  <table>
+    <thead><tr><th>问题</th><th>原因</th><th>解决</th></tr></thead>
+    <tbody>
+      <tr><td>实时无推流</td><td>相机话题未起 / 8088 端口占用</td><td>起 depth_camera.launch.py；查端口与 stream_name</td></tr>
+      <tr><td>ID 跳变</td><td>实时噪声（运动模糊/遮挡低分检测）</td><td>恢复 min_confidence=0.3 + [car] 实机 tuned 值</td></tr>
+      <tr><td>推流卡死/画面冻</td><td>pause_timeout 未解除（LLM pending 卡死）</td><td>查 LLM 进程与 8080；看 pause_timeout 事件</td></tr>
+      <tr><td>唤醒无录音</td><td>XFM 串口被占</td><td>停掉冲突的 log_server，按串口三板斧排查</td></tr>
+      <tr><td>下次启动失败</td><td>残留进程占 8080/播放设备</td><td>pkill -f llm_server / pkill -9 aplay</td></tr>
+      <tr><td>离线通过实机挂</td><td>环境/硬件问题而非框架缺陷</td><td>先复跑 pytest 回归分离两类问题，再查话题/权限</td></tr>
+    </tbody>
+  </table>
+  <div class="tip tealb"><span class="lab">🎯 数值与评分手感</span>评分：pytest 回归 20 + 离线全链路 25 + 实时摄像头与 MJPEG 35 + 五步验证与清理 20 = 100。参考值：标注帧 fps=10（frames:1920）；min_confidence=0.3；MJPEG 端口 8088；录音健康 50 帧/5s；camera_stall 阈值连续 30 次；pause_timeout=30.0s。</div>
+</section>
+
+<!-- 10 -->
+<section class="blk" id="s10">
+  <h2><span class="no">10</span>总结与思考</h2>
+  <p>本实验把九章内容合成一张验收单：三级开发（文本→语音→摄像头）保证每一层硬件都可独立回归，三模式入口（--video/--image/--camera）用统一的 FrameSource read() 契约把输入差异挡在算法层之外，五步验证（pytest → 离线 → 相机 → 实时 MJPEG → 清理）给出每步的通过判据，"缩小→复现→日志定位"给出故障时的行动地图，pkill 清理保证独占资源（8080/播放设备/串口）干净交接。从 exp01 的需求到 exp09 的全功能，事件链路里的多个 fail-closed 节点共同兜住了"不误导、不误锁"的底线。产出：pytest 全绿记录、离线/实时两条全链路日志、MJPEG 出流截图、五步核对表与清理后进程检查记录。</p>
+  <div class="tip violet">
+    <span class="lab">🤔 思考题 1</span>
+    三模式入口（--video/--image/--camera）与三级开发模式（文本→语音→摄像头）分别从哪个维度分层解除硬件依赖？为什么换模式不会引入新 bug，而换硬件层级必须"退回上一档复跑"？
+  </div>
+  <div class="tip violet">
+    <span class="lab">🤔 思考题 2</span>
+    MJPEG 实时推流为什么是"离线视频不可替代"的验证手段（相机话题延迟/推流吞吐/语音与视觉并发哪些只有实时才暴露）？headless 下关闭 display.show 有何意义？再想想：从 exp01 到 exp09，至少三个 fail-closed 节点如何共同保障系统不误导、不误锁？
+  </div>
+</section>
+
+<nav class="expnav">
+  <a class="prev" href="../exp-08-events-degrade/index.html">← EXP-08 事件日志与故障降级</a>
+  <a class="next" href="../index.html">返回课程目录 →</a>
+</nav>
+
+</main>
+</div>
+
+<footer>
+  <span>CASE-04 · 通用目标追踪综合项目 · EXP-09 全功能验证</span>
+  <span>8 学时 · 综合性 · 基于 object_tracking 实验讲义改编</span>
+</footer>
+
+<script>
+var VS9={done:0};
+function vstep(k){
+  var out=document.getElementById('vs-io');
+  if(k===0){VS9={done:0};out.innerHTML='<span class="y">← 已重置，验收灯 0/5，从 Step1 重新开始</span>';return;}
+  if(k==='a'){out.innerHTML='<span class="c">Step4 注入：</span>启动 --mjpeg 时报端口占用、明确报错退出\n<span class="c">原因：</span>8088 被上一次残留进程/其他服务占着（mjpeg_server 预检）\n<span class="y">定位：</span>ps aux | grep -E "track_app|mjpeg" → 找到占用者清理\n<span class="bad">验收：Step4 未通过 → 回退 Step3 确认话题，不要往下闯</span>';return;}
+  if(k==='b'){out.innerHTML='<span class="c">Step4 注入：</span>浏览器打开 :8088/track.mjpg 是黑屏/不刷新\n<span class="c">排查顺序：</span>① ros2 topic echo 确认 /ascamera_hp60c/.../rgb0/image 在流\n<span class="y">② tail jsonl：</span>连续读帧失败累计 30 次会出 {"kind":"camera_stall"} → 相机节点挂了\n<span class="y">③ 无 stall 仍黑屏：</span>查 stream_name（默认 track.mjpg）与 --save 落盘帧\n<span class="bad">验收：Step4 未通过 → 先修相机/推流，事件日志完整性顺延核对</span>';return;}
+  if(k>VS9.done+1){out.innerHTML='<span class="bad">拒绝跳步：</span>当前验收灯 '+VS9.done+'/5，必须先通过 Step'+(VS9.done+1)+'（顺序本身就是判据）';return;}
+  VS9.done=k;
+  var m={
+    1:'<span class="c">Step1：</span>python3 -m pytest tests/ -v\n<span class="g">结果：全绿 ✓</span> 覆盖 tools/门控/VLM 虚测/单帧 pipeline/录音自愈（x86 无 RKNN/ROS 依赖）\n<span class="c">意义：</span>框架无缺陷基线建立——实机再出问题，默认怀疑环境/硬件\n<span class="y">验收灯 1/5 亮：pytest 回归 20 分到手 ✓</span>',
+    2:'<span class="c">Step2：</span>track_app --video …/test.mp4 --text\n<span class="y">小飞小飞</span> → <span class="y">追踪 id3</span> → 目标出画 → <span class="y">清除</span>\n<span class="g">结果：闭环 ✓</span> events.jsonl 见 command → lost → unlock_all；feed_text 与音频同一回调链\n<span class="y">验收灯 2/5 亮：离线全链路（含选车/清除/日志）25 分到手 ✓</span>',
+    3:'<span class="c">Step3：</span>另终端 source ROS → ros2 launch car1_peripherals depth_camera.launch.py\n<span class="g">结果：话题在线 ✓</span> /ascamera_hp60c/camera_publisher/rgb0/image（rclpy 惰性导入）\n<span class="c">判据：</span>ros2 topic echo 有帧数据，read() 不再连续失败\n<span class="y">验收灯 3/5 亮：相机节点就绪 ✓</span>',
+    4:'<span class="c">Step4：</span>track_app --camera --mjpeg --save\n<span class="g">结果：✓</span> 浏览器 http://&lt;IP&gt;:8088/track.mjpg 持续出流；min_confidence=0.3 + [car] 双闸压噪 ID 稳定\n唤醒→追踪红色皮卡→解除闭环；runs/out 按 fps=10 落盘、follow 过滤不空；headless 无 X11\n<span class="y">验收灯 4/5 亮：实时推流 35 分大头到手 ✓</span>',
+    5:'<span class="c">Step5：</span>docs/03 五步核对 + 清理\n<span class="g">结果：✓</span> events.jsonl 各 kind 齐全、标注帧完整；pkill -f llm_server; pkill -9 aplay\nps 复查无残留（8080/播放设备/串口已释放）→ 事件完整性最终确认\n<span class="y">验收灯 5/5 全亮：五步验证与清理 20 分到手 —— 全链路验收通过 🎯</span>'
+  };
+  out.innerHTML=m[k];
+}
+</script>
+<script src="../shared/tutorial.js" defer></script>
+</body>
+</html>

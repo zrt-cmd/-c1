@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-03 · 车道保持与路口信号通行 | CASE-05 机器人小车智慧交通综合案例</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+  :root{
+    --theme:#4f46e5;
+    --theme-deep:#4338ca;
+    --theme-bg:#eef2ff;
+    --theme-bd:#c7d2fe;
+  }
+  .tag.hl{background:var(--theme-bg);border-color:var(--theme-bd);color:var(--theme-deep)}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="bar-in" style="display:flex;align-items:center;justify-content:space-between;width:100%">
+    <a class="logo" href="../index.html"><b>CASE-05</b>智慧交通</a>
+    <nav class="crumb"><a href="../../../index.html#case">总首页</a> / <a href="../index.html#case">CASE-05 机器人小车智慧交通综合案例</a> / EXP-03</nav>
+  </div>
+</header>
+
+<div class="wrap">
+  <aside class="side">
+    <h4>本页目录</h4>
+    <a href="#s1">01 本节目标</a>
+    <a href="#s2">02 核心原理</a>
+    <a href="#s3">03 硬件与场景</a>
+    <a href="#s4">04 操作步骤</a>
+    <a href="#s5">05 关键命令</a>
+    <a href="#s6">06 原理动画</a>
+    <a href="#s7">07 互动实验</a>
+    <a href="#s8">08 常见问题</a>
+    <a href="#s9">09 拓展阅读</a>
+    <a href="#s10">10 思考题</a>
+    <h4>兄弟实验</h4>
+    <a href="../exp-01-sandbox-mapping/index.html">EXP-01 沙盘认知与建图导航</a>
+    <a href="../exp-02-traffic-vision/index.html">EXP-02 交通标志与红绿灯识别</a>
+    <a href="../exp-04-smart-parking/index.html">EXP-04 智慧泊车与综合路测</a>
+  </aside>
+
+  <main class="content">
+    <div class="exp-head">
+      <div class="code">EXP-03 · 8 学时（2 理论 + 6 实践）</div>
+      <h1>车道保持与路口信号通行</h1>
+      <p class="desc">让小车"像人一样开车"：视觉巡线用 PID 把车道中心线偏差压进 ±2cm 发 /cmd_vel，路口停止线前按 /traffic/light 红灯停绿灯行，斑马线检测到行人模型必让，IDLE/CROSSING/WAITING 三级优先级状态机统管决策——验收标准：直道偏差 ≤2cm、红灯 10/10 次停稳、斑马线礼让 10/10 次触发。</p>
+      <div class="meta"><span class="tag hl">理论2+实践6</span><span class="tag">PID 巡线</span><span class="tag">停止线检测</span><span class="tag">斑马线礼让</span><span class="tag">优先级状态机</span></div>
+    </div>
+
+    <section class="blk" id="s1">
+      <h2><span class="no">01</span>本节目标</h2>
+      <ul class="check">
+        <li>讲清巡线控制闭环：视觉算偏差 e(t) → PID 出角速度 → /cmd_vel → 底盘执行 → 相机再观测，理解"反馈环画成圈"。</li>
+        <li>完成车道中心线检测节点（ROI 内高对比识别线质心提取），并用 PID 把直道偏差收敛到 ±2cm。</li>
+        <li>完成停止线检测：路口前 20cm 触发减速，结合 EXP-02 的 /traffic/light 实现红灯停、绿灯行、黄灯按距决策。</li>
+        <li>完成斑马线礼让：检测到行人模型（EXP-02 标志/颜色通道复用）30cm 内必停，行人离开 2s 后恢复。</li>
+        <li>实现 IDLE / CROSSING / WAITING 优先级状态机，讲清优先级排序：行人 &gt; 红灯 &gt; 巡线。</li>
+        <li>牢记：<b>低速起步、提前减速</b>——巡线速度超过 0.25m/s，40cm 窄道必出轨。</li>
+      </ul>
+      <div class="tip amber"><b>素材说明：</b>本实验无实拍素材，示意图与交互动画为准（沿用 EXP-01/02 的沙盘规格假设，以现场沙盘实际元素为准）。</div>
+    </section>
+
+    <section class="blk" id="s2">
+      <h2><span class="no">02</span>核心原理：偏差进、角速度出——PID 与优先级状态机的双人舞</h2>
+      <p><b>把小车想像成蒙眼走钢丝的人（只不过"眼"是下视 ROI）：</b>它看不见整个世界，只盯着脚下一小段车道线。相机在图像下方取一条 ROI 横带，对高对比识别线做质心提取——车道中心在画面 x = W/2 时偏差 e=0；偏左 e&lt;0、偏右 e&gt;0。接下来是老朋友 <b>PID</b>：<b>P</b> 项按偏差成比例打方向（纠得急），<b>I</b> 项积分消除"轮子左右不对称"造成的恒定跑偏，<b>D</b> 项对偏差变化率提前刹车、抑制过冲震荡。三者相乘相加，得到角速度 ω，连同限速后的线速度 v 一起塞进 <code>/cmd_vel</code>——差速/麦克纳姆轮据此两侧差速，车头回正，完成一圈闭环。</p>
+      <p>光会沿线还不够，路口要"懂规矩"。<b>优先级状态机</b>把三种约束排出座次：<b>行人 &gt; 红灯 &gt; 巡线</b>。IDLE（默认巡线）、WAITING（红灯/行人导致的等待）、CROSSING（绿灯通行中）。任何时刻多个条件同时成立，高优先级赢——斑马线上有人，哪怕绿灯也得让；红灯变绿的瞬间，还得确认停止线前没有行人残余，才从 WAITING 迁移到 CROSSING。<b>状态迁移要带滞回</b>：判定条件持续 200ms 才迁，避免灯缘抖动让车在路口"点头"。</p>
+      <figure class="fig">
+        <svg viewBox="0 0 720 330" role="img" aria-label="路口优先级状态机自制示意图">
+          <defs>
+            <marker id="e03a1" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#a5b4fc"/></marker>
+          </defs>
+          <g font-family="Noto Sans CJK SC, sans-serif" font-size="13" text-anchor="middle">
+            <text x="360" y="26" fill="#c7d2fe" font-weight="bold">IDLE / WAITING / CROSSING 优先级状态机</text>
+            <rect x="40" y="70" width="160" height="86" rx="14" fill="#1e1b4b" stroke="#818cf8" stroke-width="3"/>
+            <text x="120" y="104" fill="#c7d2fe" font-weight="bold" font-size="16">IDLE</text>
+            <text x="120" y="130" fill="#a5b4fc" font-size="11">巡线中 · PID 出力</text>
+            <rect x="280" y="70" width="160" height="86" rx="14" fill="#422006" stroke="#f59e0b" stroke-width="3"/>
+            <text x="360" y="104" fill="#fcd34d" font-weight="bold" font-size="16">WAITING</text>
+            <text x="360" y="130" fill="#fbbf24" font-size="11">红灯 / 行人 · v=0</text>
+            <rect x="520" y="70" width="160" height="86" rx="14" fill="#052e16" stroke="#4ade80" stroke-width="3"/>
+            <text x="600" y="104" fill="#86efac" font-weight="bold" font-size="16">CROSSING</text>
+            <text x="600" y="130" fill="#4ade80" font-size="11">绿灯通行 · 加速通过</text>
+            <path d="M200,96 H272" fill="none" stroke="#a5b4fc" stroke-width="2.5" marker-end="url(#e03a1)"/>
+            <text x="236" y="84" fill="#f87171" font-size="11">红灯 / 行人↓</text>
+            <path d="M440,96 H512" fill="none" stroke="#a5b4fc" stroke-width="2.5" marker-end="url(#e03a1)"/>
+            <text x="476" y="84" fill="#4ade80" font-size="11">绿灯 &amp; 无行人</text>
+            <path d="M520,140 H448" fill="none" stroke="#a5b4fc" stroke-width="2.5" stroke-dasharray="7 5" marker-end="url(#e03a1)"/>
+            <text x="484" y="168" fill="#fbbf24" font-size="11">过路口 → 巡线</text>
+            <path d="M280,140 H208" fill="none" stroke="#a5b4fc" stroke-width="2.5" stroke-dasharray="7 5" marker-end="url(#e03a1)"/>
+            <text x="244" y="168" fill="#a5b4fc" font-size="11">行人离开 2s</text>
+            <path d="M120,156 C120,230 470,246 585,164" fill="none" stroke="#f87171" stroke-width="2.5" marker-end="url(#e03a1)"/>
+            <text x="350" y="252" fill="#f87171" font-size="11">最高优先级抢占：CROSSING 中突现行人 → 直落 WAITING（行人 &gt; 红灯 &gt; 巡线）</text>
+            <rect x="60" y="276" width="600" height="34" rx="8" fill="#0b0f17" stroke="#1e293b"/>
+            <text x="360" y="298" fill="#94a3b8" font-size="12">迁移条件需持续 200ms（滞回），/cmd_vel 平滑斜坡限变化率，防止车头"点头"抖动</text>
+          </g>
+        </svg>
+        <figcaption>图 3-1｜<b>自制示意图</b>：路口优先级状态机——红实线为最高优先级抢占路径；每个迁移都带 200ms 滞回与速度斜坡，对应 s4 操作步骤的调参环节。</figcaption>
+      </figure>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">偏差 e 从哪来</div><div class="kt">ROI 横带内高对比识别线的质心 x 与画面中心 W/2 之差，归一化到 [-1,1]；丢线时保持上帧方向 + 降速。</div></div> <div class="kcard"><div class="kd">停止线怎么认</div><div class="kt">垂直于车道的白色亮横条：ROI 内满宽白色行 + 与车道线 T 形相交；检测到即进入"预见减速"。</div></div> <div class="kcard"><div class="kd">行人判据</div><div class="kt">EXP-02 /traffic/sign 的"注意行人"仅是提示，真正停车判据是行人模型色块在斑马线区 ROI 内出现。</div></div> <div class="kcard"><div class="kd">速度怎么限</div><div class="kt">巡线 v=0.18m/s，停止线前 20cm 斜坡降到 0.08，横向 ω 上限 1.2rad/s——宁慢勿甩。</div></div>
+      </div>
+    </section>
+
+    <section class="blk" id="s3">
+      <h2><span class="no">03</span>硬件与场景</h2>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">HP60C 下视 ROI</div><div class="kt">取画面下 1/3 为巡线 ROI；近盲区 0.5m 反而帮了忙——下视距离刚好在 0.25~0.45m，车道线清晰不畸变。</div></div> <div class="kcard"><div class="kd">麦克纳姆轮底盘</div><div class="kt">执行 /cmd_vel；全向能力使"边巡线边平移避让"成为可能，但本实验只用 v+ω 差速模式，行为更可预测。</div></div> <div class="kcard"><div class="kd">沙盘路口与斑马线</div><div class="kt">停止线、斑马线均为白色标线；灯口复用 EXP-01 语义点位，行人模型摆斑马线东侧端头。</div></div> <div class="kcard"><div class="kd">2D 激光雷达兜底</div><div class="kt">视觉失锁（反光/阴影）时，雷达前方 0.4m 扇区出现障碍仍硬停——视觉与雷达双保险。</div></div>
+      </div>
+      <table>
+        <thead><tr><th>练习科目</th><th>通过标准</th><th>常见失败</th></tr></thead>
+        <tbody>
+          <tr><td>直道巡线 5m</td><td>偏差 ≤±2cm，不压线不出线</td><td>Kp 过大蛇形；Ki 残留积分饱和</td></tr>
+          <tr><td>直角弯 4 处</td><td>入弯前减速至 0.08m/s，一次过弯</td><td>Kd=0 过冲甩尾；速度没降</td></tr>
+          <tr><td>路口红灯停</td><td>停在停止线后 2~5cm，10/10</td><td>刹车太晚越线；提前减速区设太近</td></tr>
+          <tr><td>斑马线礼让</td><td>行人模型出现 30cm 内必停，10/10</td><td>只检测"注意行人"标志而漏了真行人</td></tr>
+        </tbody>
+      </table>
+      <div class="tip tealb"><b>生活化类比：</b>状态机像路口交警、PID 像方向盘上的手——交警说"停"，手再稳也不能动；交警说"走"，手才接管。<b>谁说了算是优先级，不是谁先到</b>。</div>
+    </section>
+
+    <section class="blk" id="s4">
+      <h2><span class="no">04</span>操作步骤</h2>
+      <div class="flow">
+        <div class="step"><b class="n">S1</b>下视标定<br><small>取 ROI → 采集三光照车道帧 → 学习质心算法</small></div> <div class="arr">→</div>
+        <div class="step"><b class="n">S2</b>PID 手动整定<br><small>先 Kp 起振回退半 → 加 Kd 阻尼 → Ki 消稳态偏差</small></div> <div class="arr">→</div>
+        <div class="step"><b class="n">S3</b>停止线 + 灯态联动<br><small>0.2m 预见减速 → 读 /traffic/light → 红停绿行</small></div> <div class="arr">→</div>
+        <div class="step"><b class="n">S4</b>斑马线礼让<br><small>行人 ROI 检测 → 30cm 触发刹停 → 2s 滞后恢复</small></div> <div class="arr">→</div>
+        <div class="step"><b class="n">S5</b>状态机集成联调<br><small>三状态贯穿全圈 → 录 rosbag 回放核对迁移日志</small></div>
+      </div>
+      <ol style="margin:14px 0 6px;padding-left:22px;line-height:1.9">
+        <li><b>PID 整定顺序（经典 Z-N 简化法）：</b>Ki=Kd=0，Kp 从 0.4 起加倍到小车开始蛇形振荡，回退取 2/3 作为 Kp；加 Kd=0.15 起步压振荡；最后 Ki=0.02 消掉轮差导致的恒偏——<b>一次只动一个参数，每轮跑 5m 直道记偏差曲线</b>。</li>
+        <li><b>预见减速：</b>停止线检测到时距 0.2m 开始斜坡降速，而不是到线急刹——"提前减速"写进代码而不是靠反应。</li>
+        <li><b>灯态联动：</b>红灯或黄灯且距线 &lt;0.15m 时 v 斜坡归零进入 WAITING；/traffic/light 消失超过 1s 视为故障，按红灯处理（fail-safe 停车而非抢行）。</li>
+        <li><b>礼让逻辑：</b>行人模型色块进入斑马线 ROI 即触发（与灯态无关，优先级最高）；离开后连续 2s 无目标才恢复巡线，防止行人模型晃动反复触发。</li>
+        <li><b>状态机联调：</b>打印每次迁移的时间戳与理由（trigger），录 <code>ros2 bag record -a</code>，回放核对：全圈 4 路口 + 1 斑马线迁移序列与预期一致。</li>
+        <li><b>留痕：</b>直道偏差曲线截图、红灯/礼让 10/10 计数表、状态迁移日志，构成验收三件套。</li>
+      </ol>
+      <div class="tip amber"><b>写入 s4 的验收速查：</b>直道 ≤±2cm · 红灯停 10/10 · 礼让 10/10 · 状态迁移无振荡（同一迁移 1s 内 ≤1 次）。<b>易错点：Kp 一把梭振荡、忘记积分清零（WAITING 结束后 I 项带着旧积分冲出去）、速度没斜坡、灯态话题断了还继续走。</b></div>
+    </section>
+
+    <section class="blk" id="s5">
+      <h2><span class="no">05</span>关键命令</h2>
+      <p class="dim">/cmd_vel、teleop、rosbag 用法沿用《培训方案》xlsx 风格；灯态话题来自 EXP-02。</p>
+      <pre><span class="c"># ① 起相机（EXP-02 驱动复用）+ 灯态识别节点</span>
+ros2 launch ascamera hp60c.launch.py
+python3 src/light_node.py --config config/hsv_config.yaml
+
+<span class="c"># ② 启动巡线 + 路口状态机节点（参数包 lane_follow.yaml）</span>
+ros2 run car1_control lane_follow_node.py --ros-args \
+  --params-file src/car1_control/config/lane_follow.yaml
+ros2 topic echo /cmd_vel                       <span class="c"># 看 v/ω 是否平滑</span>
+ros2 topic echo /traffic/light                 <span class="c"># R/Y/G 联动输入</span>
+
+<span class="c"># ③ 手动微调 PID（运行中热改，改完立刻跑 5m 直道）</span>
+ros2 param set /lane_follow_node kp 0.60
+ros2 param set /lane_follow_node kd 0.15
+ros2 param set /lane_follow_node ki 0.02
+
+<span class="c"># ④ 无灯时手动注入灯态，联调状态机</span>
+ros2 topic pub -r 1 /traffic/light std_msgs/String <span class="y">"{data: 'R'}"</span>
+
+<span class="c"># ⑤ 联调录包回放：迁移日志 + TF + 偏差话题全录</span>
+ros2 bag record -a -o lane_interface_bag
+ros2 bag play lane_interface_bag
+ros2 run tf2_tools view_frames                 <span class="c"># out/frames.pdf 查 TF 完整性</span></pre>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">验收判据 ①</div><div class="kt">直道 5m 偏差曲线带宽 ≤±2cm（rosbag 提取 e(t) 画图）。</div></div> <div class="kcard"><div class="kd">验收判据 ②</div><div class="kt">红灯 10 次全停线后；绿灯 10 次全通行；灯态断流按 fail-safe 停车。</div></div> <div class="kcard"><div class="kd">验收判据 ③</div><div class="kt">行人模型 10 次出现全部刹停、离开 2s 恢复；优先级抢占在日志中可溯。</div></div> <div class="kcard"><div class="kd">验收判据 ④</div><div class="kt">全圈状态迁移序列与预期一致、无 1s 内重复振荡迁移。</div></div>
+      </div>
+    </section>
+
+    <section class="blk" id="s6">
+      <h2><span class="no">06</span>原理动画：巡线 PID 反馈环与信号灯时序通行</h2>
+      <div class="anim-box">
+        <svg viewBox="0 0 720 270" width="100%" role="img" aria-label="PID巡线闭环控制框图动画">
+          <defs>
+            <marker id="e03a2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#818cf8"/></marker>
+            <marker id="e03a3" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#4ade80"/></marker>
+          </defs>
+          <g font-family="Noto Sans CJK SC, sans-serif" font-size="12" text-anchor="middle">
+            <text x="360" y="26" fill="#c7d2fe" font-weight="bold">巡线 PID 闭环：偏差 e 进，角速度 ω 出，车头回正</text>
+            <g>
+              <circle cx="60" cy="120" r="22" fill="#0b0f17" stroke="#a5b4fc" stroke-width="2.5"/>
+              <text x="60" y="126" fill="#c7d2fe" font-size="16" font-weight="bold">Σ</text>
+              <rect x="130" y="90" width="150" height="60" rx="10" fill="#1e1b4b" stroke="#818cf8" stroke-width="2"/>
+              <text x="205" y="115" fill="#c7d2fe" font-weight="bold">PID 控制器</text>
+              <text x="205" y="137" fill="#a5b4fc" font-size="11">Kp·e + Ki·∫e + Kd· ė</text>
+              <rect x="330" y="90" width="130" height="60" rx="10" fill="#1e1b4b" stroke="#818cf8" stroke-width="2"/>
+              <text x="395" y="115" fill="#c7d2fe" font-weight="bold">/cmd_vel</text>
+              <text x="395" y="137" fill="#a5b4fc" font-size="11">v 限速 · ω 限幅</text>
+              <rect x="500" y="90" width="110" height="60" rx="10" fill="#1e1b4b" stroke="#818cf8" stroke-width="2"/>
+              <text x="555" y="115" fill="#c7d2fe" font-weight="bold">小车 C1</text>
+              <text x="555" y="137" fill="#a5b4fc" font-size="11">麦克纳姆轮</text>
+              <rect x="640" y="90" width="66" height="60" rx="10" fill="#052e16" stroke="#4ade80" stroke-width="2"/>
+              <text x="673" y="115" fill="#86efac" font-weight="bold">相机</text>
+              <text x="673" y="137" fill="#4ade80" font-size="10">ROI 质心</text>
+              <line x1="82" y1="120" x2="126" y2="120" stroke="#a5b4fc" stroke-width="2" marker-end="url(#e03a2)"/>
+              <line x1="280" y1="120" x2="326" y2="120" stroke="#a5b4fc" stroke-width="2" marker-end="url(#e03a2)"/>
+              <line x1="460" y1="120" x2="496" y2="120" stroke="#a5b4fc" stroke-width="2" marker-end="url(#e03a2)"/>
+              <line x1="610" y1="120" x2="636" y2="120" stroke="#a5b4fc" stroke-width="2" marker-end="url(#e03a2)"/>
+              <path d="M673,154 V210 H60 V146" fill="none" stroke="#4ade80" stroke-width="2.5" marker-end="url(#e03a3)"/>
+              <text x="366" y="230" fill="#4ade80" font-size="11">反馈：新 e = 质心 − W/2 —— 每帧 30 次闭环，偏差不积累过夜</text>
+              <circle r="6" fill="#fbbf24">
+                <animateMotion dur="2.6s" repeatCount="indefinite" path="M60,120 H205 H395 H555 H673"/>
+              </circle>
+              <circle r="6" fill="#4ade80">
+                <animateMotion dur="2.6s" begin="1.3s" repeatCount="indefinite" path="M673,154 V210 H60 V146"/>
+              </circle>
+            </g>
+            <g transform="translate(60,246)">
+              <text x="0" y="0" fill="#94a3b8" font-size="11" text-anchor="start">理想响应：阶跃给定下 e(t) 衰减不振荡 —— Kd 提供阻尼，Ki 消稳态差</text>
+            </g>
+          </g>
+        </svg>
+        <div class="anim-cap">动画 3-1：黄点=前向控制流（偏差→PID→速度→底盘），绿点=反馈流（相机重测质心）。环每转一圈 33ms，转得够快，车看起来才是"稳稳压着线"。</div>
+      </div>
+      <div class="anim-box">
+        <svg viewBox="0 0 720 260" width="100%" role="img" aria-label="信号灯时序与小车通行动画">
+          <g font-family="Noto Sans CJK SC, sans-serif" font-size="12" text-anchor="middle">
+            <text x="360" y="26" fill="#c7d2fe" font-weight="bold">红→绿时序 × 小车接近停止线的走停决策</text>
+            <rect x="30" y="46" width="660" height="90" rx="10" fill="#020617" stroke="#334155"/>
+            <text x="76" y="74" fill="#94a3b8" font-size="11">南北灯</text>
+            <rect x="120" y="56" width="180" height="26" rx="6" fill="#ef4444"><animate attributeName="opacity" values="1;1;0.25;0.25;1" keyTimes="0;0.06;0.62;0.68;1" dur="8s" repeatCount="indefinite"/></rect>
+            <text x="210" y="74" fill="#fff" font-size="12" font-weight="bold">RED 3s</text>
+            <rect x="300" y="56" width="100" height="26" rx="6" fill="#f59e0b"><animate attributeName="opacity" values="0.25;0.25;1;1;0.25" keyTimes="0;0.56;0.62;0.68;1" dur="8s" repeatCount="indefinite"/></rect>
+            <text x="350" y="74" fill="#451a03" font-size="12" font-weight="bold">Y 5s</text>
+            <rect x="400" y="56" width="240" height="26" rx="6" fill="#22c55e"><animate attributeName="opacity" values="0.25;1;1;0.25;0.25" keyTimes="0;0.06;0.56;0.62;1" dur="8s" repeatCount="indefinite"/></rect>
+            <text x="520" y="74" fill="#052e16" font-size="12" font-weight="bold">GREEN 25s</text>
+            <text x="76" y="118" fill="#94a3b8" font-size="11">小车</text>
+            <rect id="tCar" x="560" y="96" width="70" height="30" rx="6" fill="#fbbf24">
+              <animate attributeName="x" values="600;600;360;360;356;356;600;600" keyTimes="0;0.06;0.2;0.56;0.62;0.68;0.8;1" dur="8s" repeatCount="indefinite"/>
+            </rect>
+            <text x="595" y="116" fill="#0f172a" font-size="11" font-weight="bold">C1</text>
+            <line x1="356" y1="86" x2="356" y2="136" stroke="#f8fafc" stroke-width="3" stroke-dasharray="6 5"/>
+            <text x="356" y="152" fill="#94a3b8" font-size="11">停止线</text>
+            <rect x="30" y="166" width="660" height="76" rx="10" fill="#0b0f17" stroke="#1e293b"/>
+            <text x="60" y="192" fill="#a5b4fc" font-size="11" text-anchor="start">状态机日志（8s 一个周期）：</text>
+            <text x="60" y="216" fill="#f87171" font-size="12" text-anchor="start">WAITING：红灯，v 斜坡归零，停线后 3cm</text>
+            <text x="60" y="234" fill="#fcd34d" font-size="12" text-anchor="start">黄灯：距线远→已停；距线近→抢过（go-on-thru）</text>
+            <text x="410" y="216" fill="#4ade80" font-size="12" text-anchor="start">CROSSING：绿灯 0.18m/s 巡线过口</text>
+            <text x="410" y="234" fill="#a5b4fc" font-size="12" text-anchor="start">回 IDLE：过口 0.3m 迁移，积分清零</text>
+          </g>
+        </svg>
+        <div class="anim-cap">动画 3-2：8 秒压缩演示一个 48s 配时周期——小车在红灯段刹停于停止线，黄灯按距决策，绿灯恢复巡线过口；下方为状态机同步日志。</div>
+      </div>
+      <div class="tip violet"><span class="lab">观察</span>动画 3-1 中如果拔掉绿色反馈线会怎样？系统变成<b>开环</b>：ω 只按固定程序转，轮差、地面摩擦、光照突变全无法纠正——车走出 S 形直至出轨。<b>控制的本质不是"发命令"，是"看结果改命令"</b>。</div>
+    </section>
+
+    <section class="blk" id="s7">
+      <h2><span class="no">07</span>互动实验：巡线 PID 参数滑杆实时仿真</h2>
+      <div class="ix-panel">
+        <div class="ix-title">拖 Kp/Ki/Kd 看偏差曲线：蛇形、过冲、稳态差一目了然</div>
+        <div class="ctl-row">
+<label class="ctl">Kp 比例 <span id="kpLab">0.60</span> <input type="range" id="kpN" min="5" max="300" value="60" step="5" oninput="pidGo()"> </label>
+<label class="ctl">Ki 积分 <span id="kiLab">0.02</span> <input type="range" id="kiN" min="0" max="100" value="20" step="5" oninput="pidGo()"> </label>
+<label class="ctl">Kd 阻尼 <span id="kdLab">0.15</span> <input type="range" id="kdN" min="0" max="200" value="15" step="5" oninput="pidGo()"> </label>
+          <button class="btn ghost" onclick="pidPreset(1)">稳参推荐</button>
+          <button class="btn ghost" onclick="pidPreset(0)">复位</button>
+        </div>
+        <svg viewBox="0 0 720 240" width="100%" role="img" aria-label="偏差响应曲线仿真画布">
+          <rect x="20" y="20" width="680" height="200" rx="10" fill="#0b0f17" stroke="#1e293b"/>
+          <line x1="40" y1="120" x2="680" y2="120" stroke="#334155" stroke-width="1.5" stroke-dasharray="6 6"/>
+          <text x="46" y="112" fill="#64748b" font-size="11">e=0 车道中心</text>
+          <line x1="40" y1="96" x2="680" y2="96" stroke="#4f46e5" stroke-width="1" stroke-dasharray="3 5" opacity="0.7"/>
+          <line x1="40" y1="144" x2="680" y2="144" stroke="#4f46e5" stroke-width="1" stroke-dasharray="3 5" opacity="0.7"/>
+          <text x="660" y="90" fill="#818cf8" font-size="10">±2cm 带</text>
+          <path id="pidPath" fill="none" stroke="#fbbf24" stroke-width="2.5"/>
+          <text x="46" y="40" fill="#94a3b8" font-size="11">e(t) 阶跃响应（初始偏 6cm）——目标：尽快进带且不振</text>
+        </svg>
+        <div class="io" id="pidIo"></div>
+      </div>
+      <p style="margin-top:10px">快速实验：① Kp 拉到 3.0、Kd=0 → 曲线持续振荡（蛇形）；② Kd 拉到 2.0 → 过冲被压平但响应变肉；③ Ki 拉大且 Kp 也大 → 积分饱和，超调久收不回。<b>把三参数调到"两个周期内进带且不越界"</b>，就是实车直道 ≤±2cm 的前置条件。</p>
+    </section>
+
+    <section class="blk" id="s8">
+      <h2><span class="no">08</span>常见问题</h2>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">Q 直道上蛇形摆动？</div><div class="kt">Kp 过大或 Kd=0：按 s4 顺序回退 Kp 取 2/3 振荡点，再补 0.15 级 Kd；同时确认 ω 限幅 1.2。</div></div> <div class="kcard"><div class="kd">Q 车总往一侧偏？</div><div class="kt">轮差/轮胎气压不对称的恒偏：加 Ki=0.02 消之；或 WAITING 结束忘了清积分——积分挂着旧账冲出线。</div></div> <div class="kcard"><div class="kd">Q 红灯抢行？</div><div class="kt">/traffic/light 断流且没做 fail-safe：断流 ≥1s 必须按红灯停；查灯态节点是否被相机重启动连坐。</div></div> <div class="kcard"><div class="kd">Q 停车总是越线？</div><div class="kt">减速区太近（惯性冲过）：预见距离 0.2m 起 + 刹停斜坡；确认"提前减速"在代码而非靠手速。</div></div> <div class="kcard"><div class="kd">Q 行人模型认不出？</div><div class="kt">ROI 没盖到斑马线端头或换光照没重标色域：复用 EXP-02 标定流程，色块面积阈值降到 300px²。</div></div> <div class="kcard"><div class="kd">Q 状态机 1 秒迁 3 次？</div><div class="kt">缺滞回：迁移条件持续 200ms 才迁；灯缘抖动/行人边缘闪烁都会被 200ms 窗口滤掉。</div></div> <div class="kcard"><div class="kd">Q 弯道总切内压线？</div><div class="kt">入弯没降速 + Kd 过阻尼响应迟：弯前 0.3m 斜坡降到 0.08，弯中允许偏差放宽到 ±4cm 通过再收敛。</div></div> <div class="kcard"><div class="kd">Q /cmd_vel 来回跳变？</div><div class="kt">检测帧率不稳或双节点抢发：ros2 node info 查唯一发布者；对 ω 加斜率限制（≤4 rad/s²）。</div></div>
+      </div>
+    </section>
+
+    <section class="blk" id="s9">
+      <h2><span class="no">09</span>拓展阅读</h2>
+      <ul class="check">
+        <li><b>《机器人学中的状态估计》第 9 章 PID</b>：从误差动力学看 Kp/Ki/Kd——把互动面板的曲线与书中阶跃响应图对读。</li>
+        <li><b>Nav2 controller 参数对照</b>：DWB 的评分权重与本课 PID 是同一思想在 2D 速度采样域的展开，EXP-04 泊车会回到这个对照。</li>
+        <li><b>行为树 vs 有限状态机</b>：本课用三级优先级 FSM 够用；当规则再涨一倍（让行+限速+改道+警报），业界会迁移到 BehaviorTree.CPP——留作课程后续。</li>
+        <li><b>rosbag 分析工作流</b>：用 <code>ros2 bag info</code> + rqt_plot 画 e(t) 曲线交作业，比截图更有说服力。</li>
+        <li><b>上下文</b>：<a href="../exp-02-traffic-vision/index.html">EXP-02 的 /traffic/* 话题</a>是本实验状态机的感知输入，联调异常先回查话题频率。</li>
+      </ul>
+    </section>
+
+    <section class="blk" id="s10">
+      <h2><span class="no">10</span>思考题 · 自测</h2>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">✅ 完成成果</div><div class="kt">直道偏差 ≤±2cm、红灯 10/10、礼让 10/10、状态迁移无振荡，rosbag 留痕。</div></div> <div class="kcard"><div class="kd">🧠 原理收获</div><div class="kt">能画出 PID 闭环框图并解释三项各治什么病，讲清优先级与滞回两道保险。</div></div> <div class="kcard"><div class="kd">🛠 技能收获</div><div class="kt">独立完成 PID 手动整定、预见减速参数化、状态机日志审计三件套。</div></div> <div class="kcard"><div class="kd">📐 评分速览</div><div class="kt">巡线质量 35% + 灯口通行 30% + 礼让 25% + 日志规范 10%。</div></div>
+      </div>
+      <div class="tip violet"><span class="lab">思考 1</span>为什么 WAITING 结束进入 CROSSING 前要清积分项？用"I 项累积"解释不清积分时绿灯起步冲线的现象。</div>
+      <div class="tip violet"><span class="lab">思考 2</span>行人 &gt; 红灯 &gt; 巡线的优先级是拍脑袋定的吗？若沙盘新增"救护车优先"规则，状态机要改哪里——迁移表还是优先级表？</div>
+    </section>
+
+    <nav class="expnav">
+      <a class="prev" href="../exp-02-traffic-vision/index.html">← 上一个：EXP-02 交通标志与红绿灯识别</a>
+      <a class="next" href="../exp-04-smart-parking/index.html">下一个：EXP-04 智慧泊车与综合路测 →</a>
+    </nav>
+    <footer>
+      <div>CASE-05 · 机器人小车智慧交通综合案例（小车 C1）· EXP-03 车道保持与路口信号通行</div>
+      <div>8 学时 · 2 理论 + 6 实践 · 本实验无实拍素材，示意图与交互动画为准</div>
+    </footer>
+  </main>
+</div>
+
+<script>
+var pidT=[];
+function pidSim(kp,ki,kd){
+  // 离散 PID 操纵一阶车模：e 为归一化偏差(初始0.6≈6cm)，返回 120 采样的 e(t)
+  var e=0.6, I=0, prev=0, out=[];
+  for(var k=0;k<120;k++){
+    var P=kp*e; I=I+ki*e; I=Math.max(-1.5,Math.min(1.5,I));
+    var D=kd*(e-prev); prev=e;
+    var u=P+I+D;                        // 控制量：回正能力
+    var w=0.985*e-0.035*Math.max(-3,Math.min(3,u)); // 闭环近似
+    e=w; out.push(e);
+  }
+  return out;
+}
+function pidRender(){
+  var kp=parseInt(document.getElementById('kpN').value,10)/100;
+  var ki=parseInt(document.getElementById('kiN').value,10)/100;
+  var kd=parseInt(document.getElementById('kdN').value,10)/100;
+  document.getElementById('kpLab').textContent=kp.toFixed(2);
+  document.getElementById('kiLab').textContent=ki.toFixed(2);
+  document.getElementById('kdLab').textContent=kd.toFixed(2);
+  var y=pidSim(kp,ki,kd), d='';
+  for(var i=0;i<y.length;i++){
+    var px=40+i*(640/119);
+    var py=120+Math.max(-95,Math.min(95,y[i]*160));
+    d+=(i?' L':'M')+px.toFixed(1)+','+py.toFixed(1);
+  }
+  document.getElementById('pidPath').setAttribute('d',d);
+  // 评价：进带时间 & 振荡
+  var enter=-1, osc=0, peak=0;
+  for(var j=0;j<y.length;j++){
+    peak=Math.max(peak,Math.abs(y[j]));
+    if(enter<0&&Math.abs(y[j])<0.1&&j>5){enter=j;}
+    if(j>1&&Math.sign(y[j])!==Math.sign(y[j-1])&&Math.abs(y[j])>0.02)osc++;
+  }
+  var verdict = enter<0? '<span class="bad">不收敛：永远进不了 ±2cm 带</span>'
+    : (osc>4? '<span class="bad">蛇形振荡：过零 '+osc+' 次 —— 降 Kp 或加 Kd</span>'
+    : (Math.abs(y[119])>0.08? '<span class="warn">有稳态偏差：Ki 不足或未清积分</span>'
+    : '<span class="ok">达标：'+(enter*0.033).toFixed(2)+'s 进带 · 过零 '+osc+' 次 · 收敛</span>'));
+  document.getElementById('pidIo').innerHTML=
+    'Kp='+kp.toFixed(2)+' Ki='+ki.toFixed(2)+' Kd='+kd.toFixed(2)+'\n'
+  + '峰值偏差 '+peak.toFixed(2)+'（0.10 = 1cm）→ '+verdict+'\n'
+  + '<span class="dim">提示：黄线穿过蓝虚线(±2cm 带)并稳住即达标；等效实车直道 5m 跑分标准。</span>';
+}
+function pidGo(){pidRender();}
+function pidPreset(p){
+  if(p===1){
+    document.getElementById('kpN').value=60;
+    document.getElementById('kiN').value=20;
+    document.getElementById('kdN').value=60;
+  }else{
+    document.getElementById('kpN').value=60;
+    document.getElementById('kiN').value=20;
+    document.getElementById('kdN').value=15;
+  }
+  pidRender();
+}
+pidRender();
+</script>
+<script src="../shared/tutorial.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,381 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp002-speech-interaction/exp-04-voice-dialog/index.html
+TITLE: EXP-04 端到端语音对话 · CORE-03 教程
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+EXP-04 端到端语音对话 · CORE-03 教程
+📘 CORE-03
+本页目录
+01 问题引入：为什么"能听会说"还不够
+02 原理通俗讲解：流水线上拧螺丝
+03 关联知识点
+04 实验目标
+05 实验环境与准备
+06 动画讲解：三态状态机数据流
+07 互动讲解：对话状态机步进台
+08 实操步骤
+09 重点与易错点
+10 总结与思考
+CORE-03 · 自然语言交互
+EXP-01 六麦阵列串口唤醒
+EXP-02 声学模型 ASR 语音识别
+EXP-03 TTS 语音合成
+EXP-04 端到端语音对话
+EXP-05 大模型语义理解
+EXP-06 多模态语音情绪感知
+EXP-04 · 第 2 章 · 设计性 · 8 学时
+端到端语音对话
+把唤醒、识别、理解、回复、合成五个环节串成一条能被打断、不会卡死的实时对话管线。本实验整合实验 1-4 全部模块，跑通「说一句 → 听懂 → 思考 → 开口」的完整循环。
+三态状态机
+流式 LLM+TTS
+打断检测
+纯 Python · 零 ROS2 依赖
+01
+问题引入：为什么"能听会说"还不够
+到这里，你已经让机器人学会了「听见叫它」（EXP-01）、「听懂句子」（EXP-02）、「开口说话」（EXP-03）。但把三个脚本简单拼在一起，机器人并不像一个能聊天的伙伴，而像三个轮流上班的实习生：
+1
+它自说自话停不下来
+回答念到一半，你想插话，它非要念完。
+→
+2
+它跟自己抢话
+刚播完提示音，麦克风把提示音的回声当成了你说的话。
+→
+3
+慢
+等 LLM 完整写完一大段，再整段合成，首响超过 5 秒。
+这些问题没有一个出在单个模块上——识别是对的、合成也是对的——
+出在模块之间的衔接方式上
+：
+现象
+背后缺失的机制
+机器人自己跟自己聊（把自己的话又听了进去）
+提示音回声污染 → 需要双轮 drain
+插话无效，必须等它说完
+打断检测 → interrupt_event
+首响延迟高，"想到才说"
+流式协同 → LLM 边生成、TTS 边合成边播
+程序偶发卡死，状态卡在"说话中"
+有限状态机 + speaking_done 兜底
+💡 本节要点
+端到端语音对话的核心不是"再训练一个更大的模型"，而是
+设计状态机与调度策略
+，让五个环节在时间轴上正确地交接。这是从"模块演示"走向"产品体验"的分水岭。
+02
+原理通俗讲解：流水线上拧螺丝
+把语音对话想成一条
+餐厅的服务流水线
+——客人（用户）点单，服务员（状态机）全程只有一个，但她的脑子在三种工作之间切换：
+生活比喻
+对应环节
+通俗解释
+站在门口等人喊
+IDLE · 唤醒监听
+服务员竖着耳朵听有没有人喊"服务员"，别的都不管。
+走到桌边记录
+LISTENING · 识别
+听到喊声，先说句"我在"（提示音），然后专心记下客人点的菜（ASR 识别到端点为止）。
+跑到后厨传菜
+SPEAKING · 回复
+把菜单送进后厨（LLM），菜一道道出锅就往外端（TTS 逐句合成播放），不用等整桌菜齐。
+整条语音管线（本课程主线，务必背下来）：
+1
+拾音
+麦克风 16kHz 采样，Capture 线程不间断灌入队列
+→
+2
+唤醒
+六麦 ivw 事件或板载 KWS，喊了名字才开工
+→
+3
+识别
+ASR 流式出字，端点检测判断"说完没"
+→
+4
+理解+回复
+LLM 流式生成答案 token
+→
+5
+合成+播放
+按句切给 TTS，喂进常驻 aplay 管道
+三个关键生活常识，对应三个工程难点：
+生活常识
+工程对应
+服务员喊完"我在"要
+停半秒
+再听，不然听不清客人开口
+双轮 drain：等提示音时长 + 0.8s → 清队列 → sleep 0.2 → 再清一次，然后建全新 ASR stream
+上菜
+一道一道上
+，客人立刻动筷；而不是整桌齐了才开吃
+SENTENCE_RE 按句号逗号切句，LLM 输出一句、TTS 合成一句、aplay 播一句
+客人喊"行了行了"，服务员要
+立刻闭嘴
+并回头
+SPEAKING 中 KWS 仍运行 → interrupt_event 置位 → 杀 aplay → 回 LISTENING
+🎯 核心直觉
+状态机回答的是"
+我现在该干什么
+"；流式管线回答的是"
+数据怎么不间断地流过去
+"。两者叠加，才有"边想边说、随时能打断"的自然对话感。
+03
+关联知识点
+🔄
+三态有限状态机
+IDLE / LISTENING / SPEAKING 由
+state
+字段驱动，每个状态一个 handler，任何时刻只处于一个状态——这是防止流程串台的根本。
+🧹
+双轮 drain 防回声
+提示音的回声、房间混响、ALSA 缓冲残留会被 ASR 当成用户输入。清两次队列、中间 sleep 0.2s 等尾部回声灌完，再建 fresh stream。
+✂️
+SENTENCE_RE 流式分句
+([。！？；，、\n]|[.?!,](?=\s|$))
+匹配即切句送 TTS，把首响延迟从"等整段生成"压到"第一句生成完"。
+🔈
+持久化 aplay
+启动一次
+Popen(aplay -t raw -f S16_LE -c 2 -r 16000 -)
+，每句 PCM 直接
+stdin.write
+，进程复用零启动开销。
+✋
+interrupt_event + speaking_done
+主循环设置前者令 worker 停止；worker 在 finally 必须设置后者令主循环继续——双重 Event 缺一不可，否则永久卡死。
+🛡
+stall_timeout 防卡死
+LLM 流式响应 30s 收不到新 token 就主动放弃（TimeoutError），避免 NPU 崩溃把状态机永远拖在 SPEAKING。
+04
+实验目标
+理解实时语音交互的
+IDLE / LISTENING / SPEAKING 三态状态机
+设计（原理理解）
+掌握讯飞 XFM 六麦
+硬件唤醒
+与 sherpa-onnx 板载 KWS 两种方案的切换与取舍（方案对比）
+整合 KWS + ASR + LLM + TTS 全链路，跑通
+voice_interaction.py --mic-array
+端到端对话（集成实操）
+理解
+LLM 流式响应 + SENTENCE_RE 按句分割
+的协同设计，解释其为何降低首响延迟（原理理解）
+掌握 persistent aplay（stdin pipe）流式播放的工程实现与崩溃自恢复（工程实操）
+理解回声污染与
+双轮 drain
+的解决思路，能解释两次 drain 之间为何要 sleep 0.2s（工程实操）
+掌握打断检测与 interrupt_event 信号机制，实测打断响应 < 500ms（端到端实操）
+用
+voice_tools_interaction.py --mic-array
+完成语音控制机械臂 4 模式（迁移应用）
+05
+实验环境与准备
+类别
+配置
+硬件
+具身智能实验箱 B2（RK3576 NPU 6TOPS + 讯飞六麦阵列 + 机械臂串口 /dev/ttyUSB0 @ 1M baud）
+系统
+Ubuntu 22.04 + ROS2 Humble，Python 3.10（推荐 ros2_venv）
+核心库
+sherpa_onnx（KWS/ASR/TTS）、requests（LLM HTTP/SSE）、pyserial、pyyaml
+LLM
+RKLLM Qwen3.5-0.8B w4a16 g128（llm_server.py，OpenAI 兼容 /v1/chat/completions，端口 8080）
+源码
+ros2_ws/src/xflz_eai_car1/interaction/car1_interaction/tools/
+# 0) 确认六麦阵列与 ALSA 设备（详见 EXP-01/02）
+lsusb | grep -i 1a86
+# ID 1a86:55d4 QinHeng
+arecord -l
+# card 4: XFMDPV0018, device 0
+# 1) 确认依赖模型就位（EXP-02/03 已生成）
+#    ASR: sherpa-onnx-streaming-zipformer-* + tokens.txt
+#    TTS: model-steps-3.onnx + vocos-16khz-univ.onnx
+#    LLM: Qwen3.5-0.8B_w4a16_g128_rk3576.rkllm + /usr/lib/librkllmrt.so
+✅ 准备检查
+若
+librkllmrt.so
+不存在，LLM 自动启动必失败；若未插六麦却加
+--mic-array
+，启动即抛
+RuntimeError: 未找到 XFM 麦克风阵列设备
+。两者都会在本实验第一步就暴露。
+06
+动画讲解：三态状态机数据流
+下图是
+voice_interaction.py
+的运行全景：上半部是音频队列与唤醒判断，中部是三态流转，右侧是 LLM+TTS worker 线程与打断信号。观察 4 秒循环中「状态高亮 → 音频块流动 → 打断信号回跳」的节拍：
+Capture 线程
+ALSA 16kHz 持续采集
+audio_queue
+IDLE
+KWS 监听唤醒词
+LISTENING
+提示音 + drain + ASR
+SPEAKING
+LLM→分句→TTS→aplay
+唤醒
+端点+回复
+interrupt_event → 打断回 LISTENING
+worker 线程
+SSE 流式 token + 分句
+speaking_done.set() （finally 必调）→ 主循环回到 IDLE
+任何时刻只处于一个状态；SPEAKING 中 KWS 仍然运行
+动画 4-1：三态状态机与线程协作（4 秒循环）——IDLE 监听 → 唤醒进 LISTENING（drain 后 ASR）→ 端点后进 SPEAKING（worker 分句推送）→ 绿线 speaking_done 回 IDLE；红弧为 SPEAKING 中再次唤醒触发的打断回跳。注意两个 Event 的方向相反：
+interrupt_event 主→worker，speaking_done worker→主
+。
+07
+互动讲解：对话状态机步进台
+亲手驱动一次完整对话与一次打断：按顺序点按钮，观察状态迁移、每一步的日志，以及两个 Event 的置位时机。
+对话状态机步进台 · State Machine Stepper
+① 说"小飞小飞"
+② 说话 + 端点
+③ LLM 流式回复
+④ 说"小飞小飞"打断
+↺ 复位
+$ 状态机就绪：state=IDLE，等待唤醒…
+🔍 观察点
+第 ④ 步打断时：
+interrupt_event.set()
+先于杀 aplay；worker 在下一次轮询
+if interrupt_event.is_set(): break
+退出，finally 里
+speaking_done.set()
+。若把 finally 这行注掉，主循环在 SPEAKING 永久阻塞——互动台最后会给出该故障模拟的最后一行。
+08
+实操步骤
+1
+跑通一般对话（阶段一：能跑通）
+→
+2
+观察双轮 drain 与端点检测（阶段二：能理解）
+→
+3
+改造分句粒度与打断（阶段三：能改造）
+→
+4
+工具调用模式控制机械臂
+步骤 1：启动端到端对话
+# 终端 1（auto_start_llm=False 时需手动；否则由 voice_interaction 自动拉起）
+python3 llm_server.py
+# 终端 2：主命令
+cd ros2_ws/src/xflz_eai_car1/interaction/car1_interaction/tools/
+python3 voice_interaction.py --mic-array
+# [Main] 找到录音设备: plughw:4,0 (XFMDPV0018)
+# [KWS] 设置唤醒词: 小飞小飞, 小飞同学, 你好小飞
+# [LLM] 启动 LLM: Qwen3.5-0.8B_w4a16_g128_rk3576.rkllm (端口 8080)
+# [TTS] speed=1.0 gain=2.0
+# 就绪 — 说唤醒词开始对话, Ctrl+C 退出
+唤醒后说"今天北京天气怎么样？"，加
+--debug
+可看到 partial 识别逐行刷新、drain 帧数、状态迁移：
+# [Main] 播放提示音 (0.67s, 42880 bytes)
+# [Main] 排空音频队列: 第1轮 3 帧, 第2轮 1 帧
+# [Main] IDLE → LISTENING    [ASR] 今天北京天气怎么样？
+# [LLM]  我没有实时查询天气的能力…（逐句 TTS 播放）
+# [Main] SPEAKING → IDLE
+步骤 2：验证核心机制
+# 2a. 持久化 aplay：另开终端确认只有一个 aplay 常驻进程
+ps aux | grep aplay
+# /usr/bin/aplay -t raw -f S16_LE -c 2 -r 16000 -D plughw:4,0 -q -
+# 2b. 打断测试：长回答播放中再次说"小飞小飞"
+# [KWS] 打断: 小飞小飞 → [Main] SPEAKING → LISTENING (打断)
+# 2c. ASR 黑名单：唤醒后只说"Hi"
+# [ASR] 结果无效丢弃: "HI" → IDLE（VIVO/HELLO/OK 等噪声词直接丢弃）
+步骤 3：改造练习
+——分句更保守（只切句号问号感叹号）：
+# voice_interaction.py L328-330（原式含逗号、顿号，切得细、延迟低）
+SENTENCE_RE = re.compile(r'([。！？；，、\n]|[.?!,](?=\s|$))'
+# 保守版：只整句送 TTS，断句奇怪但合成次数少
+SENTENCE_RE = re.compile(r'([。！？\n]|[.?!](?=\s|$))'
+步骤 4：工具调用模式（语音控制机械臂）
+——先建
+action.yaml
+（4 模式：home 校准 / work 工作 / pick 抓取 / place 放置，各含 servos PWM 与 duration 2.0s），再启动：
+python voice_tools_interaction.py --mic-array
+# [Main] 已加载 4 个机械臂模式: ['home', 'pick', 'place', 'work']
+# [Main] 机械臂串口已打开: /dev/ttyUSB0 @ 1000000
+# 说"机械臂请抓取" → 关键词路径（核心字"抓"）<1s 执行 pick
+# 说"机械臂攻坚"   → fuzzy_map 纠正 攻坚→工作 → work
+# 问"今天天气怎么样" → LLM 输出 none → 不动作，回 IDLE
+⏱ 预期指标
+端到端响应 < 3s；关键词路径从说话到机械臂动作 < 1s；打断响应 < 500ms（XFM 硬件唤醒 < 100ms）；5s 内未说话超时回 IDLE。
+09
+重点与易错点
+⚠️ 高频故障
+本实验 90% 的 bug 出在
+线程协作与时序
+上：Event 忘了清、finally 忘了 set、drain 少做一轮。排错时先问"哪个状态卡住了"，再看对应 handler 的日志。
+现象
+原因
+解决
+程序卡死在 SPEAKING，无任何输出
+worker 的 finally 漏了
+speaking_done.set()
+恢复 finally 设置（源码 L1062-1065 有 MUST 注释）
+打断后下一轮 LLM 直接退出、无回复
+interrupt_event 未在开始新轮前 clear
+进入 LISTENING 前重置 interrupt_event
+唤醒后 ASR 识别出提示音/噪声词
+回声污染、drain 不足
+确认双轮 drain；把
+wait_time = prompt_dur + 0.8
+调大到 1.5
+TTS 尾音把自己又唤醒/误触发
+SPEAKING→IDLE 时未清音频队列
+状态回落时调用
+_drain_audio_queue()
+首次 run 报 Cannot connect to server
+LLM 服务未就绪（模型加载慢）
+自动启动等待上限 120s；或
+--no-server
+手动先起
+llm_server.py
+8080 端口被无关进程占用
+残留进程
+程序会自动
+GET /v1/models
+甄别并
+lsof -ti :8080 | xargs kill -9
+工具模式机械臂不动
+串口权限 / action.yaml 不在同目录
+chmod 666 /dev/ttyUSB0
+；yaml 必须与脚本同目录
+关键词误匹配（"学工"→work）
+模糊匹配过宽
+在
+fuzzy_map
+增加排除规则并调整优先级
+先跑
+demo_voice_interaction.py
+（无真实模型）验证状态机逻辑，再接真模块——排错面最小化。
+KWS 唤醒与 ASR 识别是两个独立过程：drain 期间 ASR 不启动，唤醒后请等提示音结束再说话。
+两端 Event 方向别记反：
+interrupt 由主循环设、worker 查；speaking_done 由 worker 设、主循环查
+。
+审查每一个
+time.sleep
+与队列操作是否在状态机线程里——阻塞主循环等于冻结对话。
+10
+总结与思考
+🏁
+完成成果
+跑通
+voice_interaction.py --mic-array
+全链路对话；用
+voice_tools_interaction.py
+语音控制机械臂 4 模式；验证唤醒→drain→端点→流式回复→打断全流程。
+🧠
+原理收获
+三态状态机如何杜绝流程串台；SENTENCE_RE 细粒度分句为什么能压首响延迟；双 Event 协作为何缺一不可；关键词优先 + LLM 兜底的双路径工程意义。
+🛠
+技能收获
+persistent aplay + stdin pipe 流式播放；stall_timeout/端口自清理等防御式编程；action.yaml 数据驱动的动作注册；ASR 误识别 fuzzy_map 纠正。
+➡
+去向 EXP-05
+目前"理解"还靠关键词匹配。下一步让 LLM 正面做意图识别与槽位提取——把"听懂字面"升级为"听懂你要干什么"。
+💭 思考题
+1.
+双轮 drain 的"drain1 → sleep 0.2s → drain2"中间为什么要 sleep？如果直接连续 drain 两次，会造成什么现象？请结合"capture 线程灌入是异步的"来推理。
+2.
+若只保留 interrupt_event 而删掉 speaking_done，会出现什么竞态？请画出主循环与 worker 的时序图说明状态机在哪一步永久阻塞。
+CORE-03 · 机器人自然语言交互应用 · EXP-04 端到端语音对话
+8 学时 · 设计性 · 基于 speech_practice 实验讲义改编

@@ -1,0 +1,39 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp003-ros2-application/exp-19-tf2/diagrams/fig-19-1-minimal-system.html
+TITLE: 图 19-1 · 最小系统：一条 launch，一场发与收
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+图 19-1 · 最小系统：一条 launch，一场发与收
+图 19-1 · 最小系统：一条 launch，一场发与收
+本图回答的问题：一条 launch 拉起后，TF 树从哪个节点发出、走哪条话题、被谁读走？——把刚才三步跑出的结果，对回这张链路图。
+总览 · 一条 launch 同时拉起 3 个节点：滑块窗喂关节角 → robot_state_publisher 发布整棵 TF 树 → rviz2 / view_frames 订阅读取
+display.launch.py
+终端 A · 一条命令
+经 launch 拉起 3 节点
+拉起
+robot_state
+_publisher
+树的发布者（launch 内）
+读 URDF → 算边分发
+发边
+/tf_static
+fixed 边 · 一次性
+/tf
+活动边 · 持续刷新
+订阅
+订阅方（谁在读）
+rviz2 · 画坐标轴
+view_frames · 导树图
+tf2_echo · 查单边
+上方 3 步怎么落到这条链路（每个框就是一个步骤）——同一条树，三份独立证据：
+① 启动：一条 launch
+三节点：滑块 · 发布 · 画面
+② 打印：view_frames
+订阅 5 s → frames.pdf 成树
+③ 对照：RViz 画面
+TF 图层 = 树的现场直播
+最小系统：现成 launch + 两台终端——不写一行代码，节点靠 DDS 自动发现彼此。
+唯一要求：终端 A 的 launch 别关——/tf 与 /tf_static 都挂在它身上，关了终端 B 全部 Waiting。
+✅ 结论：发布者是 robot_state_publisher——读一次 URDF、持续发整棵树，链路一图看懂
+⚠️ 风险：launch 提前退出或 frame 拼错 → 查询端永远 Waiting
+🔍 验证：上方 3 个步骤逐条对应图中 ① ～ ③
+EXP-19 · TF2 坐标系变换

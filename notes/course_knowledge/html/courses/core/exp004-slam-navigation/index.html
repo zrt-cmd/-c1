@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>机器人 SLAM 与自主导航 · 教程首页</title>
+<style>
+:root{
+  --bg-base:#f8fafc;
+  --bg-surface:#ffffff;
+  --bg-muted:#f1f5f9;
+  --text-primary:#0f172a;
+  --text-secondary:#475569;
+  --text-muted:#94a3b8;
+  --accent-teal:#0d9488;
+  --accent-blue:#2563eb;
+  --accent-amber:#d97706;
+  --accent-violet:#7c3aed;
+  --accent-rose:#e11d48;
+  --border:#e2e8f0;
+  --font-body:'Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif;
+  --font-mono:'Cascadia Code','JetBrains Mono','Consolas',monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:var(--font-body);background:var(--bg-base);color:var(--text-primary);line-height:1.7}
+a{text-decoration:none;color:inherit}
+.topbar{position:sticky;top:0;z-index:50;background:rgba(248,250,252,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--border)}
+.topbar-in{max-width:1200px;margin:0 auto;padding:.7rem 1.5rem;display:flex;align-items:center;justify-content:space-between}
+.logo{font-weight:800;font-size:.95rem}
+.logo span{color:var(--accent-teal)}
+.crumb{font-size:.85rem;color:var(--text-secondary)}
+.crumb a:hover{color:var(--accent-teal)}
+.hero{background:linear-gradient(135deg,#0f172a 0%,#134e4a 55%,#0d9488 100%);color:#fff;padding:3.5rem 1.5rem 3rem;text-align:center}
+.eyebrow{font-size:.8rem;letter-spacing:.28em;opacity:.75;margin-bottom:.8rem}
+.hero h1{font-size:clamp(1.7rem,4vw,2.6rem);font-weight:900;margin-bottom:.9rem}
+.hero h1 .grad{background:linear-gradient(90deg,#5eead4,#93c5fd);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.hero p{max-width:760px;margin:0 auto 1.4rem;opacity:.85;font-size:1rem}
+.bades{display:flex;gap:.6rem;justify-content:center;flex-wrap:wrap}
+.bade{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.28);padding:.3rem .85rem;border-radius:999px;font-size:.85rem}
+.wrap{max-width:1200px;margin:0 auto;padding:2.5rem 1.5rem}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:2.5rem}
+.stat{background:var(--bg-surface);border:1px solid var(--border);border-radius:14px;padding:1rem 1.2rem;text-align:center}
+.stat b{display:block;font-size:1.5rem;color:var(--accent-teal)}
+.stat span{font-size:.8rem;color:var(--text-secondary)}
+.sec-head{margin:2.4rem 0 1.2rem}
+.sec-head .k{font-size:.75rem;letter-spacing:.24em;color:var(--accent-teal);font-weight:700}
+.sec-head h2{font-size:1.45rem;font-weight:800;margin-top:.25rem}
+.sec-head p{color:var(--text-secondary);font-size:.92rem;margin-top:.3rem}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:1.1rem}
+.card{background:var(--bg-surface);border:1px solid var(--border);border-radius:16px;padding:1.2rem 1.3rem;transition:box-shadow .25s,transform .25s;display:flex;flex-direction:column}
+.card:hover{box-shadow:0 10px 30px rgba(13,148,136,.12);transform:translateY(-3px)}
+.card .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:.6rem}
+.card .code{font-family:var(--font-mono);font-size:.72rem;background:#ccfbf1;color:#0f766e;padding:.15rem .55rem;border-radius:6px;font-weight:700}
+.card h3{font-size:1.05rem;font-weight:800;margin-bottom:.35rem}
+.card>p{font-size:.86rem;color:var(--text-secondary);margin-bottom:.7rem}
+.card .meta{display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.6rem}
+.tag{font-size:.7rem;background:var(--bg-muted);color:var(--text-secondary);padding:.14rem .55rem;border-radius:999px;border:1px solid var(--border)}
+.explist{list-style:none;max-height:1400px;overflow:hidden;margin-bottom:.7rem}
+.explist li{display:flex;align-items:center;gap:.5rem;font-size:.82rem;padding:.42rem 0;border-top:1px dashed var(--border);color:var(--text-secondary);flex-wrap:wrap}
+.explist .stars{color:var(--accent-amber);font-size:.7rem;letter-spacing:1px}
+.explist a.ttl{flex:1;min-width:0;color:var(--text-secondary);border-radius:4px;transition:color .2s}
+.explist a.ttl:hover{color:var(--accent-teal);text-decoration:underline}
+.explist a.dur{margin-left:auto;font-size:.7rem;color:var(--accent-blue);background:#eff6ff;border:1px solid #bfdbfe;border-radius:999px;padding:.05rem .55rem;transition:background .2s}
+.explist a.dur:hover{background:#dbeafe}
+.hint{font-size:.75rem;color:var(--accent-teal);margin-top:auto;padding-top:.55rem;display:flex;justify-content:space-between;align-items:center}
+.pills{display:flex;flex-wrap:wrap;gap:.65rem}
+.pill{display:inline-flex;align-items:center;gap:.45rem;background:var(--bg-surface);border:1px solid var(--border);border-radius:999px;padding:.4rem .95rem;font-size:.83rem;color:var(--text-secondary);transition:.2s}
+.pill:hover{border-color:var(--accent-teal);color:var(--accent-teal);transform:translateY(-2px)}
+.pill i{width:.55rem;height:.55rem;border-radius:50%;display:inline-block}
+.kgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:1rem}
+.kcard{background:var(--bg-surface);border:1px solid var(--border);border-radius:14px;padding:1.1rem 1.2rem}
+.kcard h4{font-size:.95rem;margin-bottom:.45rem;display:flex;align-items:center;gap:.5rem}
+.kcard p{font-size:.84rem;color:var(--text-secondary)}
+.dot{width:.5rem;height:.5rem;border-radius:50%;display:inline-block}
+footer{border-top:1px solid var(--border);background:var(--bg-surface);margin-top:3rem}
+.foot-in{max-width:1200px;margin:0 auto;padding:1.4rem 1.5rem;display:flex;justify-content:space-between;align-items:center;font-size:.82rem;color:var(--text-secondary);flex-wrap:wrap;gap:.5rem}
+.foot-in a:hover{color:var(--accent-teal)}
+.reveal{opacity:0;transform:translateY(22px);transition:opacity .55s ease,transform .55s ease}
+.reveal.show{opacity:1;transform:none}
+@media(max-width:760px){.stats{grid-template-columns:repeat(2,1fr)}}
+/* ── 课程指引折叠面板 ── */
+.gtoggle{display:flex;align-items:center;gap:.8rem;width:100%;text-align:left;cursor:pointer;margin:.4rem 0 1rem;padding:1rem 1.2rem;font:inherit;color:inherit;background:linear-gradient(135deg,#f0fdfa,#eff6ff);border:1.5px dashed #14b8a6;border-radius:14px;transition:.25s}
+.gtoggle:hover{box-shadow:0 8px 22px rgba(20,184,166,.16);transform:translateY(-2px);border-style:solid}
+.gtoggle .gi{font-size:1.5rem;flex:none}
+.gtoggle .gt{flex:1;min-width:0}
+.gtoggle .gt b{display:block;font-size:1.02rem;letter-spacing:.02em}
+.gtoggle .gt span{display:block;font-size:.78rem;color:var(--text-secondary,#64748b);margin-top:.22rem;line-height:1.6}
+.gtoggle .gh{flex:none;font-size:.78rem;font-weight:700;color:#0d9488;background:#fff;border:1px solid #99f6e4;border-radius:999px;padding:.32rem .8rem;transition:.25s}
+.gtoggle[aria-expanded="true"] .gh{background:#0d9488;color:#fff;border-color:#0d9488}
+.gtoggle[aria-expanded="true"] .gh::after{content:" 收起"}
+.gtoggle[aria-expanded="false"] .gh::after{content:" 展开"}
+#gbox{overflow:hidden}
+#gbox[hidden]{display:none}
+#gbox.open .reveal{opacity:1;transform:none}
+@media (max-width:640px){.gtoggle{flex-wrap:wrap}}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-in">
+    <a class="logo" href="../../index.html" style="text-decoration:none;color:inherit" title="返回课程首页">🎓 具身智能课程 · <span>教程首页</span></a>
+    <div class="crumb"><a href="../../index.html">← 返回总首页</a></div>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="eyebrow">CATEGORY 1 · 核心课程 / CORE-04</div>
+  <h1>机器人 <span class="grad">SLAM 与自主导航</span></h1>
+  <p>7 个递进实验，从 SLAM 原理与 URDF 建模起步，用 SLAM Toolbox 遥控建图，深入 Nav2 导航栈与 AMCL 粒子滤波定位，以 DWB 局部避障、激光雷达多点任务调度收口，最终展望 RTAB-Map 三维 SLAM —— 每个实验均配原理讲解、动画演示与交互沙盒，基于 slam_practice 实验讲义与 car1 真实源码改写。</p>
+  <div class="bades">
+    <span class="bade">📚 7 个实验</span>
+    <span class="bade">⏱️ 48 学时</span>
+    <span class="bade">🤖 激光雷达 + 麦轮底盘</span>
+    <span class="bade">🎯 前置：ROS2 基础</span>
+    <span class="bade">🚗 仅适配小车 C1</span>
+  </div>
+</section>
+
+<div class="wrap">
+
+  <div class="stats reveal">
+    <div class="stat"><b>7</b><span>递进实验</span></div>
+    <div class="stat"><b>48</b><span>总学时</span></div>
+    <div class="stat"><b>3</b><span>知识篇章</span></div>
+    <div class="stat"><b>⭐1~3</b><span>难度跨度</span></div>
+  </div>
+
+  <button class="gtoggle" id="gtg" aria-expanded="false" aria-controls="gbox" onclick="gToggle()">
+    <span class="gi">🗺️</span>
+    <span class="gt"><b>课程路线图 &amp; 上机指引 — 点击展开</b><span>知识主线（建模 → 建图 → 定位 → 导航） · 上机通用六步法（展开后可跳转任意章节）</span></span>
+    <span class="gh">课程指引</span>
+  </button>
+  <div id="gbox" hidden>
+
+  <div class="sec-head reveal">
+    <div class="k">START HERE</div>
+    <h2>上机通用六步法</h2>
+    <p>每个实验的终端操作都遵循同一套节奏——先摆好环境，再动参数；先观察现象，再写结论。</p>
+  </div>
+  <div class="kgrid reveal">
+    <div class="kcard"><h4><span class="dot" style="background:#0d9488"></span>① 起环境</h4><p>按 05 节清单核对硬件接线与话题（/scan、odom TF、相机四话题），启动对应 launch；拿不准先 ros2 topic hz 确认数据在流动。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#2563eb"></span>② 看原理</h4><p>动手前先过一遍 02 原理章节与 06 动画：知道"这一参数对应画面里哪个动作"，报错时才有排查方向。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#7c3aed"></span>③ 跑基线</h4><p>用默认参数完整跑通一遍流程，记录"基准现象"——后面所有调参结论都以它为对照组。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#d97706"></span>④ 单变量调</h4><p>每次只改一个参数（改前抄下旧值），重启生效后复测同一场景；症状对不上就回滚，别叠加"盲改三连"。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#e11d48"></span>⑤ 记数据</h4><p>到达率、最小安全距离、收敛时间、耗时……统计数据而非单次印象；随机性大的测试至少重复 3-5 遍。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#334155"></span>⑥ 收尾归档</h4><p>保存地图 / 参数 / rosbag，填写"参数 → 现象"对照表，再回答 10 节思考题——这就是实验报告的骨架。</p></div>
+  </div>
+
+  <div class="sec-head reveal">
+    <div class="k">COURSE MAP</div>
+    <h2>知识主线：建模 → 建图 → 定位 → 导航</h2>
+    <p>一句话看懂全课程的因果链：没有 URDF 就没有 TF，没有地图就没有规划，没有定位一切都是空谈。</p>
+  </div>
+  <div class="kgrid reveal">
+    <div class="kcard"><h4><span class="dot" style="background:#0d9488"></span>① 建模：给机器人一副"身体"</h4><p>URDF 描述底盘、机械臂、夹爪的连杆与关节，TF 坐标树把雷达、里程计"钉"到车体上 —— 这是后续一切传感器数据的坐标基准（EXP-01）。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#2563eb"></span>② 建图：边走边画户型图</h4><p>SLAM Toolbox 前端扫描配准 + 后端回环优化，遥控小车逛一圈，得到一张 0.05 m 精度的二维占据栅格地图（EXP-02）。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#7c3aed"></span>③ 定位：知道自己在图上哪一格</h4><p>AMCL 粒子滤波拿实时雷达扫描与地图比对，回答"我在哪"；定位不准，导航全是徒劳（EXP-03 · EXP-04）。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#d97706"></span>④ 导航：从"到一处"到"跑多圈"</h4><p>Nav2 全局规划走大路、DWA 局部避障随机应变、多点调度连续执行任务，RTAB-Map 再把世界升到三维（EXP-05~07）。</p></div>
+  </div>
+  </div><!-- /#gbox 课程指引 -->
+
+  <div class="sec-head reveal">
+    <div class="k">CHAPTER 1</div>
+    <h2>第 1 章 · 建模与建图</h2>
+    <p>先给机器人一副"身体"（URDF + TF），再给它一张"户型图"（SLAM Toolbox 建图）—— 自主导航的两块基石。</p>
+  </div>
+  <div class="grid">
+
+    <article class="card reveal">
+      <div class="top"><span class="code">EXP-01</span><span class="tag">⭐ · 4 学时</span></div>
+      <h3>SLAM 原理与 URDF 模型</h3>
+      <p>用"蒙眼逛新家"的比喻吃透 SLAM = 边走边画地图 + 定位；再用 URDF + RViz 把 car1 机器人"搬"上屏幕，看清连杆、关节与 TF 坐标树怎么连。</p>
+      <div class="meta"><span class="tag">SLAM 概念</span><span class="tag">URDF / Xacro</span><span class="tag">TF 树</span></div>
+      <ul class="explist">
+        <li><a class="ttl" href="exp-01-slam-urdf/index.html#s1">① 问题引入：鸡生蛋——没地图怎么定位</a>
+          <span class="stars">⭐</span><a class="dur" href="exp-01-slam-urdf/index.html#s1">4 学时 · 开始</a></li>
+        <li><a class="ttl" href="exp-01-slam-urdf/index.html#s6">② 动画讲解：激光扇形扫描与栅格地图逐格填充</a>
+          <span class="stars">⭐</span><a class="dur" href="exp-01-slam-urdf/index.html#s6">动画</a></li>
+        <li><a class="ttl" href="exp-01-slam-urdf/index.html#s7">③ 互动讲解：joint 类型 × TF 树拼装台</a>
+          <span class="stars">⭐⭐</span><a class="dur" href="exp-01-slam-urdf/index.html#s7">互动</a></li>
+        <li><a class="ttl" href="exp-01-slam-urdf/index.html#s8">④ 实操步骤：display.launch.py 可视化三件套</a>
+          <span class="stars">⭐</span><a class="dur" href="exp-01-slam-urdf/index.html#s8">实操</a></li>
+        <li><a class="ttl" href="exp-01-slam-urdf/index.html#s10">⑤ 总结与思考：SLAM 与 URDF 四问</a>
+          <span class="stars">⭐</span><a class="dur" href="exp-01-slam-urdf/index.html#s10">验证</a></li>
+      </ul>
+      <div class="hint"><span>👆 点击小节标题或右侧标签直达对应章节</span></div>
+    </article>
+
+    <article class="card reveal">
+      <div class="top"><span class="code">EXP-02</span><span class="tag">⭐⭐ · 4 学时</span></div>
+      <h3>SLAM Toolbox 建图</h3>
+      <p>整门课第一个"高光时刻"：键盘遥控小车在房间里逛一圈，得到一张跟户型图一样的二维地图。全程只做三件事——启动建图、遥控逛圈、保存地图。</p>
+      <div class="meta"><span class="tag">SLAM Toolbox</span><span class="tag">扫描匹配</span><span class="tag">回环检测</span></div>
+      <ul class="explist">
+        <li><a class="ttl" href="exp-02-slam-toolbox/index.html#s1">① 问题引入：怎么把房间"扫"成一张图</a>
+          <span class="stars">⭐</span><a class="dur" href="exp-02-slam-toolbox/index.html#s1">4 学时 · 开始</a></li>
+        <li><a class="ttl" href="exp-02-slam-toolbox/index.html#s6">② 动画讲解：前端配准、关键帧与回环闭合</a>
+          <span class="stars">⭐⭐</span><a class="dur" href="exp-02-slam-toolbox/index.html#s6">动画</a></li>
+        <li><a class="ttl" href="exp-02-slam-toolbox/index.html#s7">③ 互动讲解：关键帧阈值与回环触发演练台</a>
+          <span class="stars">⭐⭐</span><a class="dur" href="exp-02-slam-toolbox/index.html#s7">互动</a></li>
+        <li><a class="ttl" href="exp-02-slam-toolbox/index.html#s8">④ 实操步骤：slam.launch → teleop 逛圈 → map_save</a>
+          <span class="stars">⭐⭐</span><a class="dur" href="exp-02-slam-toolbox/index.html#s8">实操</a></li>
+        <li><a class="ttl" href="exp-02-slam-toolbox/index.html#s10">⑤ 总结与思考：建图优劣怎么判</a>
+          <span class="stars">⭐⭐</span><a class="dur" href="exp-02-slam-toolbox/index.html#s10">验证</a></li>
+      </ul>
+      <div class="hint"><span>👆 点击小节标题或右侧标签直达对应章节</span></div>
+    </article>
+
+  </div>
+
+  <div class="sec-head reveal">
+    <div class="k">CHAPTER 2</div>
+    <h2>第 2 章 · 定位与导航</h2>
+    <p>Nav2 导航栈五大服务器、AMCL 粒子滤波、DWA 动态窗口局部避障 —— 让小车从"看地图"进化到"会走路、会躲人"。</p>
+  </div>
+  <div class="grid">
+
+    <article class="card reveal">
+      <div class="top"><span class="code">EXP-03</span><span class="tag">⭐⭐⭐ · 8 学时</span></div>
+      <h3>Nav2 机器人导航</h3>
+      <p>在 RViz 里点一个目标点，小车自己规划路线、自己转弯、自己躲开静态障碍。拆解 planner / controller / bt_navigator / behavior / velocity_smoother 五大服务器与全局、局部双代价地图。</p>
+      <div class="meta"><span class="tag">Nav2</span><span class="tag">代价地图</span><span class="tag">行为树</span></div>
+      <ul class="explist">
+        <li><a class="ttl" href="exp-03-nav2-navigation/index.html#s1">① 问题引入：给小车一张图，它怎么自己走</a>
+          <span class="stars">⭐⭐</span><a class="dur" href="exp-03-nav2-navigation/index.html#s1">8 学时 · 开始</a></li>
+        <li><a class="ttl" href="exp-03-nav2-navigation/index.html#s6">② 动画讲解：机器人沿全局路径移动 + 膨胀层绕障</a>
+          <span class="stars">⭐⭐⭐</span><a class="dur" href="exp-03-nav2-navigation/index.html#s6">动画</a></li>
+        <li><a class="ttl" href="exp-03-nav2-navigation/index.html#s7">③ 互动讲解：全局规划 vs 局部控制对比台</a>
+          <span class="stars">⭐⭐⭐</span><a class="dur" href="exp-03-nav2-navigation/index.html#s7">互动</a></li>
+        <li><a class="ttl" href="exp-03-nav2-navigation/index.html#s8">④ 实操步骤：navigation.launch + RViz 2D Goal Pose</a>
+          <span class="stars">⭐⭐</span><a class="dur" href="exp-03-nav2-navigation/index.html#s8">实操</a></li>
+        <li><a class="ttl" href="exp-03-nav2-navigation/index.html#s10">⑤ 总结与思考：贴墙、原地转与规划失败</a>
+          <span class="stars">⭐⭐⭐</span><a class="dur" href="exp-03-nav2-navigation/index.html#s10">验证</a></li>
+      </ul>
+      <div class="hint"><span>👆 点击小节标题或右侧标签直达对应章节</span></div>
+    </article>
+
+    <article class="card reveal">
+      <div class="top"><span class="code">EXP-04</span><span class="tag">⭐⭐⭐ · 8 学时</span></div>
+      <h3>AMCL 自适应蒙特卡洛定位</h3>
+      <p>小车被搬动、地图和现实对不上时，"我到底在地图哪里？"用粒子滤波三步（预测、更新、重采样）+ 似然场模型，让小车雷达一扫就自己猜出精确位置。</p>
+      <div class="meta"><span class="tag">粒子滤波</span><span class="tag">似然场</span><span class="tag">初始位姿</span></div>
+      <ul class="explist">
+        <li><a class="ttl" href="exp-04-amcl-localization/index.html#s1">① 问题引入：里程计漂移与"被绑架"的车</a>
+          <span class="stars">⭐⭐</span><a class="dur" href="exp-04-amcl-localization/index.html#s1">8 学时 · 开始</a></li>
+        <li><a class="ttl" href="exp-04-amcl-localization/index.html#s6">② 动画讲解：粒子云从散乱到收敛</a>
+          <span class="stars">⭐⭐⭐</span><a class="dur" href="exp-04-amcl-localization/index.html#s6">动画</a></li>
+        <li><a class="ttl" href="exp-04-amcl-localization/index.html#s7">③ 互动讲解：粒子数 × 传感器噪声实验台</a>
+          <span class="stars">⭐⭐⭐</span><a class="dur" href="exp-04-amcl-localization/index.html#s7">互动</a></li>
+        <li><a class="ttl" href="exp-04-amcl-localization/index.html#s8">④ 实操步骤：2D Pose Estimate 给初始位姿并观察收敛</a>
+          <span class="stars">⭐⭐</span><a class="dur" href="exp-04-amcl-localization/index.html#s8">实操</a></li>
+        <li><a class="ttl" href="exp-04-amcl-localization/index.html#s10">⑤ 总结与思考：假收敛与绑架恢复</a>
+          <span class="stars">⭐⭐⭐</span><a class="dur" href="exp-04-amcl-localization/index.html#s10">验证</a></li>
+      </ul>
+      <div class="hint"><span>👆 点击小节标题或右侧标签直达对应章节</span></div>
+    </article>
+
+    <article class="card reveal">
+      <div class="top"><span class="code">EXP-05</span><span class="tag">⭐⭐⭐ · 8 学时</span></div>
+      <h3>DWA/TEB 局部避障</h3>
+      <p>实验 3 小车会"看地图走大路"，但路上突然滚来一个球怎么办？用 DWB 局部规划器在动态窗口内采样 800 条短轨迹实时打分，绕不过去还会自己转圈、后退重新想办法。</p>
+      <div class="meta"><span class="tag">DWA / DWB</span><span class="tag">评价函数</span><span class="tag">膨胀层</span></div>
+      <ul class="explist">
+        <li><a class="ttl" href="exp-05-dwa-teb-avoidance/index.html#s1">① 问题引入：静态地图挡不住滚动的球</a>
+          <span class="stars">⭐⭐</span><a class="dur" href="exp-05-dwa-teb-avoidance/index.html#s1">8 学时 · 开始</a></li>
+        <li><a class="ttl" href="exp-05-dwa-teb-avoidance/index.html#s6">② 动画讲解：采样轨迹打分与代价地图膨胀</a>
+          <span class="stars">⭐⭐⭐</span><a class="dur" href="exp-05-dwa-teb-avoidance/index.html#s6">动画</a></li>
+        <li><a class="ttl" href="exp-05-dwa-teb-avoidance/index.html#s7">③ 互动讲解：膨胀半径 × 代价权重调参台</a>
+          <span class="stars">⭐⭐⭐</span><a class="dur" href="exp-05-dwa-teb-avoidance/index.html#s7">互动</a></li>
+        <li><a class="ttl" href="exp-05-dwa-teb-avoidance/index.html#s8">④ 实操步骤：纸箱前方 1 m 动态避障三重复试验</a>
+          <span class="stars">⭐⭐⭐</span><a class="dur" href="exp-05-dwa-teb-avoidance/index.html#s8">实操</a></li>
+        <li><a class="ttl" href="exp-05-dwa-teb-avoidance/index.html#s10">⑤ 总结与思考：DWA 与 TEB 的取舍</a>
+          <span class="stars">⭐⭐⭐</span><a class="dur" href="exp-05-dwa-teb-avoidance/index.html#s10">验证</a></li>
+      </ul>
+      <div class="hint"><span>👆 点击小节标题或右侧标签直达对应章节</span></div>
+    </article>
+
+  </div>
+
+  <div class="sec-head reveal">
+    <div class="k">CHAPTER 3</div>
+    <h2>第 3 章 · 任务调度与三维进阶</h2>
+    <p>从"点一个目标到一处"升级为"先去 A 取货、再去 B 放货"的连续任务；再用 RGB-D + RTAB-Map 让小车长出立体眼睛。</p>
+  </div>
+  <div class="grid">
+
+    <article class="card reveal">
+      <div class="top"><span class="code">EXP-06</span><span class="tag">⭐⭐⭐ · 8 学时</span></div>
+      <h3>激光雷达多点导航避障</h3>
+      <p>真实任务往往是"先去 A、再去 B、最后回 C"。用两个 Nav2 导航器（NavigateToPose / NavigateThroughPoses）连续执行多目标，中途有障碍也能一路安全走完，并做堵死鲁棒性测试。</p>
+      <div class="meta"><span class="tag">NavigateToPose</span><span class="tag">NavigateThroughPoses</span><span class="tag">Action</span></div>
+      <ul class="explist">
+        <li><a class="ttl" href="exp-06-radar-multiwaypoint/index.html#s1">① 问题引入：一个目标 vs 一串目标</a>
+          <span class="stars">⭐⭐</span><a class="dur" href="exp-06-radar-multiwaypoint/index.html#s1">8 学时 · 开始</a></li>
+        <li><a class="ttl" href="exp-06-radar-multiwaypoint/index.html#s6">② 动画讲解：机器人依次访问 A→B→C 航点</a>
+          <span class="stars">⭐⭐⭐</span><a class="dur" href="exp-06-radar-multiwaypoint/index.html#s6">动画</a></li>
+        <li><a class="ttl" href="exp-06-radar-multiwaypoint/index.html#s7">③ 互动讲解：单点 vs 多点导航器选择台</a>
+          <span class="stars">⭐⭐⭐</span><a class="dur" href="exp-06-radar-multiwaypoint/index.html#s7">互动</a></li>
+        <li><a class="ttl" href="exp-06-radar-multiwaypoint/index.html#s8">④ 实操步骤：send_goal 发送多目标并跟踪反馈</a>
+          <span class="stars">⭐⭐⭐</span><a class="dur" href="exp-06-radar-multiwaypoint/index.html#s8">实操</a></li>
+        <li><a class="ttl" href="exp-06-radar-multiwaypoint/index.html#s10">⑤ 总结与思考：失败重试与进度检查</a>
+          <span class="stars">⭐⭐⭐</span><a class="dur" href="exp-06-radar-multiwaypoint/index.html#s10">验证</a></li>
+      </ul>
+      <div class="hint"><span>👆 点击小节标题或右侧标签直达对应章节</span></div>
+    </article>
+
+    <article class="card reveal">
+      <div class="top"><span class="code">EXP-07</span><span class="tag">⭐⭐⭐ · 8 学时</span></div>
+      <h3>RTAB-Map 3D SLAM</h3>
+      <p>前 6 个实验小车眼里世界是"一张平面图"。这节课让它长出立体眼睛：RGB-D 深度相机 + RTAB-Map 构建三维点云 / 八叉树地图，理解高度、层次与悬空障碍（原理与选型为主，详见页内说明）。</p>
+      <div class="meta"><span class="tag">RTAB-Map</span><span class="tag">RGB-D</span><span class="tag">OctoMap 点云</span></div>
+      <ul class="explist">
+        <li><a class="ttl" href="exp-07-rtabmap-3d/index.html#s1">① 问题引入：平面图看不见"头顶的横梁"</a>
+          <span class="stars">⭐⭐</span><a class="dur" href="exp-07-rtabmap-3d/index.html#s1">8 学时 · 开始</a></li>
+        <li><a class="ttl" href="exp-07-rtabmap-3d/index.html#s6">② 动画讲解：RGB-D 反投影生成三维点云</a>
+          <span class="stars">⭐⭐⭐</span><a class="dur" href="exp-07-rtabmap-3d/index.html#s6">动画</a></li>
+        <li><a class="ttl" href="exp-07-rtabmap-3d/index.html#s7">③ 互动讲解：2D 栅格 vs 3D 点云选型台</a>
+          <span class="stars">⭐⭐⭐</span><a class="dur" href="exp-07-rtabmap-3d/index.html#s7">互动</a></li>
+        <li><a class="ttl" href="exp-07-rtabmap-3d/index.html#s8">④ 实操步骤：RGB-D 数据链路验证与通用流程</a>
+          <span class="stars">⭐⭐</span><span class="stars" style="color:#94a3b8">📌 无配套资源</span><a class="dur" href="exp-07-rtabmap-3d/index.html#s8">实操</a></li>
+        <li><a class="ttl" href="exp-07-rtabmap-3d/index.html#s10">⑤ 总结与思考：什么时候该上三维</a>
+          <span class="stars">⭐⭐⭐</span><a class="dur" href="exp-07-rtabmap-3d/index.html#s10">验证</a></li>
+      </ul>
+      <div class="hint"><span>👆 点击小节标题或右侧标签直达对应章节</span></div>
+    </article>
+
+  </div>
+
+  <div class="sec-head reveal">
+    <div class="k">EXPERIMENT MATRIX</div>
+    <h2>七实验一览表</h2>
+    <p>学时结构与交付物一目了然：CH1 打地基（4+4）、CH2 练核心（8×3）、CH3 上台阶（8+8），合计 48 学时。</p>
+  </div>
+  <div class="grid reveal" style="display:block">
+    <article class="card">
+      <table>
+        <tr><th>编号</th><th>实验</th><th>学时</th><th>难度</th><th>类型</th><th>核心交付物</th></tr>
+        <tr><td>EXP-01</td><td>SLAM 原理与 URDF 模型</td><td>4</td><td>⭐</td><td>验证性</td><td>car1 的 URDF + TF 树 + RViz 可视化截图</td></tr>
+        <tr><td>EXP-02</td><td>SLAM Toolbox 建图</td><td>4</td><td>⭐⭐</td><td>设计性</td><td>一张 0.05 m 精度、四角闭合的 map.pgm/yaml</td></tr>
+        <tr><td>EXP-03</td><td>Nav2 机器人导航</td><td>8</td><td>⭐⭐⭐</td><td>综合性</td><td>导航 launch 跑通 + 5 目标点到达记录</td></tr>
+        <tr><td>EXP-04</td><td>AMCL 自适应蒙特卡洛定位</td><td>8</td><td>⭐⭐⭐</td><td>综合性</td><td>初始位姿收敛观察 + 绑架恢复计时</td></tr>
+        <tr><td>EXP-05</td><td>DWA/TEB 局部避障</td><td>8</td><td>⭐⭐⭐</td><td>综合性</td><td>纸箱 1 m 三重复试验 + 参数→现象对照表</td></tr>
+        <tr><td>EXP-06</td><td>激光雷达多点导航避障</td><td>8</td><td>⭐⭐⭐</td><td>综合性</td><td>A→B→C 轨迹记录 + 四指标鲁棒性统计</td></tr>
+        <tr><td>EXP-07</td><td>RTAB-Map 3D SLAM</td><td>8</td><td>⭐⭐⭐</td><td>综合性</td><td>反投影验算 + 选型报告（📌 无配套源码资源，原理与通用流程型）</td></tr>
+      </table>
+    </article>
+  </div>
+
+  <div class="sec-head reveal">
+    <div class="k">LAB ENVIRONMENT</div>
+    <h2>实验环境与关键话题速查</h2>
+    <p>全课程同一套底座：Ubuntu 22.04 + ROS 2 Humble + 具身智能实验箱（B2）/ 小车（C1）。</p>
+  </div>
+  <div class="kgrid reveal">
+    <div class="kcard"><h4><span class="dot" style="background:#0d9488"></span>感知层</h4><p>COIN-D6 激光雷达（设备节点 /dev/lidar，发布 /scan，frame_id laser_link，0.05~12 m，10 Hz，Best Effort QoS）+ HP60C RGB-D 相机（/ascamera_hp60c/... 命名空间，供 EXP-07）。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#2563eb"></span>本体层</h4><p>麦轮底盘轮速 + BMI088 IMU，经 EKF（robot_localization）融合输出 odom→base_footprint；ω 取 IMU、vx 取轮速（麦轮旋转打滑约 45%，故不取轮速航向）。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#7c3aed"></span>地图与定位</h4><p>SLAM Toolbox 出 /map（occupancy grid：-1 未知 / 0 空闲 / 100 占据，0.05 m 格，存盘后变成 205/254/0 灰度）；AMCL 出 /amcl_pose 与粒子云 /particle_cloud。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#d97706"></span>导航栈</h4><p>car1_navigation 的 navigation.launch.py 一键起 Nav2；参数集中在 config/nav2_params.yaml（planner/controller/bt/costmap 全在里面），行为树另有 2 个 XML。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#e11d48"></span>TF 主干</h4><p>map → odom（AMCL 修正）→ base_footprint（EKF 里程计）→ 各传感器 link（URDF 定义）。TF 一断，建图导航全部报错。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#334155"></span>调试工具箱</h4><p>RViz2（看 /scan /map /plan /costmap /particle_cloud）、ros2 topic hz/echo、rqt_image_view、view_frames 查 TF 树、/behavior_tree_log 看行为树分支。</p></div>
+  </div>
+
+  <div class="sec-head reveal">
+    <div class="k">TECH STACK</div>
+    <h2>技术栈与硬件平台</h2>
+    <p>全课程围绕 ROS2 Humble + 具身智能实验箱 B2 展开：COIN-D6 激光雷达提供 /scan，麦轮底盘 + EKF 提供 odom，HP60C RGB-D 相机留给三维进阶。</p>
+  </div>
+  <div class="pills reveal">
+    <span class="pill"><i style="background:#b45309"></i>URDF / Xacro</span>
+    <span class="pill"><i style="background:#be185d"></i>TF2 坐标树</span>
+    <span class="pill"><i style="background:#2563eb"></i>SLAM Toolbox</span>
+    <span class="pill"><i style="background:#0d9488"></i>占据栅格地图</span>
+    <span class="pill"><i style="background:#7c3aed"></i>Nav2 导航栈</span>
+    <span class="pill"><i style="background:#d97706"></i>AMCL 粒子滤波</span>
+    <span class="pill"><i style="background:#e11d48"></i>DWA / DWB</span>
+    <span class="pill"><i style="background:#0891b2"></i>TEB 弹性带</span>
+    <span class="pill"><i style="background:#4f46e5"></i>RTAB-Map</span>
+    <span class="pill"><i style="background:#059669"></i>OctoMap 八叉树</span>
+    <span class="pill"><i style="background:#334155"></i>LaserScan /scan</span>
+    <span class="pill"><i style="background:#0f766e"></i>实验箱 B2 · 小车 C1</span>
+  </div>
+
+  <div class="sec-head reveal">
+    <div class="k">PITFALL RADAR</div>
+    <h2>六个高频坑，开跑前先扫一眼</h2>
+    <p>以下症状在历届上机中反复出现——每条都对应课内某章节的排障入口。</p>
+  </div>
+  <div class="kgrid reveal">
+    <div class="kcard"><h4><span class="dot" style="background:#e11d48"></span>坑 1 · TF 树断链</h4><p>现象：RViz 全线飘红"No transform"。入口：EXP-01 08 实操——核对 display 三件套与 view_frames 输出，确认 base_footprint 挂根。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#e11d48"></span>坑 2 · 地图重影"双墙"</h4><p>现象：建图回环后墙变两层。入口：EXP-02——回环没闭合或遥控过快，降速重逛并检查 loop_match_minimum_response_fine（0.45）。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#e11d48"></span>坑 3 · 初始位姿没给</h4><p>现象：粒子散成一地，小车发疯。入口：EXP-04——RViz「2D Pose Estimate」按真实位姿给初值，或开 set_initial_pose。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#e11d48"></span>坑 4 · 目标点在墙里</h4><p>现象：action 返回 ABORTED。入口：EXP-03——目标必须落在 map 系空闲区且在膨胀层之外；拖点后 zoom 确认。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#e11d48"></span>坑 5 · 改参不重启</h4><p>现象：yaml 改了没反应。入口：EXP-05——Nav2 各 server 启动时读参，改完必须重启 navigation.launch。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#e11d48"></span>坑 6 · 途经点贴太近</h4><p>现象：多点导航跳过中间点。入口：EXP-06——行为树会剔除 0.7 m 内的途经点，相邻点间距请拉开到 &gt;1.0 m，frame_id 统一写 map。</p></div>
+  </div>
+
+  <div class="sec-head reveal">
+    <div class="k">GLOSSARY</div>
+    <h2>术语速查表</h2>
+    <p>十六个贯穿全课程的关键词，第一次读到不懂没关系——先混个脸熟，实验里会反复遇见。</p>
+  </div>
+  <div class="grid reveal" style="display:block">
+    <article class="card">
+      <table>
+        <tr><th>术语</th><th>一句话解释</th><th>首秀实验</th></tr>
+        <tr><td>SLAM</td><td>Simultaneous Localization And Mapping：边走边画地图 + 同时知道自己在哪</td><td>EXP-01</td></tr>
+        <tr><td>URDF / Xacro</td><td>用 XML 描述机器人的连杆与关节，Xacro 支持宏展开复用</td><td>EXP-01</td></tr>
+        <tr><td>TF</td><td>坐标变换树：任意两帧之间的平移/旋转关系，ROS 的"定位坐标系语法"</td><td>EXP-01</td></tr>
+        <tr><td>mimic 关节</td><td>从动关节，不独立驱动而是按倍数跟随主动关节——car1 夹爪 5 个指节跟 1 个 r_joint</td><td>EXP-01</td></tr>
+        <tr><td>里程计 odom</td><td>由轮速/IMU 融合同步推算的"走了多远"，会漂移，靠 AMCL 校正</td><td>EXP-01</td></tr>
+        <tr><td>占据栅格</td><td>把世界切成 0.05 m 的格子：话题里 100 占据 / 0 空闲 / -1 未知；存成 .pgm 后是 0 / 254 / 205 灰度</td><td>EXP-02</td></tr>
+        <tr><td>回环检测</td><td>认出"我来过这里"，把累积漂移一次性修掉（地图闭合的关键）</td><td>EXP-02</td></tr>
+        <tr><td>代价地图 costmap</td><td>在地图上叠"离障碍越远越便宜"的代价层（0 / 1-252 / 254 / 255），规划只走低代价区</td><td>EXP-03</td></tr>
+        <tr><td>行为树 BT</td><td>Nav2 的任务剧本：算路径→跟踪→到达，失败时翻到恢复分支（清图 / Spin / Wait）</td><td>EXP-03</td></tr>
+        <tr><td>AMCL</td><td>撒一群粒子各自"假设我在哪"，用扫描打分、重采样优胜劣汰</td><td>EXP-04</td></tr>
+        <tr><td>膨胀半径 inflation</td><td>障碍外扩一圈"别靠太近"的缓冲带（默认 0.18 m），半径 = 安全距 vs 通过性的权衡</td><td>EXP-05</td></tr>
+        <tr><td>DWA / 动态窗口</td><td>只在"刹得住"的速度里采样短轨迹（最多 20×40 条），打分选最优——局部避障的心脏</td><td>EXP-05</td></tr>
+        <tr><td>Action</td><td>goal/feedback/result 三段式通信，专为"跑很久还要看进度"的任务</td><td>EXP-06</td></tr>
+        <tr><td>RemovePassedGoals</td><td>多点导航里"进到途经点 0.7 m 内就剔除该点"的行为树节点，决定"经过"的判定方式</td><td>EXP-06</td></tr>
+        <tr><td>词袋 Bag-of-Words</td><td>把图像特征聚类成"词汇"，凭词汇相似度判断"回到旧地"</td><td>EXP-07</td></tr>
+        <tr><td>OctoMap</td><td>把三维空间切成立方体体素的可压缩地图，导航避障的三维底图</td><td>EXP-07</td></tr>
+      </table>
+    </article>
+  </div>
+
+  <div class="sec-head reveal">
+    <div class="k">FAQ</div>
+    <h2>常见问答</h2>
+    <p>把历届同学最高频的疑问前置到首页，省下你翻论坛的功夫。</p>
+  </div>
+  <div class="kgrid reveal">
+    <div class="kcard"><h4><span class="dot" style="background:#0d9488"></span>Q1 · RViz 里看不到 /scan？</h4><p>九成是话题没数据或 QoS 不匹配：先 ros2 topic hz /scan 确认 10 Hz，再在 RViz 里把 LaserScan 的 Reliability 改为 Best Effort。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#0d9488"></span>Q2 · 建图时小车开多快？</h4><p>逛圈要"慢而不停"：转角减速、短暂停留；slam_teleop 默认 0.2 m/s、0.5 rad/s 已经比较稳，别再加速——开太快扫描配准跟不上，墙会画重影。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#0d9488"></span>Q3 · 地图保存到哪里了？</h4><p>car1_slam 的 map_save 默认写到包的 maps 目录，文件名由参数决定：<code>-p map_name:=map_01</code>。挪动文件后 navigation.launch 的 map:= 参数要跟着改。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#2563eb"></span>Q4 · AMCL 粒子越多越准？</h4><p>不一定：粒子翻倍算力也翻倍；500~2000 是常用带宽，关键是"收敛后是否假收敛"（EXP-04 互动台可试）。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#2563eb"></span>Q5 · 目标点总是 ABORTED？</h4><p>依次排查：目标是否在墙里/膨胀层内 → 定位是否已收敛 → 全局代价地图有没有静态层。八成出在第一步。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#2563eb"></span>Q6 · 避障测试总撞箱子？</h4><p>箱子放得太近（进局部窗口才被发现）或速度过快刹不住：往远放、降 max_vel_x，见 EXP-05 坑表第一行。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#7c3aed"></span>Q7 · 多点导航跳过了中间点？</h4><p>行为树会剔除 0.7 m 内已通过的途经点：把间距拉到 &gt;1.0 m，核对 poses[] 顺序与 frame_id（必须是 map）。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#7c3aed"></span>Q8 · 键盘遥控方向是反的？</h4><p>teleop 的"前后"对齐机器人 +X；若反了检查 URDF 里 base link 的朝向约定，或用 TF 确认车头方向。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#d97706"></span>Q9 · 改了 yaml 没生效？</h4><p>Nav2 各 server 启动时读参：Ctrl+C 重启 navigation.launch；只 lifecycle reload 单节点未必覆盖全部参数。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#d97706"></span>Q10 · TEB 要不要装？</h4><p>不用：本项目 controller_plugins 固定为 FollowPath→DWB，TEB 属知识扩展；理解差异即可，动手对照见 EXP-05 互动台。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#e11d48"></span>Q11 · EXP-07 没有配套源码怎么考？</h4><p>原理 + 通用流程型：交付反投影验算、数据链路验证记录、二维/三维选型报告；页面 05 节已写明验收标准。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#e11d48"></span>Q12 · 实验报告写什么？</h4><p>固定骨架：目标 → 环境 → 步骤（命令截图）→ 数据表 → 参数→现象对照 → 思考题作答。数据务必来自你自己的终端。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#0d9488"></span>Q13 · 地图和真实房间对不上？</h4><p>九成是没设初始位姿：先 rviz2 的 2D Pose Estimate 拉一次；还不准就遥控走一段直角路径让 AMCL 收敛。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#2563eb"></span>Q14 · 发了 /cmd_vel 车不动？</h4><p>先分清两条链路：手动遥控走 /cmd_vel（限幅 ±0.3 m/s），Nav2 走 /controller/cmd_vel（不设限幅）。echo 对应话题看有没有速度，再查底盘使能、急停与 remap。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#7c3aed"></span>Q15 · 键盘遥控没反应？</h4><p>slam_teleop 用 termios 读原始按键，必须跑在真终端（IDE 内嵌终端读不到）；点一下终端窗口再按，并确认 /cmd_vel 仍在发布。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#d97706"></span>Q16 · 保存的地图打不开？</h4><p>map_saver_cli 同时生成 .pgm + .yaml，yaml 里的 image 是相对路径——两个文件必须一起挪，或把 image 改成绝对路径。</p></div>
+  </div>
+
+  <div class="sec-head reveal">
+    <div class="k">LEARNING PATH</div>
+    <h2>学习路径建议</h2>
+  </div>
+  <div class="kgrid reveal">
+    <div class="kcard"><h4><span class="dot" style="background:#0d9488"></span>顺序就是因果链</h4><p>严格按 EXP-01 → 07 顺序学：URDF 的 TF 树是建图的坐标基准，建出的 map 是 Nav2 的底图，AMCL 又必须依赖 map——跳着学必然卡住。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#2563eb"></span>先看懂 02 原理再敲 08 实操</h4><p>每个实验的"原理通俗讲解"用生活比喻讲清机制，动画与互动台把参数手感找到——再去终端跑命令，报错时才知道去哪里排查。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#7c3aed"></span>地图质量决定一切</h4><p>墙厚 &lt; 0.1 m、尺寸误差 &lt; 2%、四角闭合的"好地图"才配得上后面 4 个导航实验；地图歪了，先回 EXP-02 重建，别急着调 Nav2 参数。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#d97706"></span>单变量调参法</h4><p>每次只改一个参数并记录对照：膨胀半径、粒子数、DWA 权重都有明确症状。改完 Ctrl+C 重启 navigation 栈再验证，别在运行中盲改一串。</p></div>
+  </div>
+
+</div>
+
+<footer>
+  <div class="foot-in">
+    <span>CORE-04 · 机器人 SLAM 与自主导航（CORE-04 · 48 学时 · 7 实验）</span>
+    <span><a href="../../index.html">总首页</a> · 基于 slam_practice 实验讲义改编，含原理讲解与互动演示</span>
+  </div>
+</footer>
+
+<script>
+var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('show');io.unobserve(e.target);}});},{threshold:.12});
+document.querySelectorAll('.reveal').forEach(function(el){io.observe(el);});
+function gToggle(){var b=document.getElementById('gbox'),t=document.getElementById('gtg');if(!b||!t)return;var open=b.hasAttribute('hidden');if(open){b.removeAttribute('hidden');b.classList.add('open');t.setAttribute('aria-expanded','true');b.querySelectorAll('.reveal').forEach(function(el){el.classList.add('show');});}else{b.setAttribute('hidden','');b.classList.remove('open');t.setAttribute('aria-expanded','false');}}
+</script>
+</body>
+</html>

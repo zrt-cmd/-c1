@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-08 · 人脸关键点（468 点）— 机器人视觉入门课</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<link rel="stylesheet" href="../shared/beginner.css">
+<style>:root{--theme:#db2777;--theme-deep:#be185d;--theme-bg:#fce7f3;--theme-bd:#fbcfe8}</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit">🧠 具身智能课程 · <i>机器人视觉入门</i></a>
+  <div class="crumb"><a href="../../../index.html#core">核心课程</a> / <a href="../index.html">视觉入门课</a> / EXP-08</div>
+</div>
+
+<div class="wrap">
+
+<aside class="side">
+  <h4>本页步骤</h4>
+  <a href="#s1" class="now">01 这个实验解决什么问题</a>
+  <a href="#s2">02 三分钟讲懂：468 个点是怎么找到的</a>
+  <a href="#s3">03 先认识 4 个词</a>
+  <a href="#s4">04 它吃什么、吐什么</a>
+  <a href="#s5">05 三步跑起来</a>
+  <a href="#s6">06 你该看到的画面</a>
+  <a href="#s7">07 改一个参数看变化</a>
+  <a href="#s8">08 踩坑速查</a>
+  <a href="#s9">09 进阶（可选）</a>
+  <a href="#s10">10 随堂小测</a>
+  <h4>本课程实验</h4>
+  <a href="../exp-01-color-hsv/index.html">EXP-01 颜色识别</a>
+  <a href="../exp-02-qrcode/index.html">EXP-02 二维码</a>
+  <a href="../exp-03-contour-polygon/index.html">EXP-03 多边形轮廓</a>
+  <a href="../exp-04-industrial-defect/index.html">EXP-04 工业缺陷检测</a>
+  <a href="../exp-05-garbage-classification/index.html">EXP-05 垃圾分类</a>
+  <a href="../exp-06-semantic-segmentation/index.html">EXP-06 语义分割</a>
+  <a href="../exp-07-deepsort-tracking/index.html">EXP-07 多目标跟踪</a>
+  <a href="../exp-08-face-landmarks/index.html" style="color:#0f766e;font-weight:700">EXP-08 人脸关键点</a>
+  <a href="../exp-09-pose-landmark/index.html">EXP-09 骨骼关键点</a>
+  <a href="../exp-10-depth-3d/index.html">EXP-10 深度 3D</a>
+  <a href="../exp-11-pose-control/index.html">EXP-11 体感控制</a>
+  <a href="../exp-12-hand-control/index.html">EXP-12 手势识别</a>
+</aside>
+
+<main class="content">
+
+<div class="exp-head">
+  <span class="code">EXP-08 · 第 4 阶段 · 人体感知 · 设计性 · 4 学时</span>
+  <h1>人脸关键点：在脸上打 468 个钉子</h1>
+  <p class="desc">美颜相机怎么知道该往哪儿瘦脸、该往哪儿画口红？因为它先在你脸上找到了 468 个固定位置的点。这个实验就干这件事：找出脸上 468 个点，用网格连起来，实时跟着你的表情动。</p>
+  <div class="meta">
+    <span class="tag hl">难度 ⭐⭐ · 4 学时</span>
+    <span class="tag">BlazeFace 检测</span><span class="tag">双模型级联</span>
+    <span class="tag">468 点网格</span><span class="tag">RKNN NPU</span>
+  </div>
+</div>
+
+<div class="pathline">
+  <span>01 颜色</span><span>02 二维码</span><span>03 轮廓</span><span>04 检测</span><span>05 分类</span><span>06 分割</span><span>07 跟踪</span><span class="cur">08 人脸</span><span>09 骨骼</span><span>10 3D</span><span>11 体感</span><span>12 手势</span>
+</div>
+
+<section class="blk" id="s1">
+  <h2><span class="no">01</span>这个实验解决什么问题</h2>
+
+  <div class="idea">
+    <span class="tag1">CORE IDEA · 一句话原理</span>
+    <p class="big">不是"检测人脸"，而是<b>在脸上精确找到 468 个固定位置的点</b>（眼角、鼻尖、唇线……）。</p>
+    <p class="analogy"><b>打个比方：</b>检测只是说"脸在这一块"。关键点是在脸上<b>打了 468 个钉子</b>，每个钉子固定在同一个位置 —— 左眼内角永远是第 133 号点，不管你怎么转头、笑得再夸张，它都在那儿。</p>
+  </div>
+
+  <p>有了这 468 个点，很多以前做不到的事变得很简单：</p>
+
+  <table>
+    <thead><tr><th style="width:26%">应用</th><th>怎么用这 468 个点</th></tr></thead>
+    <tbody>
+      <tr><td>美颜 / 瘦脸</td><td>点出脸的轮廓，把轮廓往里推</td></tr>
+      <tr><td>口红试色</td><td>唇部那几十个点连成一个区域，往里填颜色</td></tr>
+      <tr><td>疲劳检测（闭眼）</td><td>算上眼睑和下眼睑两点之间的距离</td></tr>
+      <tr><td>AR 面具 / 贴纸</td><td>把一张图按点位"贴"到脸上，头一动图跟着动</td></tr>
+      <tr><td>测心率</td><td>盯着脸颊区域，看颜色随心跳的微小变化</td></tr>
+    </tbody>
+  </table>
+
+  <div class="oneline"><span>本实验的目标：<b>对着镜头，屏幕上出现你的脸 + 一张绿色的 468 点网格，跟着表情实时动。</b></span></div>
+</section>
+
+<section class="blk" id="s2">
+  <h2><span class="no">02</span>三分钟讲懂：468 个点是怎么找到的</h2>
+
+  <p class="lead">模型用了<b>两个</b>网络，一前一后接力。这个"两段式"设计是本实验最重要的知识点。</p>
+
+  <div class="anim-box">
+    <svg viewBox="0 0 760 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="人脸关键点双模型级联：整图找脸裁剪出脸部区域再送入关键点网络得到468点再映射回原图">
+      <rect x="6" y="6" width="748" height="268" rx="12" fill="#111827" stroke="#334155"/>
+      <text x="380" y="28" text-anchor="middle" font-size="13" font-weight="700" fill="#f9a8d4" font-family="sans-serif">两个模型接力：先找脸，再找点</text>
+
+      <!-- ① 整图 -->
+      <text x="92" y="56" text-anchor="middle" font-size="11.5" font-weight="700" fill="#93c5fd" font-family="sans-serif">① 整张画面</text>
+      <rect x="24" y="66" width="136" height="102" rx="5" fill="#1e293b" stroke="#475569"/>
+      <circle cx="76" cy="102" r="14" fill="#475569"/>
+      <circle cx="118" cy="120" r="11" fill="#334155"/>
+      <text x="92" y="186" text-anchor="middle" font-size="9.5" fill="#64748b" font-family="sans-serif">可能有 0~2 张脸</text>
+
+      <path d="M168 117 L196 117" stroke="#475569" stroke-width="2" marker-end="url(#fa)" fill="none"/>
+      <defs><marker id="fa" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L7,4 L0,8 z" fill="#64748b"/></marker></defs>
+
+      <!-- ② 检测器 -->
+      <text x="276" y="56" text-anchor="middle" font-size="11.5" font-weight="700" fill="#93c5fd" font-family="sans-serif">② BlazeFace 找脸</text>
+      <rect x="204" y="66" width="144" height="102" rx="8" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+      <rect x="238" y="82" width="60" height="72" fill="none" stroke="#22d3ee" stroke-width="2"/>
+      <circle cx="268" cy="106" r="10" fill="#334155"/>
+      <text x="276" y="186" text-anchor="middle" font-size="9.5" fill="#64748b" font-family="sans-serif">输入 128×128</text>
+      <text x="276" y="202" text-anchor="middle" font-size="9" fill="#60a5fa" font-family="monospace">face 0.94</text>
+
+      <path d="M356 117 L384 117" stroke="#475569" stroke-width="2" marker-end="url(#fa)" fill="none"/>
+
+      <!-- ③ 裁剪 -->
+      <text x="464" y="56" text-anchor="middle" font-size="11.5" font-weight="700" fill="#fbbf24" font-family="sans-serif">③ 把脸"抠"出来放大</text>
+      <rect x="392" y="66" width="144" height="102" rx="8" fill="#422006" stroke="#fbbf24" stroke-width="1.5"/>
+      <rect x="418" y="76" width="92" height="82" rx="4" fill="#334155" stroke="#fbbf24"/>
+      <circle cx="464" cy="108" r="20" fill="#475569"/>
+      <circle cx="456" cy="104" r="3.4" fill="#111"/><circle cx="472" cy="104" r="3.4" fill="#111"/>
+      <path d="M456,120 q8,5 16,0" stroke="#111" stroke-width="1.8" fill="none"/>
+      <text x="464" y="186" text-anchor="middle" font-size="9.5" fill="#64748b" font-family="sans-serif">缩放成 192×192</text>
+      <text x="464" y="202" text-anchor="middle" font-size="9" fill="#fbbf24" font-family="monospace">ROI crop</text>
+
+      <path d="M544 117 L572 117" stroke="#475569" stroke-width="2" marker-end="url(#fa)" fill="none"/>
+
+      <!-- ④ 关键点 -->
+      <text x="652" y="56" text-anchor="middle" font-size="11.5" font-weight="700" fill="#6ee7b7" font-family="sans-serif">④ 在脸上打 468 点</text>
+      <rect x="580" y="66" width="148" height="102" rx="8" fill="#1e293b" stroke="#34d399" stroke-width="1.5"/>
+      <!-- 468 点网格示意 -->
+      <g fill="#34d399" opacity=".85">
+        <ellipse cx="654" cy="117" rx="42" ry="46" fill="none" stroke="#34d399" stroke-width="1"/>
+        <circle cx="636" cy="104" r="2"/><circle cx="672" cy="104" r="2"/>
+        <circle cx="654" cy="118" r="2"/><circle cx="654" cy="134" r="2"/>
+        <circle cx="640" cy="112" r="2"/><circle cx="643" cy="118" r="2"/><circle cx="646" cy="124" r="2"/>
+        <circle cx="668" cy="112" r="2"/><circle cx="665" cy="118" r="2"/><circle cx="662" cy="124" r="2"/>
+        <circle cx="634" cy="98" r="2"/><circle cx="644" cy="94" r="2"/><circle cx="654" cy="92" r="2"/>
+        <circle cx="664" cy="94" r="2"/><circle cx="674" cy="98" r="2"/>
+        <circle cx="636" cy="134" r="2"/><circle cx="646" cy="138" r="2"/><circle cx="662" cy="138" r="2"/>
+        <circle cx="672" cy="134" r="2"/><circle cx="654" cy="146" r="2"/>
+        <circle cx="620" cy="118" r="2"/><circle cx="688" cy="118" r="2"/>
+      </g>
+      <text x="654" y="186" text-anchor="middle" font-size="9.5" fill="#64748b" font-family="sans-serif">468 个 (x,y) 坐标</text>
+
+      <!-- ⑤ 映射回去 -->
+      <path d="M654 176 Q654 226 380 226 Q232 226 92 178" stroke="#f472b6" stroke-width="1.8" fill="none" stroke-dasharray="5 4"/>
+      <text x="380" y="250" text-anchor="middle" font-size="11" fill="#f9a8d4" font-family="sans-serif">⑤ 把 468 点从"裁剪小图"的坐标换算回"原图"的坐标 —— 这一步叫逆映射</text>
+      <text x="380" y="266" text-anchor="middle" font-size="9.5" fill="#64748b" font-family="sans-serif">忘了这一步，网格就会缩在画面左上角或者完全错位</text>
+    </svg>
+  </div>
+  <div class="cap">图 9-1｜两段式级联。注意第③步和第⑤步是"正反一对"：抠出来时做了缩放，映射回去时要按同样的比例还原。</div>
+
+  <h3>为什么必须分两个模型</h3>
+  <table>
+    <thead><tr><th style="width:22%">做法</th><th style="width:26%">问题</th><th>结果</th></tr></thead>
+    <tbody>
+      <tr><td>一个大模型直接看整图找人脸 468 点</td><td>整张 640×640 里脸可能只占 100×100。<b>要同时兼顾"找到脸"和"在很小的区域里精确放 468 个点"</b>，精度和速度都很难兼顾</td><td>要么慢，要么点不准</td></tr>
+      <tr><td><b>两个模型：先找脸，再放大看脸</b></td><td>需要多做一次裁剪和坐标映射</td><td><b>又快又准。</b>关键点模型只处理 192×192 的脸部小图，等于把脸"放大"了看</td></tr>
+    </tbody>
+  </table>
+
+  <p>这个思路非常通用 —— <b>"先用便宜的粗定位把范围缩小，再用贵的精细模型处理小区域"</b>。你在 EXP-07（检测→ReID）和 EXP-12（手掌→21 点）里都会再见到它。</p>
+
+  <h3>468 个点都在哪</h3>
+  <table>
+    <thead><tr><th style="width:24%">区域</th><th style="width:20%">点数（约）</th><th>用途</th></tr></thead>
+    <tbody>
+      <tr><td>脸部轮廓</td><td>36 个</td><td>瘦脸、脸型分析</td></tr>
+      <tr><td>左右眼（含眼周）</td><td>各 16+ 个</td><td>闭眼检测、视线方向、美瞳</td></tr>
+      <tr><td>眉毛</td><td>各 10 个</td><td>表情识别</td></tr>
+      <tr><td>鼻子</td><td>约 30 个</td><td>3D 头部姿态</td></tr>
+      <tr><td><b>嘴唇（内外两圈）</b></td><td>40 个</td><td>口红试色、说话检测、微笑识别</td></tr>
+      <tr><td>瞳孔（额外 10 个，共 478）</td><td>10 个</td><td>视线追踪</td></tr>
+    </tbody>
+  </table>
+
+  <div class="oneline"><span><b>记住两件事：</b>① 这是<b>两段式</b>（先找脸，再找点）；② 找完点必须<b>映射回原图坐标</b>。<b>这两点做错，后面的实验（体感控制、手势）全都跑不通。</b></span></div>
+</section>
+
+<section class="blk" id="s3">
+  <h2><span class="no">03</span>先认识 4 个词</h2>
+  <div class="terms">
+    <div class="term"><div class="w">关键点 <em>landmark</em></div><p class="m">图像上预先定义好语义的位置。第 133 号点永远在左眼内角 —— <b>编号是固定的，这就是它能被程序使用的原因</b>。</p></div>
+    <div class="term"><div class="w">ROI</div><p class="m">Region of Interest，感兴趣区域。这里就是"检测框框出来的那块脸部小图"。</p></div>
+    <div class="term"><div class="w">级联 <em>cascade</em></div><p class="m">多个模型串起来接力。前一个模型的输出（框）是后一个模型的输入（裁剪区域）。</p></div>
+    <div class="term"><div class="w">逆映射</div><p class="m">把小图上的坐标换算回原图。做过缩放、裁剪，就必须反向做一遍。</p></div>
+  </div>
+
+  <details class="deep">
+    <summary>为什么叫 Blaze？<em>选读 20 秒</em></summary>
+    <div class="deep-body">
+      <p>Blaze 是 Google MediaPipe 给这一系列轻量模型起的名字，意思是"像火焰一样快"。</p>
+      <p>它专为移动端/嵌入式设计：模型极小（检测器只有 584KB，关键点模型 1.6MB），能在手机上实时跑。正因为小，才能塞进我们的 NPU 里。</p>
+    </div>
+  </details>
+</section>
+
+<section class="blk" id="s4">
+  <h2><span class="no">04</span>它吃什么、吐什么</h2>
+
+  <div class="io2">
+    <div class="cellbox in">
+      <span class="lb">INPUT · 喂进去</span>
+      <div class="v">含人脸的图片 / 相机画面</div>
+      <p class="d">两个模型，两个文件：<code>face_detection_short_range.rknn</code>（584KB）找脸；<code>face_landmark.rknn</code>（1.6MB）找点。</p>
+    </div>
+    <div class="arw">→</div>
+    <div class="cellbox out">
+      <span class="lb">OUTPUT · 吐出来</span>
+      <div class="v">双栏：左原图+绿框，右黑底+468 点网格</div>
+      <p class="d">终端打印检测到的人脸数、分数、FPS。配置里 <code>num_faces: 2</code> 表示最多同时处理 2 张脸。</p>
+    </div>
+  </div>
+
+  <pre><span class="c"># 关键配置（config/face_config.yaml）</span>
+<span class="b">model:</span>
+  detector_model: models/face_detection_short_range.rknn
+  landmark_model: models/face_landmark.rknn
+  <span class="y">num_faces: 2</span>                <span class="c"># 最多几张脸</span>
+  min_detection_confidence: 0.5
+
+<span class="b">backend:</span>
+  <span class="y">core_mask: 0</span>                <span class="c"># 0=AUTO；1=CORE0；2=CORE1；4=CORE2</span>
+
+<span class="b">source:</span>
+  mode: image                 <span class="c"># image | ros | camera</span>
+  rgb_path: images/face_demo.jpg
+
+<span class="b">server:</span>
+  port: 8081                  <span class="c"># 注意：不是 8080，避免和其他实验撞</span>
+  stream_name: face.mjpg</pre>
+</section>
+
+<section class="blk" id="s5">
+  <h2><span class="no">05</span>三步跑起来</h2>
+
+  <ol class="steps3">
+    <li>
+      <span class="st">先用一张图跑通<em>约 2 分钟</em></span>
+      <p>这个实验的入口是 <code>demo_image.py</code>（不是 <code>app.py</code>），路径也埋得深一些：</p>
+      <pre><span class="g">cd</span> ~/ros2_ws/src/xflz_eai_car1/vision/09_face_landmarks
+<span class="g">ls</span> car1_face_landmark/face_landmark_core/
+<span class="g">python</span> -m face_landmark_core.demo_image --config config/face_config.yaml --save out.jpg</pre>
+      <div class="expect">faces=1  score=0.94  landmarks=468
+<i>左栏：原图 + 绿框 + "face 0.94"</i>
+<i>右栏：黑底 + 468 点网格</i>
+saved -&gt; out.jpg</div>
+      <p style="color:#b45309;font-size:13.5px">⚠️ 如果报模块找不到，说明要在 <code>car1_face_landmark/</code> 目录下运行，或者设 <code>PYTHONPATH=car1_face_landmark:$PYTHONPATH</code>。</p>
+    </li>
+
+    <li>
+      <span class="st">打开实时画面<em>约 3 分钟</em></span>
+      <p>终端 1 起相机：</p>
+      <pre><span class="g">source</span> /opt/ros/humble/setup.bash &amp;&amp; <span class="g">source</span> ~/ros2_ws/install/setup.bash
+<span class="g">export</span> ROS_DOMAIN_ID=2
+<span class="g">ros2</span> launch ascamera hp60c.launch.py</pre>
+      <p>终端 2 跑实时检测：</p>
+      <pre><span class="g">cd</span> ~/ros2_ws/src/xflz_eai_car1/vision/09_face_landmarks
+<span class="g">python</span> -m face_landmark_core.camera_demo --config config/face_config.yaml --ros</pre>
+      <div class="expect">faces=1  fps=12.4
+<i>浏览器：http://&lt;板子IP&gt;:8081/face.mjpg</i></div>
+      <p><b>注意端口是 8081</b>，不是 8080。这是为了和前面几个实验错开，方便同时跑。</p>
+    </li>
+
+    <li>
+      <span class="st">做三个小实验，验证你理解了原理<em>约 8 分钟</em></span>
+      <p><b>实验 A：转头。</b>头部左右转，看网格怎么跟。转到侧面时部分点会"发散"—— 这是因为 468 点是 2D 投影，转太侧自然不重合。</p>
+      <p><b>实验 B：遮挡。</b>用手挡住半边脸。看模型还能不能找到完整网格 —— 这能让你体会"模型对部分遮挡的鲁棒性"。</p>
+      <p><b>实验 C：两个人。</b>第二个人进入画面，看是否出现两套网格（配置 <code>num_faces: 2</code>）。然后改成 <code>num_faces: 1</code> 再试一次，看有没有变化。</p>
+      <div class="expect">num_faces: 2  → 两个人各一套网格
+num_faces: 1  → 只处理一张脸（通常是分数更高的那张）</div>
+    </li>
+  </ol>
+
+  <div class="oneline"><span>三步跑完，你手上就有了 468 个精确坐标。<b>后面所有"美颜、表情、AR"的应用，本质上都是拿这 468 个坐标做后续处理。</b></span></div>
+</section>
+
+<section class="blk" id="s6">
+  <h2><span class="no">06</span>你该看到的画面</h2>
+
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">画面 A · 左栏</div><div class="kt">原图 + 绿框</div><p>框上有 <code>face 0.94</code> 的标签（和其他实验一样的 YOLO 风格）。左下角有 FPS 红字。</p></div>
+    <div class="kcard"><div class="kd">画面 B · 右栏</div><div class="kt">黑底 + 绿网格</div><p>黑底上画出 468 个点和它们之间的连接线，组成一张"面具"。<b>把脸换成黑底是为了看清网格本身的形状</b>，不受背景干扰。</p></div>
+    <div class="kcard"><div class="kd">画面 C · 无脸</div><div class="kt">两栏都干净</div><p>没有人脸时不出框、不出网格，但程序不崩溃、FPS 照常。这是鲁棒性的基本要求。</p></div>
+  </div>
+
+  <div class="tip tealb"><span class="lab">🔍 为什么网格看起来像"面具"而不是"人脸"？</span>因为右栏只画了关键点和连接线，没有画皮肤和五官。<b>但如果你仔细看，唇部的双圈、眼睛的轮廓、鼻梁的走向都能认出来</b> —— 这就是 468 个点的意义：光是这些坐标，就已经足以描述一张脸的形状了。</div>
+</section>
+
+<section class="blk" id="s7">
+  <h2><span class="no">07</span>改一个参数看变化</h2>
+  <p class="lead">这个实验最值得玩的是 <code>core_mask</code>（NPU 核心分配）和 <code>min_detection_confidence</code>（检测门限）。</p>
+
+  <pre><span class="g">nano</span> config/face_config.yaml</pre>
+  <pre><span class="b">model:</span>
+  <span class="y">num_faces: 2</span>                    <span class="c"># 改 1 试试</span>
+  <span class="y">min_detection_confidence: 0.5</span>    <span class="c"># 改 0.3 / 0.8 试试</span>
+
+<span class="b">backend:</span>
+  <span class="y">core_mask: 0</span>   <span class="c"># 0=自动  1=核0  2=核1  4=核2  3=核0+1  7=三核全用</span></pre>
+
+  <div class="lab2">
+    <div class="lh">⚡ 参数实验台 · 人脸检测分数门限的影响</div>
+    <div class="lr">
+      <label>min_detection_confidence</label>
+      <input id="cf" type="range" min="10" max="95" step="5" value="50">
+      <output id="cf_o">0.50</output>
+    </div>
+    <div class="vis">
+      <svg viewBox="0 0 420 140" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="检测分数阈值变化时保留的人脸数量">
+        <rect x="0" y="0" width="420" height="140" rx="8" fill="#0b1220"/>
+        <g id="faces">
+          <!-- 正脸 0.94 -->
+          <g data-s="0.94">
+            <rect x="26" y="40" width="62" height="76" fill="none" stroke="#34d399" stroke-width="2"/>
+            <circle cx="57" cy="72" r="18" fill="#334155"/>
+            <text x="57" y="132" text-anchor="middle" font-size="9" fill="#34d399" font-family="monospace">0.94 正脸</text>
+          </g>
+          <!-- 侧脸 0.62 -->
+          <g data-s="0.62">
+            <rect x="122" y="46" width="56" height="70" fill="none" stroke="#fbbf24" stroke-width="2"/>
+            <ellipse cx="150" cy="78" rx="14" ry="18" fill="#334155"/>
+            <text x="150" y="132" text-anchor="middle" font-size="9" fill="#fbbf24" font-family="monospace">0.62 侧脸</text>
+          </g>
+          <!-- 远处小脸 0.31 -->
+          <g data-s="0.31">
+            <rect x="214" y="58" width="40" height="52" fill="none" stroke="#f87171" stroke-width="1.8"/>
+            <circle cx="234" cy="82" r="11" fill="#334155"/>
+            <text x="234" y="132" text-anchor="middle" font-size="9" fill="#f87171" font-family="monospace">0.31 远处</text>
+          </g>
+          <!-- 假检测 0.17 -->
+          <g data-s="0.17" data-fake="1">
+            <rect x="292" y="64" width="38" height="46" fill="none" stroke="#94a3b8" stroke-width="1.4" stroke-dasharray="4 3"/>
+            <rect x="302" y="76" width="18" height="18" rx="2" fill="#334155"/>
+            <text x="311" y="132" text-anchor="middle" font-size="9" fill="#94a3b8" font-family="monospace">0.17 误检</text>
+          </g>
+        </g>
+        <text id="ftxt" x="210" y="24" text-anchor="middle" font-size="11" fill="#5eead4" font-family="monospace">阈值 0.50 → 保留 2 张脸</text>
+      </svg>
+    </div>
+    <div class="say" id="say"></div>
+  </div>
+
+  <h3>core_mask 有什么用</h3>
+  <table>
+    <thead><tr><th style="width:18%">值</th><th style="width:26%">含义</th><th>什么时候用</th></tr></thead>
+    <tbody>
+      <tr><td><code>0</code></td><td>自动（AUTO）</td><td><b>默认，也是板上最稳的选择</b></td></tr>
+      <tr><td><code>1</code> / <code>2</code> / <code>4</code></td><td>只用某一个核</td><td>同时跑多个实验时，各占一个核避免抢</td></tr>
+      <tr><td><code>3</code> / <code>7</code></td><td>两个 / 三个核一起</td><td>单模型想跑更快时试，但本实验的两个模型都不大，收益有限</td></tr>
+    </tbody>
+  </table>
+
+  <div class="oneline"><span><b>调参思路：</b>门限决定"几张脸算数"，核分配决定"用多少算力"。<b>前者影响结果，后者影响帧率</b> —— 先想清楚你要改哪个。</span></div>
+</section>
+
+<section class="blk" id="s8">
+  <h2><span class="no">08</span>踩坑速查</h2>
+
+  <table class="pit2">
+    <thead><tr><th>现象</th><th>原因</th><th>怎么办</th></tr></thead>
+    <tbody>
+      <tr><td>报 <code>No module named face_landmark_core</code></td><td>运行目录不对</td><td>在 <code>car1_face_landmark/</code> 目录下运行，或设 <code>PYTHONPATH</code></td></tr>
+      <tr><td>浏览器打不开 :8080/face.mjpg</td><td>端口记错了</td><td>本实验用的是 <b>8081</b></td></tr>
+      <tr><td>网格缩在画面左上角</td><td>468 点没有从"裁剪小图坐标"映射回原图</td><td>检查 ROI 逆映射那一步的缩放比例和平移量</td></tr>
+      <tr><td>网格位置歪了一点</td><td>映射用的框和实际裁剪的框不是同一个</td><td>确保裁剪和逆映射用的是<b>同一个</b>检测框（包括 padding）</td></tr>
+      <tr><td>检测框全都没有</td><td>输入格式不对 —— 这个模型要 <b>float32 [0,1]</b>，不是 uint8</td><td>确认预处理做了 <code>/255.0</code>；这是本实验第一大坑</td></tr>
+      <tr><td>侧脸检测不到</td><td>该模型是"短距离检测器"，偏向正脸</td><td>正常限制。侧脸场景要用别的模型或加数据重训</td></tr>
+      <tr><td>帧率只有个位数</td><td>两个模型串行跑，每帧要做两次推理</td><td>正常。可用 <code>core_mask</code> 分核，或减少 <code>num_faces</code></td></tr>
+      <tr><td>程序退出时报错</td><td>ROS 节点销毁顺序问题</td><td>先 <code>rclpy.shutdown()</code> 再 <code>destroy_node()</code>，代码里已处理</td></tr>
+    </tbody>
+  </table>
+
+  <div class="tip amber"><span class="lab">💡 排查口诀</span><b>先看左栏有没有框，再看右栏网格位置对不对。</b>没框 = 检测阶段问题（输入格式 / 门限 / 脸太小）；有框但网格位置错 = 映射阶段问题（逆映射算错）。<b>这两个问题看起来都是"没效果"，但查的方向完全不同。</b></div>
+</section>
+
+<section class="blk" id="s9">
+  <h2><span class="no">09</span>进阶（可选）</h2>
+
+  <details class="deep">
+    <summary>进阶 1 · 算"眼睛闭上没有"<em>约 30 分钟</em></summary>
+    <div class="deep-body">
+      <p>用两个点的距离就能做疲劳检测：</p>
+      <pre>眼睛开合比 = 上下眼睑距离 / 左右眼角距离</pre>
+      <p>用左右眼角的距离做分母，是为了<b>消除"人离镜头远近"的影响</b> —— 脸大脸小，比值都不变。</p>
+      <p>正常睁眼约 0.25~0.35，闭眼掉到 0.1 以下。连续 20 帧低于阈值就判定为"闭眼"—— 这就是疲劳驾驶检测的基本原理。</p>
+      <p><b>你需要做的：</b>在 468 个点里找到眼睑和眼角的编号。MediaPipe 有公开的索引表，或者你可以直接打印所有点的坐标，肉眼找几个看看。</p>
+    </div>
+  </details>
+
+  <details class="deep">
+    <summary>进阶 2 · 贴一张 AR 贴纸<em>约 40 分钟</em></summary>
+    <div class="deep-body">
+      <p>思路：找一个"锚点"（比如鼻尖），以它为中心把贴纸图叠上去。想要贴纸跟着脸的大小缩放，就用"两眼距离"作为缩放比例。</p>
+      <pre>scale = 两眼距离 / 贴纸基准宽度
+位置  = 鼻尖坐标 - 贴纸中心偏移</pre>
+      <p>这只是最简版本 —— 头一偏贴纸就会歪。要做真正的 AR，需要根据多点坐标估算<b>头部姿态</b>（3D 旋转），再做透视变换。这是个小课题，可以当课程设计做。</p>
+    </div>
+  </details>
+
+  <details class="deep">
+    <summary>进阶 3 · 三种输入契约的差别（重要概念）<em>选读 1 分半</em></summary>
+    <div class="deep-body">
+      <p>本课程会用到三种模型的输入格式，<b>混用就是"检测全废"的头号原因</b>：</p>
+      <table>
+        <thead><tr><th style="width:30%">模型</th><th style="width:34%">喂什么</th><th>送错了会怎样</th></tr></thead>
+        <tbody>
+          <tr><td>YOLO 系列（EXP-04/02/06/07）</td><td><b>uint8</b>，0~255，<b>不归一化</b></td><td>归一化后数值太小，检测框全消失</td></tr>
+          <tr><td><b>BlazeFace / 本实验</b></td><td><b>float32，0~1</b>（要 /255）</td><td>喂 uint8 → 数值大了 255 倍 → 检测不到脸</td></tr>
+          <tr><td>BlazePose（EXP-09）</td><td><b>uint8 直喂</b>，均值 127.5 / 标准差 128 由模型内部处理</td><td>手动归一化 → 骨架乱飞</td></tr>
+        </tbody>
+      </table>
+      <p><b>怎么记？</b>不要记。每次用新模型，<b>先查它的转换配置（mean/std 设置）</b>，再决定预处理。这个习惯能帮你省掉无数小时。</p>
+    </div>
+  </details>
+</section>
+
+<section class="blk" id="s10">
+  <h2><span class="no">10</span>随堂小测</h2>
+
+  <div class="quiz2">
+    <div class="qq"><span class="qn">Q1</span>为什么要用两个模型（先找脸、再找点），而不是一个模型直接找 468 点？</div>
+    <div class="opt" data-right="0">因为两个模型加起来更小</div>
+    <div class="opt" data-right="1">因为把脸裁出来放大再找点，精度高很多；一个模型要同时兼顾"找脸"和"在小区域精确定位"很难</div>
+    <div class="opt" data-right="0">因为一个模型装不下 468 个输出</div>
+    <div class="fb"><b>对。</b>这是"粗定位 + 精处理"的经典思路。关键点模型只处理 192×192 的脸部小图，相当于把脸放大了看，精度自然高。这个套路在 EXP-12（手掌→21 点）里会再出现一次。</div>
+  </div>
+
+  <div class="quiz2">
+    <div class="qq"><span class="qn">Q2</span>关键点模型输出的 468 个坐标，是在哪个坐标系里的？</div>
+    <div class="opt" data-right="0">原图的像素坐标</div>
+    <div class="opt" data-right="1">裁剪并缩放后那张脸部小图的坐标，需要映射回原图</div>
+    <div class="opt" data-right="0">归一化到 0~1 的比例</div>
+    <div class="fb"><b>对。</b>模型只看过那张 192×192 的裁剪小图，所以它给出的坐标也是小图坐标。要映射回原图，必须按"缩放比例 + 平移量"反向换算 —— 忘了这一步，网格就会缩在画面一角。</div>
+  </div>
+
+  <div class="quiz2">
+    <div class="qq"><span class="qn">Q3</span>画面里明明有脸，但一个框都没有。最该先查什么？</div>
+    <div class="opt" data-right="0">换一个更大的模型</div>
+    <div class="opt" data-right="1">输入格式 —— 这个模型要 float32 [0,1]，是不是喂了 uint8？</div>
+    <div class="opt" data-right="0">相机坏了</div>
+    <div class="fb"><b>对。</b>"检测全废"第一嫌疑永远是输入契约。喂 uint8（0~255）给要 [0,1] 的模型，数值大了 255 倍，模型看到的是全白图，自然什么都找不到。</div>
+  </div>
+</section>
+
+<nav class="expnav">
+  <a href="../exp-07-deepsort-tracking/index.html"><span class="lb">← 上一个</span>EXP-07 多目标跟踪</a>
+  <a class="next" href="../exp-09-pose-landmark/index.html"><span class="lb">下一个实验 →</span>EXP-09 骨骼关键点</a>
+</nav>
+
+<footer>
+  <span>机器人视觉入门 · EXP-08 人脸关键点</span>
+  <span>4 学时 · 基于 vision/09_face_landmarks 源码</span>
+</footer>
+
+</main>
+</div>
+
+<script src="../shared/tutorial.js" defer></script>
+<script src="../shared/beginner.js" defer></script>
+<script>
+(function(){
+  var cf=document.getElementById('cf'); if(!cf) return;
+  var gs=document.querySelectorAll('#faces g');
+  var ftxt=document.getElementById('ftxt'), say=document.getElementById('say');
+  function upd(){
+    var t=parseInt(cf.value,10)/100;
+    document.getElementById('cf_o').textContent=t.toFixed(2);
+    var keep=0, fake=0;
+    for(var i=0;i<gs.length;i++){
+      var s=parseFloat(gs[i].getAttribute('data-s'));
+      var on=s>=t;
+      gs[i].setAttribute('opacity', on?1:0.13);
+      if(on){ if(gs[i].getAttribute('data-fake')) fake++; else keep++; }
+    }
+    ftxt.textContent='阈值 '+t.toFixed(2)+' → 保留 '+(keep+fake)+' 张（真脸 '+keep+' / 误检 '+fake+'）';
+    var m='';
+    if(t<=0.20) m='<b>阈值很低</b>：正脸、侧脸、远处小脸全收，但假框也混进来了（那个 0.17）。画面干净的场景可以这么设。';
+    else if(t<=0.40) m='<b>阈值偏低</b>：连远处的小脸也能抓到。适合"宁可多报也别漏人"的场景，比如安防。';
+    else if(t<=0.65) m='<b>阈值 0.5 附近（默认）</b>：保住正脸和侧脸，远处小脸被丢掉。日常场景的平衡点。';
+    else m='<b>阈值偏高</b>：只剩分数最高的正脸。侧脸、远处的人都不算数了 —— 需要"确保是真人真脸"时才这么设。';
+    say.innerHTML=m;
+  }
+  cf.addEventListener('input',upd); upd();
+})();
+</script>
+</body>
+</html>

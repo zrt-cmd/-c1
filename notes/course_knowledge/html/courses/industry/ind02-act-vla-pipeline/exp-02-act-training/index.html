@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-02 数据整理与 ACT 模型训练 · IND-02 双臂采训推全流程</title>
+<link rel="stylesheet" href="../shared/tutorial.css?v=3">
+<style>
+:root{
+  --theme:#7c3aed; --theme-deep:#6d28d9; --theme-bg:#f5f3ff; --theme-bd:#ddd6fe;
+}
+body{overflow-x:clip}
+figure{margin:14px 0;text-align:center}
+figure img{max-width:100%;border:1px solid var(--line,#e2e8f0);border-radius:10px;display:block;margin:0 auto}
+figcaption{font-size:12.5px;color:var(--mute,#64748b);margin-top:6px}
+.tag.hl{background:#ede9fe;color:#6d28d9}
+.img-block{margin:14px 0;text-align:center;min-width:0}
+.img-block img{max-width:100%;border-radius:10px;box-shadow:0 4px 12px rgba(15,23,42,.12)}
+.img-block figcaption{font-size:12.5px;color:var(--mute,#64748b);margin-top:6px}
+.blk{min-width:0;overflow-x:hidden}
+pre{max-width:100%;min-width:0;overflow-x:auto}
+.content{overflow-x:hidden;min-width:0}
+/* ── 五星学习法 · 课程分段 ── */
+.fivestar-note{font-size:13px;color:#5b6b78;margin-top:12px}
+.fs-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:14px}
+.fs-cell{border:1px solid var(--theme-bd);border-radius:12px;padding:10px 8px;text-align:center;background:var(--theme-bg)}
+.fs-cell .st{font-size:12.5px;font-weight:800;color:var(--theme-deep)}
+.fs-cell .tm{font-family:var(--font-mono,monospace);font-size:11px;color:#0f766e;margin-top:3px;font-weight:700}
+.fs-cell .ds{font-size:11.5px;color:#5b6b78;margin-top:4px;line-height:1.5}
+.seg{display:inline-block;font-size:11px;font-weight:700;font-family:var(--font-mono,monospace);background:var(--theme-bg);color:var(--theme-deep);border:1px solid var(--theme-bd);border-radius:99px;padding:2px 10px;margin-left:8px;vertical-align:middle;white-space:nowrap}
+.tl{width:100%;border-collapse:collapse;font-size:13px;margin-top:14px;background:#fff}
+.tl th,.tl td{border:1px solid #e2ece9;padding:7px 10px;text-align:left;vertical-align:top}
+.tl th{background:var(--theme-bg);color:var(--theme-deep);font-size:12.5px;white-space:nowrap}
+.tl .m{font-family:var(--font-mono,monospace);color:var(--theme-deep);font-weight:700;white-space:nowrap}
+@media(max-width:900px){.fs-grid{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">🧠 双臂采训推全流程 · <i>教程首页</i></div>
+  <div class="crumb"><a href="../../../index.html#ind">📚 开发者教程首页</a> › <a href="../index.html">IND-02 课程首页</a> › <span class="here">EXP-02 数据整理与 ACT 模型训练</span></div>
+</div>
+
+<div class="wrap">
+  <aside class="side">
+    <h4>实验目录 · 五星学习法</h4>
+    <a href="#s0">00 课程节奏 · 8 段微课</a>
+    <a class="now" href="#s1">§1 实验目标 ①聚焦问题</a>
+    <a href="#s2">§2 核心原理 ①聚焦 ②激活</a>
+    <a href="#s3">§3 环境与材料 ③示证新知</a>
+    <a href="#s4">§4 实操步骤 ④应用新知</a>
+    <a href="#s5">§5 关键命令 ④应用新知</a>
+    <a href="#s6">§6 动画演示 ③示证新知</a>
+    <a href="#s7">§7 互动练习 ④应用新知</a>
+    <a href="#s8">§8 常见问题 ⑤融会贯通</a>
+    <a href="#s9">§9 拓展阅读 ⑤融会贯通</a>
+    <a href="#s10">§10 思考题 ⑤融会贯通</a>
+    <h4 style="margin-top:18px">本课其他实验</h4>
+    <a href="../exp-01-teleop-recording/index.html">EXP-01 遥操作与数据采集</a>
+    <a href="../exp-03-cloud-inference/index.html">EXP-03 云服务器与推理</a>
+    <a href="../exp-04-vla-model/index.html">EXP-04 VLA 大模型</a>
+  </aside>
+
+  <main class="content">
+    <div class="exp-head">
+      <div class="code">EXP-02 · ACT TRAINING</div>
+      <h1 class="h1">数据整理与 ACT 模型训练</h1>
+      <p class="desc">把 EXP-01 录下的示范数据喂给 ACT（Action Chunking with Transformers）：看懂 CNN + Transformer 编码器-解码器 + CVAE 的三段结构，跑通 <code>lerobot-train</code> 并从日志中读懂 loss 的每一次下降。</p>
+      <div class="meta"><span class="tag">8 学时</span><span class="tag">难度 ★★☆</span><span class="tag hl">核心实验</span><span class="tag">对应指导文档第 10 章 + LeRobot 源码</span></div>
+    </div>
+
+    <!-- 00 -->
+    <section class="blk" id="s0">
+      <h2><span class="no">00</span>课程节奏：五星学习法 · 8 段微课（每段 ≤ 15 min）</h2>
+      <p>本实验按<b>五星学习法</b>组织：先用一个真实故障<b>聚焦问题</b>，再<b>激活旧知</b>（CNN、Transformer、损失函数、VAE），接着<b>示证新知</b>（ACT 的 CNN+Transformer+CVAE 三段结构），然后动手<b>应用新知</b>完成数据整理与训练并读懂日志，最后借排障与超参方法论<b>融会贯通</b>。全程切成 <b>8 段微课、每段不超过 15 分钟</b>，段间停顿 1~2 分钟消化；纯讲授合计约 100 分钟，其余课时用于动手实操与个别辅导。</p>
+      <div class="fs-grid">
+        <div class="fs-cell"><div class="st">① 聚焦问题</div><div class="tm">课段 1 · 12 min</div><div class="ds">"loss 一直不降/显存爆了/数据读不到"故障现场</div></div>
+        <div class="fs-cell"><div class="st">② 激活旧知</div><div class="tm">课段 2 · 8 min</div><div class="ds">CNN 编码 · Transformer 注意力 · 损失函数 · VAE</div></div>
+        <div class="fs-cell"><div class="st">③ 示证新知</div><div class="tm">课段 3~4 · 27 min</div><div class="ds">ACT 三段结构 + 编码器-解码器动画</div></div>
+        <div class="fs-cell"><div class="st">④ 应用新知</div><div class="tm">课段 5~7 · 40 min</div><div class="ds">数据整理 → 启动训练 → 读日志 → 收检查点</div></div>
+        <div class="fs-cell"><div class="st">⑤ 融会贯通</div><div class="tm">课段 8 · 13 min</div><div class="ds">排障口诀 · 超参方法论 · 思考题</div></div>
+      </div>
+      <table class="tl">
+        <tr><th>课段</th><th>五星阶段</th><th>时长</th><th>对应章节</th><th>本段任务</th></tr>
+        <tr><td class="m">课段 1</td><td>聚焦问题</td><td class="m">12 min</td><td>§01 + §02 前半</td><td>抛出"loss 不降/显存爆/episode 为 0"故障，明确本课要解决的目标</td></tr>
+        <tr><td class="m">课段 2</td><td>激活旧知</td><td class="m">8 min</td><td>§02 后半</td><td>用 CNN、Transformer、损失函数、VAE 四条旧知解释故障成因</td></tr>
+        <tr><td class="m">课段 3</td><td>示证新知</td><td class="m">15 min</td><td>§03</td><td>对照数据集、源码、脚本、监控工具认识训练物料清单</td></tr>
+        <tr><td class="m">课段 4</td><td>示证新知</td><td class="m">12 min</td><td>§06（回看 §02 流程）</td><td>看懂"CNN 看 → Transformer 想 → CVAE 即兴 → chunk 出手"结构</td></tr>
+        <tr><td class="m">课段 5</td><td>应用新知</td><td class="m">15 min</td><td>§04 Step1~3 + §5 命令①②</td><td>查看数据、清理输出、启动训练命令（边讲边演）</td></tr>
+        <tr><td class="m">课段 6</td><td>应用新知</td><td class="m">15 min</td><td>§04 Step4~6 + §5 命令③④</td><td>核对启动日志、盯 loss 下降、nvtop 看卡、收检查点</td></tr>
+        <tr><td class="m">课段 7</td><td>应用新知</td><td class="m">10 min</td><td>§07</td><td>超参滑杆自测，建立 lr/batch/steps 与收敛形态的直觉</td></tr>
+        <tr><td class="m">课段 8</td><td>融会贯通</td><td class="m">13 min</td><td>§08~§10</td><td>排障口诀收口，超参方法论与思考题拔高迁移</td></tr>
+      </table>
+      <p class="fivestar-note">讲课提示：课段 1/2 以讲授 + 提问为主；课段 3~4 用源码 + 动画；课段 5~6 边讲边演命令行与日志；课段 7 学员独立完成；课段 8 答疑拔高。段间停顿 1~2 分钟。</p>
+    </section>
+
+    <section class="blk" id="s1">
+      <h2><span class="no">01</span>实验目标<span class="seg">课段 1 · 聚焦问题 · 12 min</span></h2>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">目标 A</div><p>查看并打包本地数据集：<code>~/.cache/huggingface/lerobot/liming/put_cube_plate/</code>，理解 zip 打包的用途（上传云端，本地训练不需要）。</p></div>
+        <div class="kcard"><div class="kd">目标 B</div><p>跑通 <code>lerobot-train --policy.type=act</code>，能逐项解释启动日志打印的全部超参（batch_size、steps、lr、kl_weight、chunk_size…）。</p></div>
+        <div class="kcard"><div class="kd">目标 C</div><p>读懂周期日志 <code>step / loss / grdn / lr</code> 的含义，判断训练是否收敛；训练结束能在 <code>outputs/…/checkpoints/last/pretrained_model</code> 找到检查点。</p></div>
+        <div class="kcard"><div class="kd">验收</div><p>完成 ≥5000 步训练，末段 loss 相对首个日志点显著下降（如 8.0 → 1.0 以下量级），且 num_learnable_params=51597190（52M）与文档一致。</p></div>
+        <div class="kcard"><div class="kd">方法论</div><p>建立"改一个超参 → rm 旧输出 → 重跑对照 → 记录日志差异"的实验习惯，这是调参不迷路的底层纪律。</p></div>
+      </div>
+      <figure class="img-block" style="margin:18px 0 0">
+        <img src="./images/photo-train-output.png" alt="训练中通过 nvtop 查看 GPU 占用输出" loading="lazy" decoding="async">
+        <figcaption>图 1-1｜训练进行中查看 GPU 占用（第 10 章）——命令 <code>nvtop</code> / <code>nvidia-smi</code> 实时显示显存、算力与进程占用，用于确认训练确实跑在 GPU 上、显存未爆</figcaption>
+      </figure>
+    </section>
+
+    <section class="blk" id="s2">
+      <h2><span class="no">02</span>核心原理：ACT 是怎样"学会"一个任务的<span class="seg">课段 1 收尾 + 课段 2 · 激活旧知 · 8 min</span></h2>
+      <div class="tip amber"><span class="lab">❓ 聚焦问题（课段 1）</span>学员跑起训练最常遇到的怪事：<b>loss 一直在 <code>8.088</code> 不动</b>，或者干脆 <code>CUDA out of memory</code> 显存爆了，再或者启动日志显示数据集 <code>num_episodes=0</code>——命令明明跑完了，模型却啥也没学到。问题出在哪？带着这三个故障听完全课，到课段 6 你会亲手让 loss 稳稳下降。</div>
+      <p><b>通俗类比</b>：学做饭时，你一边看食材和锅（图像 / 状态），一边在脑中"放映"老师连贯的切炒动作（示范数据），越看越多就形成了"看到这一步 → 手直接这样做"的肌肉记忆。ACT 就是这套肌肉记忆的数学版，分三步走：</p>
+      <p><b>① CNN 编码器（看）</b>——每张摄像头图像过一个预训练 ResNet18（<code>ResNet18_Weights.IMAGENET1K_V1</code>），压成一串特征向量；机器人 6 维关节状态也一起拼进去。相当于把"锅里的画面"压缩成大脑能处理的重点信息。</p>
+      <p><b>② Transformer 编码器-解码器（想）</b>——编码器 4 层、解码器 1 层，维度 512、8 头注意力、前馈 3200。关键创新是 <b>动作分块（action chunking）</b>：模型不是一次预测一步，而是一次吐出未来 <code>chunk_size=100</code> 步的动作序列，避免"走一步看一步"导致的抖动与误差累积。</p>
+      <p><b>③ CVAE（造多样性的手）</b>——同一个场景，人示范的动作也会有细微差异。CVAE 在训练时往瓶颈层 <code>latent_dim=32</code> 塞一个随机变量 z，强迫模型学会"同场景不同微动作都合理"；损失函数就是指导文件中的核心公式：<b>loss = reconstruction_loss + kl_weight × kld_loss</b>（<code>kl_weight=10</code>）。重建损失管"像不像示范"，KL 损失管"随机变量像不像标准正态"——一个像老师，一个保持即兴的自由度。</p>
+      <p><b>自回归 vs 并行</b>：自回归模型（如 GPT 式输出、某些扩散策略）一 token 一 token 地续写动作，序列长了慢；ACT 借解码器一次性并行输出整段动作块，推理快、适合真机实时控制。代价是长程依赖表达弱——两条路线的取舍在 EXP-04 会再次遇到。</p>
+      <div class="tip teal"><span class="lab">↺ 激活旧知（课段 2）</span>回忆深度学习四条旧知：① <b>CNN</b> 把图像压成特征向量（ResNet18 就是这个）；② <b>Transformer</b> 用多头注意力建模序列依赖（这里编解码器 4+1 层）；③ <b>损失函数</b> = 重建损失 + KL 散度，梯度下降不断微调权重；④ <b>VAE</b> 往瓶颈塞随机变量 z 造多样性。四条合起来，正好拼出 ACT 的"看 → 想 → 即兴 → 出手"。</div>
+      <div class="tip violet"><span class="lab">数据集就位检查</span>进入缓存目录 <code>cd ~/.cache/huggingface/lerobot/liming/put_cube_plate/</code>，确认存在 <code>data/</code>（parquet 状态-动作序列）与 <code>videos/</code>（编码后视频）两个子目录，文件数与 episode 数一致——这是训练能读到数据的硬证据。</div>
+      <div class="tip violet"><span class="lab">参数对应</span>LeRobot 源码 <code>configuration_act.py</code>：num_encoder_layers=4、num_decoder_layers=1、dim_model=518→512、n_heads=8、dim_feedforward=3200、dropout=0.1、use_vae=True、latent_dim=32、kl_weight=10、optimizer_lr=1e-5、weight_decay=1e-4。</div>
+    </section>
+
+    <section class="blk" id="s3">
+      <h2><span class="no">03</span>环境与材料<span class="seg">课段 3 · 示证新知 · 15 min</span></h2>
+      <ul class="check">
+        <li><span class="ok">✓</span>EXP-01 产出的可用数据集（示例：<code>liming/put_cube_plate</code>，num_episodes ≥ 3，正式建议 ≥ 50）</li>
+        <li><span class="ok">✓</span>训练机 LeRobot 0.4.1 + CUDA 可用 GPU（日志 <code>policy.device=cuda</code>）</li>
+        <li><span class="ok">✓</span>源码参考：<code>lerobot-0.4.1/src/lerobot/policies/act/</code>（modeling_act.py、configuration_act.py）与 <code>docs/source/act.mdx</code></li>
+        <li><span class="ok">✓</span>脚本参考：<code>command/5_train.sh</code>（含数据集命名与 SAVE_FREQ 分段保存逻辑）</li>
+        <li><span class="ok">✓</span>监控工具：终端日志（log_freq=100）+ <code>nvtop</code> 看 GPU 占用</li>
+        <li><span class="ok">✓</span>输出目录：<code>./outputs/put_cube_on_plate_act</code>（每次实验前 rm -rf 清空，避免新旧日志混淆）</li>
+        <li><span class="ok">✓</span>时间口径：命令行 steps=1000 是最小示例，指导文档示例日志跑到 step 5000，正式训练按 ≥5000 步准备</li>
+        <li><span class="ok">✓</span>对照基线：指导文档示例日志起始量级为 <code>loss:8.088</code>、<code>grdn≈10</code>（见 §8 表）——换数据集后绝对值不同属正常，只比下降趋势</li>
+      </ul>
+    </section>
+
+    <section class="blk" id="s4">
+      <h2><span class="no">04</span>实操步骤<span class="seg">课段 5~6 · 应用新知 · 2×15 min</span></h2>
+      <p>整条链路按"看数据 → 打包（可选）→ 清输出 → 起训练 → 盯日志 → 收检查点"六步推进，每步都有可核验的产出物：</p>
+      <div class="flow">
+        <div class="step"><div class="n">Step 1</div>查看数据：进入缓存目录确认 parquet 状态与视频文件数量与 episode 数一致。<div class="arr"></div></div>
+        <div class="step"><div class="n">Step 2</div>（可选）打包：<code>zip -r put_cube_plate.zip ~/.cache/huggingface/lerobot/liming/put_cube_plate</code>——仅当要把数据搬去云端时才需要。<div class="arr"></div></div>
+        <div class="step"><div class="n">Step 3</div>清理旧输出 <code>rm -rf …/outputs/put_cube_on_plate_act</code>，然后启动训练命令（§5 第一条）。<div class="arr"></div></div>
+        <div class="step"><div class="n">Step 4</div>核对启动日志：Creating dataset → Creating policy → Creating optimizer → Effective batch size → num_learnable_params=51597190 (52M) → Start offline training。<div class="arr"></div></div>
+        <div class="step"><div class="n">Step 5</div>每 100 步读一条日志，盯 loss 是否下降；<code>nvtop</code> 观察显存与算力占用。<div class="arr"></div></div>
+        <div class="step"><div class="n">Step 6</div>看到 <code>Checkpoint policy after step 5000</code> 与 <code>End of training</code> 即完成，检查点位于 <code>outputs/put_cube_on_plate_act/checkpoints/last/pretrained_model</code>。<div class="arr"></div></div>
+      </div>
+      <div class="tip violet"><span class="lab">启动日志六行</span>训练命令执行后会依次打印：① <code>Creating dataset</code> → ② <code>Creating policy</code>（ACT 配置全量打印）→ ③ <code>Creating optimizer</code>（AdamW + lr schedule）→ ④ <code>Effective batch size: 32</code> → ⑤ <code>num_learnable_params=51597190 (52M)</code> → ⑥ <code>Start offline training</code>。看到第⑥行即表示进入正式训练循环。</div>
+      <div class="tip violet"><span class="lab">周期日志四数</span>每 100 步打印 <code>step / loss / grdn / lr</code>：step 稳步涨说明数据吞吐正常；loss 持续降说明策略在学；grdn（梯度范数）被 <code>grad_clip_norm=10.0</code> 裁剪，长期贴 10 则学习不稳定；lr 由调度器控制缓慢变化。</div>
+      <div class="tip amber"><span class="lab">注意</span>指导文件示例日志中 batch_size 显示 32、steps 显示 5000（命令行写 8/1000 为最小示例）。实际以你打印出的 cfg 为准；<code>loss:8.088 → 逐段下降</code> 才是健康信号。</div>
+    </section>
+
+    <section class="blk" id="s5">
+      <h2><span class="no">05</span>关键命令<span class="seg">随课段 5 / 6 对照使用</span></h2>
+      <p>四段命令依次完成"数据就位 → 启动训练 → 读日志 → 看卡"，参数均取自第 10 章原文：</p>
+      <pre><span class="c"># ── 1) 查看与打包数据（第 10 章）</span>
+cd ~/.cache/huggingface/lerobot/liming/put_cube_plate/
+zip -r put_cube_plate.zip ~/.cache/huggingface/lerobot/liming/put_cube_plate
+
+<span class="c"># ── 2) ACT 训练（第 10 章原文命令）</span>
+rm -rf /home/lz-xl01/lerobot-0.4.1/outputs/put_cube_on_plate_act
+lerobot-train --dataset.repo_id=liming/put_cube_plate --policy.type=act --policy.repo_id=put_cube_on_plate_act --policy.push_to_hub=false --batch_size=8 --steps=1000 --output_dir=./outputs/put_cube_on_plate_act --policy.device=cuda --num_workers=4 --wandb.enable=false --log_freq=100 --save_freq=1000 --eval_freq=1000
+
+<span class="c"># ── 3) 健康日志长这样（step 涨、loss 降）</span>
+step:100 smpl:3K ep:7 epch:2.23 loss:8.088 grdn:133.488 lr:1.0e-05 updt_s:0.969 data_s:0.048
+<span class="g">… loss 持续下降 → Checkpoint policy after step 5000 → End of training</span>
+
+<span class="c"># ── 4) GPU 监控</span>
+nvtop</pre>
+      <ul class="check" style="margin-top:10px">
+        <li><span class="ok">✓</span><b>grdn（梯度范数）</b>：受 grad_clip_norm=10.0 约束，长期贴着 10 说明学习不稳定。</li>
+        <li><span class="ok">✓</span><b>lr</b>：1e-5 AdamW，随调度缓慢变化；<b>data_s</b> 是取数耗时，持续偏大要减 num_workers 或查 IO。</li>
+        <li><span class="ok">✓</span><b>epch</b>：数据集小的时候很快 >10 是正常现象，关注 loss 而非 epoch。</li>
+        <li><span class="ok">✓</span><b>smpl</b>：已消耗的样本计数（3K = 3072），配合 step 判断数据吞吐是否正常。</li>
+        <li><span class="ok">✓</span><b>updt_s</b>：单步更新耗时，突然变大先查是否有别的进程抢 GPU。</li>
+      </ul>
+      <div class="tip violet"><span class="lab">检查点验证</span>训练结束看到 <code>Checkpoint policy after step 5000</code> 与 <code>End of training</code> 后，进入 <code>outputs/put_cube_on_plate_act/checkpoints/last/pretrained_model</code> 确认存在 <code>config.json</code>（策略配置）、<code>model.safetensors</code>（权重）与 <code>processor</code> 目录——三件齐全即可交给 EXP-03 加载推理。</div>
+    </section>
+
+    <section class="blk" id="s6">
+      <h2><span class="no">06</span>动画演示：ACT 编码器-解码器（CNN + Transformer + CVAE）<span class="seg">课段 4 · 示证新知 · 12 min</span></h2>
+      <div class="anim-box">
+        <svg viewBox="0 0 780 280" width="100%">
+          <defs>
+            <marker id="b1" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 Z" fill="#7c3aed"/></marker>
+          </defs>
+          <rect x="20" y="70" width="110" height="86" rx="10" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
+          <text x="75" y="100" text-anchor="middle" font-size="13" font-weight="bold" fill="#0f172a">输入</text>
+          <text x="75" y="120" text-anchor="middle" font-size="11" fill="#64748b">3 路图像</text>
+          <text x="75" y="138" text-anchor="middle" font-size="11" fill="#64748b">+ 6 维状态</text>
+          <rect x="165" y="70" width="105" height="86" rx="10" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+          <text x="217" y="103" text-anchor="middle" font-size="13" font-weight="bold" fill="#6d28d9">CNN</text>
+          <text x="217" y="123" text-anchor="middle" font-size="11" fill="#64748b">ResNet18</text>
+          <text x="217" y="140" text-anchor="middle" font-size="11" fill="#64748b">图像→特征</text>
+          <rect x="310" y="70" width="130" height="86" rx="10" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+          <text x="375" y="103" text-anchor="middle" font-size="13" font-weight="bold" fill="#6d28d9">Encoder ×4</text>
+          <text x="375" y="123" text-anchor="middle" font-size="11" fill="#64748b">Transformer</text>
+          <text x="375" y="140" text-anchor="middle" font-size="11" fill="#64748b">8 头 · dim 512</text>
+          <rect x="330" y="196" width="90" height="56" rx="10" fill="#fff7ed" stroke="#d97706" stroke-width="2"/>
+          <text x="375" y="220" text-anchor="middle" font-size="12" font-weight="bold" fill="#b45309">CVAE</text>
+          <text x="375" y="239" text-anchor="middle" font-size="11" fill="#92400e">z: 32 维</text>
+          <rect x="490" y="70" width="130" height="86" rx="10" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+          <text x="555" y="103" text-anchor="middle" font-size="13" font-weight="bold" fill="#6d28d9">Decoder ×1</text>
+          <text x="555" y="123" text-anchor="middle" font-size="11" fill="#64748b">解码 100 步动作</text>
+          <text x="555" y="140" text-anchor="middle" font-size="11" fill="#64748b">chunk_size=100</text>
+          <rect x="660" y="70" width="105" height="86" rx="10" fill="#ecfdf5" stroke="#0d9488" stroke-width="2"/>
+          <text x="712" y="103" text-anchor="middle" font-size="13" font-weight="bold" fill="#0f766e">输出动作</text>
+          <text x="712" y="123" text-anchor="middle" font-size="11" fill="#64748b">6 关节 ×</text>
+          <text x="712" y="140" text-anchor="middle" font-size="11" fill="#64748b">连续执行</text>
+          <line x1="132" y1="113" x2="160" y2="113" stroke="#7c3aed" stroke-width="2.5" marker-end="url(#b1)"/>
+          <line x1="272" y1="113" x2="305" y2="113" stroke="#7c3aed" stroke-width="2.5" marker-end="url(#b1)"/>
+          <line x1="442" y1="113" x2="485" y2="113" stroke="#7c3aed" stroke-width="2.5" marker-end="url(#b1)"/>
+          <line x1="622" y1="113" x2="655" y2="113" stroke="#0d9488" stroke-width="2.5" marker-end="url(#b1)"/>
+          <path d="M422 158 C 430 190, 400 200, 376 210" fill="none" stroke="#d97706" stroke-width="2" stroke-dasharray="6 4"/>
+          <path d="M400 196 C 445 178, 465 150, 488 130" fill="none" stroke="#d97706" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#b1)"/>
+          <circle r="7" fill="#7c3aed">
+            <animate attributeName="cx" values="134;302" dur="1.2s" repeatCount="indefinite"/>
+            <animate attributeName="cy" values="113;113" dur="1.2s" repeatCount="indefinite"/>
+          </circle>
+          <circle r="7" fill="#7c3aed">
+            <animate attributeName="cx" values="447;482" dur="1.2s" begin="0.6s" repeatCount="indefinite"/>
+            <animate attributeName="cy" values="113;113" dur="1.2s" begin="0.6s" repeatCount="indefinite"/>
+          </circle>
+          <circle r="7" fill="#0d9488">
+            <animate attributeName="cx" values="627;651" dur="1.0s" begin="1.2s" repeatCount="indefinite"/>
+            <animate attributeName="cy" values="113;113" dur="1.0s" begin="1.2s" repeatCount="indefinite"/>
+          </circle>
+          <text x="375" y="24" text-anchor="middle" font-size="12.5" fill="#6d28d9">损失：reconstruction_loss（重建得像不像示范）+ 10 × kld_loss（z 服不服从正态分布）</text>
+        </svg>
+        <div class="anim-cap">图 6-1｜ACT 前向结构动画：CNN 看图 → 4 层编码器消化场景 → CVAE 注入随机 z → 1 层解码器一次吐出 100 步动作块</div>
+      </div>
+      <p>把三段连起来读：<b>看（CNN）→ 想（Transformer）→ 带一点即兴（CVAE）→ 连贯出手（chunk）</b>。训练就是不断微调这三段的权重，让输出的动作块在"重建损失 + KL 损失"的合力下越来越像人类示范。</p>
+    </section>
+
+    <section class="blk" id="s7">
+      <h2><span class="no">07</span>互动练习：超参滑杆看训练曲线模拟<span class="seg">课段 7 · 应用新知 · 10 min</span></h2>
+      <div class="ix-panel">
+        <div class="ix-title">调学习率与批大小，看 loss 曲线与训练健康度如何变化</div>
+        <div class="ctl-row">
+          <label>学习率 ×1e-5 <input type="range" id="ixLr" min="1" max="100" value="1" oninput="ixLoss()"> <b id="ixLrV">1.0</b></label>
+          <label>batch_size <input type="range" id="ixBs" min="4" max="64" step="4" value="8" oninput="ixLoss()"> <b id="ixBsV">8</b></label>
+          <label>训练步数 <input type="range" id="ixSt" min="500" max="10000" step="500" value="5000" oninput="ixLoss()"> <b id="ixStV">5000</b></label>
+        </div>
+        <canvas id="ixCv" width="700" height="200" style="width:100%;max-width:700px;background:#fff;border:1px solid #ddd6fe;border-radius:8px"></canvas>
+        <div class="io">
+          <span>末段 loss：<b id="ixEnd">—</b></span>
+          <span>显存粗估：<b id="ixMem">—</b></span>
+          <span id="ixVerdict" class="dim">—</span>
+        </div>
+      </div>
+      <script>
+      function ixLoss(){
+        var lr=+ixLr.value, bs=+ixBs.value, st=+ixSt.value;
+        ixLrV.textContent=(lr/1).toFixed(1);ixBsV.textContent=bs;ixStV.textContent=st;
+        // 52M 参数 ACT 经验粗估：batch 8 约占 6~7GB 显存，随 batch 近似线性
+        var mem=(5.5+bs*0.16).toFixed(1);
+        ixMem.textContent=mem+" GB";
+        var cv=ixCv.getContext('2d');cv.clearRect(0,0,700,200);
+        cv.strokeStyle='#e2e8f0';cv.lineWidth=1;
+        for(var i=1;i<5;i++){cv.beginPath();cv.moveTo(0,i*40);cv.lineTo(700,i*40);cv.stroke();}
+        // 模拟：lr 过大发散/震荡，过小收敛慢；batch 过小噪声大
+        var optimum=Math.abs(lr-10)<12 && bs>=8 && bs<=32;
+        var start=9, end;
+        if(lr>60){end=2.5+Math.random()*2;}        // lr 过大：不收敛
+        else if(lr<4){end=5.5;}                     // lr 过小：几乎不动
+        else{end=Math.max(0.4, 8*Math.exp(-st/1800)*(lr/10>1.6?1.5:1));}
+        cv.strokeStyle='#7c3aed';cv.lineWidth=2.5;cv.beginPath();
+        var noise=(64-bs)/40+1;
+        for(var x=0;x<=700;x+=7){
+          var t=x/700;
+          var base=start*Math.exp(-3.2*t)+ (end<start? end : end*0.9);
+          var y=base + (lr>60? Math.sin(x/9)*3*t : 0) + (Math.sin(x/13)*0.55*noise*(1-t*0.7));
+          var py=200-(y/10)*180;
+          if(x===0)cv.moveTo(x,py);else cv.lineTo(x,py);
+        }
+        cv.stroke();
+        ixEnd.textContent=end.toFixed(2);
+        var v=document.getElementById('ixVerdict');
+        if(lr>60){v.className='bad';v.textContent='学习率过大：loss 震荡不收敛（grdn 会顶到 10.0 被裁剪）';}
+        else if(lr<4){v.className='warn';v.textContent='学习率过小：5000 步也几乎不下降';}
+        else if(bs<8){v.className='warn';v.textContent='批太小梯度噪声大：loss 锯齿明显';}
+        else if(optimum){v.className='ok';v.textContent='健康区间：参考 lr=1e-5、batch 8~32、步数 ≥5000';}
+        else{v.className='dim';v.textContent='可训练，但离推荐配置有距离';}
+      }
+      ixLoss();
+      </script>
+      <p style="font-size:13px;color:#64748b;margin-top:6px">说明：曲线为教学模拟，用于建立"lr / batch / steps 与收敛形态"的直觉；真实曲线以终端 loss 日志为准。</p>
+    </section>
+
+    <section class="blk" id="s8">
+      <h2><span class="no">08</span>常见问题<span class="seg">课段 8 · 融会贯通 · 13 min</span></h2>
+      <ul class="check">
+        <li><span class="ok">✓</span><b>显存不足（OOM / CUDA out of memory）</b>：优先降 <code>batch_size</code>（8 → 4），再关无关程序、确认没有别的训练占卡（<code>nvtop</code>）。</li>
+        <li><span class="ok">✓</span><b>数据集读不到 / episode 数为 0</b>：检查 <code>--dataset.repo_id</code> 是否与缓存目录名一致（liming/put_cube_plate）、上一实验是否留下空目录（先 rm -rf 重建）。</li>
+        <li><span class="ok">✓</span><b>loss 不降</b>：看 lr 是否被改大、数据是否其实是 reset 期垃圾片段、steps 是否太短（< 1000 看不出趋势）。</li>
+        <li><span class="ok">✓</span><b>data_s 持续很大</b>：磁盘慢或 num_workers 过高，调回 4 或把数据集移到本机 SSD。</li>
+        <li><span class="ok">✓</span><b>找不到检查点</b>：确认 <code>--output_dir</code> 与 <code>save_freq</code>，最终应有 <code>checkpoints/last/pretrained_model</code>（含 config.json、weights、processor）。</li>
+        <li><span class="ok">✓</span><b>磁盘被检查点写满</b>：分段检查点按 save_freq 持续累积，跑长训练前先看剩余空间，旧实验的 output 目录及时归档清理。</li>
+      </ul>
+      <table>
+        <tr><th>日志线索</th><th>症状</th><th>处置</th></tr>
+        <tr><td><code>loss:8.088 不动</code></td><td>学习率过低或数据问题</td><td>核对 cfg.steps / lr，抽查数据集</td></tr>
+        <tr><td><code>grdn ≈ 10.0</code></td><td>梯度被 clip 顶满，训练剧烈</td><td>降 lr 或增大 batch</td></tr>
+        <tr><td><code>CUDA out of memory</code></td><td>显存不足</td><td>batch_size 减半</td></tr>
+        <tr><td><code>num_episodes=3</code></td><td>数据太少</td><td>回 EXP-01 补采到 ≥50 组</td></tr>
+      </table>
+      <div class="tip amber"><span class="lab">黄金法则</span>一次只改一个超参，改前 rm -rf 旧 output，否则新旧日志混着看必误判。</div>
+      <div class="tip amber"><span class="lab">交付三件套</span>一次合格的训练实验 = 启动时的 cfg 打印 + 每 100 步的末段日志 + <code>checkpoints/last/pretrained_model</code> 目录，缺一项先补齐再进 EXP-03。</div>
+    </section>
+
+    <section class="blk" id="s9">
+      <h2><span class="no">09</span>拓展阅读<span class="seg">课段 8 · 融会贯通</span></h2>
+      <div class="tip violet"><span class="lab">深入</span>① 官方 <code>docs/source/act.mdx</code> 给出方法论出处（ACT 论文：Action Chunking with Transformers + CVAE）；② <code>command/5_train.sh</code> 的 SAVE_FREQ 分段保存策略（小步数阶段存密、大步数存疏）是工程省盘技巧；③ <code>image_transforms</code> 六种数据增强（ColorJitter、RandomAffine、SharpnessJitter…）默认 enable:false——双臂场景颜色/角度增强是否有效值得实验；④ 掌握 ACT 后可对照阅读 diffusion policy（扩散策略），体会"一次出块"与"迭代去噪"两条生成范式。</div>
+      <div class="tip violet"><span class="lab">延伸</span>⑤ 把每次实验的 cfg 打印（batch、steps、lr、kl_weight）连同末段 loss 一张表记录下来，是日后写对比报告的第一手材料；⑥ 同一数据集分别以 batch 8/16/32 训练 1000 步，观察 grdn 曲线差异，能快速建立"梯度噪声 ↔ 批大小"的手感；⑦ checkpoint 目录可整体拷给 EXP-03 的推理机直接加载——目录自包含正是 LeRobot 的部署友好设计。</div>
+    </section>
+
+    <section class="blk" id="s10">
+      <h2><span class="no">10</span>思考题<span class="seg">课段 8 · 融会贯通</span></h2>
+      <div class="tip violet"><span class="lab">思考 1</span>CVAE 的 kl_weight=10 调大调小各会发生什么？用"重建损失管像老师、KL 损失管保留随机性"的类比推演：<code>kl_weight=0</code> 时模型可能退化成什么样？</div>
+      <div class="tip violet"><span class="lab">思考 2</span>如果 chunk_size 从 100 改成 1，动作不再"打包"输出。想一动：真机执行时会出现什么现象（提示：与控制频率、累计误差有关）？什么场景下小 chunk 反而更合适？</div>
+    </section>
+
+    <nav class="expnav">
+      <a href="../exp-01-teleop-recording/index.html">← 上一实验：EXP-01 遥操作与数据采集</a>
+      <a href="../exp-03-cloud-inference/index.html">下一实验：EXP-03 云服务器与真机推理 →</a>
+    </nav>
+
+    <footer>
+      <div>IND-02 · 双臂采训推全流程（ACT / VLA）· EXP-02 数据整理与 ACT 模型训练</div>
+      <div>8 学时 · 核心实验 · 基于 LZ-XL01 指导文档第 10 章《模型训练》及 LeRobot ACT 源码改编</div>
+    </footer>
+  </main>
+</div>
+
+<script src="../shared/tutorial.js" defer></script>
+</body>
+</html>

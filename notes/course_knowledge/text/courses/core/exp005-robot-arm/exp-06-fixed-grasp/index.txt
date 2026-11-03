@@ -1,0 +1,441 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp005-robot-arm/exp-06-fixed-grasp/index.html
+TITLE: EXP-06 逆运动学固定抓取 · 机器人机械臂应用与开发
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+EXP-06 逆运动学固定抓取 · 机器人机械臂应用与开发
+🤖 具身智能课程 ·
+教程首页
+核心课程
+/
+机械臂应用与开发
+/ EXP-06
+本页目录
+本课程实验
+EXP-06 · 第 3 章 · 综合性 · 4 学时
+逆运动学固定抓取
+坐标已知（手工量好、写死发布），让机械臂完成一套完整抓取：set_pick_target 只记目标不动、/arm_controller/pick 触发六阶段状态机、分步移动避开奇异、四组抓取参数决定成败——这是全课程第一次"闭环干实事"。
+⭐⭐⭐ · pick/place · 状态机
+01
+问题引入
+前五课你集齐了所有零件：协议会发、动作会放、IK 会解。现在把它们串成一件事——
+抓住桌上那个立方块
+。视觉还没有介入（那是 EXP-07 的事），目标坐标由你用刻度尺量出来、手工发布。别小看"写死的坐标"：从坐标到成功抓起，中间隔着目标缓存、IK 反解、分步移动、六阶段状态机、下探深度一整条链，任何一环失调都会撞桌、撞臂或空抓。
+两条必须先背下来的接口事实（讲义特别警告）：
+抓取/放置走
+/arm_controller/set_pick_target
+话题——
+只存目标，不会让臂先动一次
+；而
+/arm_controller/target_pose
+会
+立即执行 IK 并移动
+，用于预检可达性。
+/arm_controller/pick
+、
+/arm_controller/place
+是
+std_srvs/srv/Trigger
+（
+无请求字段，命令体留空
+），不是 car1_arm_msgs/srv/Pick。
+02
+原理通俗讲解
+set_pick_target 像把东西写进"待办清单"，pick 像按下"执行"键。
+发话题只是记下"我要抓 (0.28, 0, 0.10)"——胳膊一动不动；直到 Trigger 服务被调用，状态机才开工。这个"先记账、后执行"的设计让你可以慢慢核对目标，而不用担心手一抖臂就飞出去。
+分步移动 = 挥铁锹先对准、再下铲。
+如果五个关节同时动，末端轨迹像泼水一样不可预测，还极易经过奇异位姿。car1 的
+two_stage_move()
+：
+STAGE 1
+只转底座 J1 对准目标方位，
+STAGE 2
+保持 J1、驱动 J2-J5 到目标姿态——先粗后精，工业机械臂的标配打法。
+六阶段状态机 = 一套广播体操口令。
+IDLE（立正）→ APPROACH（抬手到预抓点）→ DESCEND（下探）→ GRASP（合爪）→ LIFT（提起）→ HOLD（抱着待命）。每个口令只做一件事，做完检查（软限位、奇异）再进下一个——出错随时能停在明确的阶段上排查。
+⚠️ 先说清一件事：这套"状态名"没有对外发布
+讲义和上面的类比讲的是
+IDLE→APPROACH→DESCEND→GRASP→LIFT→HOLD
+这六个
+阶段
+，它帮你理解流程。但
+读源码会发现
+：
+arm_controller.py
+是
+一条顺序执行的
+_execute_pick()
+函数
+，没有状态变量、没有对外的状态话题——
+/arm/grasp_state
+在当前仓库里并不存在
+。所以：
+别去 echo 一个不存在的状态话题
+；要看过程，就看节点日志里的六步顺序，或者看机械臂实际在做什么。
+源码里
+_execute_pick()
+的六个动作，逐条对上：
+步
+源码做什么
+对应阶段名
+1
+_set_gripper(True)
+→ 延时
+gripper_duration+0.2
+开爪
+2
+IK 解
+(x, y, grasp_z + pre_grasp_height)
+→
+_move_stepwise()
+（
+这里含 STAGE1 转底座
+）
+APPROACH
+3
+IK 解
+(x, y, grasp_z)
+→
+_move_joints(.., 1.5)
+，只走 1.5 秒
+DESCEND
+4
+_set_gripper(False)
+→ 延时
+GRASP
+5
+IK 解回
+(x, y, grasp_z + pre_grasp_height)
+，
+这才是抬升
+LIFT
+6
+IK 解
+post_grasp_pose
+→
+_move_stepwise()
+回观察位（HOLD 的实体）
+gripper_depth
+下探多深算"抓实"
+源码口径：
+grasp_z = 检测点z − gripper_depth
+。
+所以
+正值 = 往下探
+（0.01~0.03 按物深夹），
+负值 = 抬高
+（指尖跨住物侧）。节点默认 0.0 = TCP 停在表面；
+arm_params.yaml
+实配
+−0.040
+（抬高 40 mm）。浅了抓不牢，深了穿桌。
+奇异检测
+胳膊伸直的"死点"
+理论上
+：Jacobian 条件数 cond(J) 越大越接近奇异（腿绷直了使不上劲）。
+但源码里这个检测没有实现
+——
+arm_controller.py
+只做
+_check_limits()
+（关节角 ±2.356 rad 的软限位），没有 cond(J) 计算、没有备用解切换。
+现在的防奇异手段是"分步移动 + 目标点设计"
+：先转 J1 避开、再把 z 抬高避开完全伸直。想加真检测，是本实验的开放改进项。
+03
+关联知识点
+四组抓取参数
+（GraspConfig，全部米/弧度）：
+参数
+节点默认
+含义与调法
+gripper_depth
+0.0
+arm_params.yaml 实配 −0.040
+源码算的是
+grasp_z = 检测点z − gripper_depth
+，所以：
+正值 = 往下多探
+（0.01~0.03 按物深夹）；
+负值 = 抬高
+（指尖越过表面、跨住物侧）。节点默认 0.0 = TCP 停在检测表面；yaml 实配 −0.040 是为了让夹爪"跨"住物块。
+正得太大穿桌，负得太多夹空。
+pre_grasp_height
+0.03
+预抓取净空：
+接近点 = grasp_z + pre_grasp_height
+。撞桌就加大；退出也走这一点。
+抬升实际也由它决定
+（见下一行）
+lift_height
+0.05
+源码未使用
+声明了但从未参与计算
+——
+改它没有任何效果
+。真实抬升 = 退回
+z + pre_grasp_height
+→ 再走
+post_grasp_pose
+。
+想抬得更高，调 pre_grasp_height，不是它。
+grasp_pitch
+π（180°）
+末端俯仰（自竖直量起，同 EXP-04 纪律）：0°=朝上 · 90°=水平 ·
+180°=夹爪垂直朝下
+（桌面抓取恒 180°，即四元数 {0,1,0,0}）
+grasp_x_offset
+0.0
+抓取点 X 补偿：重力 + 齿轮间隙让臂实际停在比指令
+更远
+约 1.5 cm 处，
+负值
+把抓取点往回拉。yaml 默认 0（不再用固定值掩盖模型偏差）。
+它同时作用于接近/下探/退回三个点
+，所以改了不会让路径歪掉。
+post_grasp_pose
+[0.20, 0, 0.22, π]
+抓完回到的姿态：work 位 (0.186, 0, 0.365)、pitch=90° 水平向前。源码特意
+从 pre_grasp 直接跳到这里
+，中间不加"垂直上抬"点——因为那个中间点在 pitch=180° 下不可达，auto-pitch 会偷偷把它掰到 ~165°，再切回 180° 时腕部翻转、末端"点头"下沉。
+⚠️ 这一行最容易讲错，务必分清
+抬升高度 ≠ lift_height。
+源码里
+lift_h = self.lift_height
+确实被赋值了，但后续 6 个步骤一次都没用它。真正让物体离桌的是第 5 步"退回 pre_grasp 位置"——它把 TCP 抬回
+grasp_z + pre_grasp_height
+。所以物体离桌高度就是
+pre_grasp_height
+。这条是读码发现的讲义勘误，实测"改 lift_height 毫无变化"就是这个原因。
+四位姿四元数速查
+（orientation 字段）：目标垂直向下用
+{x:0, y:1, z:0, w:0}
+（pitch=180°）；示例放置点 (0.059, 0.074, 0.219) 用
+{x:0, y:0.9826, z:0, w:0.1856}
+。
+状态机遥测
+：
+/arm/grasp_state
+话题字段 current_state(string)、target_pose、progress(0-100)；状态值 IDLE、APPROACH、DESCEND、GRASP、LIFT、HOLD、PLACE_DESCEND、RELEASE。
+参数调优（讲义 6.2 口径）
+：四参数是
+节点参数
+（运行时传入；没有"按物体形状分组的配置文件"——不同物块调出不同值是
+调参结果
+，不是预置分组）。抓之前用
+预演三工具
+核对：① 仿真器
+http://<IP>:8000/viewer
+（/viewer 后缀不能省）；② 离线 FK
+pwm_to_fk_demo.py 2150 1200 2200 2275 1500
+（输入五路 PWM，输出 TCP 位姿/RPY/四元数/PoseStamped）；③ 单独发 target_pose 看 5 路 PWM 确认无一路接近 500/2500 极限。
+04
+实验目标
+掌握 /arm_controller/set_pick_target 话题与 pick/place Trigger 服务的完整工作流程，说清"只记账"与"立即动"的区别。
+独立完成一次端到端固定抓取：设点 → pick（5~8 秒六阶段）→ 设放置点 → place。
+能读懂抓取日志中的 STAGE 1/STAGE 2 与 /arm/grasp_state 状态迁移。
+调优抓取参数：以默认 0.0 为基线，做 gripper_depth 0 / 0.01 / 0.03 三档对比，并实证"改 lift_height 无效 → 该调的是 pre_grasp_height"。
+能用软限位（servo_limits.yaml）与 Jacobian 条件数奇异检测解释"为什么抓取会中止"。
+05
+实验环境与准备
+项
+要求
+主入口
+arm/car1_arm_controller/car1_arm_controller/arm_controller.py
+接口
+话题
+/arm_controller/set_pick_target
+(PoseStamped)、
+/arm_controller/target_pose
+（即时移动）；服务
+/arm_controller/pick
+、
+/arm_controller/place
+（std_srvs/Trigger）
+前置实验
+EXP-04（IK 库与偏移补偿已标定）、EXP-02（串口正常、work 零位可信）
+标定工具
+pwm_to_fk_demo.py（离线 FK）、http://<IP>:8000/viewer 仿真器、servo_limits.yaml 软限位
+场地
+目标物（30mm 级立方块）、刻度尺——物体实际位置必须与发布坐标对齐
+上机前四条红线：
+① 先单独发 target_pose 查看 IK 解的 5 路 PWM，确认无一路接近 500/2500；② 首次抓取选 (0.28, 0, 0.10) 这类已验证示例位；③ 观察区域清空，急停意识常备；④ 物品坐标用刻度尺对齐发布值，"目测摆放"是空抓主因。
+06
+动画讲解：抓取六阶段 + 分步移动
+IDLE →（STAGE 1 底座对准）→ APPROACH → DESCEND → GRASP → LIFT → HOLD
+STAGE1 只转 J1 · STAGE2 J2~J5 到位 —— 两步分开，避开奇异
+pre_grasp 0.05
+10 秒一循环：记账(set_pick_target) → 两段移动 → 六阶段口令 → HOLD(等待 place)
+动画 10 秒一循环：先底座对准（STAGE 1），再臂部两连杆带着夹爪到预抓点、下探（DESCEND 至物体上方 pre_grasp_height → 目标点）、合爪（GRASP，绿色爪闭合）、提起（LIFT 带物离桌）进入 HOLD。物体随 LIFT 抬起、随 place 落回——每一次状态迁移前都过一遍软限位与奇异检查。
+07
+互动讲解：抓取参数配置台
+互动台 · 参数组选型 + 安全窗口校验
+物体预设
+立方块 · 浅 0.01
+大球 · 深 0.03
+圆柱 · 中 0.02
+gripper_depth (m)
+pre_grasp_height (m)
+lift_height (m)
+grasp_pitch (°)
+组包并校验
+基线（节点参数默认）：gripper_depth 0.0（arm_params.yaml 实配
+−0.040
+）／ pre_grasp_height 0.03 ／ lift_height 0.05（
+源码未使用，调了无效！
+）／ grasp_pitch π=180°。对照档：depth +0.01 / +0.03（往下探）。校验：depth 勿穿桌、pre 勿低于 0.02、pitch 保持 180° 夹爪朝下。
+选"大球"预设填入 depth 0.03 / pitch 180°；手动把 pre_grasp_height 压到 0.02 以下点"组包"，会得到
+撞桌风险
+警告——对应讲义"抓取过程撞桌面 → 增大 pre_grasp_height"的排查入口。右侧输出即你要写进 pick 调用/参数发布里的完整 GraspConfig。
+08
+实操步骤
+Step 1 · 起栈验零
+bringup + arm_controller，确认零位与软限位。
+→
+Step 2 · 勘察接口
+确认话题/服务名与类型，Trigger 无请求体。
+→
+Step 3 · 预检可达
+pwm_to_fk_demo / 仿真器核对目标位姿。
+→
+Step 4 · 记账+执行
+set_pick_target → pick，盯六阶段。
+→
+Step 5 · 放置与调参
+place 完成闭环，改参数对比。
+# 步骤 1 · 启动（先 bringup 再控制器，顺序即安全）
+ros2 launch car1_bringup bringup.launch.py
+ros2 launch car1_arm_controller arm_controller.launch.py
+# 步骤 2 · 勘察（确认接口，别猜）
+ros2 topic list | grep arm_controller
+ros2 service list | grep arm_controller
+# 预期话题：/arm_controller/target_pose、/arm_controller/set_pick_target、/arm_controller/joint_command
+# 预期服务：pick、place、set_grasp_target、set_gripper、go_home、go_work、emergency_stop
+# 注意：/arm_controller/pick、/place 是 std_srvs/srv/Trigger（无请求字段）
+# 步骤 3 · 离线预演（不动舵机）：五路 PWM → TCP 位姿交叉核对
+cd ~/ros2_ws/src/xflz_eai_car1/arm/kinematics/kinematics
+python3 pwm_to_tcp.py 1500 1100 2200 1850 1500
+# 输出 TCP 位置 / RPY / 四元数，用于核对 set_pick_target 的目标
+# 仿真预演：http://<设备IP>:8000/viewer  （/viewer 后缀不能省）
+# 步骤 4a · 设置抓取目标点（只记账，臂不会动）
+ros2 topic pub --once /arm_controller/set_pick_target geometry_msgs/msg/PoseStamped \
+  "{header: {frame_id: 'base_link'}, pose: {position: {x: 0.28, y: 0.0, z: 0.10}, orientation: {x: 0.0, y: 1.0, z: 0.0, w: 0.0}}}"
+# orientation y=1,w=0 → pitch 180° 夹爪垂直朝下
+# 步骤 4b · 触发抓取（Trigger 无请求字段，命令体留空 "{}"）
+ros2 service call /arm_controller/pick std_srvs/srv/Trigger "{}"
+# 约 5~8 秒：开爪 → 抬到 pre_grasp_height → 下探 → 合爪 → 抬升 → 回 post_grasp_pose
+# 另一条路（立即执行用于预检）：ros2 topic pub --once /arm_controller/target_pose ...（会直接动！）
+# 过程怎么看：盯 arm_controller 的终端日志（六步顺序 + IK 解的 5 路角度），没有状态话题可 echo
+# 步骤 5a · 设置放置目标点（仍走 set_pick_target，同时覆盖 pick_target 与 place_target）
+ros2 topic pub --once /arm_controller/set_pick_target geometry_msgs/msg/PoseStamped \
+  "{header: {frame_id: 'base_link'}, pose: {position: {x: 0.059, y: 0.074, z: 0.219}, orientation: {x: 0.0, y: 0.9826, z: 0.0, w: 0.1856}}}"
+# 步骤 5b · 触发放置（同样 Trigger 空体）
+ros2 service call /arm_controller/place std_srvs/srv/Trigger "{}"
+# 步骤 5c · gripper_depth 调优对比（基线/抬高/下探三档，用 -p 覆盖节点参数）
+# 重启 arm_controller 并带上新参数：
+ros2 run car1_arm_controller arm_controller --ros-args -p gripper_depth:=0.02
+# 对照档：-0.040（yaml 实配，抬高）/ 0.0（节点默认，停在表面）/ +0.02（往下探）
+# 可调项：pre_grasp_height 0.02~0.10（撞桌加大，抬升也靠它）；grasp_pitch 保持 180 夹爪朝下
+# lift_height 改了没用（源码未使用）——这一点要在报告里实测证明一次
+🔍 一个隐藏的坑：publish + call 会赛跑
+arm_controller
+用的是
+MultiThreadedExecutor
+，
+set_pick_target
+的 topic 回调和
+pick
+的服务回调
+跑在不同线程上
+。如果你用脚本"发完 topic 立刻 call pick"，
+pick 可能先看到旧目标
+——源码注释里专门写了这件事，并为此提供了服务形式
+/arm_controller/set_grasp_target
+（
+SetGraspTarget
+类型，有请求字段、会等响应，所以"存完再走"是确定的）。
+命令行手敲没这个问题
+（两条命令之间有几秒人手的间隔），但写成脚本自动抓取时必须换服务，否则会随机抓到上一个点。
+09
+重点与易错点
+预检纪律：
+先单独发布
+/arm_controller/target_pose
+或用 pwm_to_fk_demo 查看 IK 解的 5 路 PWM，
+确认无任何一路接近 500/2500 极限
+，再调 pick。极限位附近要么软限位拒绝、要么舵机憋着力——都比"跑起来再说"便宜得多。
+坑
+现象
+对策
+误用 target_pose 当记账
+指令一发臂就动
+记账用 set_pick_target；target_pose 是"立即 IK+移动"的预检口
+pick 传请求字段
+服务调用报类型错误
+std_srvs/Trigger 无字段，命令体写 "{}"
+抓取撞桌面
+DESCEND 阶段触桌
+增大 pre_grasp_height；gripper_depth 用负值抬高；物体坐标对不齐查 TF——
+别改 lift_height，源码未使用
+分步移动卡在转底座
+底座转完臂不动
+检查 J1 软限位（±2.356）与目标方位（目标在身后）；看日志
+limit violation: arm_joint1=...
+物体未夹稳掉落
+退回后掉落
+增大 gripper_depth（往下多探）；物体实物位置必须与发布坐标刻度尺对齐
+"接近奇异中止"却找不到日志
+以为被奇异检测拦了
+本仓库没有奇异检测
+——中止只可能来自 IK 报错、关节限位或急停，按这三项查
+目标明明设了却抓旧点
+脚本连发时随机抓错
+publish 与 call 赛跑：改用
+/arm_controller/set_grasp_target
+服务，或两条命令间加延时
+echo /arm/grasp_state 无输出
+以为节点挂了
+该话题
+不存在
+；过程看节点日志的六步顺序
+成功判据：pick 后 5~8 秒完成六阶段至 HOLD；place 后回 IDLE；全程无越限告警。
+参数调优至少做一组对照：gripper_depth 0 / 0.01 / 0.03 各抓一次（默认 0.0 即基线），记录成功率与掉落情况。
+坐标纪律：目标物挪了 1cm，发布坐标也要跟着改——固定抓取的"固定"指的是坐标系，不是运气。
+10
+总结与思考
+接口二分
+记账 vs 立即动
+set_pick_target 只存；target_pose 即时 IK+移动。
+两段移动
+STAGE1 底座 · STAGE2 臂
+先粗后精，绕开奇异与轨迹失控。
+六阶段
+IDLE→…→HOLD
+每步过软限位+奇异检查，遥测看 grasp_state。
+四参数
+depth/pre/lift/pitch
+组随物体换：0.015/0.03/0.025 深度三组预设。
+练习 · 前 / 前左 / 前右三方位抓取
+——同一半径 0.28 m 旋到三个方位（REP-103 坐标系：
+x 向前 · y 向左 · z 向上
+；±45° 取 cos45°≈0.707 → 0.28×0.707≈0.198）。物块要用尺子摆到对应坐标，否则夹空气：
+# 方位一 · 正前（基线）
+ros2 topic pub --once /arm_controller/set_pick_target geometry_msgs/msg/PoseStamped \
+  "{header: {frame_id: 'base_link'}, pose: {position: {x: 0.28, y: 0.0, z: 0.10}, orientation: {x: 0.0, y: 1.0, z: 0.0, w: 0.0}}}"
+ros2 service call /arm_controller/pick std_srvs/srv/Trigger "{}"
+# 方位二 · 前左（+y 侧，底座向左转 45°）
+ros2 topic pub --once /arm_controller/set_pick_target geometry_msgs/msg/PoseStamped \
+  "{header: {frame_id: 'base_link'}, pose: {position: {x: 0.198, y: 0.198, z: 0.10}, orientation: {x: 0.0, y: 1.0, z: 0.0, w: 0.0}}}"
+ros2 service call /arm_controller/pick std_srvs/srv/Trigger "{}"
+# 方位三 · 前右（−y 侧，底座向右转 45°）
+ros2 topic pub --once /arm_controller/set_pick_target geometry_msgs/msg/PoseStamped \
+  "{header: {frame_id: 'base_link'}, pose: {position: {x: 0.198, y: -0.198, z: 0.10}, orientation: {x: 0.0, y: 1.0, z: 0.0, w: 0.0}}}"
+ros2 service call /arm_controller/pick std_srvs/srv/Trigger "{}"
+# 纪律：每换一个方位先用 target_pose 预检可达（09 节预检纪律），确认无 PWM 贴近 500/2500 再 pick
+# 对照观察：STAGE 1 底座转向与 EXP-01 里你用话题转过的 ±45° 对得上号吗？/arm/grasp_state 看迁移
+思考题 1：
+为什么讲义坚持"先 set_pick_target 记账、再 pick 执行"的两步走？如果把记账和执行合并成一步（发完坐标立即动），调试体验和安全性分别会发生什么退化？
+思考题 2：
+按 EXP-04 的 pitch 纪律（0°朝上 · 90°水平 ·
+180°夹爪垂直朝下
+）分析：为什么桌面抓取必须恒 180°？若把 grasp_pitch 误设成 0，接触点会跑到哪、会先撞什么？结合四元数 {0,1,0,0} 说明"grasp_pitch 与 orientation 是同一件事的两种记法"。
+CORE-05 · 机器人机械臂应用与开发 · EXP-06 逆运动学固定抓取
+4 学时 · 综合性 · 基于 arm_practice 实验讲义改编

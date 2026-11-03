@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-09 · 全功能验证 — 老人跌倒监护综合项目</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+:root{--theme:#059669;--theme-deep:#047857;--theme-bg:#d1fae5;--theme-bd:#a7f3d0}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit" title="返回课程首页">🧠 具身智能课程 · <i>教程首页</i></a>
+  <div class="crumb"><a href="../../../index.html#case">综合项目</a> / <a href="../index.html">老人跌倒监护</a> / EXP-09</div>
+</div>
+
+<div class="wrap">
+
+<aside class="side">
+  <h4>本页目录</h4>
+  <a href="#s1" class="now">01 问题引入：零件都好了，整机怎么验收</a>
+  <a href="#s2">02 原理通俗讲解：三级路考与体检清单</a>
+  <a href="#s3">03 关联知识点：三模式 · 五步手册 · 证据完整性</a>
+  <a href="#s4">04 实验目标</a>
+  <a href="#s5">05 实验环境与准备</a>
+  <a href="#s6">06 动画讲解：五步验收阶梯与内存预算</a>
+  <a href="#s7">07 互动讲解：三模式选型与验收沙盘</a>
+  <a href="#s8">08 实操步骤：Step 1～5 快速验证流程</a>
+  <a href="#s9">09 重点与易错点</a>
+  <a href="#s10">10 总结与思考</a>
+  <h4>CH1 · 需求与配置</h4>
+  <a href="../exp-01-requirements/index.html">EXP-01 需求分析</a>
+  <a href="../exp-02-architecture/index.html">EXP-02 分层架构</a>
+  <a href="../exp-03-config/index.html">EXP-03 配置详解</a>
+  <h4>CH2 · 感知与交互</h4>
+  <a href="../exp-04-voice/index.html">EXP-04 语音交互</a>
+  <a href="../exp-05-pose-detection/index.html">EXP-05 检测与姿态</a>
+  <a href="../exp-06-fall-judgment/index.html">EXP-06 跌倒状态机</a>
+  <h4>CH3 · 告警与验证</h4>
+  <a href="../exp-07-alert-evidence/index.html">EXP-07 告警证据链</a>
+  <a href="../exp-08-llm-vlm/index.html">EXP-08 LLM·VLM</a>
+  <a href="../exp-09-full-verification/index.html">EXP-09 全功能验证</a>
+</aside>
+
+<main class="content">
+
+<div class="exp-head">
+  <span class="code">EXP-09 · 第 3 章 · 综合性 · 6 学时</span>
+  <h1>全功能验证：把 9 个实验拼成一台"能交付"的机器</h1>
+  <p class="desc">课程收官实验：用 <b>fall_app.py --mode camera/image/video</b> 三模式入口 + docs/03 <b>五步验证手册</b>，完成 唤醒→对话→跌倒→询问→应答→告警→存档 全链路闭环。跑通 <b>env_check 环境自检 → --text 文本 → --mjpeg 音频 → camera 实时</b> 逐级路考，最后核验 runs/evidence 三件套（截图/.avi/events.jsonl）并做 pkill 四层资源清理 —— 这是课程所有实验的"集成验收标准"。</p>
+  <div class="meta">
+    <span class="tag hl">难度 ⭐⭐⭐ · 6 学时</span>
+    <span class="tag">--mode 三入口</span><span class="tag">五步验证手册</span>
+    <span class="tag">内存预算 2.7G</span><span class="tag">证据三件套</span>
+  </div>
+</div>
+
+<!-- 01 -->
+<section class="blk" id="s1">
+  <h2><span class="no">01</span>问题引入：零件都好了，整机怎么验收</h2>
+  <p>前 8 个实验各自跑通了语音、检测、状态机、告警、LLM……但单测全绿 ≠ 整机能用：换个输入源就崩、拔了硬件不降级、跑完一晚磁盘满了。工程上最后一公里叫<b>集成验收</b>——不是"哪里坏了修哪里"，而是拿一份权威清单逐项打勾，直到能回答："这条链路，从唤醒到存档，<b>完整走通过几次</b>？"</p>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>Step 1 环境自检：依赖 7 库 + 模型 + 串口，全 OK 才准开机</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>Step 2 文本链路：--text 喂词，纯软件验证状态机</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>Step 3 音频链路：--mjpeg 真说话，验证唤醒/ASR/TTS</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span>Step 4 故障画像 + Step 5 摄像头整机实时验收</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">5</span>Step 6 证据三件套 + pkill 四层清理收尾</div>
+  </div>
+  <div class="tip amber"><span class="lab">💡 一个类比</span>这就是<b>驾校路考</b>：科目一先查体检报告（env_check），科目二在封闭场练基础动作（--text），科目三上真路（--mjpeg），最后路考官拿着评分表逐项打勾（五步手册）—— 顺序不能跳，跳了挂科（运行时崩溃）都不知道挂在哪。</div>
+</section>
+
+<!-- 02 -->
+<section class="blk" id="s2">
+  <h2><span class="no">02</span>原理通俗讲解：三级路考与体检清单</h2>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">三模式入口</div><div class="kt">同一个司机，换三种"路况"</div><p>fall_app.py 的 --mode camera/image/video 经 <b>FrameSource 统一抽象</b>（read/isOpened/release）走同一主循环：image=cv2.imread 单张即退、video=VideoCapture 离线、camera=惰性导入 rclpy 订阅 ROS 话题。换模式只改一个参数 —— <b>不是三份代码，是三种输入源插头</b>。</p></div>
+    <div class="kcard"><div class="kd">三级开发模式</div><div class="kt">先自行车场，再上路</div><p>文本→音频→摄像头是"最弱假设先跑通"：--text 只把 <code>text_mode</code> 置 True，输入源从 ALSA 换成 stdin 线程，<b>状态机与回调链一字不改</b>（docs/03 L5-L8）—— 所以文本模式验证过的逻辑在音频模式必然成立，音频只新增录音/识别/播放三个硬件变量，故障好定位。</p></div>
+    <div class="kcard"><div class="kd">五步验证手册</div><div class="kt">医生的"望闻问切"顺序</div><p>docs/03 把验收拆成 Step1 自检→Step2 文本→Step3 音频→Step4 故障排查表（按概率排五类）→Step5 摄像头，每步都有"预期日志+判定标准"。<b>级间有依赖</b>：跳过 Step1 直接 Step3，模型缺失会 mid-stream 崩溃 —— 体检没过不能跑马拉松。</p></div>
+    <div class="kcard"><div class="kd">证据完整性</div><div class="kt">法庭上的"三件套"</div><p>判定一次告警成功的充要条件：<b>截图+视频+事件日志齐，且事件覆盖 FALLING→ASK→ALERT（或 CANCELLED）</b>。前帧证明"跌倒前站着"、后帧证明"确实倒下了"，单帧会被"本来就躺着"骗过 —— 前后帧是最小可验证对，events.jsonl 则是可审计的推理轨迹。</p></div>
+  </div>
+  <div class="tip tealb"><span class="lab">🔔 人文关怀与隐私底线</span>验收同样克制：证据只在告警前后 5s、runs/ 全部 gitignore、testdata 视频不入库、可随时 <code>rm -rf runs/evidence/*.avi</code> 释放磁盘 —— 系统越"全能"，越要用数据最小化守住老人的居家隐私。</div>
+</section>
+
+<!-- 03 -->
+<section class="blk" id="s3">
+  <h2><span class="no">03</span>关联知识点：三模式 · 五步手册 · 证据完整性</h2>
+  <table>
+    <thead><tr><th>知识点</th><th>内容</th><th>源码锚点</th></tr></thead>
+    <tbody>
+      <tr><td>6.2.3 全链路闭环验证</td><td>六阶段：唤醒（小飞小飞/文字）→对话（LLM）→跌倒（FALLING→LYING 1.5s+3s）→询问 ASK 12s 窗→应答 救命/没事→告警存档；每条迁移都要在证据里留下事件</td><td>docs/03_开发模式与验证.md L22-L95；前置 5.1.2 六状态机</td></tr>
+      <tr><td>2.2.1 三级开发模式</td><td>--text 置 cfg["speech"]["text_mode"]=True → VoiceLoop 启动 stdin 喂词线程（daemon=True，Ctrl+C 随主进程退）；同一 feed_text 路由，文本/音频状态机完全一致</td><td>apps/fall_video_demo.py L84-L87、L91、L132、L258-L266</td></tr>
+      <tr><td>2.2.2 环境自检 env_check</td><td>三类检查：7 依赖库动态 import（numpy/cv2/scipy/rknnlite/sherpa_onnx/serial/yaml）、模型/资源存在且非空（含 VLM 开关项与串口节点）、config_schema REQUIRED 键；绝不自动安装，缺失 exit 2</td><td>common/env_check.py L30-L43、L45-L120、L115-L141；入口调用 fall_video_demo L60、fall_app L162</td></tr>
+      <tr><td>三模式入口 & camera 时序</td><td>--mode choices（fall_app L80-L81）+ _merge_args CLI 覆盖；camera 需先 ros2 launch depth_camera.launch.py，rclpy 惰性导入订阅 /ascamera_hp60c/camera_publisher/rgb0/image；wake_seen.wait() 唤醒后才检测（仅 camera+非 text）；读帧失败退避 0.2s 重试</td><td>apps/fall_app.py L54-L70（atexit 兜底）、L80-L81、L230-L242、L354-L358、L370-L398；common/source.py L19-L88、common/ros2_camera.py L29/L64</td></tr>
+      <tr><td>证据完整性与清理</td><td>三件套（jpg 前后帧 /.avi 5s / events.jsonl）+ 覆盖 FALLING/ASK/ALERT(或/CANCELLED)；max_files=100 轮转；pkill 四层 aplay→llm_server→fall_video_demo→fall_app + pgrep 复核；stop_sig.wait_grace(1.0) 防 librknnrt 析构 abort</td><td>fall_video_demo.py L267-L317（finally）、fall_app.py L409-L413（VideoWriter）；README L98-L101；docs/06 L77</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 04 -->
+<section class="blk" id="s4">
+  <h2><span class="no">04</span>实验目标</h2>
+  <ul class="check">
+    <li>能按硬件条件选择正确模式（无硬件 --text / 有声学件 --mjpeg / 有相机 camera），说清 FrameSource 如何统一三者</li>
+    <li>能独立完成 唤醒→对话→跌倒→询问→应答→告警→存档 六阶段闭环，各留一份日志记录</li>
+    <li>能排障三类高频问题：串口占用（log_server 抢 ACM0）、音频冲突（aplay 残留）、端口/内存（8088 vs 8080、VLM 同开 OOM）</li>
+    <li>能按 docs/03 五步手册逐项打勾，输出通过/未通过/问题的验收表</li>
+    <li>能核验证据三件套完整性并执行 pkill 四层清理，pgrep 复核零残留</li>
+  </ul>
+</section>
+
+<!-- 05 -->
+<section class="blk" id="s5">
+  <h2><span class="no">05</span>实验环境与准备</h2>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>硬件（实时）：小车 C1（RK3576+STM32F407）、HP60C 深度相机、XFM 六麦 /dev/ttyACM0、扬声器 plughw:3,0、告警串口 /dev/ttyUSB0；离线模式可只用板端</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>软件：Ubuntu 22.04 + ROS 2 Humble · venv <b>/home/iflytek/ros2_venv/bin/python3</b>（rknnlite 2.3.2 / sherpa-onnx 1.13.4 / opencv 4.11.0 / flask / pyserial）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>模型齐套：yolov8n.rknn · pose_landmark_full.rknn · KWS/ASR/TTS 三组 onnx · RKLLM Qwen3.5；配置/脚本在 ros2_ws/src/xflz_eai_car1/app/elderly_companion/</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span>测试素材：testdata/fall_slow_x264.mp4 拷入（不入库）；实时模式先准备两个终端与 source ROS 环境</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">5</span>开工前清场：pkill -9 aplay; pkill -f log_server; 检查 8080/8088 空闲、内存 ≥2.7G 空闲（vlm 默认关）</div>
+  </div>
+</section>
+
+<!-- 06 -->
+<section class="blk" id="s6">
+  <h2><span class="no">06</span>动画讲解：五步验收阶梯与内存预算</h2>
+  <div class="anim-box">
+    <svg viewBox="0 0 720 340" xmlns="http://www.w3.org/2000/svg">
+      <rect x="10" y="10" width="700" height="320" rx="14" fill="#111827"/>
+      <!-- 左: 五步阶梯 -->
+      <g font-family="monospace" font-size="10.5" text-anchor="middle">
+        <text x="40" y="36" fill="#6ee7b7" font-size="11">五步验证手册（docs/03 L22-L95，级间依赖不可跳）</text>
+        <g stroke="#34d399" fill="#064e3b">
+          <rect x="40" y="246" width="112" height="34" rx="6"/>
+          <rect x="156" y="206" width="112" height="34" rx="6"/>
+          <rect x="272" y="166" width="112" height="34" rx="6"/>
+          <rect x="388" y="126" width="112" height="34" rx="6" stroke="#fbbf24"/>
+          <rect x="504" y="86" width="120" height="34" rx="6"/>
+        </g>
+        <g fill="#6ee7b7">
+          <text x="96" y="267">Step1 env_check</text>
+          <text x="212" y="227">Step2 --text 文本</text>
+          <text x="328" y="187">Step3 --mjpeg 音频</text>
+          <text x="444" y="147" fill="#fbbf24">Step4 故障五类</text>
+          <text x="564" y="107">Step5 camera 整机</text>
+        </g>
+        <path d="M96 246 L212 240 L212 206" fill="none" stroke="#065f46" stroke-width="1.5" stroke-dasharray="5 4"/>
+        <circle r="5" fill="#34d399">
+          <animateMotion dur="5s" repeatCount="indefinite" keyPoints="0;1" keyTimes="0;1" calcMode="linear"
+            path="M96 236 L96 224 L212 224 L212 184 L328 184 L328 144 L444 144 L444 104 L564 104 L564 78"/>
+        </circle>
+        <text x="360" y="306" fill="#9ca3af" font-size="10">每级"预期日志+判定标准"双确认；跳 Step1 → 模型缺失 mid-stream 崩（exit 2 本应拦住）</text>
+      </g>
+      <!-- 右上: memory -->
+      <g font-family="monospace" font-size="10" text-anchor="middle">
+        <text x="40" y="52" fill="#f87171" font-size="11" text-anchor="start">内存预算（~2.7G 基线，oversize 即 OOM）</text>
+        <rect x="40" y="60" width="440" height="18" rx="4" fill="#1f2937"/>
+        <rect x="40" y="60" width="64" height="18" fill="#2563eb"/>
+        <rect x="104" y="60" width="220" height="18" fill="#7c3aed"/>
+        <rect x="324" y="60" width="100" height="18" fill="#059669"/>
+        <rect x="424" y="60" width="56" height="18" fill="#f59e0b"/>
+        <rect x="492" y="60" width="100" height="18" rx="4" fill="#3f1d1d" stroke="#ef4444" stroke-dasharray="4 3">
+          <animate attributeName="opacity" values="1;0.4;1" dur="1.8s" repeatCount="indefinite"/>
+        </rect>
+        <text x="72" y="73" fill="#fff" font-size="9">ASR 128M</text>
+        <text x="214" y="73" fill="#fff" font-size="9">LLM ~1.5G</text>
+        <text x="374" y="73" fill="#042f2e" font-size="9">YOLO+姿态 500M</text>
+        <text x="452" y="73" fill="#3b2504" font-size="9">TTS 600M</text>
+        <text x="492" y="94" fill="#f87171" font-size="9" text-anchor="start">VLM +1.3G → 3.8G 超限（默认 vlm.enabled:false 关掉这段虚线）</text>
+      </g>
+      <!-- 右下: 证据三件套 -->
+      <g font-family="monospace" font-size="10" text-anchor="middle">
+        <text x="40" y="128" fill="#60a5fa" font-size="11" text-anchor="start">证据三件套 + 四层清理（Step 6）</text>
+        <g font-size="9">
+          <rect x="40" y="136" width="150" height="52" rx="6" fill="#1e3a5f" stroke="#60a5fa"/>
+          <text x="115" y="156" fill="#93c5fd">pre.jpg + _post.jpg</text>
+          <text x="115" y="172" fill="#93c5fd">前帧证"站着"后帧证"倒了"</text>
+          <rect x="200" y="136" width="130" height="52" rx="6" fill="#1e3a5f" stroke="#60a5fa"/>
+          <text x="265" y="156" fill="#93c5fd">annotated .avi</text>
+          <text x="265" y="172" fill="#93c5fd">前3s+后2s 时序证据</text>
+          <rect x="340" y="136" width="180" height="52" rx="6" fill="#14532d" stroke="#34d399"/>
+          <text x="430" y="156" fill="#6ee7b7">events.jsonl</text>
+          <text x="430" y="172" fill="#6ee7b7">须含 FALLING→ASK→ALERT/CANCELLED</text>
+          <rect x="530" y="136" width="150" height="52" rx="6" fill="#2b1d05" stroke="#f59e0b"/>
+          <text x="605" y="154" fill="#fbbf24">pkill ×4</text>
+          <text x="605" y="170" fill="#fbbf24" font-size="8.5">aplay→llm_server→demo→app</text>
+        </g>
+        <path d="M40 204 L680 204" stroke="#4b5563" stroke-dasharray="6 5"/>
+        <text x="360" y="222" fill="#9ca3af" font-size="9.5">判定充要: 三件套齐 + 事件覆盖 + pgrep -af "aplay|llm_server|fall_video_demo|fall_app" 无输出</text>
+      </g>
+    </svg>
+    <div class="anim-cap">动画 9-1：左——五步手册的上行阶梯，绿色光点按 Step1→5 逐级爬升，Step4 故障画像用橙色标出（按概率排的五类问题）；右上——内存拼条：ASR+TTS+LLM+检测 ≈2.7G 打底，VLM 那段红色虚线一旦补上就冲破 3.8G，所以默认 vlm.enabled:false；右下——验收终点：证据三件套缺一不可，收尾 pkill 四层清场。</div>
+  </div>
+</section>
+
+<!-- 07 -->
+<section class="blk" id="s7">
+  <h2><span class="no">07</span>互动讲解：三模式选型与验收沙盘</h2>
+  <div class="ix-panel">
+    <div class="ix-title">🕹️ 五步验收沙盘 · Accept Bench —— 逐个 Shift 跑 Step，故意跳步/开 VLM 看翻车现场</div>
+    <div class="ctl-row">
+      <button onclick="vNext()">▶ 执行下一步</button>
+      <button onclick="vSkip()">⏭ 跳过 Step1 直奔 Step3</button>
+      <button onclick="vVlm()">🧠 开 VLM 同跑</button>
+      <button onclick="vStall()">🔌 模拟串口被占</button>
+      <button onclick="vDone()">✅ 补齐证据+清理</button>
+      <button onclick="vReset()">↺ 重置</button>
+    </div>
+    <div class="io" id="verifyIo"></div>
+  </div>
+  <div class="tip tealb"><span class="lab">🔔 试试「跳步」再「开 VLM」</span>跳步会在 Step3 以 exit 2 或 mid-stream 崩溃收场（自检本该拦住）；开 VLM 则内存拼条冲到 3.8G+ 触发 OOM —— 两个红灯都是讲义里的真实事故现场，对应"级间依赖"与"内存预算"两条注意事项。</div>
+</section>
+
+<!-- 08 -->
+<section class="blk" id="s8">
+  <h2><span class="no">08</span>实操步骤：Step 1～5 快速验证流程</h2>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>Step 1 env_check 全 OK，无 MISSING/FAIL</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>Step 2 --text：小飞小飞→你好→视频跌倒→救命/没事逐项过</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>Step 3 清场后 --mjpeg：真语音唤醒，[diag] 录音 ≈50 帧/5s</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span>Step 4 camera：先 ros2 launch 相机节点，再 fall_app 三模式整机跑</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">5</span>对照 docs/03 五步手册打勾，记录每步 Pass/Fail</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">6</span>Step 6 核验 runs/evidence 三件套 + pkill 四层 + pgrep 复核</div>
+  </div>
+  <div class="pre"><span class="c"># 快速验证流程（docs/03 分步验证手册的落地命令）</span>
+cd ~/ros2_ws/src/xflz_eai_car1/app/elderly_companion
+
+<span class="c"># Step 1: 环境自检（7 依赖库 + 模型文件 + 串口 + config 键）</span>
+python3 common/env_check.py --config config/fall_config.yaml
+<span class="c"># 预期全部 [env] OK，末行 [env] 自检通过；任何 MISSING 先修再前进</span>
+
+<span class="c"># Step 2: 离线视频全链路（--text 文本模式，无需硬件）</span>
+python3 apps/fall_video_demo.py --video testdata/fall_slow_x264.mp4 --text
+<span class="c"># stdin: 小飞小飞 →[文本] 唤醒 → 你好 →[LLM 回复] → 视频跌倒 →ASK</span>
+<span class="c"># stdin: 救命 →ASR 应答 x ALERT（多人也只应出现【一条】）／没事 →CANCELLED</span>
+
+<span class="c"># Step 3: 音频全链路（先清残留！aplay 占 plughw:3,0、llm_server 占 ACM0/8080）</span>
+pkill -9 aplay; pkill -f llm_server
+python3 apps/fall_video_demo.py --video testdata/fall_slow_x264.mp4 --mjpeg
+<span class="c"># 说「小飞小飞」→ 录音线程 plughw:4,0 → [diag] 录音 ~50帧/5s → 叮 → ASR/LLM/TTS</span>
+<span class="c"># 浏览器 http://&lt;板端IP&gt;:8088/fall.mjpg 确认推流</span>
+
+<span class="c"># Step 4: 实时摄像头（终端1 先起 ROS2 相机节点）</span>
+source /opt/ros/humble/setup.bash && source ~/ros2_ws/install/setup.bash
+ros2 launch car1_peripherals depth_camera.launch.py
+<span class="c"># 终端2：</span>
+python3 apps/fall_app.py --mode camera --mjpeg --save
+<span class="c"># 预期 === 老人跌倒监护启动（mode=camera）=== → wake_seen.wait() 等唤醒</span>
+<span class="c"># 话题排查: ros2 topic hz /ascamera_hp60c/camera_publisher/rgb0/image</span>
+
+<span class="c"># Step 6: 证据完整性 + 资源清理</span>
+ls -la runs/evidence/        <span class="c"># .jpg 截图 + .avi 视频 + events.jsonl 三件套</span>
+grep -o '"to": *"[A-Z_]*"' runs/evidence/events.jsonl | sort -u   <span class="c"># 覆盖 FALLING/ASK/ALERT 或 CANCELLED</span>
+pkill -9 aplay; pkill -f llm_server; pkill -f fall_video_demo; pkill -f fall_app
+pgrep -af <span class="g">"aplay|llm_server|fall_video_demo|fall_app"</span>   <span class="c"># 预期无输出</span>
+rm -rf runs/evidence/*.avi runs/evidence/*.jpg   <span class="c"># 可选，释放磁盘</span></div>
+  <div class="tip amber"><span class="lab">💡 记录要点</span>报告按 6 份证据交：env_check 截图、--text stdin 交互日志、--mjpeg 唤醒/ASR/TTS 流程日志、camera 实时推流+告警记录、五步手册 Pass/Fail 表、证据三件套+清理确认。评分占比里"全链路闭环记录"一项就值 40 分。</div>
+</section>
+
+<!-- 09 -->
+<section class="blk" id="s9">
+  <h2><span class="no">09</span>重点与易错点</h2>
+  <ul class="check">
+    <li><b>严格 Step1→5 顺序</b>：每级用"上一步已通过"当前提，跳步等于在未知地基上盖楼</li>
+    <li><b>离线也能完整验收</b>：无相机/麦克风时 --text 把全链路跑通，camera 只是最后换插头</li>
+    <li><b>单一开关切三模式</b>：text_mode 一个布尔位换掉整个输入源，逻辑零分叉 —— 排查先查开关</li>
+    <li><b>退出要温柔</b>：Ctrl+C 后 stop_sig.wait_grace(1.0) 给 NPU 1 秒收尾，别抢在这 1 秒里 pkill -9</li>
+  </ul>
+  <table>
+    <thead><tr><th>现象</th><th>原因</th><th>解决</th></tr></thead>
+    <tbody>
+      <tr><td>env_check 报大片 MISSING 依赖库</td><td>用了系统 python3 而非板端 venv</td><td>/home/iflytek/ros2_venv/bin/python3 运行，或先激活 venv</td></tr>
+      <tr><td>camera 模式无画面/输入源打开失败</td><td>ROS2 相机节点没起，或 HP60C 未连接</td><td>终端1 ros2 launch depth_camera.launch.py；ros2 topic hz 查话题</td></tr>
+      <tr><td>唤醒后没有"录音线程"日志</td><td>log_server 占着 /dev/ttyACM0，XFM 唤醒事件到不了</td><td>pkill -f log_server 再重试；确认「XFM 硬件唤醒就绪」日志</td></tr>
+      <tr><td>[diag] 录音只有 ~10 帧/5s</td><td>设备停在监听态，流稀疏（XFM 固件/接线层，与代码无关）</td><td>确认已唤醒（应 ~50 帧/5s）；仍稀疏则查 XFM 固件与接线</td></tr>
+      <tr><td>播报无声</td><td>aplay 残留独占 plughw:3,0</td><td>pkill -9 aplay 后重启程序（ALSA 句柄排他）</td></tr>
+      <tr><td>启动报端口冲突退出</td><td>MJPEG 8088 与 LLM 8080/自定义配了同一端口</td><td>改 config 的 server.port 或 llm.server.port，启动时会自动检测</td></tr>
+      <tr><td>VLM+LLM 同开后 OOM</td><td>2.7G 基线 + VLM 1.3G &gt; 3.8G</td><td>保持 model.vlm.enabled: false（默认）；4G 板先 free -h 预算</td></tr>
+      <tr><td>多人时 ASR 应答出现多条</td><td>monitor.on_asr 单次应答的 break 失效</td><td>检查 fall/monitor.py on_asr 循环保证收敛（对应 EXP-06 窄表）</td></tr>
+      <tr><td>runs/evidence/ 为空</td><td>告警链路没走完整（没进 ALERT）</td><td>补一遍 跌倒→ASK→救命→ALERT；确认目录可写</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 10 -->
+<section class="blk" id="s10">
+  <h2><span class="no">10</span>总结与思考</h2>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">✅ 完成成果</div><div class="kt">六件交付</div><p>env_check 通过报告、--text 交互日志、--mjpeg 语音流程日志、camera 实时+告警记录、五步手册验收表、证据三件套与四层清理确认。</p></div>
+    <div class="kcard"><div class="kd">🧠 原理收获</div><div class="kt">分层验收方法论</div><p>"最弱假设先跑通"的三级开发模式为何能保证逐级不崩；证据判定为何要前后帧+事件日志三件套；单开关切模式背后的 FrameSource 抽象。</p></div>
+    <div class="kcard"><div class="kd">🛠 技能收获</div><div class="kt">整机排障四板斧</div><p>venv 归因（伪 MISSING）、串口/音频设备占用排查（ACM0/ plughw:3,0）、端口与内存预算体检、pgrep/pkill 分层清理与磁盘回收。</p></div>
+    <div class="kcard"><div class="kd">❓ 排障思路</div><div class="kt">按层下钻</div><p>先环境（env_check exit code）→ 再输入源（source.read/话题）→ 再时序（wake_seen/ask 窗口）→ 再进程残留（pgrep）—— 与五步手册同构，从下往上排查必然绕路。</p></div>
+  </div>
+  <div class="tip violet"><span class="lab">🟣 思考题 1</span>为什么三级开发模式能保证"逐级升级不出错"？结合 docs/03 L7-L9（文本与音频走完全相同的状态机与回调链）解释文本模式验证过的逻辑为何在音频模式必然成立，再分析音频模式新增的 录音/识别/播放 三个硬件环节各自可能引入哪些新故障模式。</div>
+  <div class="tip violet"><span class="lab">🟣 思考题 2</span>camera 模式启动后为什么要 loop.wake_seen.wait() 等硬件唤醒才开始检测（fall_app L354-L358），而 image/video 模式却自动开跑？结合 XFM 监听态不上送音频流的特性说明：若跳过等待直接检测，跌倒→ASK→应答这条链会错位在哪里？再想：一次完整告警该留"前帧+后帧"而非只存跌倒瞬间，为什么？</div>
+</section>
+
+<nav class="expnav">
+  <a href="../exp-08-llm-vlm/index.html">← EXP-08 LLM 对话与 VLM 复核</a>
+  <a href="../index.html">返回课程目录 →</a>
+</nav>
+
+</main>
+</div>
+
+<footer>
+  <div class="foot-in">
+    <span>CASE-03 · 老人跌倒监护 · EXP-09 全功能验证</span>
+    <span>6 学时 · 综合性 · 基于 elderly_companion 实验讲义改编</span>
+  </div>
+</footer>
+
+<script>
+var vBase='验收沙盘就绪 — 当前进度 Step 0/5，内存基线 ~2.7G，证据目录 <b>未生成</b>。';
+function setV(t){document.getElementById('verifyIo').innerHTML=t;}
+var vStep=0, vVlmOn=false, vUsb=false, vEvidence=false;
+function vNext(){
+  if(vStep>=5){setV('<span class="ok">▌已到 Step5：</span>继续请「补齐证据+清理」收尾（Step 6）。');return;}
+  vStep++;
+  if(vVlmOn&&vStep>=3){setV('<span class="bad">▌OOM！</span>基线 ~2.7G + VLM 1.3G ≈ <b>3.8G+ 超限</b>（docs/06 L78）→ Step'+vStep+' 进程被杀。<br><span class="dim">▌处理：</span>保持 model.vlm.enabled: false（默认），free -h 预算后再开 —— 可点「开 VLM」撤销本开关重试');return;}
+  if(vUsb&&vStep>=4){setV('<span class="warn">▌Step'+vStep+' 受阻：</span>/dev/ttyACM0 被 log_server（8090 服务）占用 → XFM 唤醒事件到不了 → wake_seen.wait() 永远等不到。<br><span class="dim">▌处理：</span>pkill -f log_server 后重试（软件层故障，见排查表第 1 类）');return;}
+  var msg=['', 
+    '<span class="ok">▌Step1 PASS：</span>env_check 三类全绿 —— 7 依赖库 [env] OK / 模型文件 (file xxx KB) / /dev/ttyUSB0 (serial device) 末行「[env] 自检通过」',
+    '<span class="ok">▌Step2 PASS：</span>--text 文本链路：小飞小飞→[文本] 唤醒 → 你好→[LLM 回复] → 视频跌倒→FALLING→LYING→ASK → 救命→<b>ASR 应答（仅一条）</b>ALERT → 没事→CANCELLED',
+    '<span class="ok">▌Step3 PASS：</span>--mjpeg 音频链路：pkill 清场 →「检测到唤醒」→ 录音线程 plughw:4,0 → [diag] 录音 50 帧/5s → 叮 → ASR→LLM→TTS；:8088/fall.mjpg 推流正常',
+    '<span class="ok">▌Step4 PASS：</span>camera 整机：ros2 话题有数 → fall_app --mode camera --mjpeg --save → wake_seen 放行 → 模拟跌倒走通 FALLING→LYING→ASK→ALERT，标注视频写入 runs/',
+    '<span class="ok">▌Step5 PASS：</span>docs/03 五步手册逐项打勾完毕，Step4 故障五类均无命中 —— 验收表全绿'][vStep];
+  setV(msg);}
+function vSkip(){vStep=3;
+  setV('<span class="bad">▌跳过 Step1 直跑 Step3：</span>依赖/模型未验 —— 这正是讲义反对的操作。<br>分支① rknnlite 没装 → <b>import 即 ImportError 当场崩</b>；分支② 模型文件被置空 → 推理产 NaN/空框 mid-stream 崩<br><span class="dim">▌本该拦住它的：</span>env_check 返回 False → 入口 exit 2（fall_video_demo L60 / fall_app L162）「环境自检失败，退出」<br><span class="dim">▌纠正：</span>回退 Step1 逐项修 MISSING 再前进');}
+function vVlm(){vVlmOn=!vVlmOn;
+  setV(vVlmOn?'<span class="bad">▌vlm.enabled=true：</span>内存拼条 ASR 128M+TTS 600M+LLM 1.5G+检测 500M <b>≈2.7G</b>，再叠 VLM 1.3G → <b>3.8G+ 风险</b>，2G 板必 OOM<br><span class="dim">▌下一步链路（Step3+）将演示崩溃；点按钮撤销</span>':'<span class="ok">▌vlm.enabled=false（默认安全档）：</span>回到 2.7G 基线，恒以 FakeVisionJudge 返 uncertain —— 监控链路永不被复核拖死');}
+function vStall(){vUsb=!vUsb;
+  setV(vUsb?'<span class="warn">▌log_server 启动，占住 /dev/ttyACM0：</span>XFM 六麦的 AIUI 唤醒事件被抢 → notify_wake 收不到<br>后续 Step4 将卡死在 wake_seen.wait()（软件层故障）；<span class="dim">点按钮 pkill -f log_server 解除</span>':'<span class="ok">▌log_server 已停：</span>/dev/ttyACM0 归还 XFM，唤醒链路恢复 —— 可继续「执行下一步」');}
+function vDone(){
+  if(vStep<5){setV('<span class="bad">▌证据不完整：</span>还没跑满五步就来验收 → runs/evidence/ 必然是空目录（告警链路未完整执行）。<br><span class="dim">▌判定充要条件：</span>三件套齐 + 事件覆盖 FALLING→ASK→ALERT(或/CANCELLED) —— 先「执行下一步」走完验收');return;}
+  vEvidence=true;
+  setV('<span class="ok">▌Step6 PASS：</span>runs/evidence/ 三件套齐 —— pre/post.jpg（前帧证站着、后帧证倒了）+ ~5s .avi + events.jsonl 含 FALLING/ASK/ALERT<br>'+
+    '<span class="dim">▌四层清理：</span>pkill -9 aplay → pkill -f llm_server → pkill -f fall_video_demo → pkill -f fall_app<br>'+
+    '<span class="dim">▌复核：</span>pgrep -af "aplay|llm_server|fall_video_demo|fall_app" → <b>无输出</b>；可选 rm runs/evidence/*.avi 释放磁盘<br>'+
+    '<span class="ok">▌🎉 全链路闭环：唤醒→对话→跌倒→询问→应答→告警→存档 验收通过</span>');}
+function vReset(){vStep=0;vVlmOn=false;vUsb=false;vEvidence=false;setV(vBase);}
+setV(vBase);
+</script>
+<script src="../shared/tutorial.js" defer></script>
+</body>
+</html>

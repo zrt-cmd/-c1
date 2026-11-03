@@ -1,0 +1,43 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp003-ros2-application/exp-20-urdf/diagrams/fig-20-3-project-overview.html
+TITLE: 图 20-3 · 工程全景
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+图 20-3 · 工程全景
+图 20-3 · 工程全景：一个模型文件、三个节点、两把工具
+本图回答的问题：本实验改哪些文件、launch 起哪几个节点、用什么验证？
+层 1 · 模型与配置文件（urdf_demo 包）
+diff_drive_robot.urdf
+link×4 · joint×3
+.urdf.xacro
+property + macro
+display.launch.py
+注入 robot_description
+urdf_demo.rviz
+Fixed Frame 等预设
+层 2 · 展开与运行（处理/计算）
+Xacro 参数化重构
+80 行展开为 150 行 URDF
+三节点 launch
+jsp_gui + robot_state_publisher + rviz2
+RViz2 渲染
+RobotModel + TF Display
+xacro 展开
+展开产物
+ros2 launch
+-d 加载预设
+/tf · /joint_states
+层 3 · 两把工具 + 眼睛验证
+check_urdf
+语法+结构：3 child(ren)
+urdf_to_graphiz
+拓扑图 PDF 肉眼核对
+RViz2 眼睛看
+车模·TF 轴·Collision 线框
+被检对象
+渲染结果即证据
+未 source install/setup.bash · launch 硬编码 src/ 绝对路径 · Fixed Frame 写错
+任一处都会让整条链断在层 2——路径永远走 get_package_share_directory()
+✅ 结论：一份模型文件既喂三节点渲染，也喂两把工具体检
+⚠️ 风险：未 source / 硬编码路径 / Fixed Frame 写错 → 全链断
+🔍 验证：04 节检验工具三件套的三条真实输出
+EXP-20 · URDF 与 Xacro 机器人建模

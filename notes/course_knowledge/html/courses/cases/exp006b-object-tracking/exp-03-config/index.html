@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-03 · track_config.yaml 配置详解 — 通用目标追踪综合项目</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+:root{--theme:#0e7490;--theme-deep:#155e75;--theme-bg:#cffafe;--theme-bd:#a5f3fc}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit" title="返回课程首页">🎓 具身智能课程 · <i>通用目标追踪</i></a>
+  <div class="crumb"><a href="../../../index.html#case">综合项目</a> / <a href="../index.html">通用目标追踪</a> / EXP-03</div>
+</div>
+
+<div class="wrap">
+
+<aside class="side">
+  <h4>本页目录</h4>
+  <a href="#s1" class="now">01 问题引入：改坏一个键会发生什么</a>
+  <a href="#s2">02 原理通俗讲解：配置是"整车出厂设置单"</a>
+  <a href="#s3">03 关联知识点</a>
+  <a href="#s4">04 实验目标</a>
+  <a href="#s5">05 实验环境与准备</a>
+  <a href="#s6">06 动画讲解：CLI → merge → load_config 校验链</a>
+  <a href="#s7">07 互动讲解：配置改错诊断台</a>
+  <a href="#s8">08 实操步骤：三类故意改错与 class_filter 实验</a>
+  <a href="#s9">09 重点与易错点</a>
+  <a href="#s10">10 总结与思考</a>
+  <h4>CH1 · 需求与架构设计</h4>
+  <a href="../exp-01-requirements/index.html">EXP-01 需求分析</a>
+  <a href="../exp-02-track-engine/index.html">EXP-02 单状态机架构</a>
+  <a href="../exp-03-config/index.html">EXP-03 配置详解</a>
+  <h4>CH2 · 感知与交互核心</h4>
+  <a href="../exp-04-deepsort-tracking/index.html">EXP-04 DeepSORT 底座</a>
+  <a href="../exp-05-llm-gating/index.html">EXP-05 LLM 门控</a>
+  <a href="../exp-06-vlm-selection/index.html">EXP-06 VLM 选目标</a>
+  <h4>CH3 · 语音、可靠性与验收</h4>
+  <a href="../exp-07-voice-interrupt/index.html">EXP-07 语音打断</a>
+  <a href="../exp-08-events-degrade/index.html">EXP-08 事件降级</a>
+  <a href="../exp-09-full-verify/index.html">EXP-09 全功能验证</a>
+</aside>
+
+<main class="content">
+
+<div class="exp-head">
+  <span class="code">EXP-03 · 第 1 章 · 设计性 · 4 学时</span>
+  <h1>track_config.yaml 配置详解</h1>
+  <p class="desc">一个 YAML 文件管住整个项目的数值边界：13 个顶层配置段、REQUIRED 白名单强校验、CLI 参数只覆盖你显式传入的键。本实验的玩法是<b>"故意改错"</b>——类型改坏、键删掉、必填缺失，看三种真实 Traceback 如何在启动第一秒就把错误拦下来，再用 class_filter 实验感受第一级过滤的威力。</p>
+  <div class="meta">
+    <span class="tag hl">难度 ⭐⭐ · 4 学时</span>
+    <span class="tag">track_config.yaml</span><span class="tag">config_schema</span>
+    <span class="tag">_merge_args</span><span class="tag">class_filter</span>
+  </div>
+</div>
+
+<!-- 01 -->
+<section class="blk" id="s1">
+  <h2><span class="no">01</span>问题引入：改坏一个键会发生什么</h2>
+  <p>配置文件是全项目最常被摸的文件，也是最容易"改坏于无形"的文件：把 <code>min_confidence: 0.3</code> 写成 <code>0.3x</code>，追踪悄悄失灵；删掉 <code>tracking.pause_wait</code>，看门狗逻辑整个失效……本项目用<b>启动即校验</b>把这类事故拦在第一秒：</p>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>启动时 <code>load_config('config/track_config.yaml', REQUIRED)</code> 按白名单逐键校验</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>类型不对 → <code>ConfigError: expected float, got str</code>，进程直接拒启</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>必填键缺失 → <code>missing key: tracking.pause_wait</code>，想省事都不行</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span>CLI 参数经 _merge_args（L74-93）<b>只覆盖显式传入的键</b>，其余原样保留</div>
+  </div>
+  <div class="tip amber"><span class="lab">💡 为什么值得 4 学时</span>后面每个实验都会改这个文件（调阈值、加清除词、开关 ReID）。<b>先学会"怎么改错、错在哪被拦"，之后每一次正确修改才有底气。</b></div>
+</section>
+
+<!-- 02 -->
+<section class="blk" id="s2">
+  <h2><span class="no">02</span>原理通俗讲解：配置是"整车出厂设置单"</h2>
+  <p>把 track_config.yaml 想成汽车的<b>出厂设置单</b>：胎压、限速、空调温度都写在上面。4S 店接车（load_config）第一件事是<b>对着必填清单逐项打勾</b>——少一项（缺 REQUIRED 键）、格式不对（字符串当数字），直接拒收。你临时借车时说"这次把空调调到 22 度"（CLI 参数），只改这一项，其他设置原样生效 —— 这就是 <b>_merge_args 只覆盖显式键</b>的语义：你没提的，绝不替你动。</p>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">detect · 检测段</div><div class="kt">第一级过滤</div><p>score_thr=0.25、iou_thr=0.45、imgsz=640、class_filter=[car] —— 决定哪些框有资格进入追踪。</p></div>
+    <div class="kcard"><div class="kd">tracker · 追踪段</div><div class="kt">第二级过滤</div><p>use_reid=true、min_confidence=0.3、min_box_w/h=32、max_stale=15 —— keep(b) 双红线所在。</p></div>
+    <div class="kcard"><div class="kd">tracking · 引擎段</div><div class="kt">暂停与看门狗</div><p>pause_wait=true、pause_timeout=30.0 —— 指令挂起时"只读帧不处理"，30 秒自动恢复。</p></div>
+    <div class="kcard"><div class="kd">interaction · 交互段</div><div class="kt">四张词表</div><p>clear_words [清除,解除,取消,停,不追,恢复全,不跟]、track_words、color_words、desc_words —— 门控预路由的原料。</p></div>
+    <div class="kcard"><div class="kd">vlm · 描述选车段</div><div class="kt">网格与假模式</div><p>cell_cap=16 封顶；fake_result_id=3 是链路调试用的假模式，不改变真实能力。</p></div>
+    <div class="kcard"><div class="kd">server / speech / …</div><div class="kt">服务与语音</div><p>server: port=8088、stream_name=track.mjpg；speech: wake_words、kws.threshold=0.25；另有 save、log、display、source、session、llm 段。</p></div>
+  </div>
+  <table>
+    <thead><tr><th>改错了会被谁拦住</th><th>谁负责</th><th>触发时机</th></tr></thead>
+    <tbody>
+      <tr><td>类型错（0.3x）</td><td>_validate（common/config.py L49 调用）</td><td>启动 load_config 第一时间</td></tr>
+      <tr><td>必填缺失</td><td>REQUIRED 白名单（config_schema）</td><td>启动校验，missing key 报错</td></tr>
+      <tr><td>语义错（值合法但不对）</td><td>没人拦你 —— 运行期才显形</td><td>如 class_filter 扩空 → ID 爆炸</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 03 -->
+<section class="blk" id="s3">
+  <h2><span class="no">03</span>关联知识点</h2>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">知识点一</div><div class="kt">Schema 校验与白名单</div><p>REQUIRED 是"必填键白名单"，_validate 逐键核类型 —— 与数据库 CHECK 约束、API 请求校验同一思想：坏数据在入口就死。</p></div>
+    <div class="kcard"><div class="kd">知识点二</div><div class="kt">配置分层：文件 → CLI → 代码默认</div><p>_merge_args L74-93 只改动命令行显式给出的键；例如传 --camera 不会重置 video_path，两者互不搭界。</p></div>
+    <div class="kcard"><div class="kd">知识点三</div><div class="kt">IoU 与余弦距离</div><p>IoU=交集/并集，度量"框框重叠"；余弦距离度量"特征方向差异"。tracker 段的阈值一个管几何（IoU 匹配），一个管外观（ReID）。</p></div>
+    <div class="kcard"><div class="kd">知识点四</div><div class="kt">fake 模式 ≠ 关闭</div><p>vlm.fake_result_id=3 是"假装 VLM 永远答 3"的测试桩；enabled=false 是"完全不启用"。一个造阳性结果，一个造空结果 —— 用途完全不同。</p></div>
+  </div>
+</section>
+
+<!-- 04 -->
+<section class="blk" id="s4">
+  <h2><span class="no">04</span>实验目标</h2>
+  <ul class="check">
+    <li>默写 13 个顶层配置段的职责，资产重组出"我要改 X 该进哪一段"的直觉</li>
+    <li>独立复现<b>三类故意改错</b>：类型错、错键名、必填缺失，各背出对应报错关键字</li>
+    <li>解释 _merge_args 的只覆盖显式键语义，说明 --camera 为什么不重置 video_path</li>
+    <li>把 class_filter 扩成 []，观察"一辆车多个 ID、ID 急速增长"的现象并说清机理</li>
+    <li>区分 vlm.fake_result_id=3 与 enabled=false 的用途差异</li>
+    <li>养成改配置前 <code>cp</code> 备份、改完 <code>load_config</code> 自检的习惯</li>
+  </ul>
+</section>
+
+<!-- 05 -->
+<section class="blk" id="s5">
+  <h2><span class="no">05</span>实验环境与准备</h2>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">配置文件</div><div class="kt">config/track_config.yaml</div><p>13 个顶层键：llm / vlm / detect / tracker / tracking / source / session / interaction / speech / server / display / save / log。</p></div>
+    <div class="kcard"><div class="kd">校验模块</div><div class="kt">common/config · config_schema</div><p>load_config 负责读取与合并，config_schema 的 REQUIRED 负责白名单；报错文本出自 common/config.py 的 L37 / L49。</p></div>
+    <div class="kcard"><div class="kd">工具准备</div><div class="kt">sed / cp / python3</div><p>sed 做精确文本替换改错与还原、cp 备份、python3 单行跑 schema 自检 —— 全部无需硬件。</p></div>
+  </div>
+  <pre><span class="c"># ① 备份永远是第一步（改坏随时还原）</span>
+<span class="g">cp</span> config/track_config.yaml /tmp/tc.bak
+
+<span class="c"># ② 先跑一次正向校验，确认当前文件是好的</span>
+<span class="g">python3</span> -c "from common.config import load_config; from config.config_schema import REQUIRED; load_config('config/track_config.yaml', REQUIRED); print('OK')"
+
+<span class="c"># ③ 快速浏览顶层键</span>
+<span class="g">grep</span> -n "^[a-z_]*:" config/track_config.yaml</pre>
+</section>
+
+<!-- 06 -->
+<section class="blk" id="s6">
+  <h2><span class="no">06</span>动画讲解：CLI → merge → load_config 校验链</h2>
+  <p class="lead">一条配置从磁盘到生效要过三道关：合并、白名单、类型核验 —— 动画里红色叉号就是三处会"拒启"的位置：</p>
+  <div class="anim-box">
+    <svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="配置加载与校验链动画">
+      <rect x="8" y="8" width="704" height="284" rx="12" fill="#111827" stroke="#334155"/>
+      <text x="360" y="34" text-anchor="middle" font-size="14" font-weight="700" fill="#67e8f9">配置生效链 · 三道关（6 秒循环）</text>
+      <!-- 源 -->
+      <g font-size="11.5" text-anchor="middle">
+        <rect x="34" y="66" width="150" height="56" rx="9" fill="#1e293b" stroke="#0891b2" stroke-width="2"/>
+        <text x="109" y="89" fill="#67e8f9" font-weight="700">track_config.yaml</text>
+        <text x="109" y="109" fill="#94a3b8">13 个顶层键</text>
+        <rect x="34" y="152" width="150" height="56" rx="9" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/>
+        <text x="109" y="175" fill="#7dd3fc" font-weight="700">CLI 参数</text>
+        <text x="109" y="195" fill="#94a3b8">_merge_args L74-93</text>
+        <text x="109" y="234" fill="#64748b" font-size="10.5">只覆盖显式传入的键</text>
+      </g>
+      <!-- 关卡 -->
+      <g font-size="11.5" text-anchor="middle">
+        <rect x="240" y="100" width="150" height="70" rx="10" fill="#1e293b" stroke="#fbbf24" stroke-width="2"/>
+        <text x="315" y="126" fill="#fde68a" font-weight="700">关卡1 · 合并</text>
+        <text x="315" y="147" fill="#cbd5e1">file + CLI → dict</text>
+        <text x="315" y="164" fill="#64748b" font-size="10">没传的键保持原值</text>
+        <rect x="440" y="100" width="150" height="70" rx="10" fill="#1e293b" stroke="#fbbf24" stroke-width="2"/>
+        <text x="515" y="126" fill="#fde68a" font-weight="700">关卡2 · REQUIRED 白名单</text>
+        <text x="515" y="147" fill="#cbd5e1">missing key 拦截</text>
+        <text x="515" y="164" fill="#64748b" font-size="10">缺 tracking.pause_wait 即报错</text>
+        <rect x="440" y="200" width="150" height="56" rx="10" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/>
+        <text x="515" y="223" fill="#7dd3fc" font-weight="700">关卡3 · _validate 类型核</text>
+        <text x="515" y="243" fill="#cbd5e1">expected float, got str</text>
+        <rect x="626" y="150" width="70" height="70" rx="10" fill="#052e16" stroke="#22c55e" stroke-width="2"/>
+        <text x="661" y="182" fill="#86efac" font-weight="700" font-size="12">RUN</text>
+        <text x="661" y="202" fill="#86efac" font-size="11">生效</text>
+      </g>
+      <g stroke="#475569" stroke-width="1.6" fill="none">
+        <path d="M184 94 L240 125"/><path d="M184 180 L240 150"/>
+        <path d="M390 135 L440 135"/><path d="M515 170 L515 200"/>
+        <path d="M590 228 L626 195"/>
+      </g>
+      <g fill="#67e8f9">
+        <circle r="5"><animate attributeName="cx" values="109;315;515;661" dur="4s" repeatCount="indefinite"/><animate attributeName="cy" values="94;135;228;185" dur="4s" repeatCount="indefinite"/><animate attributeName="opacity" values="1;1;1;0" keyTimes="0;.8;.95;1" dur="4s" repeatCount="indefinite"/></circle>
+      </g>
+      <!-- 拒启分支 -->
+      <g font-size="11" text-anchor="middle">
+        <path d="M515 100 L515 66 L400 60" stroke="#f87171" stroke-width="1.8" fill="none" stroke-dasharray="5 4"/>
+        <text x="330" y="52" fill="#fca5a5">✕ ConfigError → 进程拒绝启动（common/config.py L37/L49）</text>
+        <path d="M440 228 L360 258" stroke="#f87171" stroke-width="1.8" fill="none" stroke-dasharray="5 4"/>
+        <text x="250" y="274" fill="#fca5a5">✕ 类型不符在 _validate 被当场打回</text>
+        <text x="661" y="240" fill="#64748b" font-size="10">改前先 cp 备份</text>
+      </g>
+    </svg>
+  </div>
+  <div class="anim-cap">动画 3-1｜配置要连过三道关才生效；任何一道红叉都发生在启动瞬间 —— 错误不会潜伏到运行期</div>
+</section>
+
+<!-- 07 -->
+<section class="blk" id="s7">
+  <h2><span class="no">07</span>互动讲解：配置改错诊断台</h2>
+  <p class="lead">选一种改法，诊断台给出它触发的关卡、真实报错关键字与修复动作：</p>
+  <div class="ix-panel">
+    <div class="ix-title">配置改错诊断台 · Cfg Clinic</div>
+    <div class="ctl-row">
+      <button class="btn" onclick="cfgCase('type')">① 0.3 改成 0.3x</button>
+      <button class="btn" onclick="cfgCase('int')">② imgsz 640 改成 640x</button>
+      <button class="btn ghost" onclick="cfgCase('miss')">③ 删掉 tracking.pause_wait</button>
+      <button class="btn ghost" onclick="cfgCase('filter')">④ class_filter 扩成 [空]</button>
+      <button class="btn ghost" onclick="cfgCase('reset')">↺ 复位</button>
+    </div>
+    <div class="io" id="cfgIo"><span class="dim">// 点击一种改错方式，先自己预判关卡再揭晓</span>
+<span class="ok">① ② ③ 属于"启动即被拦"；④ 是语义错，运行期才显形 —— 区分这两类是本节重点。</span></div>
+  </div>
+  <div class="tip"><span class="lab">💡 快速自测</span>"min_confidence 改成字符串 '0.3'" 会在哪一关被拦？报错里会看到哪两个类型词？（提示：expected float, got str——答不出就回到诊断台点一下 ①）</div>
+</section>
+
+<!-- 08 -->
+<section class="blk" id="s8">
+  <h2><span class="no">08</span>实操步骤：三类故意改错与 class_filter 实验</h2>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>备份并跑正向校验，确认起点干净（第 05 节两条命令）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>改错①：min_confidence 变字符串 → 复现 expected float, got str</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>改错②：imgsz 变 640x → 复现 expected int, got str；改错③：删必填键 → missing key</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span>逐一 <code>cp /tmp/tc.bak</code> 还原，跑通 class_filter 扩空观察 ID 爆炸，再还原</div>
+  </div>
+  <pre><span class="c"># 改错①：类型错 —— sed 精确替换（注意行尾空格，源讲义原文）</span>
+<span class="g">sed</span> -i 's/min_confidence: 0.3 /min_confidence: 0.3x /' config/track_config.yaml
+<span class="g">python3</span> -c "from common.config import load_config; from config.config_schema import REQUIRED; load_config('config/track_config.yaml', REQUIRED)"
+<span class="c"># ConfigError: tracker.min_confidence: expected float, got str</span>
+<span class="c"># Traceback: common/config.py L37 → L49 → _validate 逐键核对类型</span>
+
+<span class="c"># 改错②：int 段类型错</span>
+<span class="c"># detect.imgsz: 640 → 640x  →  ConfigError: expected int, got str</span>
+
+<span class="c"># 改错③：删 REQUIRED 必填键 tracking.pause_wait（用编辑器删除该行）</span>
+<span class="c"># →  ConfigError: missing key: tracking.pause_wait</span>
+
+<span class="c"># 还原，再做语义实验：class_filter 扩成空（放行 COCO 全部 80 类）</span>
+<span class="g">sed</span> -i 's/class_filter: \[car\]/class_filter: []/' config/track_config.yaml
+<span class="g">python3</span> apps/track_demo.py --video /home/iflytek/ros2_ws/src/xflz_eai_car1/vision/07_multi_object_tracking/test.mp4 --text
+<span class="c"># 现象：人/物全进追踪 → 一辆车被切成多个框竞争 → ID 急速增长</span>
+
+<span class="c"># 收工必还原</span>
+<span class="g">cp</span> /tmp/tc.bak config/track_config.yaml</pre>
+  <div class="tip tealb"><span class="lab">🔍 class_filter 为什么这么灵</span>它位于<b>第一级过滤</b>：YOLov8n 输出 COCO 80 类的一切框先在这里筛。留 [car] 时追踪器只跟车；清空后人、包、路牌全涌入 DeepSORT —— 匹配预算被稀释、误关联变多，ID 自然"遍地开花"。<b>第一级放水，后面每一级都遭殃。</b></div>
+</section>
+
+<!-- 09 -->
+<section class="blk" id="s9">
+  <h2><span class="no">09</span>重点与易错点</h2>
+  <div class="tip amber"><span class="lab">⚠️ 头号易错</span>sed 的行尾空格陷阱：<code>min_confidence: 0.3 </code> 模式串里 0.3 后面那个空格是<b>匹配的关键</b> —— 不带空格可能误伤 0.30、0.35 等同前缀行。替换前先 <code>grep -n "min_confidence" config/track_config.yaml</code> 核对目标行的精确文本。</div>
+  <table>
+    <thead><tr><th>⚠️ 常见坑</th><th>现象 → 解法</th></tr></thead>
+    <tbody>
+      <tr><td>改前不备份</td><td>改坏后凭记忆恢复 → 永远先 <code>cp config/track_config.yaml /tmp/tc.bak</code></td></tr>
+      <tr><td>只测通过不测报错</td><td>校验形同虚设 → REQUIRED 白名单必须用"删键/改错类型"反向验证过才可信</td></tr>
+      <tr><td>以为 CLI 全量覆盖</td><td>--camera 后 video_path 消失的错觉 → _merge_args 只覆盖显式键，video_path 原样保留</td></tr>
+      <tr><td>fake 当 enabled 用</td><td>想关 VLM 却设 fake_result_id → fake 是"永远答 n"的桩；关掉要用 enabled=false</td></tr>
+      <tr><td>class_filter 扩空忘了还原</td><td>测试完 ID 依旧爆炸 → 收工 <code>cp /tmp/tc.bak</code> 一步到位</td></tr>
+      <tr><td>kws.threshold 乱调</td><td>唤醒变迟钝/乱唤醒 → 保持 0.25 基线，调试语音时单变量动它（EXP-07 会用到 0.4 对比）</td></tr>
+    </tbody>
+  </table>
+  <ul class="check">
+    <li>三类改错的报错关键字能脱口而出：expected float, got str / expected int, got str / missing key</li>
+    <li>背出 13 个顶层键，并能指出 keep(b) 双红线住在 detect 段还是 tracker 段</li>
+    <li>class_filter 实验前后各截一次 ID 计数日志作对比</li>
+    <li>工作区已还原：diff /tmp/tc.bak config/track_config.yaml 无差异</li>
+  </ul>
+</section>
+
+<!-- 10 -->
+<section class="blk" id="s10">
+  <h2><span class="no">10</span>总结与思考</h2>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">✅ 完成成果</div><div class="kt">三类报错复现 + ID 爆炸观察</div><p>每类错误都有亲手敲出来的 Traceback 关键字，配置文件已还原干净。</p></div>
+    <div class="kcard"><div class="kd">🧠 原理收获</div><div class="kt">校验前置思想</div><p>启动一秒拦住类型与缺失错；语义错才需要运行期观察 —— 两类错误分开治。</p></div>
+    <div class="kcard"><div class="kd">🛠 技能收获</div><div class="kt">sed 精确改与备份流</div><p>cp 备份 → grep 核对 → sed 精确替换 → 校验 → 还原，五步肌肉记忆。</p></div>
+    <div class="kcard"><div class="kd">➡ 承上启下</div><div class="kt">阈值背后有算法</div><p>score_thr、min_confidence、IoU 阈值都是谁定的？EXP-04 拆 DeepSORT 内部。</p></div>
+  </div>
+  <div class="tip violet"><span class="lab">📝 思考题 1</span>vlm.fake_result_id=3 和 enabled=false 都能让"真实 VLM 不参与"，但一个会产生 ID=3 的锁定、一个什么也不锁。各自适合什么调试场景？把它们用错会引入什么假象？</div>
+  <div class="tip violet"><span class="lab">📝 思考题 2</span>为什么 _merge_args 只覆盖"显式传入的键"而不是"与默认值不同的键"？设想你平时改 yaml 里 video_path 跑离线视频，另一种覆盖策略会怎样毁掉你的工作流？</div>
+</section>
+
+<nav class="expnav">
+  <a href="../exp-02-track-engine/index.html"><span class="lb">← 上一个实验</span>EXP-02 TrackEngine 单状态机架构</a>
+  <a class="next" href="../exp-04-deepsort-tracking/index.html"><span class="lb">下一个实验 →</span>EXP-04 DeepSORT 追踪底座</a>
+</nav>
+
+<footer>
+  <span>CASE-04 · 通用目标追踪综合项目 · EXP-03 track_config.yaml 配置详解</span>
+  <span>4 学时 · 设计性 · 基于 object_tracking 实验讲义改编</span>
+</footer>
+
+</main>
+</div>
+
+<script>
+// 配置改错诊断台
+function cfgCase(k){
+  var out={
+    type:'<span class="dim">// 改法：min_confidence: 0.3 → 0.3x</span>\n'+
+      '<span class="warn">关卡：关卡3 · _validate 类型核（load_config 内）</span>\n'+
+      '<span class="bad">ConfigError: tracker.min_confidence: expected float, got str</span>\n'+
+      '<span class="dim">Traceback 锚点：common/config.py L37 → L49 → _validate</span>\n'+
+      '<span class="ok">修复：cp /tmp/tc.bak config/track_config.yaml 还原</span>',
+    int:'<span class="dim">// 改法：detect.imgsz: 640 → 640x</span>\n'+
+      '<span class="warn">关卡：关卡3 · _validate 类型核</span>\n'+
+      '<span class="bad">ConfigError: detect.imgsz: expected int, got str</span>\n'+
+      '<span class="dim">点号路径直接指出罪犯位置：哪段哪个键一目了然</span>\n'+
+      '<span class="ok">修复：还原备份；这类错误永远"启动即拦"，不会带病运行</span>',
+    miss:'<span class="dim">// 改法：删除必填行 tracking.pause_wait</span>\n'+
+      '<span class="warn">关卡：关卡2 · REQUIRED 白名单</span>\n'+
+      '<span class="bad">ConfigError: missing key: tracking.pause_wait</span>\n'+
+      '<span class="dim">白名单思想：哪怕键"可有可无"，工程也强制你显式表态</span>\n'+
+      '<span class="ok">修复：补回 pause_wait: true（看门狗逻辑依赖它）</span>',
+    filter:'<span class="dim">// 改法：class_filter: [car] → []（启动能过！）</span>\n'+
+      '<span class="ok">三道关全绿 —— 类型对、键齐全、白名单满足，进程正常启动</span>\n'+
+      '<span class="bad">运行期：COCO 80 类全部入追踪 → 一个人被切成多框竞争</span>\n'+
+      '<span class="bad">现象：一辆车多个 ID、ID 急速增长（语义错，无人拦截）</span>\n'+
+      '<span class="warn">教训：校验器只保格式，语义正确性永远靠观察与测试</span>',
+    reset:'<span class="dim">// 已复位。三关全绿，当前配置与 /tmp/tc.bak 一致。</span>\n'+
+      '<span class="ok">记住两类错误：①②③=启动即拦；④=运行期显形</span>'
+  };
+  document.getElementById('cfgIo').innerHTML=out[k];
+}
+</script>
+<script src="../shared/tutorial.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-02 · SLAM Toolbox 建图 — 机器人 SLAM 与自主导航</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+:root{--theme:#2563eb;--theme-deep:#1d4ed8;--theme-bg:#dbeafe;--theme-bd:#bfdbfe}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit" title="返回课程首页">🧠 具身智能课程 · <i>教程首页</i></a>
+  <div class="crumb"><a href="../../../index.html#core">核心课程</a> / <a href="../index.html">SLAM 与自主导航</a> / EXP-02</div>
+</div>
+
+<div class="wrap">
+
+<aside class="side">
+  <h4>本页目录</h4>
+  <a href="#s1" class="now">01 问题引入：怎么把房间"扫"成一张图</a>
+  <a href="#s2">02 原理通俗讲解：前端配准与回环</a>
+  <a href="#s3">03 关联知识点</a>
+  <a href="#s4">04 实验目标</a>
+  <a href="#s5">05 实验环境与准备</a>
+  <a href="#s6">06 动画讲解：关键帧与回环闭合</a>
+  <a href="#s7">07 互动讲解：关键帧阈值演练台</a>
+  <a href="#s8">08 实操步骤：启动 → 逛圈 → 存图</a>
+  <a href="#s9">09 重点与易错点</a>
+  <a href="#s10">10 总结与思考</a>
+  <h4>CH1 · 建模与建图</h4>
+  <a href="../exp-01-slam-urdf/index.html">EXP-01 原理与 URDF</a>
+  <a href="../exp-02-slam-toolbox/index.html">EXP-02 SLAM Toolbox 建图</a>
+  <h4>CH2 · 定位与导航</h4>
+  <a href="../exp-03-nav2-navigation/index.html">EXP-03 Nav2 导航</a>
+  <a href="../exp-04-amcl-localization/index.html">EXP-04 AMCL 定位</a>
+  <a href="../exp-05-dwa-teb-avoidance/index.html">EXP-05 DWA/TEB 避障</a>
+  <h4>CH3 · 进阶</h4>
+  <a href="../exp-06-radar-multiwaypoint/index.html">EXP-06 多点导航</a>
+  <a href="../exp-07-rtabmap-3d/index.html">EXP-07 RTAB-Map 3D</a>
+</aside>
+
+<main class="content">
+
+<div class="exp-head">
+  <span class="code">EXP-02 · 第 1 章 · 设计性 · 4 学时</span>
+  <h1>SLAM Toolbox 建图</h1>
+  <p class="desc">这节课是整门课的第一个"高光时刻"——你将用键盘遥控小车在房间里逛一圈，然后得到一张跟户型图一样的二维地图。全程只做三件事：启动建图 → 遥控逛圈 → 保存地图。</p>
+  <div class="meta">
+    <span class="tag hl">难度 ⭐⭐ · 4 学时</span>
+    <span class="tag">SLAM Toolbox</span><span class="tag">扫描匹配</span>
+    <span class="tag">回环检测</span><span class="tag">map_saver</span>
+  </div>
+</div>
+
+<!-- 01 -->
+<section class="blk" id="s1">
+  <h2><span class="no">01</span>问题引入：怎么把房间"扫"成一张图</h2>
+  <p>EXP-01 里我们知道雷达每 0.1 秒扫一圈，可一圈只看到"眼前一环"。要把整个房间拼成一张图，小车必须<b>边走边拼</b>，而拼图本身又有两个麻烦：</p>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>手推购物车走一圈回原点，因打滑"记的步数"和实际走的对不上——起点终点接不拢</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>每圈扫描都要和上一圈对齐（前端扫描配准），错一点，越拼越歪</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>逛回出发点时"咦，这面墙刚才见过"——回环检测：把首尾接上，一键把累积误差摊平</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span>SLAM Toolbox 把这三步做成了现成节点：你只管启动、逛圈、存图</div>
+  </div>
+  <div class="tip amber"><span class="lab">💡 一句话读懂</span>这节课是整门课的第一个"高光时刻"——你将用键盘遥控小车在房间里逛一圈，然后得到一张跟户型图一样的二维地图。全程只做三件事：启动建图 → 遥控逛圈 → 保存地图。</div>
+</section>
+
+<!-- 02 -->
+<section class="blk" id="s2">
+  <h2><span class="no">02</span>原理通俗讲解：前端配准与回环</h2>
+  <div class="tip tealb"><span class="lab">🧩 拼撕碎的地图</span>把户型图撕成 360 张碎纸叠在一起（每 0.1 秒一张扫描），最后<b>只留一小叠（关键帧）</b>。每次拿新碎纸和上一张对齐——这叫<b>前端扫描配准</b>（像玩"大家来找茬"：平移旋转着挪，直到两张图严丝合缝）。等你逛回起点，发现最后一张和第一张原本就是同一面墙——这叫<b>回环检测</b>，把整叠地图"首尾一捋"，之前累计的手抖全被摊平。地图从"歪扭"变"方正"，靠的就是这一捋。</div>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">前端</div><div class="kt">Scan Matching 扫描配准</div><p>在 ±0.5 m 的搜索窗（correlation_search_space_dimension 0.5）、1 cm 步进（resolution 0.01）内微调位姿，让新一帧扫描与当前地图最吻合。</p></div>
+    <div class="kcard"><div class="kd">后端</div><div class="kt">Ceres 图优化</div><p>把关键帧当节点、匹配与回环当边，用 Ceres（LEVENBERG_MARQUARDT 信赖域 + SPARSE_NORMAL_CHOLESKY 求解）整体调位置，误差被摊到每一条边上。</p></div>
+    <div class="kcard"><div class="kd">回环</div><div class="kt">Loop Closure</div><p>回到旧地时在 8 m 范围（loop_search_space_dimension 8.0）内搜索候选，粗匹配响应 &gt;0.35、细匹配响应 &gt;0.45 才认账，防"认错墙"。</p></div>
+    <div class="kcard"><div class="kd">关键帧</div><div class="kt">不是每帧都存</div><p>走超 0.01 m 或转超 0.02 rad 才开新关键帧——存太密图臃肿算不动，存太疏拼不上。</p></div>
+    <div class="kcard"><div class="kd">频率</div><div class="kt">地图 10 Hz 刷新</div><p>mode: mapping，map_update_interval 0.1 s：RViz 里能看到地图"实时长出来"。</p></div>
+    <div class="kcard"><div class="kd">量程</div><div class="kt">max_laser_range 12.0</div><p>与 COIN-D6 雷达一致；超范围的点直接丢弃，避免把远处无关噪声当地标。</p></div>
+  </div>
+</section>
+
+<!-- 03 -->
+<section class="blk" id="s3">
+  <h2><span class="no">03</span>关联知识点</h2>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">知识点 1</div><div class="kt">位姿图</div><p>关键帧节点 + 约束边构成的图，SLAM 后端优化的就是它；回环边是"首尾相接"的那根超强约束。</p></div>
+    <div class="kcard"><div class="kd">知识点 2</div><div class="kt">odom → base_footprint</div><p>建图期间 TF 链：map→odom 由 slam_toolbox 发，odom→base_footprint 由轮式里程计（EKF）发，缺一不可。</p></div>
+    <div class="kcard"><div class="kd">知识点 3</div><div class="kt">map 文件二件套</div><p>.pgm 是灰度位图（<b>254 空闲 / 0 占据 / 205 未知</b>），.yaml 记分辨率 0.05、origin 原点、occupied_thresh 0.65 / free_thresh 0.25——成对才能被 Nav2 加载。</p></div>
+    <div class="kcard"><div class="kd">知识点 4</div><div class="kt">QoS 匹配</div><p>/scan 是 Best Effort（尽力而为）：订阅端若用 Reliable 会收不到数据，RViz 里 LaserScan 的 Reliability Policy 必须改成 Best Effort。</p></div>
+    <div class="kcard"><div class="kd">知识点 5</div><div class="kt">launch 延迟启动</div><p>TimerAction period=10.0：等 bringup 的 odom/TF 与雷达 /scan 稳定 10 秒再起 slam，避免刚上电 TF 不全报错。</p></div>
+    <div class="kcard"><div class="kd">知识点 6</div><div class="kt">好地图四标准</div><p>墙单线（厚 &lt; 0.1 m）、尺寸误差 &lt; 2%、四角直角 ≈90°、闭环处无错位。地图不过关，导航全白搭。</p></div>
+  </div>
+</section>
+
+<!-- 04 -->
+<section class="blk" id="s4">
+  <h2><span class="no">04</span>实验目标</h2>
+  <ul class="check">
+    <li>跑通 <span class="ok">slam.launch.py</span> 建图节点，RViz 中地图随遥控实时生长</li>
+    <li>用 <span class="ok">slam_teleop</span>（w/s/a/d/空格，0.2 m/s、0.5 rad/s）遥控逛完整圈并完成闭环</li>
+    <li>用 <span class="ok">map_save</span>（<code>-p map_name:=</code>）或 map_saver_cli 保存出 map_01.pgm + map_01.yaml</li>
+    <li>按四标准验收地图：墙单线、尺寸 &lt; 2%、直角、<span class="ok">闭环错位 &lt; 0.1 m</span></li>
+    <li>会诊断 5 类常见问题：QoS、地图不更新、双墙、回环不触发、保存失败</li>
+  </ul>
+</section>
+
+<!-- 05 -->
+<section class="blk" id="s5">
+  <h2><span class="no">05</span>实验环境与准备</h2>
+  <table>
+    <thead><tr><th>项目</th><th>要求</th></tr></thead>
+    <tbody>
+      <tr><td>系统</td><td>Ubuntu 22.04 + ROS2 Humble，car1_slam 功能包已编译（含 slam/teleop/map_save 节点与 launch）</td></tr>
+      <tr><td>硬件</td><td>小车 C1 满电（逛圈耗电）、COIN-D6 雷达（/scan 10 Hz Best Effort）、平整 3 m × 3 m 以上场地</td></tr>
+      <tr><td>参数文件</td><td>car1_slam/config/slam.yaml（mode: mapping、do_loop_closing: true、max_laser_range: 12.0）</td></tr>
+      <tr><td>前置实验</td><td>EXP-01 TF 树正常（base_footprint 为根），否则建图节点起不来</td></tr>
+      <tr><td>RViz 配置</td><td>launch 已自带 slam.rviz：Fixed Frame = map，Map（/map，Transient Local）+ LaserScan（/scan，Best Effort）+ TF 已配好</td></tr>
+    </tbody>
+  </table>
+  <div class="tip"><span class="lab">💡 关键参数速记</span>resolution 0.05 · map_update_interval 0.1 · minimum_travel_distance 0.01 · minimum_travel_heading 0.02 · correlation_search_space_dimension 0.5 · loop_search_space_dimension 8.0 · loop_match_minimum_response_coarse 0.35 · loop_match_minimum_response_fine 0.45（均取自 car1_slam/config/slam.yaml）。</div>
+</section>
+
+<!-- 06 -->
+<section class="blk" id="s6">
+  <h2><span class="no">06</span>动画讲解：关键帧与回环闭合</h2>
+  <p class="lead">上：小车沿房间行进，每隔一小段落一个关键帧（蓝点），扫描扇形不断把墙画上图；下：逛回起点附近触发<b>回环</b>（金色虚线），原本错开的"双重墙"被对齐成单线。</p>
+  <div class="anim-box">
+    <svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="关键帧行进与回环闭合动画">
+      <rect x="8" y="8" width="704" height="284" rx="12" fill="#111827" stroke="#334155"/>
+      <text x="360" y="34" text-anchor="middle" font-size="14" font-weight="700" fill="#93c5fd">建图行进 → 关键帧 → 回环闭合纠正漂移</text>
+
+      <!-- 房间 -->
+      <rect x="90" y="64" width="540" height="196" rx="8" fill="none" stroke="#475569" stroke-width="3"/>
+
+      <!-- 关键帧路径（小车运动） -->
+      <path id="kfpath" d="M 150 210 L 150 110 L 570 110 L 570 210 L 170 210" fill="none" stroke="#334155" stroke-width="2" stroke-dasharray="5 5"/>
+
+      <!-- 关键帧点依次点亮 -->
+      <g fill="#60a5fa">
+        <circle cx="150" cy="210" r="5"><animate attributeName="opacity" values="0;1" keyTimes="0;.05" dur="7s" repeatCount="indefinite"/></circle>
+        <circle cx="150" cy="160" r="5"><animate attributeName="opacity" values="0;1" keyTimes="0;.2" dur="7s" repeatCount="indefinite"/></circle>
+        <circle cx="200" cy="110" r="5"><animate attributeName="opacity" values="0;1" keyTimes="0;.32" dur="7s" repeatCount="indefinite"/></circle>
+        <circle cx="300" cy="110" r="5"><animate attributeName="opacity" values="0;1" keyTimes="0;.42" dur="7s" repeatCount="indefinite"/></circle>
+        <circle cx="420" cy="110" r="5"><animate attributeName="opacity" values="0;1" keyTimes="0;.52" dur="7s" repeatCount="indefinite"/></circle>
+        <circle cx="570" cy="140" r="5"><animate attributeName="opacity" values="0;1" keyTimes="0;.62" dur="7s" repeatCount="indefinite"/></circle>
+        <circle cx="570" cy="210" r="5"><animate attributeName="opacity" values="0;1" keyTimes="0;.72" dur="7s" repeatCount="indefinite"/></circle>
+        <circle cx="400" cy="210" r="5"><animate attributeName="opacity" values="0;1" keyTimes="0;.82" dur="7s" repeatCount="indefinite"/></circle>
+      </g>
+
+      <!-- 小车 + 扫描扇形 -->
+      <g>
+        <g>
+          <line x1="0" y1="0" x2="-52" y2="-34" stroke="#38bdf8" stroke-width="1.6" opacity=".8"/>
+          <line x1="0" y1="0" x2="-56" y2="4" stroke="#38bdf8" stroke-width="1.6" opacity=".8"/>
+          <line x1="0" y1="0" x2="-30" y2="46" stroke="#38bdf8" stroke-width="1.6" opacity=".8"/>
+          <animateTransform attributeName="transform" type="rotate" values="0;360" dur="1.4s" repeatCount="indefinite"/>
+        </g>
+        <circle r="13" fill="#1e293b" stroke="#60a5fa" stroke-width="2.5"/>
+        <circle r="4" fill="#38bdf8"/>
+        <animateMotion dur="7s" repeatCount="indefinite" path="M 150 210 L 150 110 L 570 110 L 570 210 L 170 210"/>
+      </g>
+
+      <!-- 回环连线：末帧 -> 首帧 -->
+      <g opacity="0">
+        <animate attributeName="opacity" values="0;0;1;1;.4;.9" keyTimes="0;.78;.84;.92;.96;1" dur="7s" repeatCount="indefinite"/>
+        <path d="M 360 210 Q 300 262 150 214" fill="none" stroke="#fbbf24" stroke-width="3" stroke-dasharray="7 6">
+          <animate attributeName="stroke-dashoffset" values="0;-26" dur="1s" repeatCount="indefinite"/>
+        </path>
+        <text x="330" y="258" font-size="12.5" font-weight="700" fill="#fbbf24" text-anchor="middle">回环检测：末帧 ≈ 首帧 · 误差整段摊平</text>
+      </g>
+
+      <text x="360" y="76" text-anchor="middle" font-size="11.5" fill="#64748b">蓝点 = 关键帧（每 0.01 m / 0.02 rad 一枚）· 扫描扇形实时补墙</text>
+      <text x="614" y="176" text-anchor="end" font-size="11" fill="#86efac">双墙 → 单墙</text>
+    </svg>
+  </div>
+  <div class="anim-cap">动画 2-1｜小车 7 秒逛一圈：关键帧逐个落点，第 78% 时刻触发回环金线，累积漂移被 Ceres 后端摊平</div>
+</section>
+
+<!-- 07 -->
+<section class="blk" id="s7">
+  <h2><span class="no">07</span>互动讲解：关键帧阈值与回环触发演练台</h2>
+  <p class="lead">遥控手法直接决定关键帧密度和回环能不能触发——点按钮模拟三种逛圈方式，看系统判定：</p>
+  <div class="ix-panel">
+    <div class="ix-title">逛圈手法演练台 · KeyFrame Lab</div>
+    <div class="ctl-row">
+      <button class="btn" onclick="driveMap('slow')">🐢 慢速平移 + 走大圈</button>
+      <button class="btn ghost" onclick="driveMap('fast')">🏎 高速甩尾 + 小圈</button>
+      <button class="btn ghost" onclick="driveMap('nostop')">🔄 原地打转不挪窝</button>
+    </div>
+    <div class="io" id="kfIo"><span class="dim">// 选择一种遥控手法，观察关键帧与回环判定</span>
+<span class="ok">推荐：0.2 m/s 平移、≤1.0 rad/s 转向、走"8 字"或大圈并在起点收尾</span></div>
+  </div>
+  <table>
+    <thead><tr><th>slam.yaml 参数</th><th>默认值</th><th>作用</th></tr></thead>
+    <tbody>
+      <tr><td>minimum_travel_distance</td><td>0.01</td><td>移动超 1 cm 才存关键帧——静止时空转不刷关键帧</td></tr>
+      <tr><td>minimum_travel_heading</td><td>0.02</td><td>转角超约 1.15° 才存新帧</td></tr>
+      <tr><td>loop_match_minimum_response_fine</td><td>0.45</td><td>精细匹配响应度门槛，太低易误回环、太高难触发</td></tr>
+      <tr><td>do_loop_closing</td><td>true</td><td>回环总开关；关掉 = 永远画不出"闭合"的图</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 08 -->
+<section class="blk" id="s8">
+  <h2><span class="no">08</span>实操步骤：启动 → 逛圈 → 存图</h2>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>终端 1：source 后启动建图（launch 内置 10 秒 TimerAction 延迟起 slam 节点）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>终端 2：启动键盘遥控；RViz 确认 Fixed Frame = map、/scan 点云随车移动</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>慢速逛完整圈回到出发点，看到回环连线跳动、双墙合一后，先存图再停车</div>
+  </div>  <pre><span class="c"># ① 启动 SLAM 建图（含底盘 bringup、雷达、10 秒延迟起的 slam_toolbox 与 rviz）</span>
+<span class="g">ros2</span> launch car1_slam slam.launch.py
+<span class="c">#   不想开 rviz：追加 use_rviz:=false</span>
+
+<span class="c"># ② 另开终端：键盘遥控（w/s 前后 0.2m/s，a/d 左右转 0.5rad/s，空格停）</span>
+<span class="g">ros2</span> run car1_slam slam_teleop
+<span class="c">#   注意：必须在真终端（tty）里运行，IDE 内嵌终端读不到按键</span>
+
+<span class="c"># ③ 逛圈前自检：雷达 10Hz、里程计 TF 正常</span>
+<span class="g">ros2</span> topic hz /scan
+<span class="g">ros2</span> run tf2_ros tf2_echo odom base_footprint
+
+<span class="c"># ④ 保存地图（逛完圈、触发回环之后再执行）</span>
+<span class="g">ros2</span> run car1_slam map_save <span class="y">--ros-args -p map_name:=map_01</span>
+<span class="c">#   默认写到 install/.../car1_slam/maps/ ；想改目录再加 -p map_dir:=/绝对/路径</span>
+<span class="c">#   注意 map_save 读的是参数 map_name，不是位置参数——直接写 map_01 不会生效</span>
+
+<span class="c"># 方式二：nav2 官方 CLI（transient_local 才能收到 latched 的 /map）</span>
+<span class="g">ros2</span> run nav2_map_server map_saver_cli -f map_01 \
+  --ros-args -p map_subscribe_transient_local:=true
+
+<span class="c"># ⑤ 停掉遥控（Ctrl+C 前先保存）</span>
+<span class="g">pkill</span> -f slam_teleop</pre>
+  <p>保存产物 <code>map_01.yaml</code> 关键字段（与仓库示例 slam_map.yaml 一致）：image: map_01.pgm · mode: trinary · resolution: 0.05 · origin: [-0.381, -0.482, 0] · negate: 0 · occupied_thresh: 0.65 · free_thresh: 0.25。其中 origin 是地图左下角在 map 坐标系里的位姿。</p>
+</section>
+
+<!-- 09 -->
+<section class="blk" id="s9">
+  <h2><span class="no">09</span>重点与易错点</h2>
+  <div class="tip amber"><span class="lab">⚠️ 重点</span>回环是建图质量的分水岭：走大圈 + 回到起点多停 2 秒，给系统一次"认出老家"的机会。验收时量闭环处——两段墙必须并成单线，错位 &lt; 0.1 m、航向差 &lt; 5°。</div>
+  <table>
+    <thead><tr><th>⚠️ 常见坑</th><th>现象 → 解法</th></tr></thead>
+    <tbody>
+      <tr><td>RViz 无扫描点</td><td>LaserScan 空白 → QoS Reliability 改 <b>Best Effort</b>（雷达即尽力而为）</td></tr>
+      <tr><td>地图不生长</td><td>/map 不更新 → 确认 slam 节点在跑（ros2 node list）且 /scan 有数据</td></tr>
+      <tr><td>墙出现双影</td><td>回环没触发/配准失败 → 降低车速、走规则大圈、回起点停一停再看</td></tr>
+      <tr><td>回环永不触发</td><td>闭环区域特征太弱或太快掠过 → 回起点减速正对原方向；检查 do_loop_closing: true</td></tr>
+      <tr><td>保存失败</td><td>map_saver 等不到 /map → 加 <code>-p map_subscribe_transient_local:=true</code>，或用 car1_slam 的 map_save</td></tr>
+      <tr><td>存下来的还是旧名字</td><td>误把 <code>map_01</code> 当位置参数传 → 必须写成 <code>--ros-args -p map_name:=map_01</code></td></tr>
+      <tr><td>文件名踩坑</td><td>路径含中文/空格 → 改英文文件名；先保存再 Ctrl+C</td></tr>
+    </tbody>
+  </table>
+  <ul class="check">
+    <li>地图墙厚 <span class="ok">&lt; 0.1 m 单线</span>、整体尺寸误差 <span class="ok">&lt; 2%</span>、四角直角 90°±2°</li>
+    <li>回到起点处 <span class="ok">闭环无错位</span>（&lt; 0.1 m / 航向 &lt; 5°）</li>
+    <li>map_01.pgm + map_01.yaml <span class="ok">成对存在</span>，origin/thresholds 齐全</li>
+    <li>逛圈全程 <span class="ok">低速（≤1.0 rad/s 转向）</span>、先存图后停车、电量充足</li>
+  </ul>
+</section>
+
+<!-- 10 -->
+<section class="blk" id="s10">
+  <h2><span class="no">10</span>总结与思考</h2>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">✅ 完成成果</div><div class="kt">一张可用的户型图</div><p>slam.launch + slam_teleop 逛圈，map_save 产出 map_01.pgm/yaml 并通过四标准验收。</p></div>
+    <div class="kcard"><div class="kd">🧠 原理收获</div><div class="kt">前端 + 后端 + 回环</div><p>扫描配准堆关键帧，Ceres 图优化摊误差，回环检测是"一捋正"的关键。</p></div>
+    <div class="kcard"><div class="kd">🛠 技能收获</div><div class="kt">三步操作肌肉记忆</div><p>启动 → 遥控逛圈 → 保存；map_save 的参数式调用与 map_saver_cli 的 transient_local 参数套路。</p></div>
+    <div class="kcard"><div class="kd">❓ 排障思路</div><div class="kt">双墙排查链</div><p>QoS → /scan 频率 → 车速 → 闭环 → do_loop_closing 参数，逐级定位。</p></div>
+  </div>
+  <div class="tip violet"><span class="lab">📝 思考题 1</span>如果把 minimum_travel_distance 从 0.01 m 调大到 0.5 m，关键帧会变少还是变多？地图更新会变得"卡顿"还是"更丝滑"？对回环检测的精度又有什么影响？</div>
+  <div class="tip violet"><span class="lab">📝 思考题 2</span>为什么"先建图、后导航"的顺序不能颠倒？假设没有 map，AMCL 的粒子该往哪里对齐、Nav2 的全局规划又在什么上画线？把你的理由讲给同桌听。</div>
+</section>
+
+<nav class="expnav">
+  <a href="../index.html"><span class="lb">← 返回</span>课程目录 · SLAM 与自主导航</a>
+  <a class="next" href="../exp-03-nav2-navigation/index.html"><span class="lb">下一个实验 →</span>EXP-03 Nav2 机器人导航</a>
+</nav>
+
+<footer>
+  <span>CORE-04 · 机器人 SLAM 与自主导航 · EXP-02 SLAM Toolbox 建图</span>
+  <span>4 学时 · 设计性 · 基于 slam_practice 实验讲义改编</span>
+</footer>
+
+</main>
+</div>
+
+<script>
+// 逛圈手法演练台
+function driveMap(mode){
+  var io=document.getElementById('kfIo'),h='';
+  if(mode==='slow'){
+    h='<span class="dim">// 0.2 m/s 平移 + 1.0 rad/s 以内转向，走大圈回起点</span>\n'+
+      '<span class="ok">✔ 关键帧密度均匀（每 0.01m/0.02rad 落一枚），扫描匹配始终对得上</span>\n'+
+      '<span class="ok">✔ 回到起点：loop 响应 0.62 &gt; 0.45 → 回环触发，双墙合一</span>\n'+
+      '<span class="ok">判定：可保存 —— 墙单线、闭环 &lt; 0.1 m</span>';
+  }else if(mode==='fast'){
+    h='<span class="dim">// 高速甩尾 + 小圈急转</span>\n'+
+      '<span class="warn">⚠ 关键帧被拉稀：0.1s 内冲出 8cm，相邻帧对不上（帧间位移 &gt; 搜索半径）</span>\n'+
+      '<span class="bad">✘ 扫描匹配失败 → 地图出现弧形重影、墙变"毛边"</span>\n'+
+      '<span class="warn">回环判定：响应 0.31 &lt; 0.45 不触发 —— 降速重逛，或调大 minimum_travel_distance 反而更糟</span>';
+  }else{
+    h='<span class="dim">// 原地持续打转不平移</span>\n'+
+      '<span class="warn">⚠ 转角超 0.02 rad 就落帧 → 关键帧爆炸式增长，CPU 飙升、地图变卡</span>\n'+
+      '<span class="bad">✘ 走不出位移、看不到新区域：地图永远只有出发点那一环</span>\n'+
+      '<span class="dim">// 提示：建图要"走出去"——平移推进 + 偶尔转向补视野</span>';
+  }
+  io.innerHTML=h;
+}
+</script>
+<script src="../shared/tutorial.js" defer></script>
+</body>
+</html>

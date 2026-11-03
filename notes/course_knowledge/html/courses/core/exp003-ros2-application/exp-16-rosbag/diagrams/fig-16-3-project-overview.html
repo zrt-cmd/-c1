@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>图 16-3 · 实验工程全景</title>
+<style>
+:root{--bg-page:#ffffff;--bg-card:#ffffff;--text:#0f172a;--text2:#475569;--muted:#94a3b8;
+  --border:#e2e8f0;--teal:#0891b2;--green:#059669;--purple:#7c3aed;--orange:#ea580c;--red:#e11d48;--gray:#64748b;
+  --teal-bg:rgba(8,145,178,.08);--green-bg:rgba(5,150,105,.08);--purple-bg:rgba(124,58,237,.08);
+  --orange-bg:rgba(234,88,12,.10);--gray-bg:rgba(100,116,139,.08)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg-page);color:var(--text);font-family:system-ui,"PingFang SC","Microsoft YaHei",sans-serif;padding:16px 14px 12px}
+.hd{margin-bottom:6px}
+.hd h1{font-size:15px;margin:0 0 4px}
+.hd .q{font-size:12px;color:var(--text2);margin:0}
+svg{width:100%;height:auto;display:block}
+.t{font:600 12.5px system-ui,sans-serif;fill:var(--text)}
+.s{font:400 10.5px system-ui,sans-serif;fill:var(--text2)}
+.l{font:600 10.5px ui-monospace,Consolas,monospace;fill:var(--text2)}
+.dock{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.dock span{font-size:11.5px;border-radius:999px;padding:3px 10px;line-height:1.6}
+.ok{background:#ecfdf5;color:#047857;border:1px solid #a7f3d0}
+.warn{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca}
+.evid{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}
+.ft{font-size:10.5px;color:var(--muted);margin-top:8px;text-align:right}
+</style>
+</head>
+<body>
+<div class="hd">
+  <h1>图 16-3 · 实验工程全景：三个终端各管一段</h1>
+  <p class="q">本图回答的问题：录→查→放全流程里，每个终端各自扮演什么角色，数据从哪来到哪去？</p>
+</div>
+<svg viewBox="0 0 760 460" role="img" aria-label="实验工程全景图">
+  <!-- 三终端列 -->
+  <text class="l" x="80" y="24" fill="var(--teal)">终端 A · 现场源</text>
+  <text class="l" x="320" y="24" fill="var(--green)">终端 B / 新终端 · 观众</text>
+  <text class="l" x="580" y="24" fill="var(--orange)">终端 C · 录放控制台</text>
+
+  <!-- 终端A -->
+  <rect x="40" y="36" width="170" height="70" rx="8" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1.5"/>
+  <text class="t" x="125" y="62" text-anchor="middle">talker</text>
+  <text class="s" x="125" y="84" text-anchor="middle">ros2 run demo_nodes_cpp</text>
+
+  <!-- 终端B -->
+  <rect x="272" y="36" width="170" height="70" rx="8" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1.5"/>
+  <text class="t" x="357" y="62" text-anchor="middle">listener</text>
+  <text class="s" x="357" y="84" text-anchor="middle">录制时旁听 · 回放时当观众</text>
+
+  <!-- 终端C -->
+  <rect x="540" y="36" width="190" height="70" rx="8" fill="var(--orange-bg)" stroke="var(--orange)" stroke-width="1.5"/>
+  <text class="t" x="635" y="60" text-anchor="middle">record / info / play</text>
+  <text class="s" x="635" y="82" text-anchor="middle">写入 · 体检 · 再生发布</text>
+
+  <!-- /chatter 消息线 -->
+  <line x1="210" y1="71" x2="268" y2="71" stroke="var(--orange)" stroke-width="1.8" marker-end="url(#ao)"/>
+  <text class="l" x="214" y="62" fill="var(--orange)">/chatter 1Hz</text>
+
+  <line x1="446" y1="71" x2="536" y2="71" stroke="var(--orange)" stroke-width="1.8" marker-end="url(#ao)"/>
+  <text class="l" x="454" y="62" fill="var(--orange)">订阅</text>
+
+  <!-- record 捕获 -->
+  <line x1="357" y1="106" x2="580" y2="106" stroke="var(--purple)" stroke-width="1.5" stroke-dasharray="6,4"/>
+  <text class="l" x="380" y="124" fill="var(--purple)">record -a 分叉捕获全部活跃话题</text>
+
+  <!-- bag 目录（中心数据层） -->
+  <rect x="200" y="170" width="360" height="104" rx="10" fill="#fff"/>
+  <rect x="200" y="170" width="360" height="104" rx="10" fill="var(--purple-bg)" stroke="var(--purple)" stroke-width="2"/>
+  <text class="t" x="380" y="198" text-anchor="middle">~/ros2_bags/exp16_full/</text>
+  <g class="s">
+    <text x="220" y="224">exp16_full_0.db3 · 消息本体（CDR 时间序列）</text>
+    <text x="220" y="248">metadata.yaml · 清单（13.55s / 54 条 / QoS）</text>
+  </g>
+
+  <line x1="620" y1="106" x2="470" y2="170" stroke="var(--purple)" stroke-width="1.8" marker-end="url(#ap)"/>
+  <text class="l" x="540" y="132" fill="var(--purple)">Ctrl+C 写入</text>
+
+  <line x1="290" y1="274" x2="400" y2="330" stroke="var(--green)" stroke-width="1.8" marker-end="url(#ag2)"/>
+  <text class="l" x="286" y="312" fill="var(--green)">play 读取</text>
+
+  <!-- stage flow 底部 -->
+  <rect x="40" y="332" width="680" height="100" rx="9" fill="var(--green-bg)" stroke="var(--green)" stroke-width="1.5"/>
+  <text class="t" x="380" y="358" text-anchor="middle">四步闭环（04 节按序执行）</text>
+  <g class="s" font-weight="600">
+    <text x="70" y="392">① 录 record -a 15s</text>
+    <text x="250" y="392">② 查 info 心算 1.03Hz</text>
+    <text x="450" y="392">③ 断源后 play</text>
+    <text x="600" y="392">④ -r 2.0 调速</text>
+  </g>
+  <g stroke="var(--green)" stroke-width="1.5" marker-end="url(#ag2)">
+    <line x1="196" y1="388" x2="240" y2="388"/>
+    <line x1="418" y1="388" x2="440" y2="388"/>
+    <line x1="558" y1="388" x2="590" y2="388"/>
+  </g>
+  <text class="s" x="380" y="418" text-anchor="middle">回放前先停 talker/listener（ros2 node list 为空）——历史与现场不能混</text>
+
+  <!-- 断源红框 -->
+  <rect x="40" y="130" width="410" height="28" rx="6" fill="var(--red)" fill-opacity=".07" stroke="var(--red)" stroke-width="1.2"/>
+  <text class="s" x="245" y="149" text-anchor="middle" fill="var(--red)" font-weight="600">⚠ 第 3 步前必须 Ctrl+C 断掉终端 A/B，否则新旧消息混流</text>
+
+  <defs>
+    <marker id="ao" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="var(--orange)"/></marker>
+    <marker id="ap" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="var(--purple)"/></marker>
+    <marker id="ag2" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="var(--green)"/></marker>
+  </defs>
+</svg>
+<div class="dock">
+  <span class="ok">✅ 结论：A 造现场 · C 录放 · B 当观众，bag 目录是唯一交接物</span>
+  <span class="warn">⚠️ 风险：不断源就回放 → 分不清哪条消息是真的</span>
+  <span class="evid">🔍 验证：04 节 1.4 录制 → 2 体检 → 3 断源回放</span>
+</div>
+<div class="ft">EXP-16 · rosbag2 数据录制与回放</div>
+</body>
+</html>

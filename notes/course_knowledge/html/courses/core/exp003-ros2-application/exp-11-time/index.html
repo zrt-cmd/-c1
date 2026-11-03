@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-11 · 时间 API — 机器人 ROS2 应用与开发</title>
+<link rel="stylesheet" href="../shared/tutorial.css?v=20261027b">
+<style>:root{--theme:#ca8a04;--theme-deep:#a16207;--theme-bg:#fef9c3;--theme-bd:#fde68a}
+/* ===== 命令分步卡（与 EXP-05/06 同款） ===== */
+.termbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:22px 0 10px}
+.termbar .tl{background:#0f172a;color:#fff;border-radius:999px;padding:3px 13px;font-family:var(--font-mono);font-size:11.5px;letter-spacing:.04em}
+.termbar b{font-size:14.5px;color:var(--text-primary)}
+.termbar .note{font-size:12.5px;color:var(--text-muted)}
+.cmdstep{--theme:#0d9488;--theme-bg:#f0fdfa;--theme-bd:#ccfbf1;--theme-deep:#0f766e;
+  background:var(--bg-soft);border:1px solid var(--border);border-left:3px solid var(--theme);border-radius:12px;padding:13px 17px;margin:11px 0}
+.cmdstep .cs-hd{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.cmdstep .cs-no{font-family:var(--font-mono);font-size:12px;font-weight:700;background:var(--theme);color:#fff;border-radius:999px;min-width:22px;height:22px;text-align:center;line-height:22px;padding:0 5px;flex:none}
+.cmdstep .cs-hd b{font-size:14.5px;color:var(--text-primary)}
+.cmdstep .cs-where{margin-left:auto;font-family:var(--font-mono);font-size:11px;background:var(--theme-bg);color:var(--theme-deep);border:1px solid var(--theme-bd);border-radius:999px;padding:3px 11px;white-space:nowrap}
+.cmdstep .cs-why{font-size:13.5px;color:#475569;margin:7px 0 0;line-height:1.8}
+.cmdstep pre{margin:9px 0 0;font-size:13px;padding:13px 16px}
+.cmdstep .cs-see{font-size:12.5px;color:#0f766e;margin:8px 0 0;line-height:1.75}
+.cmdstep .io{margin:9px 0 0;font-size:12.5px;color:#cbd5e1;background:#0f172a;border-radius:10px;padding:13px 16px;line-height:1.8;font-family:var(--font-mono);white-space:pre-wrap;overflow-x:auto}
+.cmdstep .io .dim{color:#64748b}.cmdstep .io .g{color:#4ade80}.cmdstep .io .y{color:#fbbf24}
+
+/* ===== 对比盒 / 任务单 ===== */
+.cmp-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:18px 0}
+@media(max-width:720px){.cmp-grid{grid-template-columns:1fr}}
+.cmp-box{border:1px solid var(--border);border-radius:12px;padding:14px 16px;background:var(--bg-card)}
+.cmp-box.bad{border-color:#fecaca;background:#fff7f7}
+.cmp-box.good{border-color:#99f6e4;background:#f6fffd}
+.cmp-box h5{margin:0 0 8px;font-size:14px;color:var(--text-primary);display:flex;align-items:center;gap:8px}
+.cmp-box ul{margin:0;padding-left:18px;font-size:13px;line-height:1.85;color:var(--text-secondary)}
+.cmp-box li b{color:var(--text-primary)}
+.task-tbl table{font-size:13px}
+.figcap{font-size:12.5px;color:var(--text-muted);text-align:center;margin:6px 0 0}
+
+/* 指导书实操截图图廊 */
+.figs-guide{margin:1rem 0 .4rem;padding:.9rem 1rem;background:#f8fafc;border:1px dashed #94a3b8;border-radius:12px}
+.figs-guide h4{font-size:.88rem;margin:0 0 .7rem;color:#334155;display:flex;gap:.4rem;align-items:center}
+.figgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:.8rem}
+.fg{margin:0;background:#fff;border:1px solid var(--border,#e2e8f0);border-radius:10px;padding:.5rem;cursor:zoom-in;transition:.2s}
+.fg:hover{box-shadow:0 6px 18px rgba(13,148,136,.15);transform:translateY(-2px)}
+.fg img{width:100%;display:block;border-radius:6px;background:#fff}
+.fg figcaption{font-size:.74rem;color:#64748b;line-height:1.55;padding-top:.45rem}
+#lightbox{position:fixed;inset:0;background:rgba(15,23,42,.92);display:none;align-items:center;justify-content:center;z-index:99;cursor:zoom-out;padding:2vh 2vw}
+#lightbox.on{display:flex}
+#lightbox img{max-width:96vw;max-height:92vh;border-radius:8px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+
+/* ===== 02 双时钟交互演示：两套时钟与 use_sim_time 开关 ===== */
+.clock-lab{border:1px solid var(--border);border-radius:14px;padding:16px 18px;background:var(--bg-card);margin:16px 0}
+.cd-code{background:#0f172a;color:#4ade80;border-radius:10px;padding:11px 16px;font-family:var(--font-mono);font-size:13.5px;margin:0 0 12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.cd-code b{font-weight:700}
+.cd-code .cd-note{color:#94a3b8;font-family:system-ui,sans-serif;font-size:12px;font-weight:400}
+.cd-btns{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px;align-items:center}
+.cd-bat,.cd-tool{border-radius:999px;padding:7px 15px;font-size:12.5px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:#fff;color:var(--text-secondary);transition:.15s;font-family:system-ui,sans-serif}
+.cd-bat.on{background:var(--theme-bg);border-color:var(--theme);color:var(--theme-deep)}
+.cd-tool{font-weight:500;color:#0f766e;background:#f0fdfa;border-color:#ccfbf1}
+.cd-tool:hover:not(:disabled){border-color:#0d9488}
+.cd-bat:hover:not(:disabled){border-color:var(--theme)}
+.cd-tool:disabled{opacity:.38;cursor:not-allowed}
+.cd-sep{width:1px;height:22px;background:var(--border);margin:0 4px}
+.cd-clocks{display:grid;grid-template-columns:1fr 1.45fr;gap:12px}
+@media(max-width:720px){.cd-clocks{grid-template-columns:1fr}}
+.cd-watch{border:1px solid var(--border);border-radius:12px;padding:12px 14px 10px;background:#f8fafc;text-align:center}
+.cd-watch .cw-lab{font-size:12px;color:var(--text-muted);font-weight:600}
+.cd-watch .cw-val{font-family:var(--font-mono);font-size:30px;font-weight:700;color:#334155;margin:5px 0 3px;letter-spacing:.02em}
+.cd-watch .cw-sub{font-size:11.3px;color:var(--text-muted)}
+.cd-watch.main{background:#fffbeb;border-color:#fde68a}
+.cd-watch.main .cw-val{color:#a16207}
+.cd-watch.main .cw-sub{color:#b45309}
+.cd-watch.wait .cw-val{color:#b91c1c;font-size:19px}
+.cd-watch.frozen{border-color:#fecaca;background:#fef2f2}
+.cd-watch.frozen .cw-val{color:#b91c1c}
+.cd-topic{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:12px 0 0;padding:9px 14px;background:#f0f9ff;border:1px dashed #7dd3fc;border-radius:10px;font-size:12px}
+.cd-topic .cd-tt{font-family:var(--font-mono);font-weight:700;color:#0369a1;background:#e0f2fe;border-radius:6px;padding:2px 9px;font-size:11.5px}
+.cd-topic .cd-ts{color:#0369a1}
+.cd-msgcap{display:inline-block;background:#0f172a;color:#7dd3fc;border-radius:6px;padding:2px 8px;font-family:var(--font-mono);font-size:11px;margin-right:4px}
+.cd-msgcap.new{color:#fde68a}
+.cd-out{margin-top:12px}
+.cd-out .cd-ol{font-size:12px;color:var(--text-muted);font-weight:600;margin:0 0 6px}
+.cd-lines{background:#0f172a;color:#cbd5e1;border-radius:10px;padding:11px 14px;font-family:var(--font-mono);font-size:12px;line-height:1.85;min-height:172px;max-height:172px;overflow-y:auto;white-space:pre-wrap}
+.cd-lines .g{color:#4ade80}.cd-lines .r{color:#fca5a5}.cd-lines .y{color:#fbbf24}.cd-lines .b{color:#7dd3fc}.cd-lines .d{color:#64748b}
+.cd-hint{margin-top:10px;font-size:12.5px;color:var(--theme-deep);background:var(--theme-bg);border:1px dashed var(--theme-bd);border-radius:9px;padding:8px 13px}
+.tm-grid{display:grid;grid-template-columns:1fr 150px 1fr;gap:12px;align-items:stretch;margin:14px 0}
+@media(max-width:720px){.tm-grid{grid-template-columns:1fr}}
+.tm-face{border:1px solid var(--border);border-radius:12px;padding:13px 15px;background:var(--bg-card)}
+.tm-face .tf-hd{font-size:13.5px;font-weight:700;color:var(--text-primary);margin:0 0 9px}
+.tm-face pre{margin:0 0 9px;font-size:12px;padding:10px 12px;background:#f8fafc;border:1px solid var(--border);border-radius:8px;color:#0f172a;line-height:1.7}
+.tm-face p{margin:0;font-size:12.5px;color:var(--text-secondary);line-height:1.75}
+.tm-conv{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;font-family:var(--font-mono);font-size:11.5px;color:var(--theme-deep);text-align:center;font-weight:600}
+.tm-conv .tc-ic{font-size:22px}
+
+/* ===== 图解块：编号标题 + 本图回答的问题 + iframe 图页 + 三徽标 ===== */
+.srcline{font-size:12.5px;color:var(--text-muted);margin:10px 0 0}
+.figq{font-size:12.5px;color:var(--text-secondary);margin:16px 0 6px;font-weight:600}
+.figq b{color:var(--theme-deep);font-weight:700}
+.dwrap{border:1px solid var(--border);border-radius:12px;overflow:hidden;margin:8px 0 4px;background:#fff}
+.dwrap iframe{display:block;width:100%;height:560px;border:0}
+@media(max-width:720px){.dwrap iframe{height:620px}}
+.dock{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;padding:2px 10px 10px}
+.dock span{font-size:12px;border-radius:999px;padding:3px 11px;line-height:1.65}
+.dock .ok{background:#ecfdf5;color:#047857;border:1px solid #a7f3d0}
+.dock .warn{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca}
+.dock .evid{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}
+.qrow{font-size:12.5px;color:var(--text-muted);margin:14px 0 4px;font-weight:600}
+.tip details{margin:7px 0 11px;font-size:12.5px;line-height:1.8}
+.tip details summary{cursor:pointer;color:#5b21b6;font-weight:600}
+/* ===== 合并大节内的小标题（原理讲解 / 实验步骤 的 h3） ===== */
+h3.sub{margin:26px 0 12px;padding:9px 0 9px 14px;font-size:16px;font-weight:700;
+  color:var(--text-primary);line-height:1.5;
+  border-left:4px solid var(--theme);background:linear-gradient(90deg,var(--theme-bg) 0%,transparent 72%)}
+h3.sub:first-of-type{margin-top:18px}
+@media (max-width:720px){h3.sub{font-size:15px;margin:22px 0 10px}}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit" title="返回课程首页">🧠 具身智能课程 · <i>教程首页</i></a>
+  <div class="crumb"><a href="../../../index.html#core">核心课程</a> / <a href="../index.html">ROS2 应用与开发</a> / EXP-11</div>
+</div>
+<div class="wrap">
+<aside class="side">
+  <h4>本页目录</h4>
+    <a href="#goal" class="now">★ 课程目标</a>
+  <a href="#s1" class="now">01 问题引入：时间不对齐，数据全白采</a>
+  <a href="#s2">02 先看现象：让时间看得见</a>
+  <a href="#s3">03 原理讲解</a>
+  <a href="#s4">04 实验步骤</a>
+  <a href="#s5">05 注意事项与验收清单</a>
+  <a href="#s6">06 本课总结与验证题</a>
+  
+  <h4>CH3 · 底层机制与分布式</h4>
+  <a href="../exp-11-time/index.html">EXP-11 时间 API</a>
+  <a href="../exp-12-dds/index.html">EXP-12 DDS 剖析</a>
+  <a href="../exp-13-distributed/index.html">EXP-13 分布式通讯</a>
+</aside>
+<main class="content">
+<div class="exp-head">
+  <span class="code">EXP-11 · 第 3 章 · 验证性 · 2 学时</span>
+  <h1>时间 API 与双时钟体系</h1>
+  <p class="desc">IMU 200Hz、相机 30Hz，时间戳差一点数据就对不上。本课讲清 ROS2 为什么自建时间抽象层、系统时钟与 /clock 仿真时钟如何透明切换，以及 create_timer 与 Header.stamp 的正确姿势。</p>
+  <div class="meta"><span class="tag hl">难度 ⭐⭐</span><span class="tag">2 学时</span><span class="tag">验证性</span><span class="tag">关键词 Clock · Timer · stamp</span></div>
+</div>
+
+<section class="blk reveal" id="goal">
+<h2><span class="no">目标</span>本课学完，你应该能做到</h2>
+<div class="kgrid">
+  <div class="kcard"><div class="kd">① 说清架构</div><div class="kt">一个开关、一个出口</div><p>能阐述 Clock 的双时间源机制：<code>use_sim_time</code> 是唯一开关，<code>get_clock().now()</code> 是唯一出口；系统时钟与 <code>/clock</code> 仿真时钟如何透明切换。</p></div>
+  <div class="kcard"><div class="kd">② 掌握 API</div><div class="kt">Time / Duration / Timer</div><p>能正确使用 <code>get_clock().now()</code>、<code>create_timer(period, callback)</code>，以及 <code>Time</code> 的 <code>nanoseconds</code> / <code>seconds_nanoseconds</code> 转换。</p></div>
+  <div class="kcard"><div class="kd">③ 独立完成</div><div class="kt">给数据盖上时刻</div><p>独立编写一个用定时器周期采样 MQ5、并为每条数据的 <code>Header.stamp</code> 打上<b>采集时刻</b>时间戳的发布节点。</p></div>
+  <div class="kcard"><div class="kd">④ 迁移应用</div><div class="kt">诊断时间问题</div><p>能分析"消息时间戳不一致"的成因（系统时钟 vs 传感器硬件时钟），并用 <code>ros2 topic delay</code> 测量端到端延迟、识别负延迟的含义。</p></div>
+</div>
+<div class="tip tealb"><span class="lab">本课的重点与难点</span>
+<b>重点</b>：stamp 应该盖在"采集那一刻"，而不是"发布那一刻"；以及双时钟只用一个出口的意义。<br>
+<b>难点</b>：开着 <code>use_sim_time=true</code> 却没有 <code>/clock</code> 发布者时，节点会永久阻塞——这个现象很难自己猜出来。</div>
+<div class="tip amber"><span class="lab">和前后的关系</span>
+本课的时间模型是 <b>EXP-16 rosbag 回放</b>与 <b>EXP-17 launch 传 <code>use_sim_time</code></b> 的前提，务必学扎实。</div>
+</section>
+
+<section class="blk" id="s1">
+<h2><span class="no">01</span>问题引入：时间不对齐，数据全白采</h2>
+<div class="flow">
+  <div class="step"><div class="n">1</div>IMU 每秒 50 条、相机每秒 30 帧——融合前必须按<b>时间戳</b>配对，配错了姿态就算飞。</div>
+  <div class="step"><div class="n">2</div>直接用 Python 的 <code>time.time()</code>？仿真里"1 秒"可能只要真实 0.1 秒，录包回放时两条消息的时间戳也根本对不上。</div>
+  <div class="step"><div class="n">3</div>多机部署时，两台电脑系统时钟不同步，延迟甚至算出<b>负值</b>。</div>
+  <div class="step"><div class="n">4</div>ROS2 的答案：<b>自建时间抽象层</b>——Clock 类统一出口，底层自动在系统时钟与 /clock 仿真时钟间切换，上层代码一行不改。</div>
+</div>
+
+<p>生活化地说：<b>多传感器融合就像一场合唱</b>——IMU 是快声部（200 拍/秒），相机是慢声部（30 拍/秒），必须都看着<b>同一个指挥（统一时钟）</b>才能合上拍。谁自己偷偷看手机计时（<code>time.time()</code>），整团就乱。</p>
+
+<div class="cmp-grid">
+  <div class="cmp-box bad"><h5>😤 各看各的表：time.time() 混用四宗罪</h5>
+    <ul>
+      <li><b>仿真失真</b>：Gazebo 0.5 倍速时，仿真"1 秒"= 真实 2 秒，时间戳全错</li>
+      <li><b>回放失效</b>：录包回放时 stamp 是"当时录制时刻"，和新数据永远对不上</li>
+      <li><b>跨机负延迟</b>：两台电脑钟差 50ms，算出 <b>-50ms</b> 的"延迟"</li>
+      <li><b>配对失败</b>：温度 1.002s、湿度 1.008s 到达，谁配谁？</li>
+    </ul>
+  </div>
+  <div class="cmp-box good"><h5>😎 全团看指挥：get_clock().now()</h5>
+    <ul>
+      <li>所有节点问同一个 Clock，<b>答案永远一致</b></li>
+      <li>仿真模式自动换"指挥"为 /clock 话题，代码零改动</li>
+      <li>rosbag 回放发 /clock，历史时间轴整体复现</li>
+      <li>stamp 盖在<b>采集时刻</b>，延迟测量才有物理意义</li>
+    </ul>
+  </div>
+</div>
+
+<div class="tip"><span class="lab">时间 = 一等公民</span>机器人系统里时间有两类来源（真实墙上时 / 仿真逻辑时），Clock 把差异吸收在底层：<code>get_clock().now()</code> 永远返回"当前正确的时间"。</div>
+</section>
+
+<section class="blk" id="s2">
+<h2><span class="no">02</span>先看现象：让时间看得见</h2>
+<p>跑起 <code>time_demo_node</code>，用三条命令把"时间"变成看得见的数据。命令背后的代码在 05 节逐行拆。</p>
+
+<div class="termbar"><span class="tl">终端 A</span><b>启动双定时器演示节点</b></div>
+<div class="cmdstep">
+  <div class="cs-hd"><span class="cs-no">1</span><b>启动节点</b><span class="cs-where">终端 A</span></div>
+  <p class="cs-why">先进入源码目录（与实验 6 的 <code>common.py</code> 同目录，才能直接 import 它读 MQ5），再启动节点——1Hz 采样定时器 + 5s 摘要定时器同时开跑，日志里直接打印 stamp：</p>
+  <pre data-copy="cmd">cd ~/ros2_ws/src/xflz_eai_car1/driver/ros_sensor/ros_sensor/ros_sensor
+python3 time_demo_node.py</pre>
+  <div class="io"><span class="dim">$ python3 time_demo_node.py</span>
+[INFO] [time_demo_node]: 时间演示节点已启动
+[INFO] [time_demo_node]: 系统时钟模式: use_sim_time=False
+[INFO] 采样 #0001 | stamp: 1786615681.044442152 | frame_id: sensor_frame
+[INFO] 采样 #0002 | stamp: 1786615682.044580476 | frame_id: sensor_frame
+<span class="dim"># 每秒一条；sec 是接近当前时刻的 Unix 时间</span></div>
+</div>
+
+<div class="termbar"><span class="tl">终端 B</span><b>外部视角：读 stamp、测频率、测延迟</b><span class="note">新终端</span></div>
+<div class="cmdstep">
+  <div class="cs-hd"><span class="cs-no">2</span><b>echo：看消息里的时间戳</b><span class="cs-where">终端 B</span></div>
+  <p class="cs-why">stamp 的 sec 一格一格 +1——这就是"时间在数据里流动"的样子：</p>
+  <pre data-copy="cmd">ros2 topic echo /sensor_data</pre>
+  <div class="io"><span class="dim">$ ros2 topic echo /sensor_data</span>
+stamp:
+  sec: 1786615681
+  nanosec: 444421522
+frame_id: sensor_frame
+---
+stamp:
+  sec: 1786615682
+  nanosec: 445804769
+frame_id: sensor_frame
+<span class="g"># sec 逐条递增，nanosec 在 0~999999999 内补齐亚秒精度</span></div>
+  <div class="figs-guide" style="margin-top:12px"><div class="figgrid">
+    <figure class="fg" onclick="lbShow(this)"><img src="../assets/image-20260821184101472.png" alt="ros2 topic echo 显示 stamp" loading="lazy" style="max-height:220px;object-fit:contain"><figcaption>终端 B：ros2 topic echo /sensor_data —— 每条消息的 stamp.sec 逐秒递增，frame_id 固定 sensor_frame（指导书实验 11 · 步骤 2）</figcaption></figure>
+  </div></div>
+</div>
+<div class="cmdstep">
+  <div class="cs-hd"><span class="cs-no">3</span><b>hz：验证定时器节拍</b><span class="cs-where">终端 B</span></div>
+  <p class="cs-why">平均频率应贴近 1.000 —— 偏差大说明回调太重拖了后腿（03 节原理）：</p>
+  <pre data-copy="cmd">ros2 topic hz /sensor_data</pre>
+  <div class="io"><span class="dim">$ ros2 topic hz /sensor_data</span>
+average rate: 1.000
+    min: 0.997s max: 1.002s std dev: 0.00187s window: 3</div>
+  <div class="figs-guide" style="margin-top:12px"><div class="figgrid">
+    <figure class="fg" onclick="lbShow(this)"><img src="../assets/image-20260821184140393.png" alt="ros2 topic hz 输出" loading="lazy" style="max-height:180px;object-fit:contain"><figcaption>终端 B：ros2 topic hz —— average rate 1.000，抖动 ±2ms（Linux 调度器精度），定时器"活着且很准"（指导书实验 11 · 步骤 3）</figcaption></figure>
+  </div></div>
+</div>
+<div class="cmdstep">
+  <div class="cs-hd"><span class="cs-no">4</span><b>delay：测端到端延迟</b><span class="cs-where">终端 B</span></div>
+  <p class="cs-why">delay = 收到时刻 − stamp，反映通信栈实时性能；出现<b>负值</b>先怀疑时钟不同步：</p>
+  <pre data-copy="cmd">ros2 topic delay /sensor_data</pre>
+  <div class="io"><span class="dim">$ ros2 topic delay /sensor_data</span>
+average delay: 0.002
+min: 0.002s max: 0.002s std dev: 0.00000s window: 1
+average delay: 0.002
+min: 0.001s max: 0.002s std dev: 0.00054s window: 2
+<span class="g"># 本机栈开销约 2ms，滚动窗口持续统计；负值 = 发收两端钟差（先 NTP 对时再查代码）</span></div>
+  <p class="cs-see">✔ 三条命令读完，你已经把"时间"从抽象概念变成了三个可测量的数：stamp、rate、delay。</p>
+</div>
+</section>
+
+<section class="blk" id="s3">
+<h2><span class="no">03</span>原理讲解</h2>
+<h3 class="sub">一行调用，两套时钟，一个 bool 开关</h3>
+<p><b>① 调用</b>：想获取现在的时间戳，命令行里写 <code>now = self.get_clock().now()</code>，功能就一句话——问当前的钟"现在几点"。<br>
+<b>② now 是什么</b>：<code>now</code> 是一个 ROS 2 时间对象（<code>rclpy</code> 的 Time），里面装着 <code>sec</code>（秒）和 <code>nanosec</code>（纳秒）两段数值；它不是字符串，调用 <code>now.to_msg()</code> 就能变成 <code>Header.stamp</code> 那样的时间戳，直接盖到消息上。<br>
+<b>③ 和 /clock 什么关系</b>：这个 now 的时间从哪来，由钟自己决定——当 <code>use_sim_time</code> 开成 <code>true</code> 时，<code>get_clock().now()</code> 读的就是 <code>/clock</code> 话题馈进来的时间；普通模式下读的则是操作系统墙上钟。<br>
+<b>④ 两套钟，一个开关</b>：系统墙上钟、仿真钟两套并存，靠 <code>use_sim_time</code> 这个 bool 值切换（false 用墙钟、true 用 /clock）——<b>你自己的代码一行都不用改</b>，永远只有上面那一行调用。先看框图，再看详解：</p>
+
+<div class="figq"><b>极简框图 · 一个开关，二选一</b></div>
+<pre>node.get_clock().now()
+      │
+      ├── use_sim_time = false（默认）
+      │     时间源：操作系统墙钟（现实时间）
+      │     特征：和现实世界一秒一秒同步，不能快进/暂停
+      │     适用：真机、真实传感器（USB 相机 / IMU / 雷达）
+      │
+      └── use_sim_time = true
+            时间源：订阅 /clock 话题
+            特征：Gazebo / rosbag play 说了算——可 0.5 倍速、可暂停、可回退
+            适用：仿真、录包回放
+
+⚠️ 坑：true 了却没人发 /clock → 节点拿不到时间，死等不走（04 节实操 A）</pre>
+<div class="tip tealb"><span class="lab">一句速记</span>use_sim_time 就是<b>时间源选择开关</b>：关 ＝ 看电脑自带的钟；开 ＝ 听 <code>/clock</code> 话题的钟。<b>整套系统开关必须统一。</b></div>
+
+<div class="figq"><b>两个时间到底差在哪｜一张表看完</b></div>
+<table>
+  <tr><th>项目</th><th>use_sim_time=false（墙钟）</th><th>use_sim_time=true（仿真时间）</th></tr>
+  <tr><td>时间来源</td><td>Linux/Windows 系统时钟</td><td>话题 <code>/clock</code>（消息里的时间）</td></tr>
+  <tr><td>时间流速</td><td>固定 ＝ 现实时间</td><td>任意：可快、可慢、暂停、回退</td></tr>
+  <tr><td>rosbag 回放</td><td>回放时代码里的时间还在往前走，不跟着 bag 放慢</td><td>回放时间跟着 bag 走，算法行为和录制时一模一样</td></tr>
+  <tr><td>适用场景</td><td>真机，真实 IMU / 相机 / 雷达</td><td>Gazebo 仿真、rosbag 离线回放、算法复现</td></tr>
+</table>
+<div class="tip amber"><span class="lab">两条铁律</span>
+<b>① 它只是开关，不是两套时间同时生效</b>：<code>get_clock().now()</code> 按开关自动选数据源，业务代码一行不改，也<b>不需要把两个时间对齐</b>——同一节点同一时刻永远只用一套。<br>
+<b>② 所有参与融合的节点，开关必须统一</b>：激光 <code>true</code> ＋ IMU 融合 <code>false</code> ＝ 两个节点时间轴不一样，时间戳错乱，融合直接炸——真机全 <code>false</code>，仿真全 <code>true</code>。</div>
+
+<div class="tip violet"><span class="lab">随堂思考（先自己想，再展开）</span>
+<b>Q1 · Gazebo 仿真，你忘记给节点加 <code>use_sim_time:=true</code>，会怎样？</b>
+<details><summary>查看答案</summary>节点继续读<b>系统墙钟</b>；仿真加速跑时消息疯狂涌出、算法来不及处理，容易丢数据、融合发散。若别的节点开了 <code>true</code>，还会和它时间轴对不上——开关混用的后果见坑表「开关不统一」行。</details><br>
+<b>Q2 · launch 里写了 <code>use_sim_time:=true</code>，但没有启动 Gazebo / rosbag play，节点会怎样？</b>
+<details><summary>查看答案</summary>没人发 <code>/clock</code>，<code>get_clock().now()</code> 拿不到时间——节点阻塞在那里不工作（04 节实操 A 复现的就是它）。</details>
+</div>
+
+<div class="figq"><b>图 11-2 · 双时钟框架｜本图回答：切换 use_sim_time 后，now() 的时间从哪里来？</b></div>
+<div class="dwrap"><iframe src="diagrams/fig-11-2-clock-framework.html" title="图 11-2 双时钟框架" loading="lazy"></iframe>
+<div class="dock"><span class="ok">✅ 结论：两源、一开关、一个出口</span><span class="warn">⚠️ 风险：true 而无 /clock → 永久等待</span><span class="evid">🔍 验证：04 节实操 A/B</span></div></div>
+
+<div class="tip amber"><span class="lab">怎么设置 use_sim_time（唯一主场 · 先设后用）</span>
+<b>① 启动时设（正道，两条照抄）</b>：命令行 <code>python3 time_demo_node.py --ros-args -p use_sim_time:=true</code>；或 launch 字典里写 <code>'use_sim_time': True</code>（EXP-17 用这个口子）。<br>
+<b>② 真机默认 <code>false</code> 不动</b>；一旦开了 <code>true</code>，必须有节点往 <code>/clock</code> 发消息，否则本节点永久等待——04 节实操 A 就是在复现它。<br>
+<b>③ 运行中也能改，改了立即生效</b>：节点跑起来后执行 <code>ros2 param set /节点名 use_sim_time true</code>，TimeSource 的参数回调当场切换时间源（订阅/退订 <code>/clock</code>），<b>不用重启</b>。但切换瞬间 <code>now()</code> 会从墙上钟绝对秒（17 亿级）跳到仿真起点（或反跳），跨切换点的时间差、超时、TF 外推全会算错——所以稳妥做法仍是启动时定好（先设后用）。04 节实操 A 用的就是①里的命令。</div>
+
+<p class="figcap">下面的交互演示可以亲手切换时间源，<b>建议把每个按钮都点一遍</b>：</p>
+
+<div class="tip tealb"><span class="lab">术语风险：没有 ROS_TIME / ROS_SYSTEM 两个常量</span>
+  早期讲义把两套时钟写成 <code>ROS_TIME</code> / <code>ROS_SYSTEM</code>，容易误以为业务代码要自己判断时钟类型。<b>实际只有一个开关 <code>use_sim_time</code>、一个出口 <code>get_clock()</code></b>——分辨时间源是 Clock 的内部实现，业务代码不许自己判断。</div>
+
+<div class="clock-lab">
+  <div class="cd-code"><b>now = self.get_clock().now()</b><span class="cd-note">← 你的代码从头到尾只有这一行，永远不改</span></div>
+  <div class="cd-btns">
+    <button class="cd-bat on" id="cdB1" onclick="cdSetMode('sys')">🔋 时间源① 操作系统（use_sim_time=false）</button>
+    <button class="cd-bat" id="cdB2" onclick="cdSetMode('sim')">🔋 时间源② /clock 话题（use_sim_time=true）</button>
+    <span class="cd-sep"></span>
+    <button class="cd-tool" id="cdFreeze" onclick="cdFreeze()" disabled>⏸ 让仿真器卡 4 秒</button>
+    <button class="cd-tool" id="cdHalf" onclick="cdHalf()" disabled>🐢 换 0.5 倍速</button>
+    <button class="cd-tool" onclick="cdReset()">↺ 重置</button>
+  </div>
+  <div class="cd-clocks">
+    <div class="cd-watch">
+      <div class="cw-lab">真实世界秒表（墙上钟）</div>
+      <div class="cw-val" id="cdReal">0.0 s</div>
+      <div class="cw-sub">操作系统 · 永远匀速 · 谁都拦不住它</div>
+    </div>
+    <div class="cd-watch main" id="cdW2">
+      <div class="cw-lab">节点盖 stamp 用的钟（get_clock().now() 的输出）</div>
+      <div class="cw-val" id="cdNode">0.0 s</div>
+      <div class="cw-sub" id="cdSrc">时间源：① 操作系统 · 读墙上钟</div>
+    </div>
+  </div>
+  <div class="cd-topic">
+    <span class="cd-tt">/clock 话题</span>
+    <span class="cd-ts" id="cdTopicState">当前时间源①——用不到这个话题（真机的常态）</span>
+    <span id="cdMsgs"></span>
+  </div>
+  <div class="cd-out">
+    <div class="cd-ol">节点日志 · 每秒一条采样（盯住 stamp 的数值来自哪个时间源）</div>
+    <div class="cd-lines" id="cdLines"></div>
+  </div>
+  <div class="cd-hint" id="cdHint">👉 先点「时间源②」，看时间轴怎么被仿真器接管</div>
+</div>
+<p class="figcap"><b>图 11-1</b> · 一行代码，两种世界 ｜ 回答：切换时间源后节点的 stamp 跟着怎么变？</p>
+<div class="dock" style="justify-content:center"><span class="ok">✅ 结论：出口始终唯一，切换时间源不改代码</span><span class="warn">⚠️ 风险：切到②却等不到 /clock → stamp 冻结</span><span class="evid">🔍 验证：04 节实操 A/B（stamp 从 100 递增）</span></div>
+
+<div class="kgrid">
+  <div class="kcard"><div class="kd">时间源① · 操作系统</div><div class="kt">use_sim_time = false · 默认</div><p>Clock 读墙上钟，stamp 与真实世界同步——<b>真机 B2 实验箱的唯一正确选择</b>，也是你前十个实验一直在用的模式。</p></div>
+  <div class="kcard"><div class="kd">时间源② · /clock 话题</div><div class="kt">use_sim_time = true</div><p>Clock 改听 <code>rosgraph_msgs/msg/Clock</code>：仿真器推进一步发一次，stamp 跟着走一步——<b>可快、可慢、可停、可回到录制时的历史</b>。</p></div>
+  <div class="kcard"><div class="kd">最大的坑</div><div class="kt">true 却没人发 /clock</div><p>演示里「卡 4 秒」只是预演；真机上误开 true 且没有仿真器，Clock 会<b>永久等待</b>——节点启动后一片寂静（06 节实操 B 复现）。</p></div>
+  <div class="kcard"><div class="kd">妙处：代码零改动</div><div class="kt">切换时间源是 Clock 内部的事</div><p>整个演示里顶部那行代码从未变过——真机 ↔ 仿真 ↔ 回放切换，<b>一行代码都不用改</b>，这就是时间抽象层的全部意义。</p></div>
+</div>
+
+<h3 style="font-size:16px;color:var(--text-primary);margin:24px 0 0">时间的两副面孔：代码里一副，网络上一副</h3>
+<p>同一个"时刻"在两个场合长得不一样：<b>写代码时</b>要能加减比较（好算逻辑），<b>发消息时</b>要紧凑可序列化（好传输）。ROS2 干脆拆成两个类型，分工明确：</p>
+<div class="tm-grid">
+  <div class="tm-face">
+    <div class="tf-hd">🧮 代码里 · rclpy.time.Time（API 类型）</div>
+    <pre data-copy="cmd">now = clock.now()
+later = now + Duration(seconds=5.0)  <span style="color:#0f766e"># Time ± Duration</span>
+dt = t2 - t1                          <span style="color:#0f766e"># → 得 Duration</span>
+now &gt; past                            <span style="color:#0f766e"># 可直接比较</span></pre>
+    <p>像个<b>计算器</b>：能加减、能比较。回调里判断"超时没？差多久？"全靠它——但没法直接塞进消息发出去。</p>
+  </div>
+  <div class="tm-conv">
+    <span>to_msg() ↓</span>
+    <span class="tc-ic">📦</span>
+    <span>↑ Time.from_msg()</span>
+    <span style="font-size:10.5px;color:var(--text-muted)">过界必转</span>
+  </div>
+  <div class="tm-face">
+    <div class="tf-hd">📦 消息里 · builtin_interfaces/Time（传输类型）</div>
+    <pre data-copy="cmd">stamp:
+  sec: 1786615681     <span style="color:#b45309"># int32 · Unix 秒</span>
+  nanosec: 44442152  <span style="color:#b45309"># uint32 · 纳秒</span></pre>
+    <p>像个<b>快递单</b>：只有两个字段，紧凑、可序列化，嵌在 Header.stamp 里跨机传输——但自己不会算术。</p>
+  </div>
+</div>
+<div class="tip tealb"><span class="lab">过界必转</span>两个类型不能互相直接赋值：API → 消息用 <code>to_msg()</code>，消息 → API 用 <code>Time.from_msg()</code>。05 节代码精讲里 <code>now.to_msg()</code> 那一行干的就是这件事。</div>
+<h3 class="sub">create_timer 的真实行为与 stamp 规范</h3>
+<div class="kgrid">
+  <div class="kcard"><div class="kd">定时器原理</div><div class="kt">挂在 spin 事件循环上的周期源</div><p>create_timer(period, cb) 注册触发源；spin 每轮检查到点就把回调加入执行队列——<b>没有 spin 就永远不触发</b>，取代 ROS1 的 while+Rate.sleep()。</p></div>
+  <div class="kcard"><div class="kd">名义周期</div><div class="kt">回调耗时可以拖垮频率</div><p>周期只是名义下限：回调 C=0.3s &gt; 周期 T=0.2s 时，上一回调结束下一触发点早已过期 → 实际间隔≈C，<b>f ≈ 1/max(T,C) = 1/0.3 ≈ 3.3Hz</b>，永远到不了 5Hz。I/O 密集任务要异步化。</p></div>
+  <div class="kcard"><div class="kd">多定时器</div><div class="kt">同节点内串行执行</div><p>demo 节点同时挂 1s 采样定时器 + 5s 摘要定时器，各自独立计时，但回调在同一事件循环里排队——一个堵全堵。</p></div>
+  <div class="kcard"><div class="kd">stamp 规范</div><div class="kt">盖"采集时刻"不是"发布时刻"</div><p>在读传感器的那行代码处取 now()；等处理完再盖戳，等于把处理延迟算进了传输延迟——排查延迟问题时会误导自己。</p></div>
+</div>
+<div class="dock" style="justify-content:center"><span class="ok">✅ 结论：定时器靠 spin 驱动、同线程串行、f=1/max(T,C)</span><span class="warn">⚠️ 风险：回调超时 → 频率被压低；stamp 盖晚 → 延迟失真</span><span class="evid">🔍 验证：02 节实测 hz≈1.000、delay=0.3ms</span></div>
+<div class="tip"><span class="lab">端到端延迟</span><b>公式：delay = 订阅端收到时刻 − stamp 采集时刻</b>，减去 stamp 才是"通信+排队"的真延迟。局域网有线通常 &lt; 1ms（02 节实测 0.3ms）；多机出现<b>负值</b>说明两台电脑系统时钟没对齐——先 NTP 再查代码。</div>
+</section>
+
+<section class="blk" id="s4">
+<h2><span class="no">04</span>实验步骤</h2>
+<p class="srcline">工程化顺序：先看全景（图 11-3）→ 再看节点内流程（图 11-4）→ 最后逐行读代码。</p>
+
+<div class="figq"><b>图 11-3 · 工程全景｜本图回答：本实验动了哪些文件和话题，数据从哪流到哪？</b></div>
+<div class="dwrap"><iframe src="diagrams/fig-11-3-project-overview.html" title="图 11-3 工程全景" loading="lazy"></iframe>
+<div class="dock"><span class="ok">✅ 结论：一个节点、两定时器、时间只经 Clock 出口</span><span class="warn">⚠️ 风险：依赖 common.py 与仿真器，缺则功能不可用</span><span class="evid">🔍 验证：02 节 echo / hz / delay 实测</span></div></div>
+
+<h3 class="sub">time_demo_node 逐行拆解</h3>
+<p class="srcline">源码来自指导手册实验 11 的 <code>time_demo_node.py</code>：全文件只做三件事——<b>两个定时器、盖时间戳、发摘要</b>。</p>
+
+<div class="figq"><b>图 11-4 · 节点主流程｜本图回答：一次采样从触发到发布经过哪几行，没有 spin 会怎样？</b></div>
+<div class="dwrap"><iframe src="diagrams/fig-11-4-node-flow.html" title="图 11-4 节点主流程" loading="lazy"></iframe>
+<div class="dock"><span class="ok">✅ 结论：①取时刻 → ②转类型 → ③盖戳发布</span><span class="warn">⚠️ 风险：忘 spin 全不触发；回调串行一个堵全堵</span><span class="evid">🔍 验证：02 节 hz≈1.000 + 下方逐行代码</span></div></div>
+
+<h3 style="font-size:16px;color:var(--text-primary);margin:22px 0 0">第一站 · __init__：发布器 + 两个定时器</h3>
+<pre><span class="c"># 来源：time_demo_node.py __init__</span>
+self._publisher = self.create_publisher(Header, <span class="s">'sensor_data'</span>, 10)
+<span class="y"># 用 Header 消息演示 stamp 字段——它正是所有传感器消息"头部"的原型</span>
+
+self._timer1 = self.create_timer(1.0, self._timer1_callback)   <span class="y"># 1Hz：采样发布</span>
+self._sample_count = 0
+self._timer2 = self.create_timer(5.0, self._timer2_callback)   <span class="y"># 0.2Hz：状态摘要</span>
+
+self.get_logger().info(f<span class="s">'系统时钟模式: use_sim_time={self.get_parameter("use_sim_time").value}'</span>)
+<span class="y"># use_sim_time 是系统预声明参数——不用 declare 就能 get，它由 --ros-args -p 控制</span></pre>
+
+<h3 style="font-size:16px;color:var(--text-primary);margin:26px 0 0">第二站 · timer1_callback：盖时间戳的规范姿势</h3>
+<pre><span class="c"># 来源：time_demo_node.py _timer1_callback（每秒一次）</span>
+now = self.get_clock().now()      <span class="y"># ① 在"采集动作"这一行取时间——不是函数末尾</span>
+now_msg = now.to_msg()            <span class="y"># ② API 类型 → 消息类型（rclpy.time.Time → builtin_interfaces/Time）</span>
+
+msg = Header()
+msg.stamp = now_msg               <span class="y"># ③ ⭐ 核心：把采集时刻盖进消息头</span>
+msg.frame_id = <span class="s">'sensor_frame'</span>    <span class="y">#     坐标系名，TF2 章节会再见到它</span>
+self._publisher.publish(msg)
+
+self.get_logger().info(
+    f<span class="s">'采样 #{self._sample_count:04d} | stamp: {now_msg.sec}.{now_msg.nanosec:09d} | ...'</span>)
+<span class="y"># nanosec 用 :09d 补零到 9 位——否则 44442152 会被误读成更高精度</span></pre>
+<h3 style="font-size:16px;color:var(--text-primary);margin:26px 0 0">第三站 · timer2_callback 与时间运算</h3>
+<pre><span class="c"># 来源：time_demo_node.py _timer2_callback（每 5 秒摘要）</span>
+self.get_logger().info(
+    f<span class="s">'[状态摘要] 累计采样次数: {self._sample_count}, '</span>
+    f<span class="s">'当前ROS2时间: {self.get_clock().now().nanoseconds} ns'</span>)
+<span class="y"># nanoseconds：Unix 纪元起的总纳秒数（int，无溢出风险；C++ 要用 uint64_t）</span>
+
+<span class="c"># 时间运算三件套（可加进节点练习）</span>
+from rclpy.time import Duration
+future = now + Duration(seconds=5.0)   <span class="y"># Time ± Duration = Time</span>
+diff   = now - past                    <span class="y"># Time − Time = Duration（.nanoseconds/1e9 得秒）</span>
+print(now &gt; past)                      <span class="y"># Time 之间可直接比较</span></pre>
+<div class="tip tealb"><span class="lab">两个 Time 别搞混</span><code>rclpy.time.Time</code>（API 对象，可加减）与 <code>builtin_interfaces/msg/Time</code>（传输结构，字段 sec/nanosec）——过界必须 to_msg() / Time.from_msg() 转一道，直接赋值字段会类型报错。</div>
+<div class="tip"><span class="lab">没有 spin 就没有节拍</span>两个定时器都挂在 <code>rclpy.spin(node)</code> 的事件循环上：spin 不跑，定时器永远不触发。同一节点多定时器在<b>同一线程串行</b>——一个回调堵 3 秒，另一个也跟着饿 3 秒。</div>
+<h3 class="sub">亲手"接管"一个节点的时间轴</h3>
+<p class="srcline">让节点不再看墙上钟，改听手动发布的 /clock——卡在哪、怎么复活，看图 11-5：</p>
+
+<div class="figq"><b>图 11-5 · 仿真接管流程｜本图回答：节点卡在哪一步，/clock 一来为什么立刻复活？</b></div>
+<div class="dwrap"><iframe src="diagrams/fig-11-5-takeover-flow.html" title="图 11-5 仿真接管流程" loading="lazy"></iframe>
+<div class="dock"><span class="ok">✅ 结论：卡点是"等首条 /clock"，复活零改码</span><span class="warn">⚠️ 风险：真机误开 true = 假死</span><span class="evid">🔍 验证：下方实操 A/B</span></div></div>
+
+<div class="termbar"><span class="tl">终端 A</span><b>以仿真模式启动（先看它卡住）</b></div>
+<div class="cmdstep">
+  <div class="cs-hd"><span class="cs-no">1</span><b>true 开着、没人发 /clock</b><span class="cs-where">终端 A</span></div>
+  <p class="cs-why">复现 02 节演示器预演过的场景——节点启动后<b>一片寂静</b>：</p>
+  <pre data-copy="cmd">cd ~/ros2_ws/src/xflz_eai_car1/driver/ros_sensor/ros_sensor/ros_sensor
+python3 time_demo_node.py --ros-args -p use_sim_time:=true</pre>
+  <div class="io"><span class="dim">$ python3 time_demo_node.py --ros-args -p use_sim_time:=true</span>
+[INFO] [time_demo_node]: 时间演示节点已启动
+[INFO] [time_demo_node]: 系统时钟模式: use_sim_time=True
+<span class="y">(之后一片寂静——进程活着，但第一条采样永远不来)</span></div>
+</div>
+
+<div class="termbar"><span class="tl">终端 B</span><b>手动扮演"仿真器"</b></div>
+<div class="cmdstep">
+  <div class="cs-hd"><span class="cs-no">2</span><b>发布 /clock，节点瞬间复活</b><span class="cs-where">终端 B</span></div>
+  <p class="cs-why">从仿真秒 100 开始，每秒推进 1 仿真秒——观察终端 A 的 stamp 被"接管"：</p>
+  <pre data-copy="cmd">ros2 topic pub /clock rosgraph_msgs/msg/Clock "{clock: {sec: 100, nanosec: 0}}" --rate 1</pre>
+  <div class="io"><span class="dim"># 终端 A 立刻活跃起来：</span>
+[INFO] 采样 #0001 | stamp: 100.000000000 | frame_id: sensor_frame
+[INFO] 采样 #0002 | stamp: 101.000000000 | frame_id: sensor_frame
+<span class="g"># stamp 从 100 开始递增 —— 时间轴已完全由 /clock 话题决定</span></div>
+  <p class="cs-see">✔ 再试 <code>--rate 0.5</code>（0.5 倍速）：stamp 推进变慢，1Hz 定时器真实触发频率约 0.5Hz——仿真时间与真实时间彻底解耦。</p>
+</div>
+
+<div class="task-tbl">
+<table>
+  <tr><th>#</th><th>证据项</th><th>记录方式</th><th>合格标准</th></tr>
+  <tr><td>1</td><td>stamp 可见</td><td><code>topic echo</code> 截图</td><td>sec 逐条递增、nanosec 补齐 9 位</td></tr>
+  <tr><td>2</td><td>节拍准确</td><td><code>topic hz</code> 截图</td><td>average rate ≈ 1.000</td></tr>
+  <tr><td>3</td><td>延迟量级</td><td><code>topic delay</code> 截图</td><td>正值、毫秒级；能解释负值含义</td></tr>
+  <tr><td>4</td><td>卡死复现</td><td>true 无 /clock 时的终端截图</td><td>节点启动后无任何采样输出</td></tr>
+  <tr><td>5</td><td>时间轴接管</td><td>pub /clock 后终端 A 截图</td><td>stamp 从 sec=100 开始递增</td></tr>
+  <tr><td>6</td><td>变速体验</td><td>--rate 0.5 后对比截图</td><td>说出真实频率与仿真频率的关系</td></tr>
+</table>
+</div>
+</section>
+
+<section class="blk" id="s5">
+<h2><span class="no">05</span>注意事项与验收清单</h2><div class="check">
+  <ul>
+    <li>默画双时钟架构：use_sim_time 是源开关，get_clock().now() 是统一出口</li>
+    <li>说清 false＝墙钟（真机）、true＝/clock（仿真），并强调同一系统所有节点开关必须统一</li>
+    <li>讲清 Time（API）与 builtin_interfaces/Time（消息）的互转关系</li>
+    <li>实测 topic hz ≈ 1.000、topic delay 正常量级，理解负值的含义</li>
+    <li>亲手体验一次：true 开着没 /clock 的阻塞，以及手动 pub 的"复活"</li>
+    <li>说出 stamp 应该盖在采集时刻的哪一行代码</li>
+    <li>解释回调超时为什么会拖低实际频率（名义周期 ≠ 实际频率）</li>
+  </ul>
+</div>
+<table>
+  <tr><th>坑</th><th>症状</th><th>解法</th></tr>
+  <tr><td>忘调 spin</td><td>定时器永远不触发</td><td>节点创建后必须 rclpy.spin(node) 启动事件循环</td></tr>
+  <tr><td>init 顺序错</td><td>get_clock().now() 报 Clock not initialized</td><td>先 rclpy.init() 再建节点，之后才能取钟</td></tr>
+  <tr><td>真机误开 use_sim_time</td><td>节点卡死没有任何输出</td><td>无 /clock 发布者即永久等待——真机保持 false</td></tr>
+  <tr><td>delay 出现负值</td><td>跨机测量越测越离谱</td><td>两机 NTP 对时；单机则查 stamp 是不是盖晚了</td></tr>
+  <tr><td>topic delay 报 no header</td><td><code>msg does not have header</code></td><td>delay 要的是嵌套 <code>.header</code> 字段——String、裸 Header 都会这样报错（EXP-16 的 /chatter 同理），换带 header 的话题即可</td></tr>
+  <tr><td>运行中切换 use_sim_time</td><td>时间大跳变（墙钟 17 亿秒 ↔ 仿真 0），超时/TF 一串算错</td><td><code>ros2 param set</code> 改了立即生效、无需重启；代价是切换跳变，稳妥仍是启动时定好</td></tr>
+  <tr><td>开关不统一</td><td>融合节点时间戳错乱、数据对不上</td><td>同一系统所有节点 use_sim_time 必须设成同一个值——真机全 false，仿真全 true</td></tr>
+</table>
+<div class="tip tealb"><span class="lab">先给结论：use_sim_time 到底是什么</span>
+<b>false → 系统墙钟（现实时间）</b>：读操作系统时间，跟着真实世界一秒一秒走——真机、真实传感器默认用这个。<br>
+<b>true → 仿真时间（/clock 话题时间）</b>：不读系统钟，专门订阅 <code>/clock</code> 拿时间，由仿真器 / rosbag play 发布——可暂停、倍速、回退。<br>
+<b>不需要"两个时间保持一致"</b>：同一节点同一时刻只选一套时间源，二选一，不会同时用。<br>
+<b>对应关系</b>：真机实车真实传感器 → <code>false</code>；Gazebo 仿真、rosbag 回放 → <code>true</code>——你理解的这套就是标准答案；唯一强制要求是<b>全系统开关统一</b>。</div>
+<div class="tip amber"><span class="lab">一句话记住本实验</span>
+  <b>时间只有一个出口（<code>get_clock()</code>），只有一个开关（<code>use_sim_time</code>）。</b>凡是绕过出口直接读 <code>time.time()</code> 的代码，在仿真与回放里一定会出错；凡是开着 <code>use_sim_time=true</code> 却没人发 <code>/clock</code> 的机器，节点一定会永久卡住。这两条覆盖了本课 90% 的故障。</div>
+</section>
+
+<section class="blk" id="s6">
+<h2><span class="no">06</span>本课总结与验证题</h2>
+<div class="kgrid">
+  <div class="kcard"><div class="kd">抽象</div><div class="kt">双时钟一个出口</div><p>Clock 吸收系统时钟与 /clock 的差异，上层代码仿真真机零改动。</p></div>
+  <div class="kcard"><div class="kd">类型</div><div class="kt">API Time ⇄ 消息 Time</div><p>to_msg()/from_msg() 互转；sec+nanosec 结构贯穿所有 Header。</p></div>
+  <div class="kcard"><div class="kd">节拍</div><div class="kt">create_timer 挂 spin</div><p>名义周期受回调耗时拖累；多定时器同循环串行。</p></div>
+  <div class="kcard"><div class="kd">规范</div><div class="kt">stamp 盖采集时刻</div><p>delay/hz 诊断通信质量；负延迟先怀疑时钟未对齐。</p></div>
+</div>
+<div class="tip violet"><span class="lab">验证题（改动型 · 每题先自己作答，再展开核对）</span>
+
+<b>1（目标①·改参数）</b>节点带 <code>-p use_sim_time:=true</code> 运行，/clock 正以 1Hz 持续发布。把参数改成 <code>false</code> 重启后，stamp 的数值来源和步进会怎么变？
+<details><summary>参考答案与得分点</summary>
+得分点：①来源切回系统墙上钟（Unix 真实时间）②stamp 立即跳到当前真实时刻并按真实秒递增 ③不再受 /clock 影响（①②各 40%，③ 20%）
+</details>
+
+<b>2（目标②③·改代码）</b>把 <code>timer1_callback</code> 里的 <code>now = self.get_clock().now()</code> 挪到 <code>publish()</code> 之前，且取 now 前先 <code>sleep(0.2)</code>。<code>ros2 topic delay</code>（读数 ＝ 收到时刻 − stamp，见 02 节）的读数会偏大还是偏小？还测得准"采集→送达"的真实延迟吗？
+<details><summary>参考答案与得分点</summary>
+得分点：①stamp 盖晚 0.2s → delay = 收到 − stamp 变<b>偏小</b>，极端时可为负 ②测不到"采集时刻"，读数丢失处理段，<b>不再是</b>采集→送达延迟 ③印证 stamp 必须盖在采集行。（①②各 40%，③ 20%）
+</details>
+
+<b>3（目标④·改数据解释）</b>跨机测量得到 <code>delay = -50ms</code>。写出等式成因，并给出两种修复。
+<details><summary>参考答案与得分点</summary>
+得分点：①t_recv − t_stamp = −0.05s → 钟差/盖晚（本机钟慢 50ms 或 stamp 晚于真实采集）②修复 A：两机 chrony/NTP 对时 ③修复 B：核查 stamp 是否在采集那一刻取。（① 50%，②③各 25%）
+</details>
+
+<b>4（目标①·改流程）</b>实操 B 中把 <code>--rate 1</code> 改成 <code>--rate 0.5</code>。以<b>真实秒</b>计，1Hz 采样定时器的实际触发频率约多少？每次采样的 stamp 相比上一条增加多少？
+<details><summary>参考答案与得分点</summary>
+得分点：①仿真时间流速 = 0.5 仿真秒/真实秒 → 定时器周期 1.0 仿真秒 = 2.0 真实秒 → 实际约 <b>0.5Hz</b> ②每次触发 stamp 读数 <b>+1.0 仿真秒</b>（按仿真轴走）③真实频率减半、仿真步进不变。（①②各 40%，③ 20%）
+</details>
+
+<b>5（目标②·改类型）</b>删掉 <code>now_msg = now.to_msg()</code>，直接写 <code>msg.stamp = now</code>。会发生什么？正确写法里 <code>msg.stamp</code> 的类型是什么？
+<details><summary>参考答案与得分点</summary>
+得分点：①类型不匹配报错：<code>rclpy.time.Time</code> ≠ 消息字段类型 ②正确类型 <code>builtin_interfaces/msg/Time</code>（sec + nanosec）③过界必转 to_msg()/from_msg()。（①②各 40%，③ 20%）
+</details>
+
+</div>
+</section>
+
+<nav class="expnav">
+  <a href="../exp-10-parameter/index.html"><span class="lb">← 上一个实验</span>EXP-10 参数服务</a>
+  <a class="next" href="../exp-12-dds/index.html"><span class="lb">下一个实验 →</span>EXP-12 DDS 通信中间件</a>
+</nav>
+<footer><span>CORE-01 · 机器人 ROS2 应用与开发 · EXP-11 时间 API</span><span>2 学时 · 验证性 · 基于 ros_practice 实验讲义改编</span></footer>
+</main>
+</div>
+<script>
+/* ===== 02 双时钟交互演示：两套时钟与 use_sim_time 开关 ===== */
+var CD={mode:'sys',real:0,node:0,half:false,frozen:0,sample:0,waitFirst:false,msgs:[]};
+var cdBuf=[];
+function cdFmt(v){return v.toFixed(1);}
+function cdSetHint(t){var e=document.getElementById('cdHint');if(e)e.textContent=t;}
+function cdLine(html){
+  cdBuf.push(html);if(cdBuf.length>9)cdBuf.shift();
+  var e=document.getElementById('cdLines');e.innerHTML=cdBuf.join('\n');e.scrollTop=e.scrollHeight;
+}
+function cdSampleLine(){
+  CD.sample++;
+  var src=CD.mode==='sys'?'真实秒':'仿真秒'+(CD.half?'（0.5x）':'');
+  return '[INFO] 采样 #'+('000'+CD.sample).slice(-4)+' | stamp: '+cdFmt(CD.node)+' | 来源: '+src;
+}
+function cdRender(){
+  document.getElementById('cdReal').textContent=cdFmt(CD.real)+' s';
+  var w2=document.getElementById('cdW2'),nv=document.getElementById('cdNode');
+  var ts=document.getElementById('cdTopicState'),ms=document.getElementById('cdMsgs');
+  if(CD.mode==='sys'){
+    w2.className='cd-watch main';nv.textContent=cdFmt(CD.node)+' s';
+    document.getElementById('cdSrc').textContent='时间源：① 操作系统 · 读墙上钟';
+    ts.textContent='当前时间源①——用不到这个话题（真机的常态）';ms.innerHTML='';
+  }else{
+    document.getElementById('cdSrc').textContent='时间源：② /clock 话题 · '+(CD.half?'0.5 倍速':'1 倍速')+(CD.frozen>0?' · 卡住':'');
+    if(CD.waitFirst){w2.className='cd-watch main wait';nv.textContent='等待第一条 /clock…';}
+    else if(CD.frozen>0){w2.className='cd-watch main frozen';nv.textContent=cdFmt(CD.node)+' s（冻结）';}
+    else{w2.className='cd-watch main';nv.textContent=cdFmt(CD.node)+' s';}
+    if(CD.waitFirst){ts.textContent='已切到时间源②：等 Gazebo 发第一条…';ms.innerHTML='';}
+    else if(CD.frozen>0){ts.textContent='⏸ 卡住中：没有新消息';ms.innerHTML='<span class="cd-msgcap" style="color:#fca5a5">（0 条）</span>';}
+    else{
+      ts.textContent='Gazebo 推进一步发一条 · '+(CD.half?'0.5':'1')+' 倍速';
+      ms.innerHTML=CD.msgs.map(function(m,i){return '<span class="cd-msgcap'+(i===CD.msgs.length-1?' new':'')+'">'+m+'</span>';}).join('');
+    }
+  }
+  document.getElementById('cdB1').className='cd-bat'+(CD.mode==='sys'?' on':'');
+  document.getElementById('cdB2').className='cd-bat'+(CD.mode==='sim'?' on':'');
+  var dis=CD.mode!=='sim'||CD.waitFirst;
+  document.getElementById('cdFreeze').disabled=dis;
+  document.getElementById('cdHalf').disabled=dis;
+}
+function cdSetMode(m){
+  if(m===CD.mode)return;
+  if(m==='sim'){
+    CD.mode='sim';CD.waitFirst=true;CD.frozen=0;CD.msgs=[];
+    cdLine('<span class="y">$ 切换 use_sim_time:=true —— Clock 切换时间源②，改听 /clock</span>');
+    cdSetHint('⏳ 节点在等第一条 /clock —— Gazebo 一启动就会发');
+  }else{
+    CD.mode='sys';CD.node=CD.real;CD.waitFirst=false;CD.frozen=0;CD.msgs=[];
+    cdLine('<span class="y">$ 切换 use_sim_time:=false —— Clock 切回时间源①</span>');
+    cdLine('<span class="b">⏬ 时间轴跳回真实秒 '+cdFmt(CD.real)+'（stamp 与墙上钟重新同步）</span>');
+    cdSetHint('👉 真机模式：stamp 跟墙上钟同步走 —— 你前十个实验的常态');
+  }
+  cdRender();
+}
+function cdFreeze(){
+  if(CD.mode!=='sim'||CD.waitFirst||CD.frozen>0)return;
+  CD.frozen=4;CD.msgs=[];
+  cdLine('<span class="r">⚠ Gazebo 卡住：接下来 4 个真实秒没有 /clock</span>');
+  cdSetHint('⚠ 盯住两块表：左边墙上钟照走，右边 stamp 冻结 —— 两套时间彻底解耦');
+  cdRender();
+}
+function cdHalf(){
+  if(CD.mode!=='sim'||CD.waitFirst)return;
+  CD.half=!CD.half;
+  cdLine('<span class="y">$ 仿真器切 '+(CD.half?'0.5':'1')+' 倍速 —— /clock 每条推进 '+(CD.half?'0.5':'1')+' 仿真秒</span>');
+  cdSetHint(CD.half?'🐢 0.5 倍速：真实 2 秒才推进 1 仿真秒 —— 06 节实操 B 同款场景':'倍速恢复 1x');
+  cdRender();
+}
+function cdReset(){
+  CD.mode='sys';CD.real=0;CD.node=0;CD.half=false;CD.frozen=0;CD.sample=0;CD.waitFirst=false;CD.msgs=[];
+  cdBuf=[];document.getElementById('cdLines').innerHTML='';
+  cdLine('[INFO] [time_demo_node]: 节点启动 · use_sim_time=false');
+  cdSetHint('👉 先点「时间源②」，看时间轴怎么被仿真器接管');
+  cdRender();
+}
+function cdTick(){
+  CD.real+=1;
+  if(CD.mode==='sys'){
+    CD.node=CD.real;
+    cdLine(cdSampleLine());
+  }else if(CD.waitFirst){
+    CD.waitFirst=false;CD.node=100.0;CD.msgs.push('sec:100');
+    cdLine('<span class="b">⏬ 第一条 /clock 到达（sec:100）—— 时间轴跳变，stamp 改从仿真秒 100.0 开始</span>');
+    cdLine(cdSampleLine());
+    cdSetHint('✓ 时间被仿真器接管了！再点「让仿真器卡 4 秒」试试');
+  }else if(CD.frozen>0){
+    CD.frozen--;
+    if(CD.frozen===0){
+      cdLine('<span class="g">✓ 仿真器恢复 —— /clock 重新发，stamp 继续</span>');
+      cdSetHint('✓ 恢复了。注意左边真实钟从没停过 —— 这就是"两套时间互不干涉"');
+    }else{
+      cdLine('<span class="d">…（还卡着：stamp 冻结在 '+cdFmt(CD.node)+'，墙上钟已走到 '+cdFmt(CD.real)+'）</span>');
+    }
+  }else{
+    CD.node+=CD.half?0.5:1;
+    CD.msgs.push('sec:'+Math.floor(CD.node));
+    if(CD.msgs.length>4)CD.msgs.shift();
+    cdLine(cdSampleLine());
+  }
+  cdRender();
+}
+cdLine('[INFO] [time_demo_node]: 节点启动 · use_sim_time=false');
+cdRender();
+setInterval(cdTick,900);
+</script>
+<script src="../shared/tutorial.js?v=20261027a" defer></script>
+
+<div id="lightbox" onclick="this.classList.remove('on')"><img alt=""></div>
+<script>
+function lbShow(fig){var lb=document.getElementById('lightbox');if(!lb)return;var im=fig.querySelector('img');if(!im)return;lb.querySelector('img').src=im.src;lb.querySelector('img').alt=im.alt||'';lb.classList.add('on');}
+document.addEventListener('keydown',function(e){if(e.key==='Escape'){var lb=document.getElementById('lightbox');if(lb)lb.classList.remove('on');}});
+</script>
+
+</body>
+</html>

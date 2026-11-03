@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-09 · 自定义接口消息 · 温湿度传感器 — 机器人 ROS2 应用与开发</title>
+<link rel="stylesheet" href="../shared/tutorial.css?v=20261027b">
+<style>:root{--theme:#4f46e5;--theme-deep:#4338ca;--theme-bg:#e0e7ff;--theme-bd:#c7d2fe}
+/* ===== 命令分步卡（与 EXP-05/06 同款） ===== */
+.termbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:22px 0 10px}
+.termbar .tl{background:#0f172a;color:#fff;border-radius:999px;padding:3px 13px;font-family:var(--font-mono);font-size:11.5px;letter-spacing:.04em}
+.termbar b{font-size:14.5px;color:var(--text-primary)}
+.termbar .note{font-size:12.5px;color:var(--text-muted)}
+.cmdstep{--theme:#0d9488;--theme-bg:#f0fdfa;--theme-bd:#ccfbf1;--theme-deep:#0f766e;
+  background:var(--bg-soft);border:1px solid var(--border);border-left:3px solid var(--theme);border-radius:12px;padding:13px 17px;margin:11px 0}
+.cmdstep .cs-hd{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.cmdstep .cs-no{font-family:var(--font-mono);font-size:12px;font-weight:700;background:var(--theme);color:#fff;border-radius:999px;min-width:22px;height:22px;text-align:center;line-height:22px;padding:0 5px;flex:none}
+.cmdstep .cs-hd b{font-size:14.5px;color:var(--text-primary)}
+.cmdstep .cs-where{margin-left:auto;font-family:var(--font-mono);font-size:11px;background:var(--theme-bg);color:var(--theme-deep);border:1px solid var(--theme-bd);border-radius:999px;padding:3px 11px;white-space:nowrap}
+.cmdstep .cs-why{font-size:13.5px;color:#475569;margin:7px 0 0;line-height:1.8}
+.cmdstep pre{margin:9px 0 0;font-size:13px;padding:13px 16px}
+.cmdstep .cs-see{font-size:12.5px;color:#0f766e;margin:8px 0 0;line-height:1.75}
+.cmdstep .io{margin:9px 0 0;font-size:12.5px;color:#cbd5e1;background:#0f172a;border-radius:10px;padding:13px 16px;line-height:1.8;font-family:var(--font-mono);white-space:pre-wrap;overflow-x:auto}
+.cmdstep .io .dim{color:#64748b}.cmdstep .io .g{color:#4ade80}.cmdstep .io .y{color:#fbbf24}
+
+/* ===== 对比盒 / 任务单 ===== */
+.cmp-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:18px 0}
+@media(max-width:720px){.cmp-grid{grid-template-columns:1fr}}
+.cmp-box{border:1px solid var(--border);border-radius:12px;padding:14px 16px;background:var(--bg-card)}
+.cmp-box.bad{border-color:#fecaca;background:#fff7f7}
+.cmp-box.good{border-color:#99f6e4;background:#f6fffd}
+.cmp-box h5{margin:0 0 8px;font-size:14px;color:var(--text-primary);display:flex;align-items:center;gap:8px}
+.cmp-box ul{margin:0;padding-left:18px;font-size:13px;line-height:1.85;color:var(--text-secondary)}
+.cmp-box li b{color:var(--text-primary)}
+.task-tbl table{font-size:13px}
+.figcap{font-size:12.5px;color:var(--text-muted);text-align:center;margin:6px 0 0}
+
+/* ===== 五星教学法：阶段徽章 ===== */
+
+/* ===== 事故复盘 ===== */
+.lead{font-size:14px;color:#475569;line-height:1.9;margin:0 0 14px}
+.lead b{color:var(--head)}
+.case{background:#fffbeb;border:1px solid #fde68a;border-radius:14px;padding:16px 20px;margin:16px 0}
+.case-hd{font-size:15px;font-weight:700;color:#92400e;margin-bottom:9px}
+.case p{font-size:13.5px;color:#78350f;line-height:1.85;margin:0 0 10px}
+.case-tl{display:grid;gap:8px;margin:12px 0 4px}
+.case-tl .ev{display:flex;gap:12px;align-items:flex-start;font-size:13px;color:#78350f;line-height:1.75}
+.case-tl .ev .t{flex:none;font-family:var(--font-mono);font-size:11.5px;font-weight:700;color:#92400e;background:#fef3c7;border:1px solid #fde68a;border-radius:6px;padding:1px 8px;margin-top:2px}
+.case-tl .ev b{color:#7c2d12}
+.case .concl{margin:12px 0 0;font-size:13.5px;color:#7c2d12;line-height:1.8;border-top:1px dashed #fcd34d;padding-top:10px}
+/* ===== 步骤内嵌示意图/截图（响应式：窄屏不溢出）===== */
+.shot{margin:12px 0 0;cursor:zoom-in}
+.shot img,.shot svg{display:block;margin:0 auto;
+  width:auto;max-width:100%;
+  max-height:min(340px,46vh);
+  height:auto}
+.shot.wide{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.shot.wide img,.shot.wide svg{width:100%;max-width:100%;max-height:none;height:auto}
+.shot figcaption{font-size:12.5px;color:#64748b;line-height:1.65;margin-top:8px;text-align:center}
+@media (max-width:720px){
+  .shot img,.shot svg{max-height:min(260px,38vh)}
+  .shot.wide img,.shot.wide svg{width:auto;min-width:520px;max-width:none}
+  .shot figcaption{font-size:12px;text-align:left}
+  .shot.wide::after{content:'← 左右滑动查看完整内容 →';display:block;font-size:11px;color:#94a3b8;text-align:center;margin-top:4px}
+}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit" title="返回课程首页">🧠 具身智能课程 · <i>教程首页</i></a>
+  <div class="crumb"><a href="../../../index.html#core">核心课程</a> / <a href="../index.html">ROS2 应用与开发</a> / EXP-09</div>
+</div>
+<div class="wrap">
+<aside class="side">
+  <h4>本页目录</h4>
+  <a href="#goal">★ 课程目标</a>
+  <a href="#s0" class="now">01 跑出现象：DHT11 温湿度节点跑起来</a>
+  <a href="#s1">02 问题引入：一次数据串台事故复盘</a>
+  <a href="#s2">03 核心原理：结构与场景选型</a>
+  <a href="#s6">04 实操 A：通览 6 份真实契约</a>
+  <a href="#s8">05 实操 B：设计一份新接口</a>
+  <a href="#s9">06 注意事项与验收清单</a>
+  <a href="#s10">07 本课总结与思考题</a>
+  <h4>CH2 · 通信机制</h4>
+  <a href="../exp-05-node/index.html">EXP-05 节点</a>
+  <a href="../exp-06-topic/index.html">EXP-06 话题</a>
+  <a href="../exp-07-service/index.html">EXP-07 服务</a>
+  <a href="../exp-08-action/index.html">EXP-08 动作</a>
+  <a href="../exp-09-custom-msg/index.html">EXP-09 自定义接口</a>
+  <a href="../exp-10-parameter/index.html">EXP-10 参数</a>
+</aside>
+<main class="content">
+<div class="exp-head">
+  <span class="code">EXP-09 · 第 2 章 · 设计性 · 2 学时</span>
+  <h1>自定义接口消息 · 温湿度传感器</h1>
+  <p class="desc">标准 Float32 装不下"温度+湿度+有效位"。本课回看实验 6-8 用过的全部接口，讲清 .msg/.srv/.action 三种文件结构、rosidl 编译链与接口包分离哲学。</p>
+  <div class="meta"><span class="tag hl">难度 ⭐⭐</span><span class="tag">2 学时</span><span class="tag">设计性</span><span class="tag">关键词 rosidl · 接口包 · 契约</span></div>
+</div>
+
+<section class="blk reveal" id="goal">
+<h2><span class="no">目标</span>本课学完，你应该能做到</h2>
+<div class="kgrid">
+  <div class="kcard"><div class="kd">① 说清结构</div><div class="kt">三种接口文件</div><p>能阐述 <code>.msg</code>（单段字段）、<code>.srv</code>（一个 <code>---</code> 分隔请求/响应）、<code>.action</code>（两个 <code>---</code> 分隔 Goal/Result/Feedback）的结构差异与适用场景。</p></div>
+  <div class="kcard"><div class="kd">② 掌握链路</div><div class="kt">定义 → 编译 → import</div><p>掌握 <code>ros_sensor_interfaces</code> 从"写接口定义 → 配 <code>rosidl_generate_interfaces</code> → 生成 Python/C++ 类 → 节点 import 使用"的完整链路。</p></div>
+  <div class="kcard"><div class="kd">③ 独立完成</div><div class="kt">读懂已有契约</div><p>能用 <code>ros2 interface list/show</code> 查看定义，并说清 <code>TemperatureHumidity</code>、<code>VerifyFingerprint</code>、<code>RfidScan</code> 等接口与 EXP-06~08 各节点的对应关系。</p></div>
+  <div class="kcard"><div class="kd">④ 迁移应用</div><div class="kt">为新传感器定接口</div><p>能为新传感器建自定义接口包（如光照度、加速度计），并正确配置 <code>CMakeLists.txt</code> 的 <code>rosidl_generate_interfaces</code> 与 <code>package.xml</code> 的依赖。</p></div>
+</div>
+<div class="tip tealb"><span class="lab">本课的重点与难点</span>
+<b>重点</b>：接口包必须是 <code>ament_cmake</code>（不能用 ament_python）；改了接口一定要重新编译接口包，再 source。<br>
+<b>难点</b>：理解"接口是编译期的契约"——它决定了发布端与订阅端能不能对上话，而不是运行时才协商。</div>
+<div class="tip amber"><span class="lab">和前后的关系</span>
+本课是<b>EXP-06~08 的收口</b>：把散落在三个实验里的自定义接口集中再看一遍。同时为 EXP-17 launch 传参打基础。</div>
+</section>
+
+<section class="blk" id="s0">
+<h2><span class="no">01</span>跑出现象：一个真实的温湿度节点跑起来是什么样</h2>
+<p class="lead">先别急着背接口语法——<b>先看一个真跑起来的自定义消息案例</b>。DHT11 温湿度传感器正好是"一条消息装两个字段"的典型：温度和湿度<b>必须成对出现</b>，缺一个就没有意义。跑通它，你就知道自定义接口到底解决了什么问题。</p>
+
+<div class="tip tealb">🌡️ <b>这个节点你已经有了</b>：<code class="inline">dht11_sensor_node.py</code> 就在 <code class="inline">ros_sensor</code> 包里，<b>不需要你写一行代码</b>。它每 2 秒读一次 DHT11，把温度和湿度打包成一条 <code class="inline">TemperatureHumidity</code> 消息发到 <code class="inline">/temperature_humidity</code> 话题上。下面我们把它跑起来，再从三个角度观察它。</div>
+
+<div class="termbar"><span class="tl">终端 A</span><b>启动温湿度节点</b><span class="note">（保持运行，别关）</span></div>
+<div class="cmdstep">
+  <div class="cs-hd"><span class="cs-no">1</span><b>先把接口包和节点包都编译好</b><span class="cs-where">终端 A</span></div>
+  <p class="cs-why"><code>dht11_sensor_node</code> 要用 <code>TemperatureHumidity</code> 这个消息类，所以<b>接口包必须一起编</b>——只编节点包会因为找不到消息类型而失败。</p>
+  <pre data-copy="cmd"><span class="c"># ① 进工作空间，并加载 ROS2 本体</span>
+cd ~/ros2_ws
+source /opt/ros/humble/setup.bash
+<span class="c"># ② 接口包 + 节点包一起编（顺序由 colcon 按依赖自动排）</span>
+colcon build --packages-select ros_sensor_interfaces ros_sensor
+<span class="c"># ③ 注册进当前终端</span>
+source install/setup.bash</pre>
+  <p class="cs-see">✔ 看到 <code>Finished &lt;&lt;&lt; ros_sensor_interfaces</code> 和 <code>Finished &lt;&lt;&lt; ros_sensor</code> 两行都出现，才算编全。</p>
+</div>
+
+<div class="cmdstep">
+  <div class="cs-hd"><span class="cs-no">2</span><b>启动节点，看温湿度每 2 秒滚动</b><span class="cs-where">终端 A</span></div>
+  <p class="cs-why">这条命令背后就是那个 65 行的节点：读 DHT11 → 填两个字段 → 发布 → 打日志。</p>
+
+  <div class="tip tealb" style="margin-bottom:12px">📦 <b>关于 <code class="inline">dht11_native</code>（读 DHT11 的二进制模块）</b><br>
+它不是源码，而是<b>预编译好的 aarch64 C 扩展</b>，已经装在 <code class="inline">~/ros2_ws/install/dht11_native/</code> 下。<b>你不需要编译它</b>，但它必须在 <code class="inline">PYTHONPATH</code> 里才 import 得到——这就是步骤 1 里 <code class="inline">source install/setup.bash</code> 不能省的原因。<br>
+这也是为什么下面那条启动命令要 source <b>三套环境</b>：ROS2 本体提供 <code class="inline">ros2</code> 命令、工作空间提供 <code class="inline">ros_sensor</code> 与 <code class="inline">dht11_native</code>、venv 提供节点实际用的 Python 解释器。</div>
+
+<div class="tip amber" style="margin-bottom:12px">⚠️ <b>DHT11 必须用 root 跑（临时方案）</b><br>
+  DHT11 驱动是<b>直接读写 GPIO 寄存器</b>实现的（走 <code>/dev/mem</code>，走物理地址 <code>0x27320000</code>），不是标准的内核驱动，所以<b>必须有 root 权限</b>。<br>
+  但直接把 <code>ros2 run</code> 前面加 <code>sudo</code> 会失败——<code>sudo</code> 会清空 <code>PATH</code>、<code>PYTHONPATH</code> 和 venv，导致 <code>ros2: command not found</code> 或 <code>PackageNotFoundError</code>。<br>
+  <b>所以这里的做法是：用 <code>sudo</code> 拉起一个 root 的 bash，在它内部把三套环境重新 source 一遍，再启动节点。</b>下面每条 <code>source</code> 都标了作用。</div>
+
+  <p style="margin:14px 0 6px;font-weight:700;font-size:13.5px;color:var(--theme-deep)">粘贴这一整段（5 行要一起复制，别拆开）</p>
+  <pre data-copy="cmd"><span class="c"># 用 sudo 起一个 root 的 bash，在里面依次加载 3 套环境，最后启动节点</span>
+<span class="c"># 行尾的 \ 是续行符：这 5 行在 shell 看来是"一整条命令"，必须整体复制</span>
+<span class="c"># ① source /opt/ros/humble/setup.bash → ROS2 本体环境（提供 ros2 命令与 rclpy）</span>
+<span class="c"># ② source ~/ros2_ws/install/setup.bash → 本工作空间（提供 ros_sensor 包与消息类）</span>
+<span class="c"># ③ source ~/ros2_venv/bin/activate → Python 虚拟环境（节点真正用的解释器）</span>
+sudo -E bash -c 'source /opt/ros/humble/setup.bash; \
+source /home/iflytek/ros2_ws/install/setup.bash; \
+source /home/iflytek/ros2_venv/bin/activate; \
+ros2 run ros_sensor dht11_sensor_node'</pre>
+
+  <div class="tip tealb" style="margin-top:12px">🧪 <b>为什么这是"临时方案"</b><br>
+  这条命令能用，但它有三个明显的短板，只适合<b>课堂实验临时跑一次</b>：<br>
+  · <b>每次都要敲这么长</b>，而且路径写死了 <code>/home/iflytek/</code>，换台机器或换个用户就不对了；<br>
+  · <b>整个节点都在 root 下运行</b>——ROS2 网络、日志文件、工作空间缓存都会变成 root 所有，之后普通用户再跑别的节点可能报权限错；<br>
+  · <b>治不了根</b>：真正的解决方式是给 DHT11 换一个不需要 <code>/dev/mem</code> 的驱动（比如走 gpiod + 内核定时），或者给这个可执行文件单独配 <code>setcap</code>/udev 规则。这些超出本课范围。<br>
+  <b>所以：实验课用这条命令把现象跑出来就行；工程上别这么干。</b></div>
+
+  <div class="io"><span class="dim">$ sudo -E bash -c 'source ... ; ros2 run ros_sensor dht11_sensor_node'</span>
+<span class="g">[INFO]</span> [dht11_sensor_node]: DHT11 温湿度节点启动：周期=2.0s
+<span class="g">[INFO]</span> [dht11_sensor_node]: 温度=25.3°C 湿度=61.0%
+<span class="g">[INFO]</span> [dht11_sensor_node]: 温度=25.4°C 湿度=60.8%
+<span class="g">[INFO]</span> [dht11_sensor_node]: 温度=25.3°C 湿度=61.2%
+<span class="dim">…每 2 秒一行，持续滚动</span></div>
+  <p class="cs-see">✔ 关键观察：<b>温度和湿度永远打印在同一行</b>。它们来自同一次采样，是同一条消息里的两个字段——这就是"原子性"。停止请按 <code>Ctrl+C</code>。</p>
+  <figure class="shot wide" onclick="lbShow(this)">
+    <svg viewBox="0 0 700 210" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="示意：终端里温度与湿度成对打印，一条消息包含两个字段">
+      <rect width="700" height="210" rx="10" fill="#0b0f17"/>
+      <rect width="700" height="30" rx="10" fill="#1e293b"/>
+      <circle cx="20" cy="15" r="5" fill="#ef4444"/><circle cx="38" cy="15" r="5" fill="#fbbf24"/><circle cx="56" cy="15" r="5" fill="#22c55e"/>
+      <text x="350" y="20" text-anchor="middle" font-size="12" fill="#94a3b8" font-family="monospace">终端 A — dht11_sensor_node</text>
+      <text x="20" y="58" font-size="12.5" fill="#64748b" font-family="monospace">$ ros2 run ros_sensor dht11_sensor_node</text>
+      <text x="20" y="84" font-size="12.5" fill="#4ade80" font-family="monospace">[INFO] DHT11 温湿度节点启动：周期=2.0s</text>
+      <text x="20" y="112" font-size="12.5" fill="#4ade80" font-family="monospace">[INFO] 温度=25.3°C</text>
+      <text x="182" y="112" font-size="12.5" fill="#fbbf24" font-family="monospace">湿度=61.0%</text>
+      <rect x="176" y="98" width="112" height="22" rx="4" fill="none" stroke="#fbbf24" stroke-dasharray="4 3"/>
+      <text x="298" y="113" font-size="11" fill="#fbbf24">← 同一条消息的两个字段</text>
+      <text x="20" y="140" font-size="12.5" fill="#4ade80" font-family="monospace">[INFO] 温度=25.4°C</text>
+      <text x="182" y="140" font-size="12.5" fill="#fbbf24" font-family="monospace">湿度=60.8%</text>
+      <text x="20" y="168" font-size="12.5" fill="#4ade80" font-family="monospace">[INFO] 温度=25.3°C</text>
+      <text x="182" y="168" font-size="12.5" fill="#fbbf24" font-family="monospace">湿度=61.2%</text>
+      <text x="298" y="168" font-size="11" fill="#64748b">…每 2 秒一行</text>
+      <text x="20" y="196" font-size="11.5" fill="#94a3b8" font-family="monospace">TemperatureHumidity { temperature: 25.3, humidity: 61.0 }  ← 一条消息</text>
+    </svg>
+    <figcaption>示意｜温湿度<b>成对打印</b>：每一行都是一次完整采样。<code class="inline">TemperatureHumidity</code> 把两个字段装进同一条消息，订阅端收到的一定是同一时刻的配对值——不会出现"温度是这一次、湿度是上一次"的错配。</figcaption>
+  </figure>
+</div>
+
+<div class="termbar"><span class="tl">终端 B</span><b>换个角度：从话题外部偷看这条消息</b><span class="note">（终端 A 保持运行）</span></div>
+<div class="cmdstep">
+  <div class="cs-hd"><span class="cs-no">3</span><b>看话题上到底流着什么结构</b><span class="cs-where">终端 B</span></div>
+  <p class="cs-why">这是理解自定义消息最直观的一步——<b>直接看原始消息长什么样</b>。</p>
+  <pre data-copy="cmd"><span class="c"># 新终端开场：进目录 + source</span>
+cd ~/ros2_ws
+source install/setup.bash
+<span class="c"># 看话题列表（应该能找到 /temperature_humidity）</span>
+ros2 topic list
+<span class="c"># 看这条话题用的什么消息类型</span>
+ros2 topic info /temperature_humidity
+<span class="c"># 直接打印消息内容（Ctrl+C 停止）</span>
+ros2 topic echo /temperature_humidity</pre>
+  <div class="io"><span class="dim">$ ros2 topic info /temperature_humidity</span>
+Type: ros_sensor_interfaces/msg/TemperatureHumidity
+Publisher count: <span class="w">1</span>
+Subscription count: <span class="w">0</span>
+
+<span class="dim">$ ros2 topic echo /temperature_humidity</span>
+temperature: <span class="y">25.3</span>
+humidity: <span class="y">61.0</span>
+---
+temperature: <span class="y">25.4</span>
+humidity: <span class="y">60.8</span>
+---</div>
+  <p class="cs-see">✔ <b>注意 <code>---</code> 分隔符</b>：上面这两个字段属于<b>同一条消息</b>，它们之间没有分隔线；分隔线是消息与消息之间的边界。这跟 <code>.msg</code> 文件里"零个分隔符"是同一件事。</p>
+</div>
+
+<div class="cmdstep">
+  <div class="cs-hd"><span class="cs-no">4</span><b>看这个消息类是怎么定义出来的</b><span class="cs-where">终端 B</span></div>
+  <p class="cs-why">话题上那个结构不是凭空来的，它来自一个只有两行的文本文件。<code>interface show</code> 打印的就是那个文件的镜像。</p>
+  <pre data-copy="cmd"><span class="c"># 查看消息定义（就是 .msg 文件的内容）</span>
+ros2 interface show ros_sensor_interfaces/msg/TemperatureHumidity</pre>
+  <div class="io"><span class="dim">$ ros2 interface show ros_sensor_interfaces/msg/TemperatureHumidity</span>
+<span class="y"># 温湿度传感器数据</span>
+float32 temperature   <span class="dim"># 温度(摄氏度)</span>
+float32 humidity      <span class="dim"># 湿度(%)</span></div>
+  <p class="cs-see">✔ 对照一下：<b>两行定义 → 编译成消息类 → 话题上就能 echo 出结构化的两个字段</b>。这条链路就是本课的全部主题。</p>
+</div>
+
+<div class="tip amber">⚠️ <b>手上没有 DHT11 模块怎么办？</b>终端 A 会跑不起来或报 <code class="inline">读取 DHT11 失败</code>（<code class="inline">dht11_native</code> 是 aarch64 的 C 扩展，只在实验箱上能用）。<b>不影响理解本课</b>——真正的核心是"消息结构"，你可以跳过硬件的部分，直接从步骤 3 开始：手动往同一条话题上发一条消息，观察它的结构：<br>
+<code class="inline">ros2 topic pub /temperature_humidity ros_sensor_interfaces/msg/TemperatureHumidity "{temperature: 25.3, humidity: 61.0}" -r 1</code><br>
+终端 B 的 <code class="inline">echo</code> 与 <code class="inline">interface show</code> 照常可用。</div>
+
+<div class="tip tealb">🎯 <b>跑完这一步，你已经看到三件事</b>：① 一条消息可以装<b>多个字段</b>（温度+湿度）；② 这两个字段<b>永远配对</b>，不会错位；③ 这个结构来自一个<b>两行文本文件</b>。接下来要回答的就是：为什么不直接用 <code class="inline">Float32</code>？那个两行文件怎么变成代码？
+</div>
+</section>
+
+<section class="blk" id="s1">
+<h2><span class="no">02</span>问题引入：一次"数据串台"的误报事故</h2>
+
+<p class="lead">在学新东西之前，先把前四章你自己亲手敲过的代码摆到一张桌子上，看它们各自搬运的"<b>数据形状</b>"是什么。想清楚这一步，你就明白自定义接口为什么非有不可。</p>
+
+<table>
+  <tr><th>章节</th><th>通信方式</th><th>搬的是什么数据</th><th>当时用的接口</th><th>够不够用</th></tr>
+  <tr><td><b>EXP-05</b> 节点</td><td>—（只有身份）</td><td>不搬数据，只回答"谁活在计算图里"</td><td>无</td><td>—</td></tr>
+  <tr><td><b>EXP-06</b> 话题</td><td>广播式持续流</td><td>MQ5 的气体浓度，<b>一个 ppm 数值</b></td><td>标准 <code>std_msgs/Float32</code></td><td>只有一个值时刚好够</td></tr>
+  <tr><td><b>EXP-07</b> 服务</td><td>一问一答</td><td>指纹结果：成功与否 + 用户编号 + 提示语</td><td><b>自定义</b> <code>VerifyFingerprint.srv</code></td><td>标准库里<b>根本没有</b></td></tr>
+  <tr><td><b>EXP-08</b> 动作</td><td>长任务 + 进度</td><td>超时目标 + 四字段结果 + 运行状态</td><td><b>自定义</b> <code>RfidScan.action</code></td><td>标准库里<b>根本没有</b></td></tr>
+</table>
+
+<p class="lead">发现了吗？<b>服务和动作那两章，你早就在用自定义接口了</b>——只是当时的注意力全在"通信流程"上，没人停下来讲这两个接口文件本身长什么样、为什么必须自己写。<b>真正被卡住的是话题这条线</b>：它至今停在单值 <code>Float32</code> 上。</p>
+
+<div class="case">
+  <div class="case-hd">🔥 事故复盘：巡检小车的"温湿度超标报警"，为什么报了一个不存在的状态</div>
+  <p>需求很朴素：巡检测到 <b>温度 &gt; 35℃ 且 湿度 &gt; 80%</b> 就上报"环境异常"。</p>
+  <p>传感器是 DHT11，<b>一次采样同时给出温度和湿度两个值</b>。既然 EXP-06 用 <code>Float32</code> 发 MQ5 浓度没问题，最"自然"的做法就是开两个话题各发各的：</p>
+  <pre data-copy="cmd">/dht11/temperature   std_msgs/Float32   → 36.2
+/dht11/humidity      std_msgs/Float32   → 82.0</pre>
+  <p>代码跑通了，日志在刷，订阅端 print 出来的两条数值也都在——<b>看起来一切正常</b>。然后现场出现了这样的两次采样：</p>
+  <div class="case-tl">
+    <div class="ev"><span class="t">采样#1</span><div><b>36.2 ℃ / 45 %</b> —— 热但很干。按需求<b>不该报警</b>。</div></div>
+    <div class="ev"><span class="t">采样#2</span><div><b>33.1 ℃ / 82 %</b> —— 湿但温度不够。按需求<b>也不该报警</b>。</div></div>
+    <div class="ev"><span class="t">现场</span><div>湿度那条话题的第 2 条<b>先到</b>（t=2.010s），温度那条的第 2 条<b>排队晚了</b>（t=2.030s）。这 20ms 的网络抖动，在局域网上完全正常。</div></div>
+    <div class="ev"><span class="t">结果</span><div>订阅端在两个缓冲里"各取最新"：温度还停在 <b>36.2</b>，湿度已经换成 <b>82</b> → 判定成立 → <b>报警响了</b>。</div></div>
+  </div>
+
+  <div class="anim-box">
+  <svg viewBox="0 0 760 322" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="system-ui,sans-serif">
+    <text x="380" y="22" fill="#e2e8f0" font-size="12.5" text-anchor="middle" font-weight="bold">两条话题各自计时 → 订阅端"各取最新" → 拼出一个从未真实出现过的状态</text>
+
+    <text x="20" y="52" fill="#94a3b8" font-size="11.5">① 采样端：DHT11 一次同时给出两个值</text>
+    <rect x="20" y="60" width="200" height="52" rx="8" fill="#1e293b" stroke="#475569"/>
+    <text x="34" y="80" fill="#a5b4fc" font-size="11" font-family="monospace">采样#1   t = 1.00s</text>
+    <text x="34" y="101" fill="#e2e8f0" font-size="11.5" font-family="monospace">36.2 ℃   /   45 %</text>
+    <rect x="236" y="60" width="200" height="52" rx="8" fill="#1e293b" stroke="#475569"/>
+    <text x="250" y="80" fill="#a5b4fc" font-size="11" font-family="monospace">采样#2   t = 2.00s</text>
+    <text x="250" y="101" fill="#e2e8f0" font-size="11.5" font-family="monospace">33.1 ℃   /   82 %</text>
+    <text x="452" y="80" fill="#fca5a5" font-size="11.5">两次都不满足</text>
+    <text x="452" y="99" fill="#fca5a5" font-size="11.5">"温度&gt;35 且 湿度&gt;80"</text>
+
+    <text x="20" y="136" fill="#94a3b8" font-size="11.5">② 拆成两条独立话题：各自排队、各自到达</text>
+    <rect x="20" y="144" width="352" height="48" rx="8" fill="#1e293b" stroke="#f472b6"/>
+    <text x="32" y="162" fill="#f472b6" font-size="11" font-family="monospace">/dht11/temperature</text>
+    <text x="32" y="182" fill="#e2e8f0" font-size="11" font-family="monospace">36.2 @1.002s   33.1 @2.030s ← 晚到</text>
+    <rect x="388" y="144" width="352" height="48" rx="8" fill="#1e293b" stroke="#38bdf8"/>
+    <text x="400" y="162" fill="#38bdf8" font-size="11" font-family="monospace">/dht11/humidity</text>
+    <text x="400" y="182" fill="#e2e8f0" font-size="11" font-family="monospace">45 @1.008s     82 @2.010s ← 先到</text>
+
+    <text x="20" y="222" fill="#94a3b8" font-size="11.5">③ 订阅端：两个缓冲各自记"最新值"，谁先到谁先覆盖</text>
+    <rect x="20" y="230" width="352" height="46" rx="8" fill="#0b1220" stroke="#334155"/>
+    <text x="32" y="250" fill="#cbd5e1" font-size="11" font-family="monospace">最新温度 = 36.2 ℃</text>
+    <text x="32" y="268" fill="#64748b" font-size="10.5" font-family="monospace">（33.1 还在路上，没进来）</text>
+    <rect x="388" y="230" width="352" height="46" rx="8" fill="#0b1220" stroke="#334155"/>
+    <text x="400" y="250" fill="#cbd5e1" font-size="11" font-family="monospace">最新湿度 = 82 %</text>
+    <text x="400" y="268" fill="#64748b" font-size="10.5" font-family="monospace">（45 已被覆盖，回不去了）</text>
+
+    <rect x="20" y="288" width="720" height="28" rx="8" fill="#3f1d1d" stroke="#b91c1c" stroke-dasharray="5 4"/>
+    <text x="380" y="307" fill="#fca5a5" font-size="11.5" text-anchor="middle" font-family="monospace">④ 判定：36.2 ℃ 且 82 % → 报警 ✗ 这个"又热又湿"的状态现实中从未出现</text>
+    <path d="M200 116 V140" stroke="#475569" stroke-width="1.6"/><path d="M196 136 L200 143 L204 136 z" fill="#475569"/>
+    <path d="M600 116 V140" stroke="#475569" stroke-width="1.6"/><path d="M596 136 L600 143 L604 136 z" fill="#475569"/>
+    <path d="M200 196 V226" stroke="#475569" stroke-width="1.6"/><path d="M196 222 L200 229 L204 222 z" fill="#475569"/>
+    <path d="M600 196 V226" stroke="#475569" stroke-width="1.6"/><path d="M596 222 L600 229 L604 222 z" fill="#475569"/>
+    <path d="M200 280 V286" stroke="#b91c1c" stroke-width="1.6"/><path d="M196 282 L200 289 L204 282 z" fill="#b91c1c"/>
+    <path d="M600 280 V286" stroke="#b91c1c" stroke-width="1.6"/><path d="M596 282 L600 289 L604 282 z" fill="#b91c1c"/>
+  </svg>
+  </div>
+  <p class="figcap">图 9-1 · 两条各自为政的话题：订阅端"各取最新"的配对，会拼出一次现实中从未发生的环境状态</p>
+
+  <p class="concl">这不是代码 bug —— 变量名、循环、类型全都没错。<b>错的是数据结构本身</b>：本该原子的一份信息被拆成两条独立消息，等于把"配对的正确性"这个包袱从系统层甩给了每一个订阅者。更糟的是它<b>静默出错</b>：日志里两条数值都印得漂漂亮亮，你根本看不出它们不是同一刻的。运维跑过去一看现场一切正常，从此再没人信这条报警。</p>
+</div>
+
+<p class="lead" style="margin-top:16px">把这次事故拆开，会看到四层结构性缺陷——它们都不是"写得更仔细"能解决的：</p>
+
+<div class="kgrid">
+  <div class="kcard"><div class="kd">缺陷 ①</div><div class="kt">原子性丢失</div><p>温度和湿度是同一次采样的一体两面。拆成两条消息后，它们之间只剩一个<b>没有机制担保的隐含假设</b>："差不多同时到的就是一对"。</p></div>
+  <div class="kcard"><div class="kd">缺陷 ②</div><div class="kt">时间对齐靠人肉</div><p>要修就得给每条消息加时间戳、在订阅端写配对缓冲。而 6~20ms 抖动在局域网上完全正常——<b>错误还会静默发生</b>。</p></div>
+  <div class="kcard"><div class="kd">缺陷 ③</div><div class="kt">字段一多就组合爆炸</div><p>再补上"有效位""电池电压""传感器编号"，就是 5 个话题、5 路缓冲、5 处配对逻辑。每加一个字段，发布端和订阅端都要全线改一遍。</p></div>
+  <div class="kcard"><div class="kd">缺陷 ④</div><div class="kt">标准库改不了</div><p><code>common_interfaces</code> 是全球共享的冻结定义，你不可能往里塞一个 <code>temperature</code> 字段；而自己在话题上私自约定"第一条是温度、第二条是湿度"，别的节点凭什么认？</p></div>
+</div>
+
+<p class="lead">ROS2 给的答案就是<b>自定义接口</b>：用几行文本把一份数据的结构写清楚，编译成 Python / C++ 双端可用的消息类。下面先把"该打包"和"不该打包"摆在一起看：</p>
+
+<div class="cmp-grid">
+  <div class="cmp-box bad"><h5>😤 单值消息硬扛：三个话题各发各的</h5>
+    <ul>
+      <li>温度发 <code>/temperature</code>、湿度发 <code>/humidity</code>——<b>两次到达、时间对不齐</b></li>
+      <li>订阅方要自己做"配对"：哪条温度配哪条湿度？</li>
+      <li>加一个字段 = 全线改发布端和订阅端</li>
+      <li>就像<b>给你寄三张散装便签</b>：一张写重量、一张写收件人，丢了哪张都拼不出完整信息</li>
+    </ul>
+  </div>
+  <div class="cmp-box good"><h5>😎 自定义接口：一张"标准快递面单"</h5>
+    <ul>
+      <li>一张面单固定印好格子：<b>重量、收件人、是否易碎</b>——一格不多一格不少</li>
+      <li>快递员（发布端）和收件人（订阅端）<b>都认这张面单</b>，格式永不扯皮</li>
+      <li>对应到 ROS2：<code>TemperatureHumidity</code> 一条消息装下温度+湿度，天然原子性</li>
+      <li>面单格式（接口）印好后双方共守——<b>这就是契约</b></li>
+    </ul>
+  </div>
+</div>
+
+<div class="anim-box">
+<svg viewBox="0 0 760 250" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="system-ui,sans-serif">
+  <!-- 左：散装便签 -->
+  <rect x="20" y="36" width="330" height="178" rx="12" fill="#fff7f7" stroke="#fecaca" stroke-width="1.5"/>
+  <text x="185" y="60" fill="#b91c1c" font-size="13.5" text-anchor="middle" font-weight="bold">✗ 散装便签：两个 Float32 话题</text>
+  <rect x="48" y="80" width="120" height="44" rx="8" fill="#fff" stroke="#fca5a5"/><text x="108" y="107" fill="#7f1d1d" font-size="12.5" text-anchor="middle">/temperature 26.3</text>
+  <rect x="200" y="80" width="120" height="44" rx="8" fill="#fff" stroke="#fca5a5"/><text x="260" y="107" fill="#7f1d1d" font-size="12.5" text-anchor="middle">/humidity 48.0</text>
+  <text x="185" y="150" fill="#b91c1c" font-size="12" text-anchor="middle">到达时间可能差几毫秒 → 谁配谁？</text>
+  <text x="185" y="172" fill="#b91c1c" font-size="12" text-anchor="middle">第三条消息来了怎么和前两条配？</text>
+  <text x="185" y="198" fill="#ef4444" font-size="11.5" text-anchor="middle">t=1.002s 到达的温度 ↔ t=1.008s 的湿度？</text>
+  <!-- 右：快递面单 -->
+  <rect x="410" y="36" width="330" height="178" rx="12" fill="#f6fffd" stroke="#99f6e4" stroke-width="1.5"/>
+  <text x="575" y="60" fill="#0f766e" font-size="13.5" text-anchor="middle" font-weight="bold">✓ 快递面单：一条 TemperatureHumidity</text>
+  <rect x="438" y="78" width="274" height="112" rx="8" fill="#fff" stroke="#5eead4"/>
+  <text x="452" y="100" fill="#0f172a" font-size="12" font-family="monospace">TemperatureHumidity</text>
+  <line x1="452" y1="108" x2="698" y2="108" stroke="#ccfbf1" stroke-width="1.5"/>
+  <text x="452" y="126" fill="#334155" font-size="11.5" font-family="monospace">float32 temperature: 26.3</text>
+  <text x="452" y="146" fill="#334155" font-size="11.5" font-family="monospace">float32 humidity:    48.0</text>
+  <text x="452" y="166" fill="#0d9488" font-size="11" font-family="monospace"># 同一采样时刻的原子组合</text>
+  <text x="575" y="204" fill="#0f766e" font-size="12" text-anchor="middle">一条消息 = 一份完整语义，永不拆散</text>
+  <!-- 中间箭头 -->
+  <path d="M352 125 H408" stroke="#94a3b8" stroke-width="2.5" marker-end="url(#ar91)"/>
+  <defs><marker id="ar91" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6 z" fill="#94a3b8"/></marker></defs>
+</svg>
+</div>
+<p class="figcap">图 9-2 · 散装便签 vs 标准面单：为什么多字段数据要"打包"成一条自定义消息</p>
+
+<div class="tip"><span class="lab">接口 = 契约</span>接口定义是收发双方共同遵守的<b>数据契约</b>：字段名、类型、顺序一旦编译固化，任何一端擅自改动都会破坏兼容——所以它要独立成包、版本化管理。</div>
+</section>
+
+<section class="blk" id="s2">
+<h2><span class="no">03</span>核心原理：三种接口文件结构</h2>
+<div class="kgrid">
+  <div class="kcard"><div class="kd">.msg · 零个分隔符</div><div class="kt">单段字段表</div><p>每行 <code>类型 字段名 # 注释</code>。TemperatureHumidity：float32 temperature / float32 humidity——一对多持续流的数据载体。</p></div>
+  <div class="kcard"><div class="kd">.srv · 一个 ---</div><div class="kt">请求 | 响应</div><p>VerifyFingerprint：请求段<b>空</b>（直接 --- 开头）| 响应 bool success + int32 user_id + string message。可空请求是合法的。</p></div>
+  <div class="kcard"><div class="kd">.action · 两个 ---</div><div class="kt">Goal | Result | Feedback</div><p>RfidScan：int32 timeout_sec | success/uid/type/msg | status——三段对应三通道，编译生成三个类。</p></div>
+  <div class="kcard"><div class="kd">生成物</div><div class="kt">X.Request / X.Response、X.Goal/Result/Feedback</div><p>编译后固定子类名（不是 .Req！），节点直接 import 实例化使用。</p></div>
+</div>
+
+<p class="lead">光看文件结构还不够——<b>结构是用来配通信方式的</b>。下面这张图会循环高亮三条链路，把"哪种结构 → 走哪条机制 → 用在什么真实场景"一次说清：</p>
+
+<div class="anim-box">
+<svg viewBox="0 0 760 412" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="system-ui,sans-serif">
+  <defs>
+    <marker id="ar93" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6 z" fill="#64748b"/></marker>
+  </defs>
+  <text x="380" y="22" fill="#e2e8f0" font-size="12.5" text-anchor="middle" font-weight="bold">接口结构选型地图：结构 → 通信机制 → 真实用在哪</text>
+  <text x="380" y="40" fill="#64748b" font-size="11" text-anchor="middle">高亮每 3 秒切换一行，跟着亮的那行走一遍</text>
+
+  <!-- ===== 行 1：.msg ===== -->
+  <g>
+    <rect x="10" y="50" width="740" height="96" rx="12" fill="#312e81">
+      <animate attributeName="opacity" values="0;0.5;0.5;0;0;0" keyTimes="0;0.02;0.28;0.34;0.99;1" dur="9s" begin="0s" repeatCount="indefinite"/>
+    </rect>
+    <rect x="24" y="60" width="196" height="76" rx="9" fill="#1e293b" stroke="#6366f1" stroke-width="1.5"/>
+    <text x="36" y="80" fill="#fff" font-size="12.5" font-weight="bold">.msg · 零个分隔符</text>
+    <text x="36" y="100" fill="#a5b4fc" font-size="11">一整段字段表，直到文件尾</text>
+    <text x="36" y="122" fill="#64748b" font-size="10.5" font-family="monospace">TemperatureHumidity</text>
+
+    <rect x="268" y="60" width="196" height="76" rx="9" fill="#1e293b" stroke="#475569"/>
+    <text x="280" y="80" fill="#fff" font-size="12.5" font-weight="bold">话题 Topic</text>
+    <text x="280" y="100" fill="#a5b4fc" font-size="11">广播 · 持续流 · 可多订阅</text>
+    <text x="280" y="122" fill="#64748b" font-size="10.5" font-family="monospace">EXP-06 已经练过</text>
+
+    <rect x="512" y="60" width="224" height="76" rx="9" fill="#1e293b" stroke="#22c55e"/>
+    <text x="524" y="78" fill="#86efac" font-size="12" font-weight="bold">多字段传感器数据流</text>
+    <text x="524" y="97" fill="#cbd5e1" font-size="10.5">DHT11 温度 + 湿度（本次事故的解药）</text>
+    <text x="524" y="113" fill="#cbd5e1" font-size="10.5">MAX30102 心率 + 血氧 + 有效位</text>
+    <text x="524" y="129" fill="#cbd5e1" font-size="10.5">电池电压 / 里程计状态广播</text>
+
+    <path d="M220 98 H266" stroke="#64748b" stroke-width="2.5" marker-end="url(#ar93)"/>
+    <path d="M464 98 H510" stroke="#64748b" stroke-width="2.5" marker-end="url(#ar93)"/>
+    <circle r="5" fill="#818cf8" cy="98"><animate attributeName="cx" values="222;262" dur="1.1s" repeatCount="indefinite"/><animate attributeName="opacity" values="0;1;1;0" dur="1.1s" repeatCount="indefinite"/></circle>
+    <circle r="5" fill="#818cf8" cy="98"><animate attributeName="cx" values="466;506" dur="1.1s" begin="0.4s" repeatCount="indefinite"/><animate attributeName="opacity" values="0;1;1;0" dur="1.1s" begin="0.4s" repeatCount="indefinite"/></circle>
+  </g>
+
+  <!-- ===== 行 2：.srv ===== -->
+  <g>
+    <rect x="10" y="154" width="740" height="96" rx="12" fill="#312e81">
+      <animate attributeName="opacity" values="0;0;0;0.5;0.5;0;0" keyTimes="0;0.32;0.335;0.36;0.61;0.67;1" dur="9s" begin="0s" repeatCount="indefinite"/>
+    </rect>
+    <rect x="24" y="164" width="196" height="76" rx="9" fill="#1e293b" stroke="#6366f1" stroke-width="1.5"/>
+    <text x="36" y="184" fill="#fff" font-size="12.5" font-weight="bold">.srv · 一个 ---</text>
+    <text x="36" y="204" fill="#a5b4fc" font-size="11">请求段 | 响应段</text>
+    <text x="36" y="226" fill="#64748b" font-size="10.5" font-family="monospace">VerifyFingerprint</text>
+
+    <rect x="268" y="164" width="196" height="76" rx="9" fill="#1e293b" stroke="#475569"/>
+    <text x="280" y="184" fill="#fff" font-size="12.5" font-weight="bold">服务 Service</text>
+    <text x="280" y="204" fill="#a5b4fc" font-size="11">一问一答 · 同步 · 谁发谁等</text>
+    <text x="280" y="226" fill="#64748b" font-size="10.5" font-family="monospace">EXP-07 已经练过</text>
+
+    <rect x="512" y="164" width="224" height="76" rx="9" fill="#1e293b" stroke="#22c55e"/>
+    <text x="524" y="182" fill="#86efac" font-size="12" font-weight="bold">一次性请求 / 要一个结果</text>
+    <text x="524" y="201" fill="#cbd5e1" font-size="10.5">指纹验证 → 成功 / 编号 / 提示语</text>
+    <text x="524" y="217" fill="#cbd5e1" font-size="10.5">继电器开合、查询当前配置</text>
+    <text x="524" y="233" fill="#cbd5e1" font-size="10.5">"立刻告诉我答案"，绝不等很久</text>
+
+    <path d="M220 202 H266" stroke="#64748b" stroke-width="2.5" marker-end="url(#ar93)"/>
+    <path d="M464 202 H510" stroke="#64748b" stroke-width="2.5" marker-end="url(#ar93)"/>
+    <circle r="5" fill="#818cf8" cy="202"><animate attributeName="cx" values="222;262" dur="1.1s" kind="srv" repeatCount="indefinite"/><animate attributeName="opacity" values="0;1;1;0" dur="1.1s" repeatCount="indefinite"/></circle>
+    <circle r="5" fill="#818cf8" cy="202"><animate attributeName="cx" values="466;506" dur="1.1s" begin="0.4s" repeatCount="indefinite"/><animate attributeName="opacity" values="0;1;1;0" dur="1.1s" begin="0.4s" repeatCount="indefinite"/></circle>
+  </g>
+
+  <!-- ===== 行 3：.action ===== -->
+  <g>
+    <rect x="10" y="258" width="740" height="96" rx="12" fill="#312e81">
+      <animate attributeName="opacity" values="0;0;0;0;0;0.5;0" keyTimes="0;0.3;0.32;0.63;0.65;0.68;0.74" dur="9s" begin="0s" repeatCount="indefinite"/>
+    </rect>
+    <rect x="24" y="268" width="196" height="76" rx="9" fill="#1e293b" stroke="#6366f1" stroke-width="1.5"/>
+    <text x="36" y="288" fill="#fff" font-size="12.5" font-weight="bold">.action · 两个 ---</text>
+    <text x="36" y="308" fill="#a5b4fc" font-size="11">目标 | 结果 | 反馈</text>
+    <text x="36" y="330" fill="#64748b" font-size="10.5" font-family="monospace">RfidScan</text>
+
+    <rect x="268" y="268" width="196" height="76" rx="9" fill="#1e293b" stroke="#475569"/>
+    <text x="280" y="288" fill="#fff" font-size="12.5" font-weight="bold">动作 Action</text>
+    <text x="280" y="308" fill="#a5b4fc" font-size="11">长任务 · 有反馈 · 可取消</text>
+    <text x="280" y="330" fill="#64748b" font-size="10.5" font-family="monospace">EXP-08 已经练过</text>
+
+    <rect x="512" y="268" width="224" height="76" rx="9" fill="#1e293b" stroke="#22c55e"/>
+    <text x="524" y="286" fill="#86efac" font-size="12" font-weight="bold">耗时任务 + 进度反馈</text>
+    <text x="524" y="305" fill="#cbd5e1" font-size="10.5">RFID 读卡：等待刷卡、可中途取消</text>
+    <text x="524" y="321" fill="#cbd5e1" font-size="10.5">机械臂抓取、导航到目标点</text>
+    <text x="524" y="337" fill="#cbd5e1" font-size="10.5">"慢慢做，边做边告诉我到哪了"</text>
+
+    <path d="M220 306 H266" stroke="#64748b" stroke-width="2.5" marker-end="url(#ar93)"/>
+    <path d="M464 306 H510" stroke="#64748b" stroke-width="2.5" marker-end="url(#ar93)"/>
+    <circle r="5" fill="#818cf8" cy="306"><animate attributeName="cx" values="222;262" dur="1.1s" repeatCount="indefinite"/><animate attributeName="opacity" values="0;1;1;0" dur="1.1s" repeatCount="indefinite"/></circle>
+    <circle r="5" fill="#818cf8" cy="306"><animate attributeName="cx" values="466;506" dur="1.1s" begin="0.4s" repeatCount="indefinite"/><animate attributeName="opacity" values="0;1;1;0" dur="1.1s" begin="0.4s" repeatCount="indefinite"/></circle>
+  </g>
+
+  <rect x="10" y="366" width="740" height="38" rx="10" fill="#0b1220" stroke="#334155"/>
+  <text x="380" y="383" fill="#94a3b8" font-size="11" text-anchor="middle">标准库 <tspan fill="#cbd5e1" font-family="monospace">common_interfaces</tspan> 已经给了 Float32 / String / Image / Odometry…</text>
+  <text x="380" y="399" fill="#fbbf24" font-size="11" text-anchor="middle">只有当"标准装不下"或"标准库不许你改"时才自定义——一旦要定契约，就从上表挑对应的结构</text>
+</svg>
+</div>
+<p class="figcap">图 9-3 · 接口结构选型地图（动画）：三种结构各自绑定一条通信机制，也就各自对应一类真实场景</p>
+
+<div class="anim-box">
+<svg viewBox="0 0 760 300" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="system-ui,sans-serif">
+  <rect x="24" y="40" width="220" height="180" rx="10" fill="#0f172a"/>
+  <text x="134" y="64" fill="#a5b4fc" font-size="12.5" text-anchor="middle" font-weight="bold">.msg · 零个分隔符</text>
+  <rect x="44" y="78" width="180" height="118" rx="6" fill="#1e293b"/>
+  <text x="58" y="100" fill="#e2e8f0" font-size="11" font-family="monospace">float32 temperature</text>
+  <text x="58" y="120" fill="#e2e8f0" font-size="11" font-family="monospace">float32 humidity</text>
+  <text x="58" y="146" fill="#64748b" font-size="10.5" font-family="monospace"># 一整段字段表</text>
+  <text x="58" y="164" fill="#64748b" font-size="10.5" font-family="monospace"># 直到文件尾</text>
+  <text x="134" y="244" fill="#86efac" font-size="12" text-anchor="middle">切成 1 段：数据本身</text>
+  <text x="134" y="264" fill="#94a3b8" font-size="11" text-anchor="middle">TemperatureHumidity()</text>
+  <rect x="270" y="40" width="220" height="180" rx="10" fill="#0f172a"/>
+  <text x="380" y="64" fill="#a5b4fc" font-size="12.5" text-anchor="middle" font-weight="bold">.srv · 一个 ---</text>
+  <rect x="290" y="78" width="180" height="118" rx="6" fill="#1e293b"/>
+  <text x="304" y="98" fill="#64748b" font-size="10.5" font-family="monospace"># 请求（可为空）</text>
+  <text x="304" y="116" fill="#fbbf24" font-size="12" font-family="monospace">----------------</text>
+  <text x="304" y="138" fill="#e2e8f0" font-size="11" font-family="monospace">bool success</text>
+  <text x="304" y="156" fill="#e2e8f0" font-size="11" font-family="monospace">int32 user_id</text>
+  <text x="304" y="174" fill="#e2e8f0" font-size="11" font-family="monospace">string message</text>
+  <text x="380" y="244" fill="#86efac" font-size="12" text-anchor="middle">切成 2 段：请求 | 响应</text>
+  <text x="380" y="264" fill="#94a3b8" font-size="11" text-anchor="middle">VerifyFingerprint.Request / .Response</text>
+  <rect x="516" y="40" width="220" height="180" rx="10" fill="#0f172a"/>
+  <text x="626" y="64" fill="#a5b4fc" font-size="12.5" text-anchor="middle" font-weight="bold">.action · 两个 ---</text>
+  <rect x="536" y="76" width="180" height="120" rx="6" fill="#1e293b"/>
+  <text x="550" y="94" fill="#e2e8f0" font-size="10.5" font-family="monospace">int32 timeout_sec</text>
+  <text x="550" y="112" fill="#fbbf24" font-size="11" font-family="monospace">----------</text>
+  <text x="550" y="130" fill="#e2e8f0" font-size="10.5" font-family="monospace">bool success ...</text>
+  <text x="550" y="148" fill="#fbbf24" font-size="11" font-family="monospace">----------</text>
+  <text x="550" y="166" fill="#e2e8f0" font-size="10.5" font-family="monospace">string status</text>
+  <text x="626" y="220" fill="#64748b" font-size="10" text-anchor="middle">Goal ↓ 上行 · Result/Feedback ↑ 下行</text>
+  <text x="626" y="244" fill="#86efac" font-size="12" text-anchor="middle">切成 3 段：Goal | Result | Feedback</text>
+  <text x="626" y="264" fill="#94a3b8" font-size="11" text-anchor="middle">RfidScan.Goal / .Result / .Feedback</text>
+  <rect x="24" y="278" width="712" height="1.5" fill="#e2e8f0"/>
+  <text x="380" y="296" fill="#4f46e5" font-size="12" text-anchor="middle" font-weight="bold">规律：文件里几个 ---，就切成几段；段数 = 通信方向数 = 编译产出的类数</text>
+</svg>
+</div>
+<p class="figcap">图 9-4 · 三种接口文件的切面解剖：分隔符是"剪刀"，剪出请求/响应、目标/结果/反馈</p>
+
+<table>
+  <tr><th>接口类型</th><th>分隔符</th><th>编译生成的类</th><th>实验对应</th></tr>
+  <tr><td><code>.msg</code></td><td>无</td><td>消息类本身（如 TemperatureHumidity()）</td><td>EXP-06 气体可继续用 Float32，结构化才自定义</td></tr>
+  <tr><td><code>.srv</code></td><td>1 个 <code>---</code></td><td>VerifyFingerprint.Request / .Response</td><td>EXP-07 指纹验证</td></tr>
+  <tr><td><code>.action</code></td><td>2 个 <code>---</code></td><td>RfidScan.Goal / .Result / .Feedback</td><td>EXP-08 RFID 读卡</td></tr>
+</table>
+<div class="tip amber"><span class="lab">字段类型用定长</span>写 <code>int32</code> 而不是 C 风格 <code>int</code>——跨语言/跨平台必须宽度确定。另外传感器消息常加 <code>bool valid</code>：MAX30102 未接触皮肤时心率恒为 0，没有有效位的话，0 是"读数"还是"没测"根本无法区分。</div>
+
+<h3 style="font-size:16px;color:var(--text-primary);margin:28px 0 0">那这行文本是怎么变成可 import 的类的？</h3>
+<p>你在 01 节 echo 出来的 <code class="inline">TemperatureHumidity</code> 结构不是手写的——它由那个两行的 <code class="inline">.msg</code> 文件经编译自动生成。这条链路走四步：</p>
+<div class="anim-box">
+<svg viewBox="0 0 760 235" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="system-ui,sans-serif">
+  <g>
+    <rect x="20" y="44" width="150" height="76" rx="10" fill="#1e293b" stroke="#4f46e5" stroke-width="2"/>
+    <text x="95" y="72" fill="#fff" font-size="14" text-anchor="middle" font-weight="bold">msg/srv/action</text>
+    <text x="95" y="93" fill="#a5b4fc" font-size="11.5" text-anchor="middle">.msg / .srv / .action</text>
+    <text x="95" y="110" fill="#64748b" font-size="10.5" text-anchor="middle">（src 内手写契约）</text>
+    <rect x="220" y="44" width="160" height="76" rx="10" fill="#1e293b" stroke="#4f46e5" stroke-width="2"/>
+    <text x="300" y="70" fill="#fff" font-size="14" text-anchor="middle" font-weight="bold">rosidl_generate</text>
+    <text x="300" y="89" fill="#fff" font-size="14" text-anchor="middle" font-weight="bold">_interfaces</text>
+    <text x="300" y="110" fill="#a5b4fc" font-size="11" text-anchor="middle">CMake 编译入口</text>
+    <rect x="430" y="44" width="150" height="76" rx="10" fill="#1e293b" stroke="#4f46e5" stroke-width="2"/>
+    <text x="505" y="72" fill="#fff" font-size="14" text-anchor="middle" font-weight="bold">生成代码</text>
+    <text x="505" y="93" fill="#a5b4fc" font-size="11.5" text-anchor="middle">Python 类 + C++ 头</text>
+    <text x="505" y="110" fill="#64748b" font-size="10.5" text-anchor="middle">（install/ 交付）</text>
+    <rect x="630" y="44" width="120" height="76" rx="10" fill="#1e293b" stroke="#22c55e" stroke-width="2"/>
+    <text x="690" y="72" fill="#fff" font-size="14" text-anchor="middle" font-weight="bold">节点 import</text>
+    <text x="690" y="95" fill="#86efac" font-size="10.5" text-anchor="middle">from …srv import</text>
+    <text x="690" y="111" fill="#86efac" font-size="10.5" text-anchor="middle">VerifyFingerprint</text>
+  </g>
+  <path d="M170 82 H220" stroke="#334155" stroke-width="3"/>
+  <path d="M380 82 H430" stroke="#334155" stroke-width="3"/>
+  <path d="M580 82 H630" stroke="#334155" stroke-width="3"/>
+  <circle r="6" fill="#818cf8" cx="170" cy="82"><animate attributeName="cx" values="170;220" dur="1.5s" repeatCount="indefinite"/><animate attributeName="opacity" values="0;1;1;0" dur="1.5s" repeatCount="indefinite"/></circle>
+  <circle r="6" fill="#818cf8" cx="380" cy="82"><animate attributeName="cx" values="380;430" dur="1.5s" begin="0.5s" repeatCount="indefinite"/><animate attributeName="opacity" values="0;1;1;0" dur="1.5s" begin="0.5s" repeatCount="indefinite"/></circle>
+  <circle r="6" fill="#818cf8" cx="580" cy="82"><animate attributeName="cx" values="580;630" dur="1.5s" begin="1s" repeatCount="indefinite"/><animate attributeName="opacity" values="0;1;1;0" dur="1.5s" begin="1s" repeatCount="indefinite"/></circle>
+  <!-- 失败分支 -->
+  <rect x="430" y="160" width="290" height="52" rx="8" fill="#3f1d1d" stroke="#b91c1c" stroke-dasharray="5 4"/>
+  <text x="575" y="181" fill="#fca5a5" font-size="12" text-anchor="middle">忘 source / 忘列进 CMake 列表</text>
+  <text x="575" y="200" fill="#fca5a5" font-size="12" text-anchor="middle">→ ModuleNotFoundError / interface list 缺失</text>
+  <path d="M505 120 V160" stroke="#b91c1c" stroke-width="1.6" stroke-dasharray="4 4"/>
+  <text x="95" y="175" fill="#94a3b8" font-size="12">接口独立成包 ⇒</text>
+  <text x="95" y="194" fill="#94a3b8" font-size="12">多节点/C++/Python 共享</text>
+  <text x="95" y="213" fill="#94a3b8" font-size="12">一套无歧义的数据类型</text>
+</svg>
+</div>
+<p class="anim-cap">契约（文本）→ 编译（rosidl）→ 生成物（双语言类）→ 消费（import）；任何一环断掉都会在最后一格报找不到模块。</p>
+
+<h3 style="font-size:16px;color:var(--text-primary);margin:28px 0 0">接口包要配什么：CMakeLists 与依赖声明</h3>
+<p>上面那步"编译"不是自动发生的——你得在接口包里点名告诉 rosidl 要编哪些文件、基础类型去哪找。这就是 <code class="inline">CMakeLists.txt</code> 那几行的作用：</p>
+<pre data-copy="cmd"><span class="c"># 接口包（ament_cmake）CMakeLists.txt 核心段</span>
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "srv/VerifyFingerprint.srv"
+  "srv/TriggerRelay.srv"
+  "action/RfidScan.action"
+  "msg/TemperatureHumidity.msg"
+  "msg/HeartRateSpO2.msg"
+  "msg/PhotoState.msg"
+  DEPENDENCIES std_msgs action_msgs builtin_interfaces   <span class="y"># ← 基础类型从哪来</span>
+)
+ament_package()</pre>
+<table>
+  <tr><th>位置</th><th>声明什么</th><th>作用</th></tr>
+  <tr><td>CMakeLists DEPENDENCIES</td><td>std_msgs / action_msgs / builtin_interfaces</td><td>编译期：告诉 rosidl 去哪找 float32/int32/GoalStatus 等基础类型</td></tr>
+  <tr><td>package.xml（接口包）</td><td>buildtool_depend rosidl_default_generators + exec rosidl_default_runtime + depend std_msgs…</td><td>构建工具与运行时链条</td></tr>
+  <tr><td>package.xml（节点包）</td><td><code>&lt;depend&gt;ros_sensor_interfaces&lt;/depend&gt;</code></td><td>运行期 import 的入场券——EXP-04 依赖标签的实战</td></tr>
+</table>
+<div class="tip tealb"><span class="lab">为什么要独立接口包</span>接口是契约、节点是实现：分离后 C++ 与 Python 节点共享同一类型；改实现不碰契约；接口版本可单独演进。若写死在节点包里，别的包想用这个类型就不得不<b>依赖整个实现包</b>——循环依赖的温床。</div>
+
+<h3 style="font-size:16px;color:var(--text-primary);margin:28px 0 0">动手验证：这段需求该用哪种接口？</h3>
+<p>原理讲完了，用下面这个小工具自测一下——选一个需求，看它该配哪种接口结构、为什么。</p>
+<div class="ix-panel">
+  <div class="ix-title">Interface Router · 这段需求该用哪种接口</div>
+  <div class="ctl-row">
+    <label class="ctl">需求描述
+      <select id="req" onchange="routeIf()">
+        <option value="th">一次发布温度+湿度两个相关联的值</option>
+        <option value="vf">请求"验证手指"，返回成功与否+用户号+说明</option>
+        <option value="rf">下达"读卡"任务：可设超时、过程要报状态、结果含卡号</option>
+        <option value="std">发布单个 ppm 浓度值</option>
+        <option value="relay">请求"3 号继电器吸合 0.5 秒"，回执成败</option>
+      </select>
+    </label>
+  </div>
+  <div class="io" id="ifIo">// 选择需求，输出接口文件形态与字段草案…</div>
+</div>
+</section>
+
+<section class="blk" id="s6">
+<h2><span class="no">04</span>实操 A：通览全部 6 份契约，逐份读懂</h2>
+<p>01 节你只看了一条 <code>TemperatureHumidity</code>，但接口包里一共有 <b>3 类 6 份定义</b>——它们正好对应 EXP-06~08 用过的通信方式。这一节把 6 份陆续读一遍。</p>
+
+<div class="termbar"><span class="tl">终端 B</span><b>自省四连：确认契约已注册进系统</b><span class="note">（01 节编译好的环境继续用）</span></div>
+<div class="cmdstep">
+  <div class="cs-hd"><span class="cs-no">1</span><b>列出全部 6 个自定义接口</b><span class="cs-where">终端 B</span></div>
+  <p class="cs-why">这条命令相当于"查户口"——6 个接口全在，说明编译、注册两环都没掉：</p>
+  <pre data-copy="cmd"><span class="c"># 列出本接口包的所有接口，按 msg / srv / action 三类</span>
+ros2 interface list | grep ros_sensor_interfaces</pre>
+  <div class="io"><span class="dim">$ ros2 interface list | grep ros_sensor_interfaces</span>
+msg/HeartRateSpO2
+msg/PhotoState
+msg/TemperatureHumidity
+srv/TriggerRelay
+srv/VerifyFingerprint
+action/RfidScan
+<span class="g"># 3 msg + 2 srv + 1 action = 6 个，一个不少</span></div>
+</div>
+<div class="cmdstep">
+  <div class="cs-hd"><span class="cs-no">3</span><b>检视 .srv：注意"空请求"</b><span class="cs-where">终端 B</span></div>
+  <p class="cs-why">打印出的字段必须与源文件一字不差——这是"编译生效"的最直接证据：</p>
+  <pre data-copy="cmd">ros2 interface show ros_sensor_interfaces/srv/VerifyFingerprint</pre>
+  <div class="io"><span class="dim">$ ros2 interface show ros_sensor_interfaces/srv/VerifyFingerprint</span>
+<span class="y"># 请求段为空：触发即验证，无需入参</span>
+---
+bool success
+int32 user_id
+string message
+<span class="g"># --- 上面的"空白"就是完整请求段 —— 空请求是合法的</span></div>
+</div>
+<div class="cmdstep">
+  <div class="cs-hd"><span class="cs-no">4</span><b>检视 .action 与 .msg</b><span class="cs-where">终端 B</span></div>
+  <p class="cs-why">对照上面图 9-4 数分隔符：.action 两个 <code>---</code> 三段、.msg 零个一段：</p>
+  <pre data-copy="cmd">ros2 interface show ros_sensor_interfaces/action/RfidScan
+ros2 interface show ros_sensor_interfaces/msg/TemperatureHumidity</pre>
+  <div class="io"><span class="dim">$ ros2 interface show …/action/RfidScan</span>
+int32 timeout_sec      <span class="dim"># Goal 段</span>
+---
+bool success
+string card_uid
+string card_type
+string message         <span class="dim"># Result 段</span>
+---
+string status          <span class="dim"># Feedback 段</span>
+
+<span class="dim">$ ros2 interface show …/msg/TemperatureHumidity</span>
+float32 temperature
+float32 humidity</div>
+  <p class="cs-see">✔ 自省四连的输出 = 源文件的镜像。<b>先 show 再读代码</b>，系统层的证据永远比记忆可靠。</p>
+</div>
+
+<h3 style="font-size:16px;color:var(--text-primary);margin:28px 0 0">再打开源目录，逐份读原文</h3>
+<p><code>interface show</code> 打的是编译后的镜像，源文件里还有注释和目录组织。直接进目录读一遍：</p>
+
+<div class="cmdstep">
+  <div class="cs-hd"><span class="cs-no">5</span><b>进入接口包，看清目录结构</b><span class="cs-where">终端 B</span></div>
+  <p class="cs-why">接口包的标准形态：<code>msg/ srv/ action/</code> 三个目录 + <code>CMakeLists.txt</code>。先确认结构再读内容：</p>
+  <pre data-copy="cmd"><span class="c"># 进接口包目录，列出三类定义文件</span>
+cd ~/ros2_ws/src/xflz_eai_car1/driver/ros_sensor/ros_sensor_interfaces
+ls -R msg srv action</pre>
+  <div class="io"><span class="dim">$ ls -R msg srv action</span>
+msg:
+HeartRateSpO2.msg  PhotoState.msg  TemperatureHumidity.msg
+
+srv:
+TriggerRelay.srv  VerifyFingerprint.srv
+
+action:
+RfidScan.action</div>
+</div>
+<div class="cmdstep">
+  <div class="cs-hd"><span class="cs-no">6</span><b>读 .msg：注意 valid 字段的用意</b><span class="cs-where">终端 B</span></div>
+  <p class="cs-why">逐个打开三份消息定义，对照"字段 ↔ 传感器"的对应关系：</p>
+  <pre data-copy="cmd"><span class="c"># 一次读完三份消息定义</span>
+cat msg/TemperatureHumidity.msg
+cat msg/HeartRateSpO2.msg
+cat msg/PhotoState.msg</pre>
+  <div class="io"><span class="dim">$ cat msg/TemperatureHumidity.msg</span>
+float32 temperature   <span class="dim"># 温度(摄氏度)</span>
+float32 humidity      <span class="dim"># 湿度(%)</span>
+
+<span class="dim">$ cat msg/HeartRateSpO2.msg</span>
+float32 heart_rate
+float32 spo2
+bool valid            <span class="y"># ← MAX30102 未接触皮肤时心率恒 0，</span>
+                      <span class="y">#   没有它就分不清"读数是 0"还是"没测"</span></div>
+  <p class="cs-see">✔ 想一想：为什么 TemperatureHumidity 不需要 valid，HeartRateSpO2 却必须加？</p>
+</div>
+<div class="cmdstep">
+  <div class="cs-hd"><span class="cs-no">3</span><b>读 .srv：数一数分隔符</b><span class="cs-where">终端 B</span></div>
+  <p class="cs-why">验证"一个 <code>---</code> 切两段"的规律，并留意请求段允许为空：</p>
+  <pre data-copy="cmd">cat srv/VerifyFingerprint.srv
+cat srv/TriggerRelay.srv</pre>
+  <div class="io"><span class="dim">$ cat srv/VerifyFingerprint.srv</span>
+<span class="dim"># 请求：触发一次指纹验证（无参数）</span>
+---
+bool success
+int32 user_id
+string message
+
+<span class="dim">$ cat srv/TriggerRelay.srv</span>
+int32 relay_id       <span class="dim"># 这次请求段不为空：继电器编号</span>
+float32 duration
+---
+bool success
+string message</div>
+</div>
+<div class="cmdstep">
+  <div class="cs-hd"><span class="cs-no">4</span><b>读 .action：三段各自承载谁</b><span class="cs-where">终端 B</span></div>
+  <p class="cs-why">两个 <code>---</code> 切三段，三个方向：Goal 客户端→服务端，Result/Feedback 服务端→客户端：</p>
+  <pre data-copy="cmd">cat action/RfidScan.action</pre>
+  <div class="io"><span class="dim">$ cat action/RfidScan.action</span>
+<span class="dim"># 目标：执行一次读卡任务</span>
+int32 timeout_sec
+---
+<span class="dim"># 结果</span>
+bool success
+string card_uid
+string card_type
+string message
+---
+<span class="dim"># 反馈</span>
+string status</div>
+  <p class="cs-see">✔ 读完 6 份文件回到本节步骤 2 再跑一遍 <code>interface show</code>——你会发现自己已经能"背出"输出。</p>
+</div>
+</section>
+
+<section class="blk" id="s8">
+<h2><span class="no">05</span>实操 B：设计任务——为新传感器定义接口</h2>
+<p><b>任务背景</b>：小车上要新装一个光照传感器，需要上报「照度值 + 读数是否有效 + 采样时刻」。请按真实工程流程走完"定义 → 登记 → 编译 → 验证"四步。</p>
+
+<div class="cmdstep">
+  <div class="cs-hd"><span class="cs-no">1</span><b>编写 Illuminance.msg</b><span class="cs-where">终端 B</span></div>
+  <p class="cs-why">用 heredoc 一次写入三字段定义（和 6 份前辈接口住在同一个包里）：</p>
+  <pre data-copy="cmd">cd ~/ros2_ws/src/xflz_eai_car1/driver/ros_sensor/ros_sensor_interfaces
+cat &gt; msg/Illuminance.msg &lt;&lt; 'EOF'
+# 光照度消息：单段，无分隔符
+float32 lux          # 照度(lx)
+bool valid           # 读数有效位（遮挡/超量程时 false）
+builtin_interfaces/Time stamp   # 最近一次采样时刻
+EOF
+cat msg/Illuminance.msg   <span class="c"># 回读确认</span></pre>
+</div>
+<div class="cmdstep">
+  <div class="cs-hd"><span class="cs-no">2</span><b>把文件登记进编译列表</b><span class="cs-where">编辑器</span></div>
+  <p class="cs-why">打开 <code>CMakeLists.txt</code>，在 <code>rosidl_generate_interfaces</code> 列表末尾追加一行（<code>builtin_interfaces</code> 已在 DEPENDENCIES 里，无需再改）：</p>
+  <pre data-copy="cmd">rosidl_generate_interfaces(${PROJECT_NAME}
+  "srv/VerifyFingerprint.srv"
+  "srv/TriggerRelay.srv"
+  "action/RfidScan.action"
+  "msg/TemperatureHumidity.msg"
+  "msg/HeartRateSpO2.msg"
+  "msg/PhotoState.msg"
+  "msg/Illuminance.msg"        <span class="c"># ← 新增这一行</span>
+  DEPENDENCIES std_msgs action_msgs builtin_interfaces
+)</pre>
+  <div class="io"><span class="dim">// 忘了登记会怎样？</span>
+<span class="y">$ colcon build 成功，但 ros2 interface list 里永远没有 Illuminance</span>
+<span class="dim">// ——每个接口文件都必须显式列入列表才会被编译</span></div>
+</div>
+<div class="cmdstep">
+  <div class="cs-hd"><span class="cs-no">3</span><b>重编 + source + 验证</b><span class="cs-where">终端 B</span></div>
+  <p class="cs-why">编译接口包并重新加载环境，然后用系统层命令做最终验收：</p>
+  <pre data-copy="cmd">cd ~/ros2_ws
+colcon build --packages-select ros_sensor_interfaces
+source install/setup.bash
+ros2 interface show ros_sensor_interfaces/msg/Illuminance</pre>
+  <div class="io"><span class="dim">$ ros2 interface show ros_sensor_interfaces/msg/Illuminance</span>
+float32 lux
+bool valid
+builtin_interfaces/Time stamp
+<span class="g"># 三字段完整打印 = 定义→登记→编译全链路打通 ✔</span></div>
+  <p class="cs-see">✔ 此时任何节点包加上 <code>&lt;depend&gt;ros_sensor_interfaces&lt;/depend&gt;</code> 后即可 <code>from ros_sensor_interfaces.msg import Illuminance</code>——契约已对全系统生效。</p>
+</div>
+
+<div class="tip"><span class="lab">设计题</span>如果把 stamp 字段去掉，"采样时刻"就只能靠订阅端收到消息的时间估算——处理排队越久误差越大。这正是 EXP-11 <code>Header.stamp</code> 规范的伏笔：<b>时间戳要在采集端盖，而不是接收端猜</b>。</div>
+
+<div class="task-tbl">
+<table>
+  <tr><th>#</th><th>证据项</th><th>记录方式</th><th>合格标准</th></tr>
+  <tr><td>1</td><td>接口包目录结构</td><td><code>ls -R msg srv action</code> 截图</td><td>能看到 Illuminance.msg 已就位</td></tr>
+  <tr><td>2</td><td>编译列表登记</td><td>CMakeLists.txt 修改段截图</td><td>列表含 7 个文件（6 + 1）</td></tr>
+  <tr><td>3</td><td>编译成功</td><td>colcon build 输出截图</td><td>Finished &lt;&lt;&lt; ros_sensor_interfaces</td></tr>
+  <tr><td>4</td><td>系统层验证</td><td><code>interface show Illuminance</code> 截图</td><td>三字段完整打印</td></tr>
+  <tr><td>5</td><td>消费端可用</td><td><code>python3 -c "from ros_sensor_interfaces.msg import Illuminance; print('ok')"</code>（source 后）</td><td>打印 ok</td></tr>
+</table>
+</div>
+</section>
+
+<section class="blk" id="s9">
+<h2><span class="no">06</span>注意事项与验收清单</h2>
+<div class="check">
+  <ul>
+    <li>默画三种接口的分隔符结构：.msg 无、.srv 一个 ---、.action 两个 ---</li>
+    <li>6 个既有接口全部 interface show 成功，字段与源文件一致</li>
+    <li>说出接口包与节点包为何必须分离（契约 vs 实现）</li>
+    <li>解释 DEPENDENCIES 各项分别在支撑哪些字段类型</li>
+    <li>独立完成新消息 Illuminance 的定义 → 编译 → import 三步</li>
+    <li>知道接口改动后"重编接口包+全部消费方"的连锁规则</li>
+  </ul>
+</div>
+<table>
+  <tr><th>坑</th><th>症状</th><th>解法</th></tr>
+  <tr><td>分隔符数量错</td><td>rosidl 编译直接失败</td><td>.srv 数 1 条 ---、.action 数 2 条，缺一即错</td></tr>
+  <tr><td>类型写成 int</td><td>字段类型报错</td><td>改 <code>int32</code>/uint8/float32 等定长类型</td></tr>
+  <tr><td>文件没进 CMake 列表</td><td>interface list 里没有它</td><td>每个接口都要显式列入 rosidl_generate_interfaces</td></tr>
+  <tr><td>没 source / 没重编</td><td>ModuleNotFoundError / 节点读不到新字段</td><td>build + source；接口是契约，改了全链重编</td></tr>
+  <tr><td>接口写进节点包</td><td>别的包要用只能连实现一起依赖</td><td>接口必须独立 ament_cmake 包，节点包 just depend</td></tr>
+</table>
+</section>
+
+<section class="blk" id="s10">
+<h2><span class="no">07</span>本课总结与思考题</h2>
+<div class="kgrid">
+  <div class="kcard"><div class="kd">结构</div><div class="kt">0 / 1 / 2 个分隔符</div><p>msg 单段、srv 请求响应、action 三段——文件结构直接映射通信模型。</p></div>
+  <div class="kcard"><div class="kd">编译</div><div class="kt">rosidl_generate_interfaces</div><p>列表 + DEPENDENCIES 双配置，产出 Python/C++ 双端类。</p></div>
+  <div class="kcard"><div class="kd">组织</div><div class="kt">接口包 / 节点包分离</div><p>契约独立演进，多语言共享，阻断循环依赖。</p></div>
+  <div class="kcard"><div class="kd">自省</div><div class="kt">ros2 interface list/show</div><p>不看源码也能审计系统里全部数据契约。</p></div>
+</div>
+<div class="tip violet"><span class="lab">思考题</span>
+① TemperatureHumidity 若要补"传感器在线状态"和"最近读数时间戳"，给出扩展后的完整 .msg 与每个字段的选型理由（提示：在线用什么时间戳用什么）。<br>
+② MQ5 将来要发 ppm + 电压 + ADC 原始值三个量——改用标准消息组合还是自定义？对比两种方案的耦合度、可读性与维护成本，并给出与 ros_sensor_interfaces 命名风格一致的方案。<br>
+③ 为什么 HeartRateSpO2 需要 valid 而 TemperatureHumidity 没有？什么条件下"有效位"应该是接口设计的默认字段？</div>
+</section>
+
+<nav class="expnav">
+  <a href="../exp-08-action/index.html"><span class="lb">← 上一个实验</span>EXP-08 动作通信 · RFID</a>
+  <a class="next" href="../exp-10-parameter/index.html"><span class="lb">下一个实验 →</span>EXP-10 参数系统</a>
+</nav>
+<footer><span>CORE-01 · 机器人 ROS2 应用与开发 · EXP-09 自定义接口消息</span><span>2 学时 · 设计性 · 基于 ros_practice 实验讲义改编</span></footer>
+</main>
+</div>
+<script>
+var ROUTES={
+  th:'<span class="dim">// 分类中…</span>\n<span class="ok">✓ 用【.msg 自定义消息】</span>\n<span class="dim">草案 msg/TemperatureHumidity：</span>\n<span class="y">float32 temperature   # 温度(℃)</span>\n<span class="y">float32 humidity      # 湿度(%)</span>\n<span class="dim">理由：两个值语义关联（同一采样周期），拆成两个 Float32 话题会失去原子性。</span>',
+  vf:'<span class="dim">// 分类中…</span>\n<span class="ok">✓ 用【.srv 服务】</span>\n<span class="dim">草案 srv/VerifyFingerprint：</span>\n<span class="y">---              # 请求为空（触发即验证）</span>\n<span class="y">bool success</span>\n<span class="y">int32 user_id</span>\n<span class="y">string message</span>\n<span class="dim">理由：一次性一问一答、需要明确成败、无中间过程 → 同步 RPC。</span>',
+  rf:'<span class="dim">// 分类中…</span>\n<span class="ok">✓ 用【.action 动作】</span>\n<span class="dim">草案 action/RfidScan：</span>\n<span class="y">---\nint32 timeout_sec      # Goal：可配超时</span>\n<span class="y">---\nbool success\nstring card_uid        # Result：四字段</span>\n<span class="y">---\nstring status          # Feedback：状态流</span>\n<span class="dim">理由：耗时不可知 + 要过程反馈 + 可取消——三段结构一一对应。</span>',
+  std:'<span class="dim">// 分类中…</span>\n<span class="ok">✓ 用【标准消息 std_msgs/msg/Float32】</span>\n<span class="dim">单值定长、生态通用（rosbag/rqt 开箱即用），自定义反而增加对接成本。</span>\n<span class="dim">何时升级自定义：ppm+电压+ADC 三值语义绑定时 → msg/GasReading。</span>',
+  relay:'<span class="dim">// 分类中…</span>\n<span class="ok">✓ 用【.srv 服务】</span>\n<span class="dim">草案 srv/TriggerRelay：</span>\n<span class="y">int32 relay_id      # 继电器编号</span>\n<span class="y">float32 duration    # 吸合时长(秒)</span>\n<span class="y">---</span>\n<span class="y">bool success\nstring message</span>\n<span class="dim">理由：短耗时、确定性执行、要回执 → 同步 RPC（对应 EXP-07 relay 控制实为服务场景）。</span>'
+};
+function routeIf(){document.getElementById('ifIo').innerHTML=ROUTES[document.getElementById('req').value];}
+routeIf();
+</script>
+<script src="../shared/tutorial.js?v=20261027a" defer></script>
+</body>
+</html>

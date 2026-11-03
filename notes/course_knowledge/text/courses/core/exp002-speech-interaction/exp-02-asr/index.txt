@@ -1,0 +1,347 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp002-speech-interaction/exp-02-asr/index.html
+TITLE: EXP-02 · 声学模型 ASR 语音识别 — 机器人自然语言交互应用
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+EXP-02 · 声学模型 ASR 语音识别 — 机器人自然语言交互应用
+🧠 具身智能课程 ·
+教程首页
+核心课程
+/
+自然语言交互应用
+/ EXP-02
+本页目录
+01 问题引入：从"声音"到"文字"隔着多远
+02 原理通俗讲解：听写员的三道工序
+03 关联知识点
+04 实验目标
+05 实验环境与准备
+06 动画讲解：音频流 → 分块 → 声学模型 → 解码
+07 互动讲解：热词与解码参数实验台
+08 实操步骤：跑通 sherpa-onnx 实时识别链
+09 重点与易错点
+10 总结与思考
+CORE-03 · 自然语言交互
+EXP-01 六麦阵列串口唤醒
+EXP-02 ASR 语音识别
+EXP-03 TTS 语音合成
+EXP-04 端到端语音对话
+EXP-05 大模型语义理解
+EXP-06 情绪感知
+EXP-02 · 第 1 章 · 设计性 · 4 学时
+声学模型 ASR 语音识别：把声音变成文字
+唤醒之后，机器人必须"听清你在说什么"。本实验围绕
+sherpa-onnx + Zipformer-Transducer
+流式识别链：100ms 微块送入 encoder、RKNN 模型跑在 RK3576 NPU 上、endpoint 三条判停规则决定何时出完整句，再用
+热词表 + beam search 调参
+把"左转"听成"转收"的尴尬压下去，最后以 WER 字错率量化验收。
+难度 ⭐⭐ · 4 学时
+sherpa-onnx
+Zipformer 声学模型
+热词 · modified_beam_search
+WER
+01
+问题引入：从"声音"到"文字"隔着多远
+EXP-01 让机器人"听见有人叫它"，但喊完"小飞小飞，前进"之后——
+后半句去哪了？
+阵列的 ivw 唤醒事件只带一个词，真正的话还在空气里飘。把话变成文字，机器人会遇到三难：
+1
+连续性
+：声音是河，文字是桥——如何在说话中途就"边流边译"，而不是等说完才处理
+2
+一词多听
+："shi/zi/si"不分、环境噪声干扰，同音字让裸识别错误率居高不下
+3
+何时算完
+：你停顿 2 秒是在想词，还是说完了？停顿判定错，句子被拦腰截断
+4
+算力有限
+：工控主机没有 GPU 独显，识别必须跑得又快又省
+💡 解法总览
+课程选用
+sherpa-onnx
+（ONNX 推理框架 + 丰富的流式模型生态）+
+Zipformer-Transducer
+模型，模型量化为 RKNN 后用
+NPU 加速
+；配合热词、判停规则与解码参数三组旋钮解决上面四难。
+02
+原理通俗讲解：听写员的三道工序
+生活比喻：会议速记员。
+你说话时，速记员不是等你整段讲完才动笔，而是边听边写、时不时回头修正。一条 ASR 管线就是三位接力的工人：
+1
+前端特征工 = 磨面
+：原始波形每 100ms 切一块，转成声学特征（FBank/MFCC）——就像把麦子磨成面粉，扔掉音色保留"能识别内容的信息"
+2
+声学模型 = 听写员
+：Zipformer（Transformer 变体）盯着特征序列，输出"此刻最可能在发哪些音"的概率
+3
+解码器 = 终审编辑
+：Transducer 的 joiner 把声学概率与语言先验合并，beam search 保留 Top-N 条候选路径，边走边吐字
+4
+判停 = 编辑画句号
+：endpoint 三规则判断"你说完了"，固化输出并清空会话状态
+模块
+生活类比
+本实验对应
+流式分块
+边吃火锅边涮，不等一桌菜全熟
+每 100ms 一段喂入 encoder，首字延迟可感知地低
+声学模型
+听写员的"耳朵+拼音功底"
+Zipformer encoder 输出音素级概率
+语言模型先验
+编辑的"语文语感"
+解码器偏好常见词组；热词即"给编辑划重点"
+hotwords 热词
+生僻人名预先写在稿纸上
+hotwords="前进 后退 左转"
+，权重 hotwords_score=2.0
+endpoint 判停
+编辑看你停笔多久才画句号
+rule1 静音 4.5s / rule2 尾部静音 1.5s / rule3 最长 300s
+WER 字错率
+校对统计错字率
+(替换+删除+插入)/总字数，越低越好
+🔍 关键概念：Transducer
+传统"声学模型→字典→语言模型"三件套是接力赛；Transducer 把声学与解码
+端到端联训
+，中间不再查字典 —— 少一次翻译，错一次少一层传播。代价是训练更讲究，但推理侧更紧凑，正适合边缘部署。
+03
+关联知识点
+模型
+Zipformer-Transducer 三件套
+encoder_fp16.rknn
++
+decoder_fp16.rknn
++
+joiner_fp16.rknn
+，合计约 14MB，专为边缘侧设计的流式中英识别模型。
+推理
+RKNN NPU vs CPU
+RK3576 带 6 TOPS NPU；
+provider="rknn"
+与
+provider="cpu"
+两组配置对照跑，实测识别延迟与实时率差异。
+拾音
+六麦阵列声卡通道
+detect_xfm_devices()
+用
+arecord -l | grep XFM
+自动找到阵列声卡 →
+plughw:4,0
+；增益链 PGA/ALC 可调。
+解码
+greedy vs modified_beam_search
+贪心快但"鼠目寸光"；beam search 保留多条候选。
+热词只在 beam search 下生效
+（实验重点坑）。
+输出
+COMMAND_MAP 命令词表
+"前进 / 后退 / 左转 / 右转 / 停下 / 打开灯 / 关闭灯" → 运动控制指令，ASR 从此接入机器人动作。
+评测
+WER 基准测试
+标准测试句 + 三种采样条件（近讲/阵列/噪声）各跑一轮，编辑距离算 WER，量化调参收益。
+04
+实验目标
+能画出"波形 → 分块特征 → Zipformer encoder → joiner 解码 → 文本"的完整数据流并标注维度
+用
+python3 asr_test.py --mic-array
+从六麦阵列实时识别，延迟可感知地低于一句话说完
+配置
+modified_beam_search
++ 热词表，让"打开灯"正确率显著高于裸贪心解码
+解释 endpoint rule1 / rule2 / rule3 各自管什么，并通过改参数复现"句子被截断 / 尾巴拖太长"两种故障
+切换 rknn / cpu 两种 provider，记录同一句测试语的延迟与 CPU 占用差异
+按讲义 WER 流程跑一轮基准，给出调参前后的字错率对比表
+05
+实验环境与准备
+# ① 安装推理框架（版本必须锁定，混装易 ABI 报错）
+pip3
+install sherpa-onnx==1.10.0
+# ② 模型文件就位（三件套 + 词表 + 热词文件）
+ls
+models/zipformer-transducer/
+encoder_fp16.rknn  decoder_fp16.rknn  joiner_fp16.rknn  tokens.txt  hotwords.txt
+# ③ 确认阵列声卡（数字为示例，以 arecord -l 实际输出为准）
+arecord
+-l | grep -i xfm
+card 4: XFM1100 [XFM1100], device 0: ...
+# ④ 确认 NPU 驱动在位
+ls
+/dev/rknpu
+/dev/rknpu   ← 存在即 RKNN 加速可用
+💡 准备清单
+准备一段
+10 句固定测试语
+（讲义附基准句表）用于前后对照 WER；关闭系统其他占音频的应用；把麦克风增益记下来（实验要求"调增益前后各测一轮"）。
+06
+动画讲解：音频流 → 分块 → 声学模型 → 解码
+观察一个音频块（100ms）从入队到出字的旅程：波形被切块 → encoder 计算中（NPU 闪烁）→ beam search 候选路径竞争 → partial 文本实时回显，endpoint 触发后句号落下。
+① 波形 · 100ms 分块
+chunk 0
+chunk 1
+chunk 2
+② Zipformer · RKNN NPU
+encoder
+decoder
+joiner
+14MB · fp16
+音素概率 P(·|t)
+③ Beam Search 候选竞争
+Top-1
+剪枝
+partial: 打开实验室的灯
+final: 打开实验室的灯 ✓ (静音4.5s → endpoint)
+热词表: 打开灯·关闭灯·前进·左转
+动画 2-1｜音频 100ms 分块飞入 NPU 三件套 → beam search 三条候选竞争、低分路径被剪枝 → partial 实时回显，endpoint 判停输出 final 句（4 秒循环）
+07
+互动讲解：热词与解码参数实验台
+同一句含噪输入"打开灯"，切换解码方式与参数组合，观察候选打分与 WER 变化（数据为讲义实验的典型值示意）：
+解码参数实验台 · Decoding Lab
+⚡ 贪心解码（无热词）
+🌊 beam search（无热词）
+🔥 beam + 热词 score=2.0
+🔥🔥 热词 score=4.0
+// 输入测试句（噪声环境下三遍平均）："打开灯" / "请把灯打开"
+提示：先跑贪心基线，再逐级加武器，看 WER 曲线往下掉
+🔬 对照建议
+热词 score 并非越大越好：
+4.0 会让热词喧宾夺主
+——识别"关灯"时可能被"开灯"族词抢跑（画廊里每个人都喊最响的名字）。试着造一句反例验证过拟合。
+08
+实操步骤：跑通 sherpa-onnx 实时识别链
+1
+落模型：三件套 rknn + tokens.txt 放入
+models/zipformer-transducer/
+，核对路径
+2
+起识别：
+python3 asr_test.py --mic-array
+，确认日志出现
+provider=rknn
+（或对照组 cpu）
+3
+近讲三遍基准句 → 加热词文件重跑 → 换噪声环境复测，每轮记 WER 表
+4
+接命令层：识别结果查
+COMMAND_MAP
+，命中即执行小车指令（与 EXP-04 状态机预留接口对齐）
+# —— 识别器构建（asr_test.py 核心配置）——
+import
+sherpa_onnx
+config = sherpa_onnx.OfflineRecognizerConfig.from_transducer(
+    encoder=sherpa_onnx.OfflineTransducerModelConfig(
+        encoder=sherpa_onnx.CTCModelConfig(
+            model=
+"models/zipformer-transducer/encoder_fp16.rknn"
+),
+        decoder=..., joiner=...),
+# 三件套齐
+tokens=
+"models/zipformer-transducer/tokens.txt"
+, tokens_type=
+"zh"
+)
+config.model.provider =
+"rknn"
+# 改 "cpu" 做对照组
+config.decoding_method =
+"modified_beam_search"
+# 热词仅此模式生效！
+config.hotwords_file =
+"hotwords.txt"
+# 打开灯 关闭灯 前进 后退 左转 右转 停下
+config.hotwords_score = 2.0
+# 每个热词 token 的加分
+config.rule1_min_trailing_silence = 4.5
+# 静音超 4.5s 判停
+config.rule2_min_trailing_silence = 1.5
+# 检出句号且尾静音 1.5s 判停
+config.rule3_max_utterance_length = 300.0
+# 硬上限 300s
+# —— 拾音与分块（100ms 一口喂进去）——
+import
+numpy as np, sounddevice as sd
+device = detect_xfm_devices()
+# arecord -l | grep XFM → "plughw:4,0"
+def callback(indata, frames, t, status):
+    stream.accept_waveform(sample_rate, indata[:, 0])
+# 边说边解
+while
+stream.is_ready(): recognizer.decode_stream(stream)
+    print(
+"partial:"
+, stream.result.text)
+# 实时回显
+if
+stream.detected_endpoint(): print(
+"final:"
+, ...)
+python3
+asr_test.py --mic-array
+[ASR] provider=rknn  decoding=modified_beam_search  hotwords=7
+partial: 打开实验室的灯
+final: 打开实验室的灯 → COMMAND_MAP 命中: 打开灯
+# —— 热词失效排查（三连）——
+# ① decoding_method 是不是 modified_beam_search？② 热词是否用
+空格
+分词？③ 路径对不对？
+⚠️ 热词不是万灵药
+热词按
+token 空格分词
+后整体加分，词表应只放业务相关指令词；它提升"领域词召回"，并不能修复增益过小、爆音（削顶失真）这类
+采集端
+问题 —— 先看波形再调参。
+09
+重点与易错点
+🎯 本实验三重点
+① 流式管线的"块-模型-解码-判停"四拍；② 热词只在
+modified_beam_search
+下生效；③ WER 是唯一的裁判 —— 任何调参都要用数据说话。
+⚠️ 常见坑
+现象 → 解法
+热词不起作用
+热词设了照样错 → 检查 decoding_method 是否 greedy（贪心直接忽略热词词汇）
+句子被截断
+话没说完就出 final → rule2 尾静音阈值调大，或说话中途停顿超过 rule1
+半天不出句
+说完没反应 → 把 rule1 4.5s 调小做实验，观察灵敏度/准确度权衡
+声卡找错
+识别到笔记本内置麦 →
+arecord -l
+重新核对编号，用
+plughw:N,0
+而非 default
+增益过小/爆音
+小声识别差 / 大声全是毛刺 → 调 PGA 数字增益 + ALC 自动电平，波形峰值保持 1/3~1/2
+rknn 加载失败
+provider=rknn
+报错回退 → 确认 /dev/rknpu 存在、sherpa-onnx==1.10.0 与模型格式匹配
+版本混装
+pip 升级后模型加载器报符号错误 → 锁定版本重装，不要与旧版 so 共存
+实时识别出字速度跟得上语速，partial 持续更新、endpoint 后输出 final
+热词组 vs 非热词组的 WER 对比表已记录，能解释数字变化的原因
+三组 endpoint 参数的截断/拖沓故障均已人为复现过一次
+rknn 与 cpu 两组延迟/占用数据入表，能说出 NPU 加速的实际收益
+识别"左转"等指令能被 COMMAND_MAP 命中并打印动作名
+10
+总结与思考
+✅ 完成成果
+实时听写链路贯通
+阵列拾音 → sherpa-onnx 流式识别 → partial/final 输出 → 指令词命中。
+🧠 原理收获
+Transducer 端到端解码
+四拍管线、beam 候选竞争、三规则判停，理解"流式"为什么难。
+🛠 技能收获
+调参有据
+热词 / endpoint / provider 三组变量的控制变量法实验与 WER 记账。
+➡ 去向
+EXP-03 让它回话
+有了文字，还要把回答合成为人声才算闭环。
+📝 思考题 1
+热词机制本质是给词"加钱"。若业务指令扩到 500 词，几乎覆盖整个词表，加钱还有效吗？请从 beam 候选打分的角度论证，并给出替代方案（提示：语言模型 / 语法约束解码 / 两级识别）。
+📝 思考题 2
+rule1 的 4.5 秒"静音判停"和人类"说完即止"的直觉差很远。结合课堂对话场景算一算：每轮回复要白等多少秒？怎样既不截断句子又快速判停？（提示：主动句末标点检测 + VAD 联动，与 EXP-04 的 VAD 期权衡呼应。）
+CORE-03 · 机器人自然语言交互应用 · EXP-02 声学模型 ASR 语音识别
+4 学时 · 设计性 · 基于 speech_practice 实验讲义改编

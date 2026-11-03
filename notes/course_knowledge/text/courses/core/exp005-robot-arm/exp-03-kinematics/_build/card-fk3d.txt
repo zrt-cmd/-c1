@@ -1,0 +1,44 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp005-robot-arm/exp-03-kinematics/_build/card-fk3d.html
+TITLE: 3D 机械臂（URDF 加载）：拖关节角，看指尖落在哪
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+3D 机械臂（URDF 加载）：拖关节角，看指尖落在哪
+这个模型不是"画"出来的：页面
+加载
+simple-arm.urdf
+（只用圆柱 / 方块这类基本体写的），关节位置、转轴、连杆长度全部读自 URDF。拖
+关节滑杆
+看姿态与指尖坐标；勾
+坐标帧
+看每个 link 的原点与三轴（X 红 / Y 绿 / Z 蓝）；切
+侧视 / 俯视
+压成 2D 平面。
+3D 透视
+侧视 2D
+俯视 2D
+坐标帧
+指尖 tcp_link（base_link 系）
+x – · y – · z – m
+水平距离 r =
+–
+m · 高度 h =
+–
+m
+X 前
+Y 左
+Z 上
+3D：
+左键拖动
+转视角 ·
+右键 / Shift+拖动
+平移 ·
+滚轮
+缩放 ·
+双击
+复位
+复位视角
+FK 就一件事：从
+base_link
+沿这棵 URDF 坐标树一节节往下走，
+每到一节先按 origin 平移、再绕 axis 转发一个关节角
+。

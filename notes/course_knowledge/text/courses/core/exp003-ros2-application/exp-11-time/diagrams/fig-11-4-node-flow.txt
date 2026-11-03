@@ -1,0 +1,32 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp003-ros2-application/exp-11-time/diagrams/fig-11-4-node-flow.html
+TITLE: 图 11-4 · 节点主流程
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+图 11-4 · 节点主流程
+图 11-4 · 节点主流程：一次采样如何从触发走到发布
+本图回答的问题：定时器回调里哪一行取时刻、哪一行盖章，没有 spin 会怎样？
+__init__：建两个定时器
+rclpy.spin 在运行？
+事件循环检测到点
+否
+回调永不触发
+节点"假死"
+是 · 到点
+哪个定时器？
+timer1 · 1.0s
+① now = get_clock()
+.now()
+采集时刻 · 就在这里取
+② now_msg = now.to_msg()
+API Time → 消息 Time
+③ stamp 盖戳 → 发布
+publish(/sensor_data)
+日志 + 计数
+等待下一周期
+timer2 · 5.0s
+读 now().nanoseconds
+累计次数 + 总纳秒 → 日志
+✅ 结论：时刻取在①采集行，盖章在③，两步之间不做耗时操作
+⚠️ 风险：忘 spin → 全部回调不触发；同线程串行，一个堵全堵
+🔍 验证：02 节 hz≈1.000；04 节逐行代码与终端输出
+EXP-11 · 时间 API 与双时钟体系

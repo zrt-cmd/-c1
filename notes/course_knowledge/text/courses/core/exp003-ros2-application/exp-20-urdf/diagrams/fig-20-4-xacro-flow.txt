@@ -1,0 +1,25 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp003-ros2-application/exp-20-urdf/diagrams/fig-20-4-xacro-flow.html
+TITLE: 图 20-4 · Xacro 参数化重构
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+图 20-4 · Xacro 参数化重构
+图 20-4 · Xacro 参数化重构（复用压缩到 80 行）
+本图回答的问题：150 行的重复模型，靠哪四步压进 80 行且不丢公式？
+手写 150 行
+① property 收尺寸
+wheel_radius=0.05 …
+② ${} 推导联动量
+改车宽轮距自动跟
+③ macro 公式即代码
+惯性宏 + 轮宏 x_reflect
+④ xacro 展开 → check_urdf 复验 → RViz
+80 行 .xacro 展开为 150 行 .urdf，结构分毫不差
+两行调用镜像左右轮
+xacro:wheel ×2
+x_reflect = ±1
+① 根标签漏 xmlns:xacro → 所有宏标签失效　② 宏调用 name 撞车 → 重复 link，解析失败
+宏定义必须先于调用、且同在一个 <robot> 标签内
+✅ 结论：改一处尺寸，全模联动——80 行管住 150 行
+⚠️ 风险：xmlns 未声明宏全失效；name 撞车解析失败
+🔍 验证：04 节 head -80 展开对比 + check_urdf 复验通过
+EXP-20 · URDF 与 Xacro 机器人建模

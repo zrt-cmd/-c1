@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-05 ROS2 架构与动作回放 — 机器人机械臂应用与开发</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+:root{--theme:#dc2626;--theme-deep:#b91c1c;--theme-bg:#fee2e2;--theme-bd:#fecaca}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit" title="返回课程首页">🤖 具身智能课程 · <i>教程首页</i></a>
+  <div class="crumb"><a href="../../../index.html#core">核心课程</a> / <a href="../index.html">机械臂应用与开发</a> / EXP-05</div>
+</div>
+
+<div class="wrap">
+<aside class="side">
+  <h4>本页目录</h4>
+  <a href="#s1" class="now">01 问题引入：录好的动作如何原样动起来</a>
+  <a href="#s2">02 原理通俗讲解：乐团指挥与总谱</a>
+  <a href="#s3">03 关联知识点：节点拓扑 · 弧度 · offset</a>
+  <a href="#s4">04 实验目标</a>
+  <a href="#s5">05 实验环境与准备</a>
+  <a href="#s6">06 动画讲解：回放管线数据流</a>
+  <a href="#s7">07 互动讲解：弧度 ↔ PWM 双向换算台</a>
+  <a href="#s8">08 实操步骤：bringup → action_player 回放</a>
+  <a href="#s9">09 重点与易错点</a>
+  <a href="#s10">10 总结与思考</a>
+  <h4>本课程实验</h4>
+  <a href="../exp-01-urdf-simulation/index.html">EXP-01 URDF 模型与仿真控制</a>
+  <a href="../exp-02-serial-pwm/index.html">EXP-02 关节电机底层控制与应用</a>
+  <a href="../exp-03-kinematics/index.html">EXP-03 正运动学基础</a>
+  <a href="../exp-04-ik-solver/index.html">EXP-04 逆运动学基础与 IK 解算</a>
+  <a href="../exp-05-action-replay/index.html" class="now">EXP-05 ROS2 架构与动作回放</a>
+  <a href="../exp-06-fixed-grasp/index.html">EXP-06 逆运动学固定抓取</a>
+  <a href="../exp-07-visual-grasp/index.html">EXP-07 视觉动态抓取</a>
+</aside>
+<main class="content">
+
+<div class="exp-head">
+  <span class="code">EXP-05 · 第 3 章 · 综合性 · 4 学时</span>
+  <h1>ROS2 架构与动作回放</h1>
+  <p class="desc">换回 <b>ROS2 路线</b>：bringup 拉起 7~8 个节点组成观察网络，<code>action_player</code> 节点按 <b>pick_and_place.yaml</b> 总谱把 EXP-02 录的动作原样回放，play / next / stop 三个 Trigger 服务当遥控器，servo_calib GUI 消除装配偏差。</p>
+  <div class="meta">
+    <span class="tag hl">难度 ⭐⭐ · 4 学时 · 综合性</span>
+    <span class="tag">节点拓扑勘察</span>
+    <span class="tag">joint_command 弧度</span>
+    <span class="tag">action_player</span>
+    <span class="tag">软件 offset 校准</span>
+  </div>
+</div>
+
+<!-- 01 -->
+<section class="blk" id="s1">
+  <h2><span class="no">01</span>问题引入：录好的动作如何原样动起来</h2>
+  <p>EXP-02 录好了一套"开爪 → 下探 → 合爪 → 提升"的 pick_and_place.yaml，但它是裸机世界的数据。要让整机系统执行它，需要一条完整的<b>供给链</b>：谁发指令？发到哪个话题？内容是弧度还是微秒？谁在中间翻译成串口帧？</p>
+  <p>ROS2 的回答是"分工"：<code>bringup</code> 起 7~8 个节点把底盘、IMU、里程计、状态话题全部跑起来；<code>arm_controller</code> 单独启动、只订阅一个话题——<code>/arm_controller/joint_command</code>；<code>action_player</code> 像唱总谱的乐手，逐条读 YAML 发指令。三个进程互不认识，却配合出连续动作。</p>
+  <div class="tip amber"><span class="lab">⚠️ 两条易混红线</span>① <b>action_player 是节点不是 launch</b>（console_scripts 注册，用 ros2 run 启动）；② 本实验范围<b>严禁 target_pose / pick / place</b> —— 那是 EXP-06 的 IK 抓取接口，这里只回放预录点位。</div>
+</section>
+
+<!-- 02 -->
+<section class="blk" id="s2">
+  <h2><span class="no">02</span>原理通俗讲解：乐团指挥与总谱</h2>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">生活比喻 · 乐团</div><div class="kt">action_player = 指挥</div><p>指挥拿着总谱（YAML）逐小节挥棒：先抬手（play），想慢放就一拍一拍来（next），喊停就全体收声（stop）。</p></div>
+    <div class="kcard"><div class="kd">生活比喻 · 播放列表</div><div class="kt">YAML = 动作播放列表</div><p>每条 = 五个关节的目标角 + 持续时间，和手机歌单一样：<b>顺序播放</b>，结构必须与 EXP-02 的 yaml 导出完全一致。</p></div>
+    <div class="kcard"><div class="kd">生活比喻 · 翻译官</div><div class="kt">arm_controller = 弧度↔脉冲翻译官</div><p>指挥说的是"弧度"，舵机只认 μs；翻译官坐在 /joint_command 话题后面，听到弧度就组好 0xAA55 帧发下总线。</p></div>
+    <div class="kcard"><div class="kd">生活比喻 · 直达车</div><div class="kt">action_player 不坐翻译官的车</div><p>YAML 里存的已经是 <b>PWM（id→μs）</b>，所以 action_player <b>直接发到舵机位置话题</b> <code>/car1_base_driver/bus_servo/set_position</code>，跳过 arm_controller。<b>两条路各走一边</b>：要弧度就用 joint_command，要复现录好的脉宽就用 action_player——别以为它俩在同一条链上。</p></div>
+    <div class="kcard"><div class="kd">生活比喻 · 仪表盘</div><div class="kt">bringup = 整车通电自检</div><p>点火开关一拧，七八个仪表同时活了（/joint_states 50Hz、/odom、/imu/data）—— bringup 就是整机的"上电自检"。</p></div>
+  </div>
+  <p>三个 Trigger 服务像遥控器的三个键：</p>
+  <table>
+    <thead><tr><th>服务</th><th>行为</th><th>类比</th></tr></thead>
+    <tbody>
+      <tr><td><code>/action_player/play</code></td><td>按顺序连续回放整段动作（6~10 秒一个循环）</td><td>▶ 整曲播放</td></tr>
+      <tr><td><code>/action_player/next</code></td><td>单步模式：每调一次执行一步，可逐帧检视</td><td>⏯ 单曲循环里的"下一首"</td></tr>
+      <tr><td><code>/action_player/stop</code></td><td>立即中断后续动作，机械臂停在当前位置</td><td>⏸ 急停按钮</td></tr>
+    </tbody>
+  </table>
+  <div class="tip amber"><span class="lab">⚠️ next 不是随时能按的——它有个开关</span><code>~/next</code> 在源码里做了两道前置检查：<b>① 必须正在播放</b>（<code>self.playing == True</code>）；<b>② 必须开着单步模式</b>。单步模式是启动参数 <code>step_mode</code>，<b>默认 False</b>。所以直接 <code>call next</code> 会返回 <code>"Not in step mode"</code>，不是坏了。正确用法是启动时就带上：<br><code>ros2 run car1_arm_controller action_player --ros-args -p action_file:=pick_and_place.yaml -p step_mode:=true</code><br>另一个容易踩的是 <code>auto_play</code>：它默认 <b>True</b>，节点起来 2 秒后会自己开始播——如果你先启动节点、再去 call play，会看到 <code>"Already playing"</code>。<b>想要手动控制，就在启动时加 <code>-p auto_play:=false</code>。</b></div>
+  <div class="tip tealb"><span class="lab">🔍 还有一个启动参数：loop</span><code>loop</code> 默认 <b>False</b>（播完一遍就退出循环）。轮播演示时才加 <code>-p loop:=true</code>。注意它在源码里的位置是"整个 <code>for</code> 循环外面那层 <code>while</code>"，所以开了 loop 之后 <code>~/stop</code> 仍是唯一的出口——急停键在循环模式下尤其重要。</div>
+  <div class="tip tealb"><span class="lab">🔍 关键跃迁</span>为什么"录"在裸机、"放"在 ROS2 没问题？因为两边共享同一份 <b>PWM↔弧度换算</b>与同一套 YAML 结构 —— 接口对齐，架构随便换，这就是分层的红利。</div>
+</section>
+
+<!-- 03 -->
+<section class="blk" id="s3">
+  <h2><span class="no">03</span>关联知识点：节点拓扑 · 弧度 · offset</h2>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">知识点 1</div><div class="kt">唯一入口：joint_command</div><p>arm_controller <b>只用</b> /arm_controller/joint_command（sensor_msgs/JointState：position = 5 个关节的弧度）—— 不碰它，手臂绝不动。<b>一个源码怪癖</b>：运动时长居然是从 <code>effort[0]</code> 读的（<code>if len(msg.effort)&gt;0: duration = msg.effort[0]</code>）；不填就用默认 <code>default_duration</code>。effort 字段本该是力矩，这里被借去当时间了——发指令时想控制快慢，就得填 effort。</p></div>
+    <div class="kcard"><div class="kd">知识点 2</div><div class="kt">弧度工作位的来历</div><p>work PWM [1500,1100,2200,1850,1500] 逐项换算：<b>[0.0, −0.9424, 1.6492, 0.8246, 0.0]</b>（2200 → 700×0.002356 = 1.6492）。这和 <code>arm_controller.go_work</code> 里硬编码的 <code>WORK_JOINTS_RAD</code> 完全一致——<b>对账时以这 4 位小数为准</b>，别四舍五入成 1.65。</p></div>
+    <div class="kcard"><div class="kd">知识点 3</div><div class="kt">零位校准 servo_offsets.yaml</div><p>机械装配总会歪几度：servo_calib GUI 拖滑块找机械中位 → Apply 写入软件 offset（<b>offset = 实测中位 PWM − 1500</b>，常见量级几十 μs）。<b>注意</b>：课程件走"写 yaml 软件补偿"，不写舵机 EEPROM——EEPROM 写入次数有限（约 10 万次量级），不是这堂课该消耗的资源。</p></div>
+  </div>
+  <pre><span class="c"># YAML 结构（必须与 EXP-02 的 export_yaml 输出一致，由 action_player._load_action 解析）</span>
+<span class="g">name</span>: pick_front            <span class="c"># 动作组名（导出时输入的那个）</span>
+<span class="g">description</span>: pick_front action
+<span class="g">actions</span>:
+  - <span class="y">name</span>: pre_grasp
+    <span class="y">duration</span>: 2.0            <span class="c"># 秒；臂段固定 2.0，夹爪段 1.0，home 段 3.0</span>
+    <span class="y">servos</span>:
+      <span class="y">0</span>: 1500
+      <span class="y">1</span>: 1100
+      <span class="y">2</span>: 2200
+      <span class="y">3</span>: 1850
+      <span class="y">4</span>: 1500
+  - <span class="y">name</span>: gripper_open
+    <span class="y">duration</span>: 1.0
+    <span class="y">servos</span>:
+      <span class="y">5</span>: 800              <span class="c"># 夹爪单独一段：id5, PWM 800（开）</span>
+  - <span class="y">name</span>: grasp_down
+    ...</pre>
+  <div class="tip tealb"><span class="lab">🔍 三个字段必须记准（读码得到，别凭印象）</span><b>① <code>servos</code> 是一个"字典"，键是舵机 ID（0~5）、值是脉宽 μs</b>——不是 <code>pwm: [...]</code> 数组，也不是弧度。臂段写 <code>{0..4}</code> 五个键，夹爪段只写 <code>{5}</code>，home 段写 <code>{0..5}</code> 六个键。<br><b>② <code>duration</code> 单位是秒</b>，不是毫秒。<br><b>③ 顶层必须有 <code>actions</code> 键</b>——<code>_load_action</code> 会检查这个键，缺了直接报 "missing actions key" 并返回 None。<br>另外 <code>action_player</code> 加载时会做 <code>{int(k): int(v)}</code> 归一化，所以 YAML 里写带引号的键（<code>"0": 1500</code>）也能读；但值是字符串就会把 int() 抛出异常。<b>导出后别手改数值类型，只改数字。</b></div>
+  <div class="tip amber"><span class="lab">⚠️ EEPROM 之殇</span>offset 写进舵机寄存器受 10 万次写入寿命约束 —<b>别手痒反复 Apply</b>，调好一次用很久；课程件走 servo_offsets.yaml 软件补偿即可。</div>
+</section>
+
+<!-- 04 -->
+<section class="blk" id="s4">
+  <h2><span class="no">04</span>实验目标</h2>
+  <ul class="check">
+    <li>依次启动 bringup（7~8 节点）与 arm_controller，用 <code>ros2 node list</code> / <code>topic list</code> / <code>rqt_graph</code> 勘察拓扑</li>
+    <li>理解并验证频率基线：/joint_states 50Hz、/odom 30~50Hz、/imu/data 100~200Hz</li>
+    <li>手工发布一条 <code>/arm_controller/joint_command</code> 弧度消息让手臂移动</li>
+    <li>启动 <code>action_player</code>（节点）加载 pick_and_place.yaml，完成 play 连续回放与 next 单步调试</li>
+    <li>会用 stop 急停，并能解释 YAML 改动后为何要 colcon build 才生效</li>
+    <li>打开 servo_calib GUI 找零位，说明软件 offset 与 EEPROM 寿命的约束关系</li>
+  </ul>
+</section>
+
+<!-- 05 -->
+<section class="blk" id="s5">
+  <h2><span class="no">05</span>实验环境与准备</h2>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">源码入口</div><div class="kt">四个主入口认清</div><p>bringup.launch.py（全节点）、arm_controller.launch.py（翻译官）、action_player（节点非 launch）、servo_calib.launch.py（校准 GUI）。</p></div>
+    <div class="kcard"><div class="kd">前置产物</div><div class="kt">EXP-02 的 YAML</div><p>pick_and_place.yaml 已导出并 colcon build 过；没有就回 EXP-02 录一段（至少含 pre_grasp/grasp_down/lift）。</p></div>
+    <div class="kcard"><div class="kd">终端规划</div><div class="kt">至少四个终端</div><p>T1 bringup · T2 arm_controller · T3 action_player · T4 观察与服务调用；每个终端都要 source 两次环境。</p></div>
+  </div>
+  <pre><span class="c"># 归一化"频率/话题"预期（启动后自检用）</span>
+<span class="g">ros2</span> topic hz /joint_states     <span class="c"># 预期 50Hz</span>
+<span class="g">ros2</span> topic hz /odom             <span class="c"># 预期 30~50Hz</span>
+<span class="g">ros2</span> topic hz /imu/data         <span class="c"># 预期 100~200Hz</span></pre>
+</section>
+
+<!-- 06 -->
+<section class="blk" id="s6">
+  <h2><span class="no">06</span>动画讲解：回放管线数据流</h2>
+  <p class="lead">看一字节的旅程：YAML 总谱 → action_player → <b>舵机位置话题</b> → 串口帧 → 舵机转角，五站接力。<b>看清一件事</b>：action_player 是<b>直连舵机侧</b>的，它不经过 arm_controller——YAML 里存的就是 PWM，无需翻译成弧度。</p>
+  <div class="anim-box">
+    <svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="动作回放六级管线数据流动画">
+      <!-- 节点盒 -->
+      <g font-size="11.5" text-anchor="middle">
+        <rect x="30" y="60" width="96" height="52" rx="10" fill="#1e293b" stroke="#f87171"/>
+        <text x="78" y="83" fill="#fca5a5">pick_and_place</text><text x="78" y="99" fill="#94a3b8">YAML 总谱</text>
+        <rect x="176" y="60" width="96" height="52" rx="10" fill="#1e293b" stroke="#fbbf24"/>
+        <text x="224" y="83" fill="#fde68a">action_player</text><text x="224" y="99" fill="#94a3b8">节点 · 指挥</text>
+        <rect x="322" y="60" width="116" height="52" rx="10" fill="#1e293b" stroke="#60a5fa"/>
+        <text x="380" y="80" fill="#93c5fd">bus_servo</text><text x="380" y="96" fill="#94a3b8" font-size="9.5">set_position · PWM</text>
+        <rect x="488" y="60" width="96" height="52" rx="10" fill="#1e293b" stroke="#4ade80"/>
+        <text x="536" y="83" fill="#86efac">base_driver</text><text x="536" y="99" fill="#94a3b8">组帧下发</text>
+        <rect x="488" y="180" width="96" height="52" rx="10" fill="#1e293b" stroke="#c084fc"/>
+        <text x="536" y="203" fill="#d8b4fe">串口帧</text><text x="536" y="219" fill="#94a3b8">0xAA55+CRC8</text>
+        <rect x="322" y="180" width="116" height="52" rx="10" fill="#1e293b" stroke="#22d3ee"/>
+        <text x="380" y="203" fill="#67e8f9">5 舵机 + 夹爪</text><text x="380" y="219" fill="#94a3b8">500~2500μs</text>
+      </g>
+      <!-- 流动光点 -->
+      <g fill="#fde68a">
+        <circle r="5"><animate attributeName="cx" values="126;176" dur="1.4s" repeatCount="indefinite"/><animate attributeName="cy" values="86;86" dur="1.4s" repeatCount="indefinite"/></circle>
+        <circle r="5" fill="#93c5fd"><animate attributeName="cx" values="272;322" dur="1.4s" begin=".35s" repeatCount="indefinite"/><animate attributeName="cy" values="86;86" dur="1.4s" begin=".35s" repeatCount="indefinite"/></circle>
+        <circle r="5" fill="#4ade80"><animate attributeName="cx" values="438;488" dur="1.4s" begin=".7s" repeatCount="indefinite"/><animate attributeName="cy" values="86;86" dur="1.4s" begin=".7s" repeatCount="indefinite"/></circle>
+        <circle r="5" fill="#c084fc"><animate attributeName="cx" values="536;536" dur="1.4s" begin="1.05s" repeatCount="indefinite"/><animate attributeName="cy" values="112;180" dur="1.4s" begin="1.05s" repeatCount="indefinite"/></circle>
+        <circle r="5" fill="#22d3ee"><animate attributeName="cx" values="488;438" dur="1.4s" begin="1.4s" repeatCount="indefinite"/><animate attributeName="cy" values="206;206" dur="1.4s" begin="1.4s" repeatCount="indefinite"/></circle>
+      </g>
+      <!-- 遥控器 -->
+      <g font-size="11">
+        <rect x="30" y="180" width="242" height="52" rx="10" fill="#0f172a" stroke="#475569" stroke-dasharray="5 4"/>
+        <text x="46" y="202" fill="#94a3b8">遥控器 · std_srvs/Trigger</text>
+        <text x="46" y="220" fill="#fbbf24">play ▶ 　next ⏯ 　stop ⏸</text>
+        <path d="M151 180 L151 118" stroke="#fbbf24" stroke-width="1.6" stroke-dasharray="5 4">
+          <animate attributeName="stroke-dashoffset" values="0;-18" dur=".9s" repeatCount="indefinite"/>
+        </path>
+      </g>
+      <!-- 反馈关节状态 -->
+      <path d="M322 180 C 240 150, 180 136, 126 112" stroke="#4ade80" stroke-width="1.4" fill="none" stroke-dasharray="4 4" opacity=".75">
+        <animate attributeName="stroke-dashoffset" values="0;-16" dur="1.2s" repeatCount="indefinite"/>
+      </path>
+      <text x="210" y="152" font-size="10.5" fill="#4ade80">/joint_states 50Hz 回传闭环</text>
+      <text x="360" y="272" font-size="11" fill="#64748b" text-anchor="middle">一次 play = 总谱逐条下发 → PWM 位置话题 → 组帧 → 舵机齐动 → joint_states 汇报到位</text>
+      <text x="640" y="86" font-size="10.5" fill="#94a3b8">6~10s</text>
+      <text x="640" y="206" font-size="10.5" fill="#94a3b8">1.4% 带宽</text>
+    </svg>
+  <div class="anim-cap">动画 3-1｜回放五级管线：光点依次流经 YAML → action_player → PWM 位置话题 → 组帧 → 舵机，绿色虚线是 50Hz 位置反馈闭环（<b>注意：action_player 走的是舵机侧直连，不经过 arm_controller</b>）</div>
+  </div>
+</section>
+
+<!-- 07 -->
+<section class="blk" id="s7">
+  <h2><span class="no">07</span>互动讲解：弧度 ↔ PWM 双向换算台</h2>
+  <p class="lead">ROS2 世界说弧度、总线世界说微秒 —— 换算台在两个世界之间当翻译，顺便预演 joint_command 消息：</p>
+  <div class="ix-panel">
+    <div class="ix-title">弧度脉宽对账台 · Radian ⇄ Microsecond</div>
+    <div class="ctl-row">
+      <label class="ctl">joint_command 弧度（如 1.6500）
+        <input type="number" id="rad" value="1.65" step="0.05"></label>
+      <button class="btn" onclick="toPwm()">弧度 → PWM</button>
+      <label class="ctl">J2 大臂软件 offset（度）
+        <input type="number" id="ofs" value="4" step="0.5"></label>
+      <button class="btn ghost" onclick="applyOfs()">叠加零位偏移</button>
+    </div>
+    <div class="io" id="calIo"><span class="dim">// 预置 EXP-05 工作位 joint3 = 1.65 rad（PWM 2200 → 700×0.002356）</span>
+<span class="ok">1.65 rad ÷ 0.002356 + 1500 = 2200 μs ✔ 落在 [500,2500] 安全窗</span></div>
+  </div>
+  <div class="tip tealb"><span class="lab">🔍 为什么先算再发</span>把弧度心算成 μs 再发 joint_command，是老手的<b>上机前预演习惯</b>：算出 3000μs 这种越界值，就该去查 YAML 或 IK，而不是让它上总线撞限位。</div>
+</section>
+
+<!-- 08 -->
+<section class="blk" id="s8">
+  <h2><span class="no">08</span>实操步骤：bringup → action_player 回放</h2>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>T1 启动整机：<code>ros2 launch car1_bringup bringup.launch.py</code>（7~8 节点上线，串口驱动与 /joint_states 都在这）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>T2 启动翻译官：<code>ros2 launch car1_arm_controller arm_controller.launch.py</code>（不在 bringup 里，必须手动！）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>T4 勘察：node list / topic list / rqt_graph 看拓扑；topic hz 核对 50Hz 基线</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span>T3 启动总谱手：<code>ros2 run car1_arm_controller action_player --ros-args -p action_file:=pick_and_place.yaml -p auto_play:=false</code></div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">5</span>T4 触发回放：call play 连续执行；不稳就改 call next 单步（需 step_mode:=true）；出事 call stop</div>
+  </div>
+  <div class="tip amber"><span class="lab">⚠️ 为什么顺序不能反</span>action_player 在 <code>__init__</code> 里就把 YAML 读进来、把 Publisher 建好了——<b>它不等任何人</b>。如果 bringup 还没起来（舵机位置话题没人收）或 arm_controller 没起，它照样"发得很开心"，只是没人听：手臂一动不动，日志却显示 "Playing/Done"，看起来像播放成功了。<b>所以"顺序即安全顺序"不是规矩，是物理事实</b>：先让听得见的人到位，再让说的开口。</div>
+  <pre><span class="c"># 单手发一条弧度指令，直击 joint_command（观察手臂动没动）</span>
+<span class="c"># 关节名必须是 arm_joint1~5（URDF 里的原名）；写成 joint1 控制器收不到——</span>
+<span class="c"># arm_controller 只按 msg.position 的"顺序"取前 5 个数，名字写错不会报错，只会静默跑到别处</span>
+<span class="g">ros2</span> topic pub /arm_controller/joint_command sensor_msgs/msg/JointState \
+  "{name: ['arm_joint1','arm_joint2','arm_joint3','arm_joint4','arm_joint5'], position: [0.0,-0.9424,1.6492,0.8246,0.0], effort: [3.0]}"
+
+<span class="c"># effort[0] 是本次运动时长（秒）——这不是笔误，源码里真的借用了 effort 字段当 duration</span>
+
+<span class="c"># 三个遥控器（Trigger 请求体为空花括号）</span>
+<span class="g">ros2</span> service call /action_player/play std_srvs/srv/Trigger <span class="y">"{}"</span>
+<span class="g">ros2</span> service call /action_player/next std_srvs/srv/Trigger <span class="y">"{}"</span>
+<span class="g">ros2</span> service call /action_player/stop std_srvs/srv/Trigger <span class="y">"{}"</span>
+
+<span class="c"># 零位校准 GUI（找机械中位 → Apply，写入 servo_offsets.yaml）</span>
+<span class="g">ros2</span> launch calibration servo_calib.launch.py</pre>
+  <div class="tip amber"><span class="lab">⚠️ YAML 改完必须重装</span>action_player 用 <code>get_package_share_directory</code> 找 <b>install/</b> 里的 YAML —— 改了源文件不 <code>colcon build --packages-select car1_arm_controller</code>，跑的还是旧总谱。</div>
+</section>
+
+<!-- 09 -->
+<section class="blk" id="s9">
+  <h2><span class="no">09</span>重点与易错点</h2>
+  <div class="tip"><span class="lab">💡 本实验最大重点</span><b>启动顺序即安全顺序</b>：先 bringup 整机状态，再 arm_controller 翻译官，最后 action_player 总谱手 —— 顺序反了，指令没人接，手臂僵在半空还以为坏了。</div>
+  <table>
+    <thead><tr><th>⚠️ 常见坑</th><th>现象 → 解法</th></tr></thead>
+    <tbody>
+      <tr><td>把 action_player 当 launch</td><td><code>ros2 launch ... action_player</code> 报错 → 它是节点，用 <code>ros2 run</code> + <code>-p action_file:=...</code></td></tr>
+      <tr><td>arm_controller 没起</td><td>发 joint_command 手臂不动 → bringup 不含它，手动 <code>ros2 launch car1_arm_controller arm_controller.launch.py</code></td></tr>
+      <tr><td>误用 EXP-06 接口</td><td>调 target_pose/pick 没反应或报类型错 → 本实验范围严禁，只用 joint_command 与三个 Trigger</td></tr>
+      <tr><td>YAML 修改不生效</td><td>回放内容还是旧的 → 源 YAML 改动后必须 colcon build 重装到 install/</td></tr>
+      <tr><td>rqt_graph 空白</td><td>图上没东西 → 节点至少要有一个订阅/发布才显示；先确认两大 launch 都开着</td></tr>
+      <tr><td>零位歪斜</td><td>work 位手臂明显偏 → servo_calib 拖滑块找机械中位再 Apply，offset 落盘 servo_offsets.yaml</td></tr>
+    </tbody>
+  </table>
+  <ul class="check">
+    <li><code>ros2 node list</code> 看到 bringup 全家与 arm_controller；rqt_graph 连线指向 /arm_controller/joint_command</li>
+    <li>/joint_states 稳定 <span class="ok">50Hz</span>，/odom 30~50Hz，/imu/data 100~200Hz</li>
+    <li>play 一次完成 6~10 秒完整抓放循环，逐舵机平滑无抖动</li>
+    <li>next 单步可逐条执行；stop 后手臂立即冻结在当前位置</li>
+    <li>能口头解释：YAML 里的"点位"与 EXP-02 PWM、与弧度三者如何互相换算</li>
+  </ul>
+</section>
+
+<!-- 10 -->
+<section class="blk" id="s10">
+  <h2><span class="no">10</span>总结与思考</h2>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">✅ 完成成果</div><div class="kt">总谱回放全闭环</div><p>bringup + arm_controller + action_player 三件套拉起，play/next/stop 三服务娴熟，YAML 换装即换动作。</p></div>
+    <div class="kcard"><div class="kd">🧠 原理收获</div><div class="kt">话题为界分层</div><p>唯一入口 joint_command 之上是任意节点生态，之下是串口协议 —— 分层让"录"与"放"跨架构复用。</p></div>
+    <div class="kcard"><div class="kd">🛠 技能收获</div><div class="kt">拓扑勘察四件套</div><p>node/topic list · hz · info、rqt_graph 读图、Trigger 服务调用、servo_calib 零位校准。</p></div>
+    <div class="kcard"><div class="kd">❓ 排障思路</div><div class="kt">先链路后内容</div><p>不动 → 查 launch 顺序与控制器；乱动 → 查 YAML 单位（弧度还是 μs）与 offset 是否叠加。</p></div>
+  </div>
+  <div class="tip violet"><span class="lab">📝 思考题 1</span>action_player 用的是 std_srvs/Trigger —— 请求里<b>没有任何字段</b>。如果想"从第 3 步开始回放"或"播放速度 × 1.5"，现有接口够用吗？说明需要自定义哪种接口（.srv 该加什么字段），并与 EXP-06 的 set_pick_target 话题方案对比。</div>
+  <div class="tip violet"><span class="lab">📝 思考题 2</span>为什么零位偏差要用"软件 offset"补偿而不是直接拧紧机械结构？请从装配公差、EEPROM 10 万次写寿命、以及"换舵机后的可移植性"三个角度作答。</div>
+</section>
+
+<nav class="expnav">
+  <a href="../exp-02-serial-pwm/index.html"><span class="lb">← 上一个实验</span>EXP-02 关节电机底层控制与应用</a>
+  <a class="next" href="../exp-03-kinematics/index.html"><span class="lb">下一个实验 →</span>EXP-03 正运动学基础</a>
+</nav>
+
+<footer>
+  <span>CORE-05 · 机器人机械臂应用与开发 · EXP-05 ROS2 架构与动作回放</span>
+  <span>4 学时 · 综合性 · 基于 arm_practice 实验讲义改编</span>
+</footer>
+
+</main>
+</div>
+
+<script>
+var PT2=0.002356,CW2=1500;
+function toPwm(){
+  var v=parseFloat(document.getElementById('rad').value),io=document.getElementById('calIo');
+  if(isNaN(v)){io.innerHTML='<span class="bad">✗ 请输入弧度数值</span>';return;}
+  var p=Math.round(v/PT2+CW2);
+  if(p<500||p>2500){io.innerHTML='<span class="warn">⚠ '+v+' rad → '+p+'μs 越界 [500,2500]：该关节角实机不可达，禁止发布 joint_command！</span>';return;}
+  io.innerHTML='<span class="dim">// 公式：PWM = rad ÷ 0.002356 + 1500</span>\n'+
+   '<span class="ok">'+v+' rad → '+p+' μs ✔</span>\n'+
+   '<span class="dim">// 对应指令片段 position: [..., '+v.toFixed(4)+', ...] 仅差一步 ros2 topic pub</span>';}
+function applyOfs(){
+  var r=parseFloat(document.getElementById('rad').value),d=parseFloat(document.getElementById('ofs').value),io=document.getElementById('calIo');
+  if(isNaN(r)||isNaN(d)){io.innerHTML='<span class="bad">✗ 弧度与偏移都必须为数字</span>';return;}
+  var rad2=r-d*Math.PI/180,p=Math.round(rad2/PT2+CW2);
+  var ok=(p>=500&&p<=2500);
+  io.innerHTML='<span class="dim">// 补偿方向（EXP-04 实测）：发给关节的角 = 期望角 − 机械偏移角</span>\n'+
+   '<span class="warn">期望 '+r.toFixed(4)+' rad，检出机械偏移 +'+d+'°（'+(d*Math.PI/180).toFixed(4)+' rad）</span>\n'+
+   (ok?'<span class="ok">补偿后发送 '+(p)+' μs ✔ 换算无越界</span>'
+      :'<span class="bad">补偿后 PWM='+p+'μs 越界！先核对偏移量是否录反了</span>');}
+</script>
+<script src="../shared/tutorial.js" defer></script>
+</body>
+</html>

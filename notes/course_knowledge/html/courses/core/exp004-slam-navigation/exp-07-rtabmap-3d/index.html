@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-07 · RTAB-Map 3D SLAM — 机器人 SLAM 与自主导航</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+:root{--theme:#2563eb;--theme-deep:#1d4ed8;--theme-bg:#dbeafe;--theme-bd:#bfdbfe}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit" title="返回课程首页">🧠 具身智能课程 · <i>教程首页</i></a>
+  <div class="crumb"><a href="../../../index.html#core">核心课程</a> / <a href="../index.html">SLAM 与自主导航</a> / EXP-07</div>
+</div>
+<div class="wrap">
+<aside class="side">
+  <h4>本页目录</h4>
+  <a href="#s1" class="now">01 问题引入</a>
+  <a href="#s2">02 原理通俗讲解</a>
+  <a href="#s3">03 关联知识点</a>
+  <a href="#s4">04 实验目标</a>
+  <a href="#s5">05 实验环境与准备</a>
+  <a href="#s6">06 动画讲解</a>
+  <a href="#s7">07 互动讲解</a>
+  <a href="#s8">08 实操步骤</a>
+  <a href="#s9">09 重点与易错点</a>
+  <a href="#s10">10 总结与思考</a>
+  <h4>CH1 · 建模与建图</h4>
+  <a href="../exp-01-slam-urdf/index.html">EXP-01 原理与 URDF</a>
+  <a href="../exp-02-slam-toolbox/index.html">EXP-02 SLAM Toolbox 建图</a>
+  <h4>CH2 · 定位与导航</h4>
+  <a href="../exp-03-nav2-navigation/index.html">EXP-03 Nav2 导航</a>
+  <a href="../exp-04-amcl-localization/index.html">EXP-04 AMCL 定位</a>
+  <a href="../exp-05-dwa-teb-avoidance/index.html">EXP-05 DWA/TEB 避障</a>
+  <h4>CH3 · 任务调度与三维进阶</h4>
+  <a href="../exp-06-radar-multiwaypoint/index.html">EXP-06 多点导航</a>
+  <a href="../exp-07-rtabmap-3d/index.html">EXP-07 RTAB-Map 3D</a>
+</aside>
+<main class="content">
+<div class="exp-head">
+  <span class="code">EXP-07 · 第 3 章 · 综合性 · 8 学时</span>
+  <h1>RTAB-Map 3D SLAM</h1>
+  <p class="desc">一句话读懂：前 6 个实验，小车眼里世界是"一张平面图"（俯视图，像户型图）。这节课让小车"长出一双立体眼睛"——用 RGB-D 深度相机 + RTAB-Map，构建三维点云/八叉树地图，让机器人理解高度、层次、悬空障碍，为"分楼层导航、抓取定位"打基础。</p>
+  <div class="meta"><span class="tag hl">难度 ⭐⭐⭐ · 8 学时</span><span class="tag">综合性（进阶）</span><span class="tag">📌 无配套源码资源</span><span class="tag">前置：EXP-03</span></div>
+</div>
+
+<section class="blk" id="s1">
+  <h2><span class="no">01</span>问题引入：平面图看不见"头顶的横梁"</h2>
+  <div class="tip amber"><span class="lab">情境</span>
+    二维栅格地图是俯视图：一根离地 1.2 m 的横梁、一张悬空的桌面下沿，在俯视图里<strong>要么被并进"障碍"、要么根本看不见</strong>。仓库取货机器人要"知道第二层货架上有东西"，机械臂抓取要知道"杯子在桌面上 30 cm 处"——这些都需要高度这一维。给小车装上 RGB-D 深度相机（本课程硬件 HP60C），用 RTAB-Map 构建<strong>三维点云 / 八叉树地图</strong>，世界就从"户型图"升级成了"3D 模型"。
+  </div>
+</section>
+
+<section class="blk" id="s2">
+  <h2><span class="no">02</span>原理通俗讲解：从"照片"到"立体"的两步跳</h2>
+  <div class="tip tealb"><span class="lab">白话比喻</span>
+    普通相机只记"那里有个东西"，深度相机还记"那个东西离我多远"——有了<strong>方向（像素 u,v）+ 距离（深度 d）</strong>，就能拼出立体世界。点云地图是"一堆沙子"（每个颗粒一个三维点，直观但冗余），OctoMap 是"乐高积木"（规则小方块体素，能数得清哪块占据哪块空——可压缩、可增量更新，导航避障常用）。
+  </div>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">认路方式</div><div class="kt">词袋回环（Bag of Words）</div><p>RTAB-Map 用图像特征（ORB）聚类成"词汇"，一帧图 = 一组词汇集合；检索"和当前帧最像的历史帧"，相似度过阈值即回环 → g2o 图优化消漂移。就像凭"照片里出现吧台+红椅+吊灯"判断"我回到了这家咖啡馆"，而不是逐像素比照片。</p></div>
+    <div class="kcard"><div class="kd">反投影</div><div class="kt">像素 → 三维点</div><p>有内参 (fx, fy, cx, cy) 就能把 (u,v,d) 换算成空间点：X=(u−cx)·d/fx，Y=(v−cy)·d/fy，Z=d。像素放图像中心 (cx,cy) 时应得 X≈0、Y≈0——这是自检口诀。</p></div>
+    <div class="kcard"><div class="kd">与前作对比</div><div class="kt">同是图优化，传感器不同</div><p>slam_toolbox：激光雷达 + 扫描匹配回环 + 二维栅格；RTAB-Map：RGB-D 相机 + 图像词袋回环 + 三维点云/OctoMap。两者都是图优化 SLAM，只是"用什么看世界"不同。</p></div>
+    <div class="kcard"><div class="kd">三维导航</div><div class="kt">OctoMap 进代价地图</div><p>三维地图替代二维栅格作 costmap 输入，悬空障碍可被正确区分（低矮可跨、横梁必躲）。但 ROS2 里需要投影/转换环节，地面小车通常二维就够——三维更多服务感知/抓取/展示。</p></div>
+  </div>
+  <p><strong>选型口诀</strong>：二维 = 平面图（便宜够用），三维 = 3D 模型（信息全但贵）。核心判据就一条——<strong>任务需不需要"高度"这一维</strong>：出现悬空障碍 / 高度分层 / 抓取定位需求时，才该上三维。</p>
+</section>
+
+<section class="blk" id="s3">
+  <h2><span class="no">03</span>关联知识点</h2>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">知识点 1</div><div class="kt">RTAB-Map 框架</div><p>Real-Time Appearance-Based Mapping：前端图像特征里程计 → 局部地图 → 词袋回环 → g2o/GTSAM 位姿图优化。</p></div>
+    <div class="kcard"><div class="kd">知识点 2</div><div class="kt">RGB-D 二合一</div><p>HP60C 同时输出彩色图（640×480）与深度图（每像素距离 d，单位毫米，25 fps）；反光、超距、强光处深度返回 0（图上全黑）。</p></div>
+    <div class="kcard"><div class="kd">知识点 3</div><div class="kt">点云 vs OctoMap</div><p>海量 3D 点直观但冗余不可编辑；体素八叉树可压缩、增量更新、支持占据查询——导航/避障更常用后者。</p></div>
+    <div class="kcard"><div class="kd">知识点 4</div><div class="kt">回环那一"咔"</div><p>回环触发时地图会整体抖一下——那是图优化一次性校正所有历史帧的瞬间，属正常现象，不是 bug。</p></div>
+    <div class="kcard"><div class="kd">知识点 5</div><div class="kt">相机内参来源</div><p>/camera_info 里带 fx/fy/cx/cy；<code>ros2 topic echo /ascamera_hp60c/camera_publisher/depth0/camera_info</code> 可查。反投影公式必须配内参才成立。</p></div>
+    <div class="kcard"><div class="kd">知识点 6</div><div class="kt">算力现实</div><p>RK3576 跑实时三维 SLAM 压力大；三维比二维更怕运动畸变——遥控角速度 ≤0.5 rad/s，转角处多停留。</p></div>
+  </div>
+</section>
+
+<section class="blk" id="s4">
+  <h2><span class="no">04</span>实验目标</h2>
+  <ul class="check">
+    <li>理解视觉 SLAM 与 RTAB-Map 基本原理（ORB 特征、词袋回环、图优化） —— <strong>原理理解</strong></li>
+    <li>理解 RGB-D 相机工作原理与反投影公式、点云/八叉树两种地图表示 —— <strong>原理理解</strong></li>
+    <li>掌握三维建图与三维导航的通用流程（相机 → RTAB-Map → 操控 → 保存） —— <strong>流程掌握</strong></li>
+    <li>能够完成 RGB-D 数据链路验证（话题频率 / 深度图查看 / 手算反投影） —— <strong>流程掌握</strong></li>
+    <li>能对比二维与三维 SLAM 的六维差异并做场景选型分析 —— <strong>迁移应用</strong></li>
+  </ul>
+</section>
+
+<section class="blk" id="s5">
+  <h2><span class="no">05</span>实验环境与准备</h2>
+  <div class="tip violet"><span class="lab">资源声明</span>源讲义明确标注：本实验 spec 的 source_code_path 指向 source-codes/exp07/，notes = 无资源（仓库暂缺 RTAB-Map 专用源码）。因此本实验为<strong>原理 + 通用流程型</strong>：以概念讲解、通用命令、数据链路验证与选型分析为主，<strong>不强行要求跑通三维导航、不编造项目专属 launch</strong>；若后续补充源码，将按源码更新操作步骤。</div>
+  <table>
+    <tr><th>类别</th><th>配置</th></tr>
+    <tr><td>硬件</td><td>小车 C1 + <strong>HP60C RGB-D 深度相机</strong>（驱动在 <code>examples/camera/HP60C/src/ascamera/</code>）</td></tr>
+    <tr><td>系统</td><td>Ubuntu 22.04 + ROS 2 Humble</td></tr>
+    <tr><td>核心库</td><td>rtabmap_ros（ROS2 版）、depth_image_proc、octomap_server、rviz2</td></tr>
+    <tr><td>依赖</td><td>HP60C 驱动（ascamera）能发布 RGB + Depth 话题；Nav2 可用（EXP-03）</td></tr>
+    <tr><td>主入口</td><td>通用流程 <code>ros2 run rtabmap_slam rtabmap</code> + 相机驱动 <code>ros2 launch ascamera hp60c.launch.py</code>；本项目为原理演示型</td></tr>
+  </table>
+  <div class="tip amber"><span class="lab">⚠️ 话题名必须记准</span>HP60C 驱动<b>刻意不允许 remap</b>（驱动靠话题名里的 "rgb0/depth0" 子串决定推哪路流），所以真实话题名是 <code>/ascamera_hp60c/camera_publisher/rgb0/image</code>、<code>.../depth0/image_raw</code>、<code>.../depth0/camera_info</code>、<code>.../depth0/points</code>——<b>不是</b>教科书里常见的 <code>/camera/rgb/image_raw</code>。第 08 节的命令都按真实名写。</div>
+  <div class="tip amber"><span class="lab">两条路线</span><strong>有 HP60C 相机</strong>：按 08 节通用流程跑数据链路验证与三维建图演示；<strong>无相机 / 无资源</strong>：完成反投影手算 + 对比表 + 选型判断题（报告写全即可），可观看课程演示视频/截图。深度相机注意有效距离与避开强光直射。</div>
+</section>
+
+<section class="blk" id="s6">
+  <h2><span class="no">06</span>动画讲解：RGB-D 反投影生成三维点云</h2>
+  <div class="anim-box">
+    <svg viewBox="0 0 640 300" width="100%" height="300" xmlns="http://www.w3.org/2000/svg">
+      <rect width="640" height="300" fill="#f8fafc"></rect>
+      <!-- 深度图像 (u,v,d) -->
+      <g>
+        <rect x="40" y="60" width="150" height="110" rx="6" fill="#e2e8f0" stroke="#94a3b8"></rect>
+        <text x="115" y="50" font-size="13" fill="#1d4ed8" text-anchor="middle" font-family="monospace">深度图 (u,v,d)</text>
+        <!-- 热力色块（近红远蓝） -->
+        <rect x="50" y="70" width="35" height="26" fill="#ef4444"></rect>
+        <rect x="87" y="70" width="35" height="26" fill="#f97316"></rect>
+        <rect x="124" y="70" width="35" height="26" fill="#eab308"></rect>
+        <rect x="50" y="98" width="35" height="26" fill="#f97316"></rect>
+        <rect x="87" y="98" width="35" height="26" fill="#eab308"></rect>
+        <rect x="124" y="98" width="35" height="26" fill="#22c55e"></rect>
+        <rect x="50" y="126" width="35" height="26" fill="#eab308"></rect>
+        <rect x="87" y="126" width="35" height="26" fill="#22c55e"></rect>
+        <rect x="124" y="126" width="35" height="26" fill="#3b82f6"></rect>
+        <!-- 活跃像素 -->
+        <rect x="87" y="98" width="35" height="26" fill="none" stroke="#fff" stroke-width="3">
+          <animate attributeName="stroke-opacity" values="1;0.2;1" dur="1.2s" repeatCount="indefinite"></animate>
+        </rect>
+        <text x="115" y="188" font-size="12" fill="#475569" text-anchor="middle">近 = 红，远 = 蓝</text>
+      </g>
+      <!-- 相机与光线 -->
+      <g>
+        <rect x="248" y="104" width="54" height="36" rx="8" fill="#1d4ed8"></rect>
+        <circle cx="302" cy="122" r="8" fill="#93c5fd"></circle>
+        <text x="275" y="94" font-size="12" fill="#1d4ed8" text-anchor="middle">HP60C</text>
+        <line x1="302" y1="122" x2="452" y2="70" stroke="#f59e0b" stroke-width="2.5">
+          <animate attributeName="stroke-dasharray" values="0 160;160 0" dur="1.6s" repeatCount="indefinite"></animate>
+        </line>
+        <line x1="302" y1="122" x2="452" y2="126" stroke="#f59e0b" stroke-width="2.5">
+          <animate attributeName="stroke-dasharray" values="0 155;155 0" dur="1.6s" begin="-0.5s" repeatCount="indefinite"></animate>
+        </line>
+        <line x1="302" y1="122" x2="452" y2="186" stroke="#f59e0b" stroke-width="2.5">
+          <animate attributeName="stroke-dasharray" values="0 170;170 0" dur="1.6s" begin="-1s" repeatCount="indefinite"></animate>
+        </line>
+      </g>
+      <!-- 三维点云 -->
+      <g>
+        <text x="520" y="50" font-size="13" fill="#1d4ed8" text-anchor="middle" font-family="monospace">三维点云 (X,Y,Z)</text>
+        <!-- 由像素反投影出的点（颜色与像素块对应） -->
+        <circle cx="462" cy="72" r="5" fill="#eab308"><animate attributeName="opacity" values="0.2;1" begin="0.4s" dur="1.6s" repeatCount="indefinite"></animate></circle>
+        <circle cx="478" cy="96" r="5" fill="#22c55e"><animate attributeName="opacity" values="0.2;1" begin="0.7s" dur="1.6s" repeatCount="indefinite"></animate></circle>
+        <circle cx="458" cy="124" r="5" fill="#f97316"><animate attributeName="opacity" values="0.2;1" begin="1s" dur="1.6s" repeatCount="indefinite"></animate></circle>
+        <circle cx="500" cy="118" r="5" fill="#3b82f6"><animate attributeName="opacity" values="0.2;1" begin="1.3s" dur="1.6s" repeatCount="indefinite"></animate></circle>
+        <circle cx="524" cy="84" r="5" fill="#ef4444"><animate attributeName="opacity" values="0.2;1" begin="1.6s" dur="1.6s" repeatCount="indefinite"></animate></circle>
+        <circle cx="540" cy="132" r="5" fill="#eab308"><animate attributeName="opacity" values="0.2;1;0.2" begin="1.9s" dur="1.6s" repeatCount="indefinite"></animate></circle>
+        <circle cx="494" cy="160" r="5" fill="#22c55e"><animate attributeName="opacity" values="0.2;1" begin="2.2s" dur="1.6s" repeatCount="indefinite"></animate></circle>
+        <circle cx="546" cy="184" r="5" fill="#f97316"><animate attributeName="opacity" values="0.2;1" begin="2.5s" dur="1.6s" repeatCount="indefinite"></animate></circle>
+        <!-- 坐标轴 -->
+        <line x1="440" y1="240" x2="580" y2="240" stroke="#334155" stroke-width="2"></line>
+        <line x1="440" y1="240" x2="440" y2="140" stroke="#334155" stroke-width="2"></line>
+        <line x1="440" y1="240" x2="490" y2="270" stroke="#334155" stroke-width="2"></line>
+        <text x="590" y="244" font-size="12" fill="#334155">X</text>
+        <text x="432" y="136" font-size="12" fill="#334155">Y</text>
+        <text x="496" y="282" font-size="12" fill="#334155">Z</text>
+      </g>
+      <!-- 反投影公式 -->
+      <text x="320" y="238" font-size="14" fill="#1d4ed8" text-anchor="middle" font-family="monospace">X=(u−cx)·d/fx</text>
+      <text x="320" y="260" font-size="14" fill="#1d4ed8" text-anchor="middle" font-family="monospace">Y=(v−cy)·d/fy, Z=d</text>
+      <text x="320" y="284" font-size="12" fill="#64748b" text-anchor="middle" font-family="monospace">d 先由毫米换成米；中心行 v=cy 时 Y≈0</text>
+    </svg>
+  </div>
+  <p class="anim-cap">图 7-1：深度图每个像素 (u,v,d) 携带"方向+距离"，乘相机内参反投影成空间点 (X,Y,Z)；逐帧累积并用相机自身运动拼接，就长出了带颜色的三维点云——再体素化（乐高化）即得 OctoMap。动画中彩色点与左侧深度图像素块一一对应。<b>注意</b>：上式是"相机光学坐标系"约定，Z 朝前、X 朝右、Y 朝下，所以 v 小于 cy（图像偏上）时 Y 为负——这也是深度图坐标系与 RViz 世界系不一致的根源。</p>
+</section>
+
+<section class="blk" id="s7">
+  <h2><span class="no">07</span>互动讲解：2D 栅格 vs 3D 点云选型台</h2>
+  <div class="ix-panel">
+    <div class="ix-title">🎛 给任务选地图形态：二维够吗？该上三维吗？</div>
+    <div class="ctl-row">
+      <button class="btn ghost" onclick="pick('home')">A · 家庭扫地机器人</button>
+      <button class="btn" onclick="pick('wh')">B · 仓库货架多层取货</button>
+      <button class="btn ghost" onclick="pick('drone')">C · 无人机绕楼巡检</button>
+      <button class="btn ghost" onclick="pick('meal')">D · 走廊送餐小车</button>
+    </div>
+    <div class="io dim" id="pickIo">↑ 点击四个场景：先自己选二维/三维并说明理由，再对照讲义的六维选型表推演。</div>
+  </div>
+  <table>
+    <tr><th>维度</th><th>二维 SLAM（slam_toolbox）</th><th>三维 SLAM（RTAB-Map）</th></tr>
+    <tr><td>传感器</td><td>激光雷达</td><td>RGB-D 深度相机</td></tr>
+    <tr><td>地图</td><td>栅格（俯视）</td><td>点云 / OctoMap（立体）</td></tr>
+    <tr><td>算力</td><td>低（RK3576 轻松）</td><td>高（实时需更强算力）</td></tr>
+    <tr><td>精度</td><td>水平精度高</td><td>含高度信息，垂直精度依赖深度质量</td></tr>
+    <tr><td>导航</td><td>Nav2 直接消费 /map</td><td>需投影/转换后才能消费</td></tr>
+    <tr><td>适用</td><td>地面巡检 / 送货</td><td>分层避障 / 抓取定位 / 展示</td></tr>
+  </table>
+</section>
+
+<section class="blk" id="s8">
+  <h2><span class="no">08</span>实操步骤：RGB-D 数据链路验证与通用流程</h2>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>启动 HP60C 相机驱动，确认四话题（rgb0/image、depth0/image_raw、depth0/camera_info、depth0/points）都有数据</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>rqt_image_view 查看深度图（近红远蓝、反光处发黑）；echo camera_info 抄下 fx/fy/cx/cy</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>用 numpy 手算一次反投影：把一个像素 (u,v,d) 转成 (X,Y,Z)，并用中心像素自检 X≈0、Y≈0（注意 d 先换算成米）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span>启动 RTAB-Map（显式指定话题名）+ RViz PointCloud2 显示，遥控小车<strong>低速走闭环</strong>，转角停留 1-2 s，观察点云成形与回环对齐</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">5</span>保存与导出：rtabmap 数据库（.db）+ octomap_server 导出八叉树；无相机条件则按此流程写报告 + 看演示</div>
+  </div>
+  <pre><span class="c"># ① 启动相机（命名空间 ascamera_hp60c），核对四话题</span>
+ros2 launch ascamera hp60c.launch.py
+ros2 topic list | <span class="g">grep</span> ascamera_hp60c
+<span class="c">#   /ascamera_hp60c/camera_publisher/rgb0/image</span>
+<span class="c">#   /ascamera_hp60c/camera_publisher/depth0/image_raw</span>
+<span class="c">#   /ascamera_hp60c/camera_publisher/depth0/camera_info</span>
+ros2 topic hz /ascamera_hp60c/camera_publisher/depth0/image_raw
+ros2 topic echo /ascamera_hp60c/camera_publisher/depth0/camera_info   <span class="c"># 抄 fx fy cx cy</span>
+
+<span class="c"># ② 查看深度图（近红远蓝，反光/超距处发黑）</span>
+ros2 run rqt_image_view rqt_image_view /ascamera_hp60c/camera_publisher/depth0/image_raw
+
+<span class="c"># ③ 启动 RTAB-Map（通用命令：话题名不匹配就显式指定）</span>
+ros2 run rtabmap_slam rtabmap --ros-args -p subscribe_rgbd:=true \
+  -p rgb_topic:=/ascamera_hp60c/camera_publisher/rgb0/image \
+  -p depth_topic:=/ascamera_hp60c/camera_publisher/depth0/image_raw \
+  -p approx_sync:=true
+
+<span class="c"># ④ 遥控低速走闭环（角速度 ≤ 0.5 rad/s，转角停留 1-2s）观察 RViz 点云</span>
+ros2 run teleop_twist_keyboard teleop_twist_keyboard
+
+<span class="c"># ⑤ 保存数据库 / 导出八叉树</span>
+ros2 service call /rtabmap/save std_srvs/srv/Empty
+ros2 launch octomap_server octomap_mapping.launch.xml   <span class="c"># 通用</span></pre>
+  <pre><span class="c"># 反投影手验算（numpy）：中心像素应得到 X≈0, Y≈0, Z=d</span>
+import numpy as np
+fx, fy, cx, cy = 380.0, 380.0, 320.0, 240.0   <span class="c"># ← 以实测 camera_info 为准</span>
+u, v, d = 320.0, 240.0, 1.500                 <span class="c"># 深度换算成「米」再算</span>
+X = (u - cx) * d / fx
+Y = (v - cy) * d / fy
+Z = d
+print(X, Y, Z)   <span class="c"># 期望 ≈ 0, 0, 1.5</span></pre>
+  <div class="tip tealb"><span class="lab">单位陷阱</span>HP60C 的 depth 图默认是 <b>millimeter</b> 编码（16UC1，单位毫米），而 RTAB-Map 与 Nav2 都用「米」。手算时先把 d 除以 1000，否则算出来的 Z 会大三个数量级——这是本实验最容易错的一步。</div>
+  <div class="tip tealb"><span class="lab">无资源时的验收标准</span>仓库暂缺 RTAB-Map 专用 launch/源码——有相机跑通 ①-⑤ 并记录回环现象；无相机则交付：反投影验算截图 + 二维/三维对比表 + 四场景选型结论 + 完整通用流程文字描述（等同本页 08 节）。</div>
+</section>
+
+<section class="blk" id="s9">
+  <h2><span class="no">09</span>重点与易错点</h2>
+  <div class="tip amber"><span class="lab">重点</span>① 词袋回环 vs 扫描匹配回环的本质区别；② RGB-D 反投影公式、内参与<b>毫米→米</b>的单位；③ 点云与 OctoMap 的取舍（沙子 vs 乐高）；④ 六维选型表——"什么信号提示你该上三维了"。</div>
+  <table>
+    <tr><th>坑</th><th>现象</th><th>解决</th></tr>
+    <tr><td>深度图全黑</td><td>无深度数据</td><td>超出有效距离或反光/强光直射；调整距离与环境</td></tr>
+    <tr><td>话题名照抄教科书</td><td>RTAB-Map 收不到数据</td><td>真实名是 /ascamera_hp60c/camera_publisher/rgb0/image 与 depth0/image_raw；用 -p rgb_topic:=… / -p depth_topic:=… 显式指定</td></tr>
+    <tr><td>给相机做 remap</td><td>话题改名后相机不再出流</td><td>驱动靠话题名里的 "rgb0/depth0" 子串判断推哪路流，remap 会丢掉这个线索——<b>不要 remap</b></td></tr>
+    <tr><td>深度单位当米用</td><td>点云/点算出来大 1000 倍</td><td>depth 图是 16UC1 毫米编码，计算前先 /1000</td></tr>
+    <tr><td>反投影公式记反</td><td>点云左右/上下镜像</td><td>中心像素自检：(cx,cy) → X≈0、Y≈0、Z=d</td></tr>
+    <tr><td>三维地图"花"</td><td>点云散乱重影</td><td>走太快导致运动畸变；更慢速（≤0.5 rad/s），转角停留 1-2 s</td></tr>
+    <tr><td>回环时地图乱一下</td><td>点云整体抖动</td><td><strong>正常！</strong>图优化一次性校正所有帧，记录即可</td></tr>
+    <tr><td>算力不足卡顿</td><td>RViz 卡、掉帧</td><td>降分辨率/关闭额外显示；实时性优先场景改用二维</td></tr>
+    <tr><td>以为三维导航直接替换</td><td>Nav2 吃不到 OctoMap</td><td>需投影/转换成 Nav2 costmap 可消费的格式，工程有额外环节</td></tr>
+    <tr><td>以为词袋 = 深度学习</td><td>概念混淆</td><td>词袋是经典特征聚类（ORB + KMeans），不是神经网络</td></tr>
+    <tr><td>跟风上三维</td><td>成本失控</td><td>三维算力与工程成本翻倍；地面任务优先二维，确有高度需求再上</td></tr>
+  </table>
+  <ul class="check">
+    <li>本实验为原理+演示型，<strong>不强行要求跑通三维导航</strong>，重点在理解与选型分析</li>
+    <li>RGB-D 强光/远距/反光处失效——户外或大场景优先激光雷达</li>
+    <li>三维地图文件大，保存后检查磁盘空间</li>
+    <li>记住"话题名 + 毫米单位"这两个本机特有的坑，比背公式更容易拿分</li>
+  </ul>
+</section>
+
+<section class="blk" id="s10">
+  <h2><span class="no">10</span>总结与思考：什么时候该上三维</h2>
+  <div class="tip tealb"><span class="lab">本课收获</span>打通了"深度图像素 → 反投影 → 三维点云 → 体素 OctoMap"的表示链；理解了 RTAB-Map 以词袋回环替代扫描匹配的图优化路线；掌握 RGB-D 数据链路验证与三维建图通用流程；并能用六维对比表回答选型问题。也如实认识了工程边界：仓库暂无 RTAB-Map 专用源码，本课为原理+流程型。</div>
+  <div class="tip violet"><span class="lab">思考 1</span>RTAB-Map 用"图像词袋"做回环检测，slam_toolbox 用"扫描匹配"——两者本质区别是什么？各在什么传感器配置下更可靠（提示：走廊重复纹理 vs 空旷大厅）？</div>
+  <div class="tip violet"><span class="lab">思考 2</span>写出 RGB-D 反投影公式并解释每个符号；点云与 OctoMap 各自优缺点是什么、导航为何更常用 OctoMap？请给出至少两条"该上三维了"的信号，并解释把三维导航落到 Nav2 上的工程难点。</div>
+</section>
+
+<nav class="expnav">
+  <a href="../exp-06-radar-multiwaypoint/index.html"><span class="lb">← 上一个实验</span>EXP-06 激光雷达多点导航避障</a>
+  <a class="next" href="../index.html"><span class="lb">返回目录 →</span>SLAM 与自主导航 · 课程总览</a>
+</nav>
+<footer>
+  <span>CORE-04 · 机器人 SLAM 与自主导航 · EXP-07 RTAB-Map 3D SLAM</span>
+  <span>8 学时 · 综合性 · 基于 slam_practice 实验讲义改编</span>
+</footer>
+</main></div>
+<script>
+function pick(k){
+  var io=document.getElementById('pickIo'),h='';
+  if(k==='home'){
+    h='<span class="ok">✔ A 家庭扫地机器人 → 二维</span>\n'+
+      '<span class="dim">地面平面清洁，家具腿部激光即可分辨；无高度分层需求</span>\n'+
+      '<span class="dim">二维算力低、/map 直接喂 Nav2，性价比完胜</span>\n'+
+      '<span class="warn">现代高端机带 LDS 也仍以 2D 栅格做主导航层</span>';
+  }else if(k==='wh'){
+    h='<span class="ok">✔ B 仓库多层取货 → 三维</span>\n'+
+      '<span class="ok">✔ 关键信号：高度分层 + 抓取定位——第 2/3 层货架的高度必须建模</span>\n'+
+      '<span class="warn">⚠ 代价：算力↑、Nav2 需要 OctoMap 投影/转换环节</span>\n'+
+      '<span class="dim">工程折中：底盘走二维 + 机械臂工作区局部三维，成本最优</span>';
+  }else if(k==='drone'){
+    h='<span class="ok">✔ C 无人机绕楼巡检 → 三维（必选）</span>\n'+
+      '<span class="ok">✔ 悬空障碍（横梁/线缆/檐角）二维根本表示不了</span>\n'+
+      '<span class="dim">三维 6-DoF 位姿 + 点云建模是飞行安全的底线</span>\n'+
+      '<span class="warn">⚠ 同时也最吃算力——"信息全但贵"的极端例子</span>';
+  }else{
+    h='<span class="ok">✔ D 走廊送餐小车 → 二维</span>\n'+
+      '<span class="dim">走廊宽度有限、障碍都是地面接触式（人/箱）；雷达一封信就够</span>\n'+
+      '<span class="warn">⚠ 例外信号：若餐厅桌底有悬空横档、需要伸臂取餐 → 再评估三维</span>\n'+
+      '<span class="dim">结论模板：先找"高度"信号，找不到就别为三维买单</span>';
+  }
+  io.innerHTML=h;
+}
+</script>
+<script src="../shared/tutorial.js" defer></script>
+</body>
+</html>

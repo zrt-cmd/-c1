@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EXP-07 · 自主码垛 — 智慧工厂装货分拣码垛综合项目</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+:root{
+  --theme:#ea580c;
+  --theme-deep:#c2410c;
+  --theme-bg:#ffedd5;
+  --theme-bd:#fed7aa;
+}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit" title="返回课程首页">🧠 具身智能课程 · <i>教程首页</i></a>
+  <div class="crumb"><a href="../../../index.html#case">综合项目</a> / <a href="../index.html">智慧工厂装货分拣码垛</a> / EXP-07</div>
+</div>
+
+<div class="wrap">
+<aside class="side">
+  <h4>本页目录</h4>
+  <a href="#s1" class="now">01 问题引入</a>
+  <a href="#s2">02 原理通俗讲解</a>
+  <a href="#s3">03 关联知识点</a>
+  <a href="#s4">04 实验目标</a>
+  <a href="#s5">05 实验环境与准备</a>
+  <a href="#s6">06 动画讲解</a>
+  <a href="#s7">07 互动讲解</a>
+  <a href="#s8">08 实操步骤</a>
+  <a href="#s9">09 重点与易错点</a>
+  <a href="#s10">10 总结与思考</a>
+  <h4 style="margin-top:22px">CASE-01 · 智慧工厂</h4>
+  <a href="../exp-01-requirements/index.html">EXP-01 需求分析</a>
+  <a href="../exp-02-architecture/index.html">EXP-02 五节点架构</a>
+  <a href="../exp-03-interface-design/index.html">EXP-03 接口设计</a>
+  <a href="../exp-04-voice-integration/index.html">EXP-04 语音交互集成</a>
+  <a href="../exp-05-visual-loading/index.html">EXP-05 视觉自适应装货</a>
+  <a href="../exp-06-sorting/index.html">EXP-06 智能分拣</a>
+  <a href="../exp-07-palletizing/index.html">EXP-07 自主码垛</a>
+  <a href="../exp-08-emergency-stop/index.html">EXP-08 危险检测与急停</a>
+  <a href="../exp-09-full-verification/index.html">EXP-09 全功能快速验证</a>
+</aside>
+
+<main class="content">
+  <div class="exp-head">
+    <span class="code">EXP-07 · 第 2 章 · 综合性 · 6 学时</span>
+    <h1>自主码垛：流水线送料 + 跨节点编排抓取</h1>
+    <p class="desc">码垛是全项目最完整的任务链路：N2 调度器先调 N-conveyor 的 run_until_sensor 让流水线送料
+    （复用底盘电机 M1，光电 GPIO17 定点停），订阅 /eai_factory/conveyor/state 收到 sensor_blocked 后
+    才触发 N-grasp 固定点位八步抓取，完成后播报"码垛完成"——融合流水线驱动、光电防抖、跨节点状态同步三大知识点（R6）。</p>
+    <div class="meta">
+      <span class="tag hl">🏗️ 跨节点编排</span>
+      <span class="tag">M1 电机复用 · rps=0.1</span>
+      <span class="tag">光电定点停 run_until_sensor</span>
+      <span class="tag">sensor_blocked 状态同步</span>
+      <span class="tag">急停置位保持 · 显式复位</span>
+    </div>
+  </div>
+
+  <section class="blk" id="s1">
+    <h2><span class="no">01</span>问题引入：为什么要"先送料，再抓取"？</h2>
+    <p>分拣是手边直接抓，码垛的物料却在流水线那头——这引入了两个新问题：
+    <strong>流水线怎么停得准</strong>（不能靠数秒数），以及<strong>两个节点怎么配合</strong>
+    （调度器不能瞎猜物品到了没有）。源讲义的回答是：让传感器说话。
+    流水线转到光电被遮挡才停（<code>sensor_blocked</code>），调度器订阅这个状态、收到才触发抓取——
+    <strong>用状态同步取代 sleep 固定时长</strong>，这是分布式编排的通用范式。</p>
+    <p>相应地停不准也有代价：本实验快速验证流程里写得很清楚——触发后不放物品，送料会空跑
+    <code>sensor_timeout=30.0s</code> 后置 <code>timeout</code>，抓取永远不会开始。</p>
+  </section>
+
+  <section class="blk" id="s2">
+    <h2><span class="no">02</span>原理通俗讲解：传送带、感应门与调度室</h2>
+    <div class="kgrid">
+      <div class="kcard"><div class="kd">借马达</div><div class="kt">流水线电机复用前左轮</div>
+        <p>工厂流水线不另买驱动，<strong>复用底盘电机通道 M1（前左轮）</strong>：N-conveyor 往
+        <code>/car1_base_driver/set_motor</code> 发速度，STM32 会<strong>保持最后收到的速度一直转</strong>；
+        要停就发 <code>rps=0</code>——立即且可靠。参数：<code>motor_id=1</code>、<code>run_speed=0.1</code>（m/s）。
+        就像借用已有的电风扇插座：插上就转，拔掉（发 0）就停。</p></div>
+      <div class="kcard"><div class="kd">感应门</div><div class="kt">光电四段式定点停</div>
+        <p><code>run_until_sensor</code> 分四段：<strong>先等"清沿"</strong>（光电恢复无遮挡，确认起始端干净）
+        → <strong>再等"挡沿"</strong>（物品到达、电平变 LOW(0)）→ <strong>防抖确认</strong>
+        （<code>debounce_reads=3</code> 连续 3 次读遮挡才算数，<code>poll_period=0.05s</code>）
+        → 停带。约定：<strong>1=无遮挡、0=遮挡</strong>；超时 <code>sensor_timeout=30s</code>。
+        就像车库感应门：先确认门前确实有车、稳定停住，才判断"到位"。</p></div>
+      <div class="kcard"><div class="kd">调度室</div><div class="kt">等状态，不数秒</div>
+        <p>N2 的 <code>_start_palletize_sequence</code>（L98-110）置 <code>_awaiting_sensor=True</code> 后异步调送料；
+        物品到位时 <code>_conveyor_state_cb</code>（L121-127）收到 <code>sensor_blocked</code> 才
+        <code>_trigger_grasp('palletize')</code>。<strong>等信号，不等时间</strong>——传送带快慢、物品长短都不影响正确性。</p></div>
+      <div class="kcard"><div class="kd">保险栓</div><div class="kt">急停置位保持、显式复位</div>
+        <p>conveyor 状态机：<code>idle / running / sensor_blocked / emergency / timeout / error</code>。
+        <code>emergency_stop</code> 置位 <code>_emergency_stop=True</code> 并立即发 rps=0（L240-248）；
+        期间 <code>run</code>/<code>run_until_sensor</code> 一律拒绝（"emergency active — call reset_emergency first"），
+        必须显式 <code>reset_emergency</code> 才回 idle——<strong>急停后绝不自动复跑</strong>，像总闸按下后必须人工合闸。</p></div>
+    </div>
+  </section>
+
+  <section class="blk" id="s3">
+    <h2><span class="no">03</span>关联知识点</h2>
+    <div class="kgrid">
+      <div class="kcard"><div class="kd">GPIO 准备</div><div class="kt">sysfs 导出 GPIO17</div>
+        <p><code>sudo bash scripts/setup_conveyor_gpio.sh</code> 导出 + 上拉输入（幂等，已导出跳过 L13-24）；
+        读 <code>/sys/class/gpio/gpio17/value</code>；节点启动时未导出会尝试免密 sudo 自动补导出（L135-163）。</p></div>
+      <div class="kcard"><div class="kd">palletize 点位</div><div class="kt">固定抓取（vision=false）</div>
+        <p>observe [0.145, 0.0027, 0.185, 3.1381] 取料、place [0.0608, 0.1345, 0.2051, 2.6461] 放置；
+        全套八步含提前开爪、抬 0.03、放后抬 0.05、go_work。</p></div>
+      <div class="kcard"><div class="kd">语音闭环</div><div class="kt">"码垛"→"码垛完成"</div>
+        <p>intent_hints 内置"码垛/开始码垛/堆码/马舵"等误识别词（yaml L36）；完成后 _grasp_status_cb 映射
+        <code>palletize→码垛完成</code> 发 /eai_factory/speak 播报。</p></div>
+      <div class="kcard"><div class="kd">TC1~TC9</div><div class="kt">流水线验收矩阵</div>
+        <p>启停（TC1/TC2）、photo 话题（TC3）、定点停与超时（TC4/TC5）、手动急停（TC6）、
+        N3 danger 联动急停（TC7）、GPIO 已/未导出场景（TC8/TC9），见 docs/10。</p></div>
+    </div>
+  </section>
+
+  <section class="blk" id="s4">
+    <h2><span class="no">04</span>实验目标</h2>
+    <ul class="check">
+      <li>理解复用底盘电机 M1 的驱动原理（发布速度 → STM32 保持 → 发 0 即停）与光电电平约定 1=无遮挡、0=遮挡。</li>
+      <li>掌握 run_until_sensor"清沿 → 挡沿 → 防抖 → 超时"四段式流程与流水线状态机转换。</li>
+      <li>独立完成"先送料后抓取"跨节点编排的全链路验证（服务/语音双通道触发，观察 sensor_blocked → 抓取 → done）。</li>
+      <li>掌握急停置位/复位语义与 run 被拒绝的安全含义，能按 docs/10 完成 TC1~TC9 验收。</li>
+    </ul>
+  </section>
+
+  <section class="blk" id="s5">
+    <h2><span class="no">05</span>实验环境与准备</h2>
+    <ul class="check">
+      <li>硬件：流水线电机（复用底盘 M1 前左轮通道）＋光电传感器 GPIO0_C1=17；码垛为固定点位抓取，不用 AprilTag。</li>
+      <li>先导出 GPIO 并验证可读
+      <pre>sudo bash scripts/setup_conveyor_gpio.sh
+cat /sys/class/gpio/gpio17/value   <span class="c"># 输出 0 或 1 即成功</span></pre></li>
+      <li>arm_controller 在跑（抓取/放置/回 work 依赖）；机械臂处于 work 安全位、车身固定。</li>
+      <li>省内存启动（保留流水线+机械臂，关语音/视觉/画面）：
+      <pre>source /opt/ros/humble/setup.bash
+source /home/iflytek/ros2_ws/install/setup.bash
+ros2 launch eai_factory eai_factory.launch.py \
+  start_voice:=false start_vision:=false start_viz:=false</pre></li>
+      <li>确认节点与服务：<code>ros2 node list</code> 应有 eai_factory_conveyor / grasp / scheduler；
+      <code>ros2 service list | grep conveyor</code> 应有 run / stop / run_until_sensor / emergency_stop / reset_emergency。</li>
+    </ul>
+  </section>
+
+  <section class="blk" id="s6">
+    <h2><span class="no">06</span>动画讲解：编排链路与状态机</h2>
+    <div class="anim-box">
+<svg viewBox="0 0 720 310" xmlns="http://www.w3.org/2000/svg">
+  <text x="20" y="26" font-size="15" fill="#94a3b8">palletize 跨节点编排：先送料后抓取</text>
+  <rect x="25" y="44" width="140" height="46" rx="8" fill="#0f172a"/>
+  <text x="95" y="64" font-size="12" fill="#fdba74" text-anchor="middle">N2 调度器</text>
+  <text x="95" y="82" font-size="10" fill="#94a3b8" text-anchor="middle">start_palletize</text>
+  <rect x="215" y="44" width="150" height="46" rx="8" fill="#ffedd5" stroke="#ea580c" stroke-width="2"/>
+  <text x="290" y="64" font-size="12" fill="#9a3412" text-anchor="middle">N-conveyor</text>
+  <text x="290" y="82" font-size="10" fill="#c2410c" text-anchor="middle">run_until_sensor 送料</text>
+  <rect x="415" y="44" width="130" height="46" rx="8" fill="#ffedd5" stroke="#ea580c" stroke-width="2"/>
+  <text x="480" y="64" font-size="12" fill="#9a3412" text-anchor="middle">光电 GPIO17</text>
+  <text x="480" y="82" font-size="10" fill="#c2410c" text-anchor="middle">0=遮挡 防抖×3</text>
+  <rect x="590" y="44" width="110" height="46" rx="8" fill="#0f172a"/>
+  <text x="645" y="64" font-size="12" fill="#fdba74" text-anchor="middle">N-grasp</text>
+  <text x="645" y="82" font-size="10" fill="#94a3b8" text-anchor="middle">固定八步</text>
+  <line x1="165" y1="67" x2="215" y2="67" stroke="#ea580c" stroke-width="2"/>
+  <polygon points="215,67 207,63 207,71" fill="#ea580c"/>
+  <text x="190" y="57" font-size="10" fill="#64748b" text-anchor="middle">① service</text>
+  <line x1="365" y1="67" x2="415" y2="67" stroke="#ea580c" stroke-width="2"/>
+  <polygon points="415,67 407,63 407,71" fill="#ea580c"/>
+  <text x="390" y="57" font-size="10" fill="#64748b" text-anchor="middle">② 转带</text>
+  <line x1="545" y1="67" x2="590" y2="67" stroke="#dc2626" stroke-width="2" stroke-dasharray="5 4"/>
+  <polygon points="590,67 582,63 582,71" fill="#dc2626"/>
+  <text x="567" y="57" font-size="10" fill="#dc2626" text-anchor="middle">③ state</text>
+  <path d="M 645 90 C 645 128, 95 128, 95 90" fill="none" stroke="#16a34a" stroke-width="2" stroke-dasharray="5 4"/>
+  <polygon points="95,90 91,100 101,99" fill="#16a34a"/>
+  <text x="370" y="124" font-size="11" fill="#16a34a" text-anchor="middle">④ grasp/status: palletize|done → speak"码垛完成"</text>
+  <circle r="7" fill="#ea580c">
+    <animate attributeName="cx" values="95;290;480;645;95" dur="5s" repeatCount="indefinite"/>
+    <animate attributeName="cy" values="67;67;67;67;67" dur="5s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="1;1;1;1;0" dur="5s" repeatCount="indefinite"/>
+  </circle>
+  <text x="20" y="168" font-size="15" fill="#94a3b8">conveyor 状态机：急停置位保持、显式复位</text>
+  <g font-size="11">
+    <rect x="30"  y="186" width="86" height="40" rx="8" fill="#ffedd5" stroke="#ea580c" stroke-width="2"/>
+    <text x="73" y="210" fill="#9a3412" text-anchor="middle">idle</text>
+    <rect x="160" y="186" width="90" height="40" rx="8" fill="#ffedd5" stroke="#ea580c" stroke-width="2"/>
+    <text x="205" y="210" fill="#9a3412" text-anchor="middle">running</text>
+    <rect x="295" y="186" width="128" height="40" rx="8" fill="#ffedd5" stroke="#ea580c" stroke-width="2"/>
+    <text x="359" y="210" fill="#9a3412" text-anchor="middle">sensor_blocked</text>
+    <rect x="160" y="244" width="90" height="40" rx="8" fill="#fee2e2" stroke="#dc2626" stroke-width="2"/>
+    <text x="205" y="268" fill="#b91c1c" text-anchor="middle">emergency</text>
+    <rect x="295" y="244" width="80" height="40" rx="8" fill="#f1f5f9" stroke="#94a3b8" stroke-width="2"/>
+    <text x="335" y="268" fill="#64748b" text-anchor="middle">timeout</text>
+    <line x1="116" y1="206" x2="160" y2="206" stroke="#ea580c" stroke-width="2"/>
+    <polygon points="160,206 152,202 152,210" fill="#ea580c"/>
+    <line x1="250" y1="206" x2="295" y2="206" stroke="#ea580c" stroke-width="2"/>
+    <polygon points="295,206 287,202 287,210" fill="#ea580c"/>
+    <text x="272" y="198" fill="#64748b" text-anchor="middle">挡沿×3</text>
+    <line x1="205" y1="226" x2="205" y2="244" stroke="#dc2626" stroke-width="2"/>
+    <polygon points="205,244 201,236 209,236" fill="#dc2626"/>
+    <text x="180" y="240" fill="#dc2626">急停</text>
+    <line x1="250" y1="264" x2="330" y2="264" stroke="#dc2626" stroke-width="2" stroke-dasharray="4 3"/>
+    <text x="290" y="258" fill="#dc2626" text-anchor="middle">reset</text>
+    <path d="M 160 264 C 110 264, 73 254, 73 226" fill="none" stroke="#16a34a" stroke-width="2" stroke-dasharray="4 3"/>
+    <polygon points="73,226 69,236 79,235" fill="#16a34a"/>
+    <text x="60" y="266" fill="#16a34a">回 idle</text>
+  </g>
+  <text x="440" y="210" font-size="11" fill="#94a3b8">emergency 期间 run / run_until_sensor 全被拒绝：</text>
+  <text x="440" y="230" font-size="11" fill="#fdba74">"emergency active — call reset_emergency first"</text>
+  <text x="440" y="254" font-size="11" fill="#94a3b8">⚠ 30s 不放物品 → timeout，抓取永不开始</text>
+  <text x="440" y="274" font-size="11" fill="#94a3b8">急停后绝不自动复跑 —— 必须显式 reset</text>
+</svg>
+    </div>
+    <div class="anim-cap">图 7-1　上：四步编排链（service 送料 → 转带 → sensor_blocked 状态回传 → 八步抓取 → 完成播报），光点即一次任务的数据流；下：conveyor 状态机，红色为急停置位路径，急停期间所有启动请求被拒绝。</div>
+  </section>
+
+  <section class="blk" id="s7">
+    <h2><span class="no">07</span>互动讲解：编排时序故障沙盘</h2>
+    <p>点击按钮模拟不同现场情形，观察调度器与流水线的实际反应：</p>
+    <div class="ix-panel">
+      <div class="ix-title">🎛️ 码垛编排时序沙盘</div>
+      <div class="ctl-row">
+        <button class="btn" onclick="palCase('ok')">正常流程</button>
+        <button class="btn" onclick="palCase('late')">放货太晚</button>
+        <button class="btn" onclick="palCase('block')">物品已挡光</button>
+        <button class="btn" onclick="palCase('estop')">急停未复位</button>
+        <button class="btn" onclick="resetPal()">复位</button>
+      </div>
+      <div class="io" id="palIo">选择一种现场情形，观察 run_until_sensor 四段流程与调度器编排的结果……</div>
+    </div>
+    <div class="tip tealb" style="margin-top:14px"><span class="lab">核心</span>
+      四种情形殊途同归地指向同一条设计原则：<strong>编排依赖"状态信号"而非"时间估算"</strong>——
+      每种失败模式都能在状态机上找到确定的落点（timeout / immediate / emergency）。</div>
+  </section>
+
+  <section class="blk" id="s8">
+    <h2><span class="no">08</span>实操步骤</h2>
+    <div class="flow">
+      <div class="step"><div class="n">1</div><div><strong>环境准备（导出 GPIO + 省内存启动）</strong>
+<pre>sudo bash scripts/setup_conveyor_gpio.sh
+cat /sys/class/gpio/gpio17/value        <span class="y"># 0 或 1</span>
+ros2 launch eai_factory eai_factory.launch.py \
+  start_voice:=false start_vision:=false start_grasp:=true start_viz:=false</pre></div></div>
+      <div class="step"><div class="n">2</div><div><strong>流水线单测（观察电机—光电—定点停）</strong>
+<pre>ros2 topic echo /eai_factory/conveyor/state      <span class="c"># 终端1</span>
+ros2 service call /eai_factory/conveyor/run_until_sensor std_srvs/srv/Trigger
+<span class="c"># 触发后尽快把物品放到流水线起始端</span></pre>
+      预期：立即返回 started；/car1_base_driver/set_motor 出现 <code>id: 1, rps: 0.1</code>；
+      遮挡后 <code>rps: 0.0</code>，state 出现 <code>sensor_blocked</code>。</div></div>
+      <div class="step"><div class="n">3</div><div><strong>码垛全流程：送料 → 抓取 → 播报</strong>
+<pre>ros2 topic echo /eai_factory/conveyor/state      <span class="c"># 三终端同开</span>
+ros2 topic echo /eai_factory/grasp/status
+ros2 service call /eai_factory/start_palletize std_srvs/srv/Trigger</pre>
+      日志应出现 <code>[SCHEDULER] palletize: feeding belt...</code> → <code>item at sensor — starting grasp</code>
+      → 八步抓取 → <code>palletize|done</code>。</div></div>
+      <div class="step"><div class="n">4</div><div><strong>急停三连测（TC6）</strong>
+<pre>ros2 service call /eai_factory/conveyor/emergency_stop std_srvs/srv/Trigger
+ros2 service call /eai_factory/conveyor/run std_srvs/srv/Trigger
+<span class="y">success: False — "emergency active — call reset_emergency first"</span>
+ros2 service call /eai_factory/conveyor/reset_emergency std_srvs/srv/Trigger
+ros2 service call /eai_factory/conveyor/run std_srvs/srv/Trigger   <span class="y"># 恢复成功</span></pre></div></div>
+      <div class="step"><div class="n">5</div><div><strong>语音联动</strong>：全功能启动后喊"小飞小飞 → 码垛"，听到"码垛完成"播报，
+      终端 <code>task palletize done — announce "码垛完成"</code>（intent_hints 已含"马舵"等容错词）。</div></div>
+      <div class="step"><div class="n">6</div><div><strong>TC1~TC9 验收</strong>：必测 TC1 run、TC2 stop、TC4 定点停、TC6 手动急停；
+      尝试 TC5（不放物品等 30s 看 timeout）与 TC7（手动发 <code>/eai_factory/safety/danger true</code> 联动急停，
+      测完必须再发 <code>false</code> 恢复）。结果按 docs/10_流水线测试用例.md 填表。</div></div>
+    </div>
+  </section>
+
+  <section class="blk" id="s9">
+    <h2><span class="no">09</span>重点与易错点</h2>
+    <div class="tip amber"><span class="lab">诊断</span>"只送不抓"三查：<strong>state 到没到 sensor_blocked</strong>（photo 话题是否 true）、
+    <strong>防抖满足没有</strong>（debounce_reads=3）、<strong>急停标志在不在</strong>（emergency 拒绝返回）。</div>
+    <table>
+      <tr><th>现象</th><th>根因</th><th>处理</th></tr>
+      <tr><td>流水线不转</td><td>GPIO 未导出或电机通道接错</td><td><code>sudo bash scripts/setup_conveyor_gpio.sh</code>；确认 conveyor.motor_id=1</td></tr>
+      <tr><td>run_until_sensor 立即 timeout</td><td>物品已停在光电位，清沿不满足</td><td>先移开物品再触发，或先 run 清位再 stop</td></tr>
+      <tr><td>遮挡了仍不判 sensor_blocked</td><td>电平约定弄反或防抖未满</td><td>确认 1=无遮挡、0=遮挡；看 photo 是否持续 true 三个周期</td></tr>
+      <tr><td>码垛只送料不抓取</td><td>state 变化没触发 _conveyor_state_cb</td><td><code>ros2 topic echo /eai_factory/conveyor/state</code> 确认消息在发</td></tr>
+      <tr><td>抓取位置偏</td><td>堆叠高度/位置与打点不一致</td><td>重新打点更新 grasp.tasks.palletize.observe_pose（yaml L89）</td></tr>
+      <tr><td>服务一直拒绝 "emergency active"</td><td>急停置位保持，未显式复位</td><td><code>reset_emergency</code> 后再触发（安全设计，非故障）</td></tr>
+    </table>
+    <ul class="check">
+      <li>评分自测（源讲义 15/30/35/10/10）：原理 15、步骤与命令日志 30、四步验证现象 35、TC1~TC9 表 10、思考题 10。</li>
+      <li>安全：启停前确认机械臂 work 位、车身固定；抓取区全程手离；测完急停必须复位。</li>
+      <li>实验结束 <code>bash scripts/stop_eai_factory.sh</code> 清理，防残留进程占串口。</li>
+    </ul>
+  </section>
+
+  <section class="blk" id="s10">
+    <h2><span class="no">10</span>总结与思考</h2>
+    <div class="kgrid">
+      <div class="kcard"><div class="kd">借力</div><div class="kt">M1 电机复用</div><p>发速度即转、发 0 即停，STM32 保持最后速度驱动流水线。</p></div>
+      <div class="kcard"><div class="kd">等信号</div><div class="kt">清沿→挡沿→防抖→超时</div><p>四段式定点停，debounce_reads=3 过滤抖动，30s 超时兜底。</p></div>
+      <div class="kcard"><div class="kd">跨节点</div><div class="kt">state 同步再抓取</div><p>_awaiting_sensor + _conveyor_state_cb，状态驱动取代定时。</p></div>
+      <div class="kcard"><div class="kd">安全停</div><div class="kt">置位保持 · 显式复位</div><p>急停后 run 全拒，防误自启是设计而非缺陷。</p></div>
+    </div>
+    <div class="tip violet" style="margin-top:14px"><span class="lab">思考 1</span>
+      为什么 run_until_sensor 要先等"清沿"再等"挡沿"？如果物品一开始就在光电传感器处，
+      省掉清沿会发生什么？（提示：与超时 30s 现象联系起来）</div>
+    <div class="tip violet"><span class="lab">思考 2</span>
+      编排等待如果不用 _conveyor_state_cb 订阅、而是 <code>sleep(10)</code> 再触发抓取，
+      在"传送带加速"和"抓取服务还没就绪"两种情况下分别会出什么问题？
+      结合 _pending_task / 2s 重试机制说明状态订阅方案多补了哪一层保险。</div>
+  </section>
+
+  <nav class="expnav">
+    <a href="../exp-06-sorting/index.html" class="prev">← EXP-06 智能分拣</a>
+    <a href="../exp-08-emergency-stop/index.html" class="next">EXP-08 危险检测与急停 →</a>
+  </nav>
+
+  <footer>
+    <span>CASE-01 · 智慧工厂装货分拣码垛 · EXP-07 自主码垛</span>
+    <span>6 学时 · 综合性 · 基于 llm_practice 实验讲义改编</span>
+  </footer>
+</main>
+</div>
+
+<script>
+function palCase(kind){
+  var io = document.getElementById('palIo');
+  var lines = [];
+  if(kind === 'ok'){
+    lines.push('<span class="dim">$ start_palletize → run_until_sensor</span>');
+    lines.push('<span class="ok">[四段] 清沿 OK（起始端干净）→ 物品上带 → 挡沿 ×3 防抖确认</span>');
+    lines.push('<span class="ok">state: running → sensor_blocked（rps 0.1 → 0.0）</span>');
+    lines.push('<span class="ok">[SCHEDULER] item at sensor — starting grasp → 固定八步</span>');
+    lines.push('<span class="b">grasp status: palletize|done → 播报"码垛完成"</span>');
+  } else if(kind === 'late'){
+    lines.push('<span class="warn">$ 服务先触发、物品迟迟没上带</span>');
+    lines.push('<span class="warn">清沿瞬间满足（本来就无遮挡）→ 皮带空转等挡沿……</span>');
+    lines.push('<span class="bad">30.0s（sensor_timeout）→ state=timeout → 抓取永不触发</span>');
+    lines.push('<span class="dim">对策：听到指令后立即把物品放上起始端；或先 run 手动清位</span>');
+  } else if(kind === 'block'){
+    lines.push('<span class="bad">$ 物品一开始已停在光电位（清沿不满足）</span>');
+    lines.push('<span class="bad">run_until_sensor 立即 / 快速返回 timeout</span>');
+    lines.push('<span class="warn">这是"先清沿后挡沿"设计的可观测后果——防止把旧位置误当新到位</span>');
+    lines.push('<span class="dim">对策：先移开物品再触发，或先 run 把带清空后 stop</span>');
+  } else {
+    lines.push('<span class="bad">$ 上一轮急停未复位（_emergency_stop=True）</span>');
+    lines.push('<span class="bad">run 与 run_until_sensor 均返回 success: False</span>');
+    lines.push('<span class="dim">message: "emergency active — call reset_emergency first"（L203-207 / L223-227）</span>');
+    lines.push('<span class="warn">安全语义：置位保持、显式复位，急停后绝不自动复跑</span>');
+    lines.push('<span class="ok">ros2 service call /eai_factory/conveyor/reset_emergency → 回 idle 可再跑</span>');
+  }
+  io.innerHTML = lines.join('\n');
+}
+function resetPal(){
+  document.getElementById('palIo').innerHTML = '选择一种现场情形，观察 run_until_sensor 四段流程与调度器编排的结果……';
+}
+</script>
+<script src="../shared/tutorial.js" defer></script>
+</body>
+</html>

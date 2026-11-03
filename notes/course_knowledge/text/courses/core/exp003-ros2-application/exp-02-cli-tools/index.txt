@@ -1,0 +1,947 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp003-ros2-application/exp-02-cli-tools/index.html
+TITLE: EXP-02 · ROS2 常用命令工具 — 机器人 ROS2 应用与开发
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+EXP-02 · ROS2 常用命令工具 — 机器人 ROS2 应用与开发
+🧠 具身智能课程 ·
+教程首页
+核心课程
+/
+ROS2 应用与开发
+/ EXP-02
+本页目录
+★ 课程目标
+01 程序跑起来就变黑盒？ROS2 的答案
+02 核心原理：命令体系与计算图动画
+03 异步话题 vs 同步服务——两种通信模型的对比
+04 实操中心：四关（试车台 · node · topic · bag）
+05 注意事项与验收清单
+06 互动：命令选配台（综合自测）
+07 实验总结与思考题
+CH1 · ROS2 基础
+EXP-01 ROS2 简介
+EXP-02 命令工具
+EXP-03 工作空间
+EXP-04 功能包
+EXP-02 · 第 1 章 · 验证性 · 2 学时
+ROS2 常用命令工具：给系统做"体检"
+一个跑起来的 ROS2 系统是
+看不见的分布式进程网
+。ros2 命令行是
+名词域 × 动作
+结构：先选名词域，再给动作——
+node / topic / service / param / interface / bag 是最常用的六个命令族
+，另外还有action 专管长任务，run / launch / pkg 负责启动与编排（`ros2` 还有更多名词域，用到时 `ros2 --help` 一查便知）。list / info / echo / call 是它们常用的动作。本实验以这六族为主线，教你不用读一行源码，就能回答"谁在发、谁在收、发的什么、多快"——并用 rosbag2 把现场录成可以回放的"时间机器"。
+难度 ⭐ · 2 学时
+ros2 CLI
+名词域 × 动作
+topic · service · param
+rosbag2
+目标
+本课学完，你应该能做到
+① 说清设计
+一个入口统一全部
+能阐述 ros2 CLI 的设计理念——为什么把 node / topic / service / param / action / bag / interface / launch / run / pkg 这些子命令收敛到
+ros2
+一个入口。
+② 掌握主力命令
+node / topic / service
+熟练使用
+node list|info
+、
+topic list|echo|info|hz|pub
+、
+service list|type|call
+。
+③ 独立排查
+param / interface / bag
+能独立用
+ros2 param
+管理参数、
+ros2 interface
+查消息定义、
+ros2 bag
+录放数据。
+④ 迁移成习惯
+遇事先敲命令
+后续实验中遇到"这节点是什么""这话题有没有在发""这服务怎么调"，能第一反应想到对应的 CLI 工具，而不是先翻代码。
+本课的重点与难点
+重点
+：
+topic echo
+/
+hz
+/
+info
+三件套——它们是后面每一个实验的验收工具。
+难点
+：建立"名词域 × 动作"的检索思维：先想"我要看的是哪类东西"（node/topic/service），再想"要对它做什么"（list/info/echo）。
+和前后的关系
+本课学的命令会在
+后续 18 个实验里反复出现
+。这里多敲几遍，后面能省几十遍。
+01
+问题引入：程序跑起来就变成黑盒？ROS2 给了一个不一样的答案
+先问一个几乎每个开发者都遇过的问题：
+程序一旦跑起来，你还剩多少手段看清它在干什么？
+不管写 Java、Python 还是嵌入式 C，程序运行后的"可观测手段"翻来覆去就那么几样：
+手段一
+看日志
+最通用，也最原始。问题是：日志
+是写代码的人预先决定要打印的
+——他没想起来打的地方，你永远看不见。
+手段二
+断点调试 / 仿真器
+单步执行很爽，但它要求能
+停下来
+。机器人正在跑、电机正在转、传感器 30Hz 在出数据——一旦停下来，现象就消失了。
+手段三
+抓包 / 中间件工具
+能看到字节，但要
+先知道去哪抓
+：端口、协议、序列化格式都得事先搞清，还得会和业务字段对应上。
+手段四
+埋点 / 接口注入
+最"正规"，代价是
+要改代码、重新发布
+。生产环境下往往根本不允许。
+这四种手段有个共同的隐含前提：
+你得先知道内部结构，才能去观察它
+。于是出现一个尴尬局面——
+⚠ 传统开发的"黑盒时刻"
+接手一份别人写的代码、或者一个已经在跑的系统，你常常要回答三个问题：
+它现在在做什么？谁在给它发数据？它发出去的东西别人收到了吗？
+而传统手段的答案往往分别是：
+不知道（日志没打）、不知道（代码里没写）、不知道（只能靠猜）
+。
+ROS2 的答案：让"内部结构"本身变成可查询的公开信息
+ROS2 之所以能跳出这个困境，是因为它在架构层面做了一件别家很少做的事：
+把"谁存在、谁和谁连着、连线上流什么"这件事，从程序内部搬到了系统层面，并规定所有组件都必须如实登记。
+这份登记表就是上一课讲过的
+计算图（Graph）
+。它不是某个人画出来的文档，而是
+DDS 在运行时实时维护的在场名单
+：每个节点一上线就自动登记自己的名字、开放了哪些话题、提供哪些服务——谁来问都一样，
+不区分是"自己人"还是"路过的工具"
+。
+于是
+ros2
+这套 CLI 工具，本质上就是
+一批合法的"第三方观察者"
+：它以普通参与者身份加入这张图，把图里已经登记好的信息读出来给你看。
+传统程序：边界之内是黑盒
+程序内部（模块互相调用）
+模块A
+模块B
+C
+调用关系 / 数据流向 —— 外部看不见
+你只能：看日志、加埋点、停下来调试
+→ 都得先知道内部结构，或先改代码
+ROS2：结构本身可被查询
+计算图（DDS 实时维护）
+talker
+listener
+/chatter
+节点 / 话题 / 服务 —— 已登记，可随时问
+你可以：
+ros2 topic echo
+直接旁听
+→ 不改代码、不改配置、不打断运行
+→
+架构
+改变
+图 1-1｜差别不在于"工具更强"，而在于
+结构信息归谁保管
+：传统程序的调用关系藏在进程内部，ROS2 把它提升成了系统级的公开事实。
+这就是 ROS2 相对传统开发方式最实质的一个优势：
+它把"可观测性"做进了架构，而不是靠开发者事后补日志。
+你可以对着一台完全陌生的机器人，不读一行源码，30 秒内问清"谁在线、谁给谁发数据、发的是什么、多快"。
+横向对比：五种开发场景，各自怎么看运行中的系统
+把话说准一点——
+不是 ROS2 在所有方面都更强
+。不同场景各有各的成熟手段，只是在"运行时结构可见性"这一项上，ROS2 的做法有天然优势。下面这张表按同一组维度横向摆开：
+场景
+运行时主要靠什么看
+能否不读代码看清结构
+能否不改程序拿到数据
+主要瓶颈
+服务端 / 后端
+日志 + APM 链路追踪 + 接口文档
+部分可以（靠 OpenAPI/Swagger 文档）
+较难（要加日志或埋点）
+文档与代码易脱节；调用链跨服务后靠 trace 拼
+网页前端
+浏览器 DevTools（网络面板、元素检查、Performance）
+可以（DOM / Network 直接可见）
+可以
+（Network 面板就能抓请求）
+只管得了浏览器内；跨端、跨设备后断链
+小程序
+开发者工具 + vConsole + 平台真机调试
+较难（需在开发者工具内运行）
+较难（真机环境受限）
+真机与模拟器行为不一致，线上问题难复现
+嵌入式 C/C++
+串口打印 + J-Link/ST-Link 调试器 + 逻辑分析仪
+难（结构在编译期就定死了）
+难（要占用串口或加探针）
+资源紧张放不下日志；打断点即改变时序
+ROS2 应用
+ros2
+CLI + rqt + rviz2 + rosbag2（后续实验逐个展开）
+可以
+（计算图由 DDS 实时登记）
+可以
+（CLI 以第三方参与者旁听）
+前提是所有组件都遵守 ROS2 规范并入同一通信域
+💡 一句话读懂这张表
+前端有 DevTools、服务端有链路追踪、嵌入式调试器——
+每种开发都有自己的"透视镜"
+。ROS2 的特别之处在于：它的透视镜不是附加工具，而是
+架构自带的
+。因为节点之间的通信本来就走统一的中间件，所以"旁听"和"查图"是白送的，不需要你提前埋任何东西。
+⚠ 但要记住 ROS2 的前提与代价
+这个优势不是没有条件的：
+①
+所有组件必须都按 ROS2 规范写、在同一
+ROS_DOMAIN_ID
+下运行——一个用私有 socket 通信的模块，CLI 一样看不到它；
+②
+这套机制本身有开销（序列化、发现流量），所以对微秒级实时性要求极高的环节，往往仍要绕开它直接操作寄存器；
+③
+"能看见"不等于"能理解"——图上告诉你
+/cmd_vel
+在发数据，但为什么发这个值，还得看算法。
+那具体怎么"看"？先认两个词
+名词 · 计算图
+系统长什么样，就是一张图
+节点是图上的
+点
+，话题是图上的
+线
+。把"谁在线、谁和谁连着、连线上流什么"全画出来，就是计算图（Graph）。它由 DDS 实时维护，不是谁画出来的文档。
+名词 · CLI
+命令行里敲的那套工具
+CLI = Command Line Interface。
+ros2
+开头的一整套命令，专门用来向计算图提问——它就是那把"翻通讯录的手"。
+有了这两个概念，"30 秒看懂一个陌生系统"其实就是
+对着计算图连问四个问题
+：
+1
+ros2 node list
+：先看有哪些
+进程单元
+（谁活着）
+2
+ros2 topic list -t
+：再看它们之间流着什么
+数据
+（在说什么）
+3
+ros2 topic echo /chatter
+看
+内容
+、
+ros2 topic hz /chatter
+测
+频率
+（说得对不对、多快）
+4
+ros2 topic info /chatter
+看
+谁发谁收
+、
+ros2 node info /talker
+看节点全貌（谁和谁认识）
+💡 一句话总结
+把 ROS2 系统当成人，计算图就是它的
+通讯录
+，CLI 就是翻通讯录的手——你不动任何人的脑子，只是把通讯录里已经记好的内容念出来。
+而这份通讯录之所以存在，是因为 ROS2 要求每个组件入职时都必须登记。
+02
+核心原理：ros2 的"名词域 × 动作"体系
+ros2 CLI 和 git 一样是
+先说对象、再说动作
+的结构：
+ros2 <名词域> <动作>
+——先选名词域（操作什么），再给动作（怎么操作）。除六大命令族外还有 action 与执行入口一族，按职责分五组，各管计算图的一个侧面：
+图拓扑
+node / topic / service / action
+进程、数据流、请求应答、长任务——四种图元素的 list / info / echo / call。
+运行配置
+param
+list / get / set / dump：每个节点自带一个参数服务器，随时查改其"旋钮"。
+接口定义
+interface
+show 查看 .msg / .srv / .action 的字段结构——通信双方的"合同原文"。
+数据存档
+bag
+record 录制话题流 → play 回放：把现场时间冻结成可复现的数据集。
+执行入口
+run / launch / pkg
+run 启动单个可执行文件，launch 编排一群，pkg 在已安装包里搜索。
+你想回答的问题
+命令
+关键输出
+系统里有哪些节点？
+ros2 node list
+节点名（如 /talker）
+这个话题谁在发谁在收？
+ros2 topic info /chatter
+Type + Pub/Sub count
+消息长什么样？
+ros2 interface show std_msgs/msg/String
+字段清单
+string data
+消息以什么频率发？
+ros2 topic hz /chatter
+average rate: 1.000
+节点参数是什么？
+ros2 param list /talker
+ros2 param get /talker use_sim_time
+ros2 param set /talker use_sim_time true
+参数名清单 → 单个值 → 改后返回
+Set parameter successful
+这个服务怎么调？
+ros2 service type /talker/get_parameters
+ros2 interface show rcl_interfaces/srv/GetParameters
+ros2 service call /talker/get_parameters rcl_interfaces/srv/GetParameters "{names: ['use_sim_time']}"
+先查类型 → 看字段 → 用
+---
+分请求与响应
+上表这些命令按下去，计算图里到底发生了什么？关键在于
+echo
+/
+hz
+/
+info
+并不侵入 talker 进程
+——它们以第三方订阅者/查询者身份加入计算图，拿的是 DDS 分发的同一份数据：
+运行中的 ROS2 系统（你不许改它）
+/talker
+Publisher
+/listener
+Subscriber
+/chatter
+std_msgs/String · 1Hz
+ros2 CLI · 第三方自省视角
+$ ros2 topic echo /chatter
+data: Hello World: 7
+$ ros2 topic hz /chatter
+average rate: 1.000
+$ ros2 topic info /chatter
+Publisher: 1  Subscriber: 1
+# 匿名订阅 · 零侵入 · 不改对方一行代码
+CLI 以普通 DDS 参与者身份加入同一域 → 拿到的是分发给所有订阅者的同一份数据
+动画 2-1｜CLI 工具零侵入挂载计算图：echo 是订阅者、info 是图查询（1.4 秒循环）
+动画只示意了"命令如何挂到计算图上"这一步。命令敲下去究竟等多久、返回什么、失败了会怎样，得自己跑一遍才清楚。不过动手之前要先认清一个分岔：
+topic 与 service 用的是两种不同的通信模型
+——一个异步单向，一个同步等待应答。下一节用对比图把这两者讲透，再到第 04 节实操中心按四关依次练习。
+03
+异步话题 vs 同步服务——两种通信模型的对比
+不要把这节理解成"两条命令的使用技巧不同"。真正的差别在
+通信模型
+：
+topic 是异步单向的
+——发布者把消息扔进话题就完事，不关心谁收、收没收到；
+service 是同步一问一答的
+——客户端发请求后
+阻塞等待
+，直到服务端回一个响应才继续往下走。
+用同一个场景对比：
+你想问 talker 节点"你的 use_sim_time 参数是什么"
+。两种模型各写一遍，看差在哪。
+① topic · 异步单向：发完立刻返回，不等任何人
+Publisher
+Subscriber
+publish(msg) 扔进 /chatter
+立刻返回
+无响应 · 无确认 · 无返回值
+对方在不在线、收没收到 —— 发送方一概不知
+② service · 同步请求应答：发完阻塞，必须等到响应
+Client
+Server
+request：get_parameters(names=[use_sim_time])
+阻塞等待…
+response：values=[false]
+拿到值，继续
+服务端不在线？服务端卡住？—— 客户端就一直等
+图 3-1｜同一件事的两种时序：上为 topic 单向投递（发完即返回），下为 service 请求应答（阻塞至响应到达）
+📋 同一个需求，两种写法对照
+对比项
+topic（异步发布）
+service（同步请求应答）
+命令
+ros2 topic pub --once /chatter std_msgs/msg/String "{data: 'hi'}"
+ros2 service call /talker/get_parameters rcl_interfaces/srv/GetParameters "{names: ['use_sim_time']}"
+通道
+话题
+/chatter
+（广播式，多个订阅者都能收到）
+服务
+/talker/get_parameters
+（点对点，一对一）
+方向
+单向：只有去，没有回
+双向：先请求，再响应
+命令何时返回
+立刻
+——消息写进 DDS 就结束
+等到 response 才返回
+——中间一直阻塞
+能拿到返回值吗
+不能
+。终端只打印
+publishing #1
+，仅表示"发出去了"
+能
+。终端打印
+response:
+及其内容
+对方不在线时
+命令照常成功返回。消息被丢弃，
+你不会知道
+先打印
+waiting for service to become available...
+，然后
+一直等
+适合什么
+持续数据流：传感器、状态广播、控制指令
+需要结果的查询/操作：读参数、查状态、触发一次计算
+⏱️ 关于超时：一个无限等，一个限时等
+这是初学者最容易踩的坑。同一段"等响应"的逻辑，写不写超时，行为是两回事——
+左边是 CLI 的做法（无限等），右边是你在程序里应该写的做法（限时等）
+：
+❌ 无限等待（CLI 源码就是这么写的）
+✅ 带超时（程序里应该这么写）
+等连接建立
+if
+not cli.service_is_ready():
+    cli.wait_for_service()
+# 服务永远不起 → 死等
+ok = cli.wait_for_service(
+        timeout_sec=
+2.0
+)
+if
+not ok:
+# 2 秒后主动放弃，去处理
+return
+'service 不在线'
+等响应返回
+rclpy.spin_until_future_complete(
+    node, future)
+# 服务不回包 → 死等
+rclpy.spin_until_future_complete(
+    node, future, timeout_sec=
+2.0
+)
+if
+not future.done():
+# 超时了，主线程继续走
+服务端卡死时
+整个进程僵住，只能
+Ctrl+C
+或 kill
+2 秒后返回失败，
+机器人继续正常动作
+在你的机器人上
+主循环停摆 → 底盘不响应遥控、
+机器人"僵住不动"
+降级处理 → 停下等指令 / 报警，仍可控
+⚠️ 两个事实，别记混
+① CLI 本身没有超时参数。
+ros2 service call
+只支持
+-r/--rate
+（重复调用频率），
+没有
+--timeout
+。上面左栏那种"无限等"就是它真实的实现（源码见
+ros2service/verb/call.py
+）。命令卡住时，交互状态下可以
+Ctrl+C
+中断；
+写脚本时可以用 shell 的
+timeout
+命令从外部包一层
+（下一小节讲）。
+② 写程序时，等连接和等响应这两处都要给超时。
+很多人只给了其中一处——比如给
+spin_until_future_complete
+加了
+timeout_sec
+，却漏了
+wait_for_service
+，结果服务端根本没起，程序一样卡死。
+两处都要设。
+💡 还有一条官方警告：别在回调里用同步的 call()
+rclpy
+的
+Client.call()
+（同步版）内部是
+event.wait()
+——
+永久阻塞、没有超时参数
+。官方源码里明确写着
+Do not call this method in a callback or a deadlock may occur
+。
+因为回调函数本身就跑在执行器线程里，你在回调里同步等响应，等于让执行器停下来等自己——
+死锁
+。回调里要用
+call_async()
+拿 Future，或者干脆换
+call_async
++ 回调链的写法。
+🧪 亲手验证：让"阻塞"和"不阻塞"肉眼可见
+光看理论不会形成直觉。按下面三步做，你会亲眼看到两者的差别——
+这是本实验最值得做的一次对比
+：
+# 准备：终端 A 跑 talker，终端 B 备用
+ros2
+run demo_nodes_cpp talker
+# ① 先看 topic 的"发完就走"：终端 C
+ros2
+topic pub --once /chatter std_msgs/msg/String
+"{data: 'hello'}"
+# → 瞬间返回。即使终端 B 的 listener 没开，这条命令也照样"成功"
+# ② 再看 service 的"必须等到回包"：终端 C
+ros2
+service call /talker/get_parameters rcl_interfaces/srv/GetParameters
+"{names: ['use_sim_time']}"
+# → 立刻返回 response: values=[false]（服务端在线，所以很快）
+# ③ 关键对比：把终端 A 的 talker 杀掉，再执行 ②
+# → 卡住了。屏幕停在 "waiting for service to become available..."
+# → 此时 ① 依然瞬间返回。这就是异步与同步的鸿沟
+# → 只能 Ctrl+C 中断：CLI 没有超时参数，它不会自己放弃
+✅ 做完这步你应该能回答
+为什么
+topic pub
+在没人订阅时也"成功"？——因为异步模型不定义"送达"，它只保证"投递出去"。
+为什么
+service call
+会卡死？——因为同步模型的定义就是"等到应答"，没有应答就没有结束条件，而 CLI 又没给超时。
+🛡️ 命令行也能限时：用 shell 的 timeout 包一层
+上面第 ③ 步你只能
+Ctrl+C
+手动脱身。
+但命令行并非没有办法限时
+——既然
+ros2 service call
+自己不带超时参数，就让外层的
+shell 定时器
+替它掐断。这是 Linux 上处理"可能卡死的命令"的标准做法，不只用于 ROS2：
+# 语法：timeout [选项] 秒数 命令...
+# ③ 的改进版：最多等 3 秒，超时自动杀掉
+timeout
+3
+ros2 service call /talker/get_parameters rcl_interfaces/srv/GetParameters
+"{names: ['use_sim_time']}"
+# → 3 秒后进程被终止，提示：Terminated
+# → 终端立即回到提示符，不用手动 Ctrl+C
+# 想知道"到底是超时了，还是命令自己失败"？用 --preserve-status 区分退出码
+timeout
+--preserve-status
+3
+ros2 service call ...
+echo
+$?
+# 124 = 超时被杀；0 = 正常返回；其他 = 命令自身报错
+# 常用选项
+#   -s SIGINT   超时后发 SIGINT（相当于替你按 Ctrl+C，更温和）
+#   --preserve-status  保留命令自身的退出码，便于脚本判断
+#   -k 2        如果 SIGINT 不管用，2 秒后补一个 SIGKILL 强制杀
+💡 三层超时，各管一段——别把它们搞混
+① 命令参数层：
+ros2 service call
+没有超时参数，这一层是空的。
+② shell 包装层：
+用
+timeout 3 ros2 ...
+从外部掐断，适合在终端里手动排查、或写 shell 脚本时兜底。
+注意它杀的是整个进程
+——命令被强行终止，你拿不到"调用失败"这种结构化结果，只能靠退出码判断。
+③ 代码层：
+在 rclpy 里给
+wait_for_service
+和
+spin_until_future_complete
+设
+timeout_sec
+。这是唯一能
+优雅降级
+的做法——超时后程序继续执行，你可以发告警、改用备用方案、或重试。
+结论：终端里排查用 ②，写进产品代码必须用 ③。
+04
+实操中心：四关打通命令工具（点哪关练哪关）
+四关按难度递进编排：
+第一关
+先在仿真终端把 02 节表格六行逐条验证（只点按钮，零门槛）；
+第二关
+学会读懂单个节点的"户口本"；
+第三关
+动手注入消息、热改参数；
+第四关
+录制回放闭环，完整带走一次现场。按顺序解锁：
+🔧 实机前提 · 一次配好全程通用
+开
+3 个终端
+（全部先
+source /opt/ros/humble/setup.bash
+）：终端 A
+ros2 run demo_nodes_cpp talker
+；终端 B
+ros2 run demo_nodes_cpp listener
+（即 EXP-01 跑通的 Hello World 案例，保持运行）；
+终端 C 留作观察位
+——下面所有"实机步骤"都在终端 C 执行。四关同用这一套环境，不用反复重启。
+第 1 关
+命令试车台
+⭐ 六条基础命令验证
+第 2 关
+node 组 · 户口本
+⭐ 读懂 node info 输出
+第 3 关
+topic 组 · 注入与调参
+⭐⭐ 动手改系统
+第 4 关
+bag 组 · 时间机器
+⭐⭐ 录放闭环，综合
+难度 ⭐
+第 1 关 · 命令试车台：先在仿真里熟悉，再到设备上验证
+仿真先行：
+下面是一个搭好了 EXP-01 案例的仿真终端——点按钮逐条执行，对照 02 节表格的"关键输出"确认理解。
+命令试车台 · 用 EXP-01 的 talker / listener 验证六条命令
+▶ ros2 node list
+▶ ros2 topic info /chatter
+▶ interface show String
+▶ ros2 topic hz /chatter
+▶ ros2 param list /talker
+▶ service get_parameters
+🧹 清屏
+// 仿真终端就绪：EXP-01 的 talker / listener 已在后台运行，点击上方任一命令开始验证…
+已过关命令：
+0
+/ 6 ✅——六条全亮后，仿真过关，进入实机验证。
+实机验证
+（终端 C，talker / listener 保持运行）：把上面六条命令原样敲一遍，按下表核对——
+输出与仿真一致即过关
+：
+#
+实机命令（终端 C）
+过关标准（与仿真对照）
+1
+ros2 node list
+输出
+/talker
+和
+/listener
+两行
+2
+ros2 topic info /chatter
+Publisher count: 1
+且
+Subscription count: 1
+3
+ros2 interface show std_msgs/msg/String
+只有
+string data
+一字段
+4
+ros2 topic hz /chatter
+（Ctrl+C 退出）
+average rate: 1.000
+左右
+5
+ros2 param list /talker
+列出
+use_sim_time
+6
+ros2 service call /talker/get_parameters rcl_interfaces/srv/GetParameters "{names: ['use_sim_time']}"
+返回
+bool_value: false
+难度 ⭐
+第 2 关 · node 组——图的"户口本"（实机）
+1
+确认前提：终端 A/B 的 talker、listener 还在跑（没跑按实机前提重启）
+2
+终端 C 敲
+ros2 node info /talker
+3
+对照下方输出样板，逐区认出 Publishers / Subscribers / Service Servers
+4
+换
+ros2 node info /listener
+再来一遍——Subscribers 里应有
+/chatter
+# 终端 C：
+ros2
+node info /talker
+# Publishers:
+#   /chatter            ← 它往外说的话题
+#   /parameter_events   ← 参数变更广播（每个节点都有）
+#   /rosout             ← 日志话题（每个节点都有）
+# Subscribers:
+#   /parameter_events /rosout
+# Service Servers:
+#   /talker/describe_parameters   ← 自带参数服务器！
+#   /talker/get_parameters  /talker/set_parameters ...
+🔍 读法口诀 · 过关标准
+对每个节点问三句话：
+它说什么（Publishers）、它听什么（Subscribers）、它提供什么服务（Service Servers）
+。任何节点还自带 parameter_events 与 rosout 两条"官方频道"——list 出来别慌，那不是业务话题。
+✅ 过关：能在实机输出里指认出这三区，且 listener 的 Subscribers 含 /chatter。
+难度 ⭐⭐
+第 3 关 · topic 组——注入与调参（实机）
+1
+终端 C：
+ros2 topic list
+与
+list -t
+——先看全局水流
+2
+echo
+看内容、
+hz
+看频率、
+bw
+看带宽
+3
+另开终端 D（也先 source），
+pub --once
+注入一条消息——
+盯终端 B：listener 应立刻打印 injected
+4
+参数组：
+param list → dump → set
+三连，观察 set 后命令立即返回 Success
+# 终端 C：观察
+ros2
+topic list -t
+# /chatter [std_msgs/msg/String]  /parameter_events  /rosout
+ros2
+topic hz /chatter
+# average rate: 1.000 · min/max 软实时统计
+# 终端 D：动手改系统
+ros2
+topic pub --once /chatter std_msgs/msg/String
+"{data: 'injected'}"
+# 验证点：终端 B 的 listener 多打印一行 I heard: [injected] —— 发布者是谁它根本不关心
+# 参数组三连（终端 C）
+ros2
+param list /talker
+# /talker  use_sim_time
+ros2
+param dump /talker > talker.yaml
+# 导出快照（生成了 yaml 文件即成功）
+ros2
+param set /talker use_sim_time false
+# 返回 Success 即热改生效
+✅ 过关标准
+三项实见其一不可：①
+pub --once
+后
+终端 B 立刻多出 injected 行
+（松耦合实证）；②
+dump
+后
+cat talker.yaml
+能看到
+use_sim_time: false
+；③
+set
+返回
+Success
+。
+难度 ⭐⭐
+第 4 关 · bag 组——把现场冻进"时间机器"（实机）
+1
+终端 D：
+ros2 bag record -a -o exp02_test
+——录全部话题，
+10~20 秒后 Ctrl+C
+（防止文件膨胀）
+2
+ros2 bag info exp02_test
+：核对条数、时长、话题清单里有
+/chatter
+3
+把终端 A 的 talker Ctrl+C 杀掉
+（制造"现场已灭"），再
+ros2 bag play exp02_test
+——
+终端 B 的 listener 重新开始打印
+4
+进阶：
+--rate 2.0
+变速回放；录完重开 talker 恢复现场
+# 终端 D：录制（跑着的 talker/listener 会一起被录下来）
+ros2
+bag record -a -o exp02_test
+# -a=all  10~20 秒就 Ctrl+C
+ros2
+bag info exp02_test
+# Files: exp02_test_0.db3        Duration: 12.3s
+# Topic /chatter: 12 msgs    Serialization: cdr
+# 关键验证：先杀掉终端 A 的 talker，再回放
+ros2
+bag play exp02_test
+# 时间戳原样 → 终端 B 恢复打印 Hello World
+ros2
+bag play exp02_test --rate
+2.0
+# 2 倍速回放，调试效率翻倍
+✅ 过关标准 · bag 的两种身份
+过关：终端 A 已杀掉的前提下 play，终端 B 仍持续打印
+——"人不在，时间还在"。
+调试
+：现场偶发 bug 录下来，回实验室无限次复现；
+数据集
+：SlamNav 算法的训练/评估数据就是这样采的——bag 是 ROS2 世界的"行车记录仪"。
+四关全部通过后，去下一节对照验收清单核对一遍，再到最后的
+命令选配台
+做一次反向自测（给任务 → 选命令）。
+05
+注意事项与验收清单
+至少开
+3 个终端
+（talker / listener / CLI 观察位），全部正确 source
+ros2 node info /talker
+能指出 Publishers / Service Servers 两大区
+topic echo
+、
+topic hz
+（≈1.000）、
+pub --once
+三项全部见输出
+service call get_parameters
+返回
+bool_value: false type: 1
+bag record → info → play
+完整闭环，回放期间 listener 持续打印
+⚠️ 常见坑
+现象 → 解法
+前提未满足
+node/topic list 为空 → 先确认被观察的节点还活着（CLI 不会主动帮你启动）
+YAML 引号
+pub/call
+的参数串必须整体单引号包裹，内层用双引号
+echo 只出一条
+与
+pub --once
+搞混——echo 是持续流，
+pub --once
+才是一次
+bag 文件暴涨
+-a
+全录增长 10~20MB/s → 及时 Ctrl+C，或只录目标话题
+回放没反应
+play 前确认订阅节点在线；bag 内话题名与类型
+原样
+复现，不需要 remap
+06
+互动：命令选配台（综合自测）
+最后做一次
+反向自测
+：前三关都是"给你命令，验证输出"，这里反过来——
+只给排查任务，你自己挑命令
+。七个任务覆盖本实验全部命令组，看看还记不记得选：
+命令选配台 · Verb Picker（先心里选命令，再点"给出命令"对答案）
+排查任务
+系统里有哪些节点在跑？
+/chatter 里到底传了什么？
+/chatter 发送频率正常吗？
+/chatter 谁在发、谁在收、什么类型？
+查一下 talker 的 use_sim_time 参数
+把当前所有参数导出成 YAML 备用
+路上机器人偶发异常，先保住现场数据
+⚡ 给出命令
+// 先自己想好用哪条命令，再点右上"给出命令"对答案…
+07
+实验总结与思考题
+✅ 完成成果
+六大命令族 + 执行入口全链路通关
+node / topic / service / param / interface / bag 配 list / info / echo / call 各至少用过一次；run / pkg / launch 各司其职。
+🧠 原理收获
+CLI = 计算图查询界面
+零侵入自省的原理；同步 service call 与异步 topic pub 的模型差异。
+🛠 技能收获
+30 秒系统体检流程
+list → echo/hz → info → param dump 的固定排查套路，迁移到任何 ROS2 系统。
+❓ 排障思路
+空输出三连查
+节点活着吗 → 域一致吗（DOMAIN_ID）→ 话题名拼对了吗（前导 /）。
+📝 思考题 1 · 综合应用
+你接手一台陌生机器人，只有命令行权限、不许看源码。运行
+ros2 topic list -t
+后看到
+/cmd_vel
+、
+/scan
+、
+/image_raw
+、
+/odom
+四个话题，但
+ros2 node list
+只输出一个节点
+/nav_node
+。
+问 1
+请只靠 CLI 判断出：
+/scan
+和
+/odom
+是"这个节点自己发的"还是"它订阅别人发的"？用哪条命令、看输出里的哪一区？
+问 2
+如果
+ros2 topic echo /scan
+有数据、但
+ros2 topic hz /scan
+显示 0.2 Hz（期望 10 Hz），此时
+/scan
+的
+Publisher count
+可能是多少？请把
+数字与现象对应起来
+说明你的推理。
+问 3 · 扩展
+/image_raw
+用
+echo
+刷屏根本看不清。除了
+hz
+，本章的哪条命令能帮你判断它的
+数据量
+是否正常？如果
+/image_raw
+在
+topic list -t
+里显示的类型与
+node info
+里该节点声明的不一致，说明什么？
+📝 思考题 2 · 现场排查
+一台导航小车在跑，
+偶发
+出现"原地打转"——大约跑十分钟才出现一次，出现后几秒自行恢复。
+问 1
+现场只有你一个人，bug 无法主动复现。请设计一套 bag 方案把现场"带回去"：录哪些话题（提示：想清楚"打转"这个动作由哪个话题决定）、用
+-a
+还是指定话题、为什么？
+问 2
+回到实验室回放时，你
+先启动了什么节点
+？如果只
+play
+而不启动任何订阅节点，能否观察到问题？
+问 3
+回放时想快速定位异常时刻，用
+--rate
+加速会遇到什么风险？请给出一个"先粗后细"的两段式回放策略。
+问 4 · 扩展
+如果同一现象你想在
+两台机器
+上分别录制再对比（比如车载端 vs 遥控端），录出来的 bag 能否直接叠加播放？需要考虑什么问题？
+CORE-01 · 机器人 ROS2 应用与开发 · EXP-02 常用命令工具
+2 学时 · 验证性 · 基于 ros_practice 实验讲义改编

@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-08 · 事件日志与故障降级 — 通用目标追踪综合项目</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+:root{--theme:#0e7490;--theme-deep:#155e75;--theme-bg:#cffafe;--theme-bd:#a5f3fc}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit" title="返回课程首页">🎓 具身智能课程 · <i>通用目标追踪</i></a>
+  <div class="crumb"><a href="../../../index.html#case">综合项目</a> / <a href="../index.html">通用目标追踪</a> / EXP-08</div>
+</div>
+
+<div class="wrap">
+
+<aside class="side">
+  <h4>本页目录</h4>
+  <a href="#s1" class="now">01 问题引入：出事了，谁的锅？</a>
+  <a href="#s2">02 原理通俗讲解：黑匣子与各退一步</a>
+  <a href="#s3">03 关联知识点：五类事件 + 降级链</a>
+  <a href="#s4">04 实验目标</a>
+  <a href="#s5">05 实验环境与准备</a>
+  <a href="#s6">06 动画讲解：故障注入与降级路径</a>
+  <a href="#s7">07 互动讲解：故障注入沙盘</a>
+  <a href="#s8">08 实操步骤：事件触发与注入</a>
+  <a href="#s9">09 重点与易错点</a>
+  <a href="#s10">10 总结与思考</a>
+  <h4>CASE-04 · 通用目标追踪</h4>
+  <a href="../exp-01-requirements/index.html">EXP-01 需求分析</a>
+  <a href="../exp-02-track-engine/index.html">EXP-02 TrackEngine 架构</a>
+  <a href="../exp-03-config/index.html">EXP-03 配置详解</a>
+  <a href="../exp-04-deepsort-tracking/index.html">EXP-04 DeepSORT 底座</a>
+  <a href="../exp-05-llm-gating/index.html">EXP-05 LLM 门控</a>
+  <a href="../exp-06-vlm-selection/index.html">EXP-06 VLM 选目标</a>
+  <a href="../exp-07-voice-interrupt/index.html">EXP-07 语音与 TTS</a>
+  <a href="../exp-08-events-degrade/index.html">EXP-08 日志与降级</a>
+  <a href="../exp-09-full-verify/index.html">EXP-09 全功能验证</a>
+</aside>
+
+<main class="content">
+
+<div class="exp-head">
+  <span class="code">EXP-08 · 第 3 章 · 综合性 · 6 学时</span>
+  <h1>事件日志与故障降级：坏了也不能崩，事后还能查</h1>
+  <p class="desc">边缘 AI 设备 7×24 跑在真实环境里，断网、拔相机、杀播放器是常态。本实验两条主线：<b>事件日志</b>——<code>events.jsonl</code> 每事件一行 JSON（append_event_log，tracking/events.py L7-18，写失败吞异常不反噬主循环），五类 kind：<b>lost</b>（follow 目标从 confirmed 差分消失，engine L131-145）/<b>unlock_all</b>（清除或 unlock_on_loss 全丢）/<b>command</b>（执行了锁定/清除）/<b>camera_stall</b>（读帧连续失败 <code>_cam_fail&gt;=30</code>，L115-122）/<b>pause_timeout</b>（LLM 处理挂死超 30.0s，L101-107）；<b>fail-closed 降级</b>——任何"不确定锁谁"分支不调 <code>submit_effect()</code>，配合 _rule_fallback 断网兜底、ReID 超时 features=None 纯 IoU、aplay 被杀重启降级打印，做到"任何异常都收敛、不挂起"。</p>
+  <div class="meta">
+    <span class="tag hl">难度 ⭐⭐⭐ · 6 学时</span>
+    <span class="tag">events.jsonl</span><span class="tag">lost 差分</span>
+    <span class="tag">fail-closed 三道闸</span><span class="tag">故障注入</span>
+  </div>
+</div>
+
+<!-- 01 -->
+<section class="blk" id="s1">
+  <h2><span class="no">01</span>问题引入：出事了，谁的锅？</h2>
+  <p>前面的实验都在"一切正常"的前提下验证功能。真实部署会遇到：</p>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>目标跟丢了——<b>什么时候丢的？是出画还是跟踪器提前放弃？</b>没有记录就无法回答</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>锁定莫名其妙解除了——是用户说了"清除"，还是 unlock_on_loss 全丢自动解？<b>两种路径要能区分追责</b></div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>用户说"追踪一百号目标"——id=100 根本不存在，此时<b>锁一个差不多的？解锁当前的？还是什么都不做？</b></div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span>断网了 LLM 连不上、ReID worker 全崩、aplay 被杀、相机线松了——<b>主循环绝不能崩、不能挂起</b></div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">5</span>LLM 指令处理期间主循环暂停读帧，若 LLM 挂死——<b>画面冻结 30 秒后谁来解冻？</b></div>
+  </div>
+  <div class="tip amber"><span class="lab">⚠️ 两条设计红线</span>① 状态变化必须留结构化痕迹（events.jsonl）供事后追责；② 任何"不确定"分支<b>零副作用</b>，全部故障都有收敛策略——这就是 fail-closed + 降级。</div>
+</section>
+
+<!-- 02 -->
+<section class="blk" id="s2">
+  <h2><span class="no">02</span>原理通俗讲解：黑匣子与各退一步</h2>
+  <div class="kgrid">
+    <div class="kcard">
+      <div class="kd">比喻 1</div>
+      <div class="kt">events.jsonl = 飞机黑匣子 + 值班日志本</div>
+      <p>每发生一件"有状态意义"的事（锁定、跟丢、解锁、断流、超时）就<b>追加一行 JSON</b>，永不改写历史。就像黑匣子只记录不辩解：tail -f 实时看、jq 逐行查。写失败也只吞异常——<b>日志系统自己绝不能把主程序弄死</b>。</p>
+    </div>
+    <div class="kcard">
+      <div class="kd">比喻 2</div>
+      <div class="kt">fail-closed = 拿不准就不盖章的银行柜员</div>
+      <p>柜员办业务时身份证对不上，规范做法是<b>"退回材料，不盖章也不涂改"</b>——宁可这单不办，也不能盖错章。对应代码：所有 fail 分支的共同点是<b>不调用 engine.submit_effect()</b>；锁是印章，只在完全确定时落下去。</p>
+    </div>
+    <div class="kcard">
+      <div class="kd">比喻 3</div>
+      <div class="kt">空 submit = 误会也会毁约</div>
+      <p>有人问"追踪一百号"，若空集合也算一次 submit，就会<b>把现在好好锁着的 id3 解掉</b>——用户没让你解锁，你却解锁了（误导误锁的状态翻转）。所以"不确定 → 维持现状 + 引导"，把错误状态转移概率压到零。</p>
+    </div>
+    <div class="kcard">
+      <div class="kd">比喻 4</div>
+      <div class="kt">降级链 = 各个工位的备胎方案</div>
+      <p>主厨（LLM）请假 → 切配工按标准菜单做（_rule_fallback：追踪/清除/截图仍可用，闲聊本来就不标准化——回"没听懂"）；验貌师傅（ReID）病了 → 门卫改按运动轨迹认人（features=None 纯 IoU，ID 可能短暂跳但不崩）；广播（aplay）坏了 → 改贴告示（打印降级）。<b>每个岗位坏了都有下位方案，全店照常营业。</b></p>
+    </div>
+    <div class="kcard">
+      <div class="kd">比喻 5</div>
+      <div class="kt">两个看门狗 = 水位报警器</div>
+      <p>相机断流就"连续 30 次读不到"才报警（camera_stall + 暂停 1s 周期性重连，而不是 0.2s 一次无脑忙等）；LLM 卡死就"pending 持续 30.0s"解除暂停（pause_timeout）——<b>像水库设警戒线：到线才动作，既不误报也不放任漫坝。</b></p>
+    </div>
+    <div class="kcard">
+      <div class="kd">比喻 6</div>
+      <div class="kt">有界队列 = 快递柜满了拒收最旧的</div>
+      <p>CommandWorker 队列 maxsize=8，put_nowait 满了丢弃最旧（E6，L220/L247-250）。LLM 风暴式连发指令也不会把内存撑爆——<b>柜子就这么大，新件进不来时淘汰超期旧件</b>，这是背压（backpressure）的最朴素形态。</p>
+    </div>
+  </div>
+  <div class="tip tealb"><span class="lab">🎯 一句话本质</span>健壮性 = <b>留痕</b>（结构化事件，可追责）+ <b>不作恶</b>（不确定时零副作用）+ <b>各退一步</b>（每层故障有收敛策略，绝不挂起）。三件事缺一件，系统就经不起真实环境。</div>
+</section>
+
+<!-- 03 -->
+<section class="blk" id="s3">
+  <h2><span class="no">03</span>关联知识点：五类事件 + 降级链</h2>
+  <table>
+    <thead><tr><th>事件 kind</th><th>触发条件</th><th>源码位置</th><th>追责价值</th></tr></thead>
+    <tbody>
+      <tr><td><code>lost</code></td><td>follow 目标从 confirmed 集合差分消失（prev_ids−cur_ids）</td><td>engine L131-145 + events.py L7-18</td><td>何时出画/被遮挡、跟踪器是否提前丢掉（TTS"idX 已消失"）</td></tr>
+      <tr><td><code>unlock_all</code></td><td>① clear_track 全清 ② unlock_on_loss=true 且全丢；<b>部分丢失不写</b></td><td>engine L142-144 + gate L320-337</td><td>回答"系统为何放弃锁定"，两路径合并记录</td></tr>
+      <tr><td><code>command</code></td><td>执行了锁定/清除等指令副作用</td><td>_apply_effect 链路</td><td>谁在何时下了什么令</td></tr>
+      <tr><td><code>camera_stall</code></td><td>相机模式读帧失败连续 <code>_cam_fail&gt;=30</code> 次</td><td>engine L115-122</td><td>相机节点挂了/线松，周期探测重连证据</td></tr>
+      <tr><td><code>pause_timeout</code></td><td>pause_wait=true 且 pending 持续超 30.0s</td><td>engine L101-107</td><td>LLM 挂死、画面解冻的诊断锚点</td></tr>
+    </tbody>
+  </table>
+  <p>故障 → 收敛降级全链路（每条都有实验步骤对应）：</p>
+  <table>
+    <thead><tr><th>故障</th><th>收敛策略</th><th>位置</th></tr></thead>
+    <tbody>
+      <tr><td>断网 / LLM 不可达</td><td>_rule_fallback：追踪/清除/截图仍全功能，闲聊回"没听懂"</td><td>L620-628，调用方 L275/284/299/313/316/547</td></tr>
+      <tr><td>ReID worker 全挂</td><td>extract get(timeout=10) 超时 → 全零特征 → 纯 IoU 匹配，主循环不断流</td><td>reidpool L37-47 + pipeline L33-36/L44-52</td></tr>
+      <tr><td>aplay 被杀</td><td>_restart_playback 重启；持续失败置 _failed 丢音频打印降级，互斥释放回 IDLE</td><td>speech/tts.py Playback</td></tr>
+      <tr><td>VLM 无结果</td><td>_vlm_none() 引导，不锁</td><td>L402-405</td></tr>
+      <tr><td>指令队列满</td><td>put_nowait 满丢最旧（maxsize=8）</td><td>L220 / L247-250</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 04 -->
+<section class="blk" id="s4">
+  <h2><span class="no">04</span>实验目标</h2>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">目标 1</div><div class="kt">掌握事件日志</div><p>触发并核对 events.jsonl 各 kind，能按 kind/时间做事后追责查询。</p></div>
+    <div class="kcard"><div class="kd">目标 2</div><div class="kt">理解降级一致性</div><p>fail-closed 降级不崩线程、不挂起、不空 submit——任何异常收敛。</p></div>
+    <div class="kcard"><div class="kd">目标 3</div><div class="kt">完成故障注入</div><p>断网 ReID / 相机断流 / aplay 被杀 / 无 VLM 四类注入并验证主循环存活。</p></div>
+    <div class="kcard"><div class="kd">目标 4</div><div class="kt">用好 CLI 覆盖</div><p>CLI&gt;config 覆盖在调试中的正确用法（只改显式键，见 EXP-03）。</p></div>
+    <div class="kcard"><div class="kd">目标 5</div><div class="kt">迁移设计模式</div><p>把"事件日志 + fail-closed"迁移到其他边缘 AI 运维场景。</p></div>
+  </div>
+</section>
+
+<!-- 05 -->
+<section class="blk" id="s5">
+  <h2><span class="no">05</span>实验环境与准备</h2>
+  <table>
+    <thead><tr><th>类别</th><th>内容</th></tr></thead>
+    <tbody>
+      <tr><td>硬件</td><td>具身智能实验箱 B2 / 小车 C1（需板端；事件日志在 runs/logs/）</td></tr>
+      <tr><td>系统</td><td>Ubuntu 22.04 + ROS 2 Humble，Python 3.10</td></tr>
+      <tr><td>核心库</td><td>同前（RKNN / ReID / RKLLM）</td></tr>
+      <tr><td>关键命令</td><td><code>tail -f runs/logs/events.jsonl</code>、<code>--video … --text</code></td></tr>
+      <tr><td>参考文档</td><td>docs/09_事件与故障测试用例.md（E 用例）</td></tr>
+    </tbody>
+  </table>
+  <p><b>实验前清空事件文件</b>，否则旧记录会污染"新增事件"的判定：</p>
+  <pre><span class="g">cd ~/ros2_ws/src/xflz_eai_car1/app/object_tracking</span>
+<span class="g">&gt; runs/logs/events.jsonl</span>            <span class="c"># 清空便于判定新增（log.dir 可配置）</span>
+<span class="g">tail -f runs/logs/events.jsonl</span>     <span class="c"># 另终端常开，实时观察追加</span></pre>
+</section>
+
+<!-- 06 -->
+<section class="blk" id="s6">
+  <h2><span class="no">06</span>动画讲解：故障注入与降级路径</h2>
+  <div class="anim-box">
+    <svg viewBox="0 0 720 310" xmlns="http://www.w3.org/2000/svg" font-family="monospace">
+      <rect x="0" y="0" width="720" height="310" fill="#0b1220"/>
+      <text x="20" y="24" fill="#7dd3fc" font-size="14">故障注入 → 收敛降级：每个红框故障都有一条绿色去处，主循环永远不死</text>
+      <!-- 中央主循环 -->
+      <rect x="280" y="90" width="160" height="70" rx="10" fill="#122033" stroke="#38bdf8" stroke-width="2"/>
+      <text x="360" y="120" fill="#e2e8f0" font-size="14" text-anchor="middle">TrackEngine 主循环</text>
+      <text x="360" y="142" fill="#94a3b8" font-size="11" text-anchor="middle">读帧 → pipeline → 事件</text>
+      <rect x="300" y="98" width="120" height="54" rx="8" fill="none" stroke="#4ade80" stroke-width="2" stroke-dasharray="6 5">
+        <animate attributeName="opacity" values="0.2;1;0.2" dur="2.2s" repeatCount="indefinite"/>
+      </rect>
+      <!-- 四个故障红框 -->
+      <rect x="30" y="34" width="170" height="52" rx="8" fill="#2a1215" stroke="#f87171" stroke-width="2">
+        <animate attributeName="stroke-width" values="2;4;2" dur="1.4s" repeatCount="indefinite"/>
+      </rect>
+      <text x="115" y="55" fill="#fecaca" font-size="12" text-anchor="middle">① 断网 / LLM 挂死</text>
+      <text x="115" y="74" fill="#fca5a5" font-size="11" text-anchor="middle">chat fallback failed</text>
+      <rect x="30" y="176" width="170" height="52" rx="8" fill="#2a1215" stroke="#f87171" stroke-width="2">
+        <animate attributeName="stroke-width" values="2;4;2" dur="1.4s" begin="0.5s" repeatCount="indefinite"/>
+      </rect>
+      <text x="115" y="197" fill="#fecaca" font-size="12" text-anchor="middle">② ReID worker 全挂</text>
+      <text x="115" y="216" fill="#fca5a5" font-size="11" text-anchor="middle">extract 超时 10s</text>
+      <rect x="520" y="34" width="170" height="52" rx="8" fill="#2a1215" stroke="#f87171" stroke-width="2">
+        <animate attributeName="stroke-width" values="2;4;2" dur="1.4s" begin="1s" repeatCount="indefinite"/>
+      </rect>
+      <text x="605" y="55" fill="#fecaca" font-size="12" text-anchor="middle">③ 相机断流 / LLM 超时</text>
+      <text x="605" y="74" fill="#fca5a5" font-size="11" text-anchor="middle">_cam_fail≥30 / 30.0s</text>
+      <rect x="520" y="176" width="170" height="52" rx="8" fill="#2a1215" stroke="#f87171" stroke-width="2">
+        <animate attributeName="stroke-width" values="2;4;2" dur="1.4s" begin="1.5s" repeatCount="indefinite"/>
+      </rect>
+      <text x="605" y="197" fill="#fecaca" font-size="12" text-anchor="middle">④ aplay 被杀 / 无 VLM</text>
+      <text x="605" y="216" fill="#fca5a5" font-size="11" text-anchor="middle">write 返回 False</text>
+      <!-- 绿色收敛箭头 -->
+      <path d="M200 60 L275 96" stroke="#4ade80" stroke-width="2" fill="none" stroke-dasharray="6 4"/>
+      <text x="175" y="98" fill="#4ade80" font-size="11">_rule_fallback 规则兜底</text>
+      <path d="M200 200 L285 154" stroke="#4ade80" stroke-width="2" fill="none" stroke-dasharray="6 4"/>
+      <text x="150" y="178" fill="#4ade80" font-size="11">features=None 纯 IoU</text>
+      <path d="M520 60 L445 96" stroke="#4ade80" stroke-width="2" fill="none" stroke-dasharray="6 4"/>
+      <text x="470" y="80" fill="#4ade80" font-size="11">stall 事件+暂停重试/解冻</text>
+      <path d="M520 200 L435 154" stroke="#4ade80" stroke-width="2" fill="none" stroke-dasharray="6 4"/>
+      <text x="448" y="196" fill="#4ade80" font-size="11">重启/打印降级 || _vlm_none</text>
+      <!-- 事件落盘 -->
+      <rect x="265" y="216" width="190" height="46" rx="8" fill="#101a2b" stroke="#facc15" stroke-width="2"/>
+      <text x="360" y="236" fill="#fde68a" font-size="12" text-anchor="middle">events.jsonl（黑匣子）</text>
+      <text x="360" y="253" fill="#94a3b8" font-size="10" text-anchor="middle">lost·unlock_all·command·stall·timeout</text>
+      <path d="M360 160 L360 212" stroke="#facc15" stroke-width="2" fill="none" stroke-dasharray="5 4"/>
+      <polygon points="360,216 354,205 366,205" fill="#facc15"/>
+      <circle r="5" fill="#facc15">
+        <animateMotion dur="2.8s" repeatCount="indefinite" path="M360 160 L360 212"/>
+        <animate attributeName="opacity" values="0;1;1;0" dur="2.8s" repeatCount="indefinite"/>
+      </circle>
+      <text x="20" y="290" fill="#94a3b8" font-size="12">红=注入故障（脉冲闪烁） · 绿=预设收敛路径 · 黄=状态变化落盘 · 全程无一条箭头指向"线程退出"</text>
+    </svg>
+  </div>
+  <p class="anim-cap">图：四类故障各有绿色出口汇回主循环（绿框脉冲 = 持续存活），唯一的"离开"只往事件文件里写一行——绝不往 exit 写。</p>
+</section>
+
+<!-- 07 -->
+<section class="blk" id="s7">
+  <h2><span class="no">07</span>互动讲解：故障注入沙盘</h2>
+  <div class="ix-panel">
+    <div class="ix-title">🎛️ 故障注入沙盘 — 点一个故障，看降级路径、事件落盘与最终副作用</div>
+    <div class="ctl-row">
+      <button class="btn" onclick="fx('lost')">目标出画（lost）</button>
+      <button class="btn" onclick="fx('unlock')">清除/全丢（unlock_all）</button>
+      <button class="btn" onclick="fx('e1')">E1 追踪一百号</button>
+      <button class="btn" onclick="fx('e2')">E2 描述无果</button>
+      <button class="btn" onclick="fx('net')">断网（LLM 不可达）</button>
+      <button class="btn" onclick="fx('reid')">ReID 全超时</button>
+      <button class="btn" onclick="fx('cam')">相机断流 30 次</button>
+      <button class="btn" onclick="fx('llmhang')">LLM 挂死 30s</button>
+      <button class="btn" onclick="fx('queue')">队列满（E6）</button>
+      <button class="btn" onclick="fx('reset')">重置</button>
+    </div>
+    <pre id="fx-io" class="io"><span class="y">← 点击左侧任一故障/事件：观察降级路径、events.jsonl 新增行与副作用结论</span></pre>
+  </div>
+  <p>九条路径覆盖 docs/09 的 E1-E3/E5/E6 与四类注入：<b>fail 分支全部"不 submit"</b>；断网后追踪/清除仍可用（规则兜底）、闲聊不可是设计预期；ReID/aplay/camera_stall 都是<b>降级不退出</b>。</p>
+  <div class="tip amber"><span class="lab">⚠️ 注入要在安全环境做</span>断网、拔相机、<code>kill -9 $(pgrep aplay)</code> 会短暂影响实机，做完必须按步骤恢复；pause_timeout 某次实验没出现属正常（说明 LLM 没挂死），先区分"未触发"与"丢日志"。</div>
+</section>
+
+<!-- 08 -->
+<section class="blk" id="s8">
+  <h2><span class="no">08</span>实操步骤：事件触发与故障注入</h2>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>触发 lost（约 70min）：文本模式追踪 id3 → 目标出画 → tail 核对 command/lost 两行</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>验证 unlock_all（约 90min）：输入"清除"看 clear 路径；再验证 unlock_on_loss 全丢路径——部分丢失只写 lost 不写 unlock_all</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>文本模式跑 fail-closed E1-E3/E5/E6（约 90min）：一百号/无蓝车/清除/id999 逐条断言"不锁"</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span>断网规则兜底（约 90min）：pkill -f llm_server → 追踪/清除仍可用、闲聊回引导；顺手验 ReID 超时降级</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">5</span>完整 E2E + 注入（约 90min）：唤醒→VLM 锁→假 id→清除→闲聊；拔相机 camera_stall、杀 aplay 降级</div>
+  </div>
+
+  <p><b>步骤 1-2 · 触发 lost / unlock_all 并核对</b>：</p>
+  <pre><span class="g">cd ~/ros2_ws/src/xflz_eai_car1/app/object_tracking</span>
+<span class="g">python3 apps/track_app.py --video /home/iflytek/ros2_ws/src/xflz_eai_car1/vision/07_multi_object_tracking/test.mp4 --text --mjpeg</span>
+<span class="y">小飞小飞</span> → <span class="y">追踪 id3</span> → 待目标出画 → <span class="y">清除</span>
+<span class="c"># 另终端：</span>
+<span class="g">tail -f runs/logs/events.jsonl</span>
+<span class="y">{"t": ..., "kind": "command", "ids": [3], ...}</span>       <span class="c"># 锁定留痕</span>
+<span class="y">{"t": ..., "kind": "lost", "ids": [3]}</span>             <span class="c"># 差分 prev_ids-cur_ids，TTS"id3 已消失"</span>
+<span class="y">{"t": ..., "kind": "unlock_all", "ids": [3]}</span>       <span class="c"># 全清才写；部分丢失不写</span></pre>
+
+  <p><b>步骤 3 · fail-closed 用例（全程断言"不产生副作用"）</b>：</p>
+  <pre><span class="y">追踪一百号目标</span> → track_ids 数值不对齐 {100} → <span class="y">[LLM] 未找到该 ID 目标</span>   <span class="c"># E1：不锁、不走 VLM、不 grid dump</span>
+<span class="y">追踪蓝色皮卡</span>（无蓝车）→ <span class="y">[track_vlm] 无法识别</span> → 回引导                <span class="c"># E2：_vlm_none，不锁</span>
+<span class="y">清除</span> → <span class="y">[track_app] 清除语义指令，执行 clear_track</span>                     <span class="c"># E3：clear_words 拦截短路</span>
+<span class="y">追踪 id999</span> → 未找到该 ID 目标                                            <span class="c"># E5：不存在的 id</span>
+<span class="c"># E6：连发指令撑满队列 → put_nowait 满丢最旧（q maxsize=8，L220/L247-250）</span></pre>
+
+  <p><b>步骤 4 · 断网注入 → 规则兜底 + ReID 降级</b>：</p>
+  <pre><span class="g">pkill -f llm_server</span>        <span class="c"># 或 config 关 llm.enabled=false 重跑</span>
+<span class="g">python3 apps/track_app.py --video .../test.mp4 --text --mjpeg</span>
+<span class="y">小飞小飞</span> → <span class="y">追踪 id3</span>
+<span class="y">[track_app] chat fallback failed</span> → <span class="g">_rule_fallback L620-628</span>：parse_instruction 直解 → 追踪/清除仍可用
+<span class="y">[LLM] 没听懂…</span>              <span class="c"># 闲聊无规则可兜——设计预期不是缺陷</span>
+<span class="c"># ReID 全 worker 崩：extract get(timeout=10) 超时 → 全零特征</span>
+<span class="c"># pipeline L44-52：features 长度≠dets 数 → 归零 → tracker.update(dets, features=None) 纯 IoU，不断流</span></pre>
+
+  <p><b>步骤 5 · 相机/aplay 注入 + 完整性收尾</b>：</p>
+  <pre><span class="g">python3 apps/track_app.py --camera --mjpeg</span>
+<span class="c"># 注入① 拔相机线：连续 30 次读帧失败（_cam_fail>=30，engine L115-122）</span>
+<span class="y">{"t": ..., "kind": "camera_stall"}</span> + 暂停 1s 周期重连（其余失败仅 sleep 0.2s）
+<span class="y">{"t": ..., "kind": "pause_timeout"}</span>  <span class="c"># LLM 挂死期间 pending 超 30.0s → 清 pending 解冻（L101-107）</span>
+<span class="c"># 注入② 另终端杀播放器看降级：</span>
+<span class="g">kill -9 $(pgrep aplay)</span>   → _restart_playback 重启；持续失败置 _failed → 打印降级，状态机不卡 SPEAKING
+<span class="g">tail -f runs/logs/events.jsonl</span>   <span class="c"># 收尾：核对本轮产生的各 kind 是否齐全</span></pre>
+</section>
+
+<!-- 09 -->
+<section class="blk" id="s9">
+  <h2><span class="no">09</span>重点与易错点</h2>
+  <ul class="check">
+    <li><b>fail-closed 的判据只有一条</b>：该分支是否调用了 submit_effect()。任何"不确定锁谁"（id 不对齐 / VLM 无果 / 解析失败）都必须零副作用，只回引导。</li>
+    <li><b>绝不空 submit</b>：submit_effect(set()) 会清掉当前锁定——"追踪一百号"导致 id3 被误解锁，就是灾难级误导误锁。</li>
+    <li><b>lost 是差分不是单帧</b>：DeepSORT confirmed 目标 max_age=70 帧内仍存活，判定用帧间 confirmed 集合差分（prev_ids−cur_ids），单帧检测缺失不算丢。</li>
+    <li><b>unlock_all 只在"全解锁"时写</b>：clear_track 或 unlock_on_loss 全丢两条路径；follow 集合仍非空的部分丢失只写 lost。</li>
+    <li><b>没 follow 就没有 lost</b>：纯视觉 video 不追踪时日志里不出 lost 属正常——先"追踪 id3"再等出画。</li>
+    <li><b>完整性 = 产生的都有写</b>：pause_timeout/camera_stall 未出现只说明故障没触发；排查先区分"未触发"与"丢了日志"（写失败本身被吞）。</li>
+    <li><b>断网后闲聊不可是预期</b>：_rule_fallback 只覆盖追踪/清除/截图三类；若断网后连追踪都不行，查 parse_instruction 与 registry.tools。</li>
+    <li><b>注入后必须恢复</b>：llm_server、aplay、相机节点、events.jsonl 清空状态都要复位，否则污染下一实验。</li>
+  </ul>
+  <table>
+    <thead><tr><th>问题</th><th>原因</th><th>解决</th></tr></thead>
+    <tbody>
+      <tr><td>lost 事件缺失</td><td>没有 follow（没追踪）</td><td>先"追踪 idX"让目标出画再看日志</td></tr>
+      <tr><td>unlock_all 缺失</td><td>只部分丢失 / 没清除</td><td>激活清除或 unlock_on_loss=true 再测</td></tr>
+      <tr><td>画面冻结不解</td><td>LLM 挂死 pending 不清</td><td>看 pause_timeout 事件（30.0s）→ 查 LLM 进程/8080</td></tr>
+      <tr><td>断网后追踪不可</td><td>_rule_fallback 未生效</td><td>确认 parse_instruction / registry.tools 可用</td></tr>
+      <tr><td>相机不断但 stall 报警</td><td>_cam_fail 连续 30 次阈值</td><td>查话题 /ascamera_hp60c/.../rgb0/image 与保活</td></tr>
+      <tr><td>jsonl 写失败没报错</td><td>写失败只吞异常（设计）</td><td>检查 runs/logs/ 权限与磁盘空间，属静默降级</td></tr>
+    </tbody>
+  </table>
+  <div class="tip tealb"><span class="lab">🎯 数值示例</span>camera_stall：连续 30 次读帧失败 → 事件 + 暂停 1s；普通失败 sleep 0.2s。pause_timeout=30.0s。队列 maxsize=8。ReID extract timeout=10s。mp -l 队列消费：满丢最旧（E6）。JSONL 样例：<code>{"t":1788849463,"kind":"lost","ids":[3]}</code>。</div>
+</section>
+
+<!-- 10 -->
+<section class="blk" id="s10">
+  <h2><span class="no">10</span>总结与思考</h2>
+  <p>本实验把系统的"下限"补齐了：events.jsonl 让状态变化可追责（五类 kind 各答一个问题），fail-closed 三条闸门（清除短路 / id 对齐 / VLM 收口）保证"不确定就零副作用"，四条降级链（规则兜底 / 纯 IoU / 播放重启 / 引导语）保证"任何异常都收敛、不挂起"，两个看门狗（camera_stall、pause_timeout）保证外部依赖卡死不冻结主循环。这是从"能跑"到"敢上线"的关键一跃。产出：E1-E3 执行表、四类注入降级记录、jsonl 完整性核对。</p>
+  <div class="tip violet">
+    <span class="lab">🤔 思考题 1</span>
+    lost / unlock_all / command / camera_stall / pause_timeout 各在什么条件下触发？分别回答了追责链上的什么问题？为什么"部分丢失"不写 unlock_all？
+  </div>
+  <div class="tip violet">
+    <span class="lab">🤔 思考题 2</span>
+    fail-closed 为什么要禁止"空 submit"？如果空集合也能提交，系统会被带到什么错误状态（结合"追踪一百号"时手正锁着 id3 想）？再想想：降级链里 ReID 退回纯 IoU 与 LLM 退回规则兜底，各自牺牲了什么能力、保住了什么底线？
+  </div>
+</section>
+
+<nav class="expnav">
+  <a class="prev" href="../exp-07-voice-interrupt/index.html">← EXP-07 语音交互（流式 TTS 打断）</a>
+  <a class="next" href="../exp-09-full-verify/index.html">EXP-09 全功能验证 →</a>
+</nav>
+
+</main>
+</div>
+
+<footer>
+  <span>CASE-04 · 通用目标追踪综合项目 · EXP-08 事件日志与故障降级</span>
+  <span>6 学时 · 综合性 · 基于 object_tracking 实验讲义改编</span>
+</footer>
+
+<script>
+function fx(k){
+  var out=document.getElementById('fx-io');
+  var m={
+    lost:'<span class="c">状态：</span>follow=id3 → 目标出画\n<span class="c">判定：</span>engine L131-145 每帧算 prev_ids − cur_ids 差集，follow 目标从 confirmed 消失\n<span class="y">{"kind":"lost","ids":[3]}</span> 追加一行（events.py L7-18 open("a")）\n<span class="y">[TTS] id3 已消失</span>（_handle_event L797-800）\n<span class="g">副作用：维持现状 ✓</span> <span class="c"># 若 unlock_on_loss=true 且 follow 清空 → 追加 unlock_all</span>',
+    unlock:'<span class="c">路径①：</span>用户"清除" → clear_words 拦截（L320-337）→ clear_track → submit_effect(None) → 引擎清空 follow\n<span class="c">路径②：</span>unlock_on_loss=true：on_track_lost 清空（engine L142-144）且集合为空\n<span class="y">{"kind":"unlock_all","ids":[3]}</span>\n<span class="g">副作用：有意为之 ✓</span>——部分丢失（集合非空）只写 lost 不写 unlock_all，粒度与锁状态一一对应',
+    e1:'<span class="c">指令：</span>"追踪一百号目标" → parse_instruction 提取 id=100 → tool=track_ids {100}\n<span class="c">门控第④步：</span>expect {100} ∩ got 现场 ids 为空 → id 数值不对齐（L365-375）\n<span class="y">[LLM] 未找到该 ID 目标</span>\n<span class="g">副作用：无 ✓</span>——不锁 100、不走 VLM 猜车、不 grid dump、更不解现有锁',
+    e2:'<span class="c">指令：</span>"追踪蓝色皮卡"（画面无蓝车）→ track_vlm 挂真 VLM → 四路 None（不选/越界/解析失败/超 cap）\n<span class="c">收口：</span>→ _vlm_none() L402-405 WARN + 引导语\n<span class="y">[LLM] 请描述更具体（颜色/车型）或告诉我目标编号</span>\n<span class="g">副作用：无 ✓</span>——descriptior None 不产空 submit（P0-2 防误清锁）',
+    net:'<span class="c">注入：</span>pkill -f llm_server（等价断网）→ _chat_reply 异常 "chat fallback failed"\n<span class="c">收敛：</span>_rule_fallback L620-628：parse_instruction 无 LLM 直解"追踪 idX / 清除" → registry.call\n<span class="y">追踪 id3 → ✓ 规则兜底生效</span>；<span class="y">你好 → [LLM] 没听懂…</span>\n<span class="g">副作用：追踪/清除完整 ✓</span> 闲聊不可 = 设计预期。主循环不挂（调用方 L275/284/299/313/316/547 全收敛）',
+    reid:'<span class="c">注入：</span>reid_pool 4 worker 全 crash → extract 对每个 crop get(timeout=10) 超时（reidpool L37-47）\n<span class="c">收敛：</span>返回全零特征 → pipeline L33-36/L44-52 检测 features is None 或维度≠dets 数 → 归零\n<span class="y">tracker.update(dets, features=None) → 纯 IoU 匹配</span>\n<span class="g">副作用：跟踪不断流 ✓</span> 代价：外观线索丢失，遮挡后 ID 可能短暂跳变（max_iou_distance=0.8 兜着）',
+    cam:'<span class="c">注入：</span>拔相机线 → read() 连续失败\n<span class="c">阈值：</span>_cam_fail < 30 时仅 sleep 0.2s 静默重试；<span class="y">_cam_fail &gt;= 30 → {"kind":"camera_stall"}</span>（engine L115-122）+ 暂停 1s\n<span class="c">恢复：</span>插回 → 读帧成功计数清零继续跑\n<span class="g">副作用：事件留痕 + 周期探测 ✓</span>——断流是"节点挂了"，要重连不要忙等',
+    llmhang:'<span class="c">场景：</span>pause_wait=true，LLM 处理中主循环暂停读帧，pending 挂着\n<span class="c">看门狗：</span>pending 持续 &gt; pause_timeout=30.0s（engine L101-107）\n<span class="y">{"kind":"pause_timeout"}</span> + 清 pending → 主循环解冻\n<span class="g">副作用：只记日志 ✓</span>——外部依赖卡死不冻结主循环（watchdog 模式），画面不再冻 30s 以上',
+    queue:'<span class="c">注入：</span>短时间连发 &gt;8 条指令 → CommandWorker.q maxsize=8（L220）\n<span class="c">行为：</span>push 用 put_nowait（L247-250）→ 柜满丢最旧（背压，不阻塞不报错）\n<span class="y">被淘汰的最旧指令不执行也不留 jsonl（未产生事件）</span>\n<span class="g">副作用：内存不涨 ✓</span> LLM 风暴不撑爆系统——代价是最旧那条请求被静默放弃',
+    reset:'<span class="y">← 点击左侧任一故障/事件：观察降级路径、events.jsonl 新增行与副作用结论</span>'
+  };
+  out.innerHTML=m[k];
+}
+</script>
+<script src="../shared/tutorial.js" defer></script>
+</body>
+</html>

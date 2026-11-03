@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-02 · LDT-01 遥操作与数据采集 | IND-03 物料分拣应用场景</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+  :root{
+    --theme:#d97706;
+    --theme-deep:#b45309;
+    --theme-bg:#fffbeb;
+    --theme-bd:#fde68a;
+  }
+  figure.shot{margin:18px 0;border:1px solid var(--theme-bd);border-radius:12px;overflow:hidden;background:#fff}
+  figure.shot img{display:block;width:100%;height:auto}
+  figure.shot figcaption{padding:10px 14px;font-size:13px;color:#92400e;background:var(--theme-bg);border-top:1px solid var(--theme-bd)}
+  .pair-box{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .pair-col{display:flex;flex-direction:column;gap:10px}
+  .pair-item{padding:10px 12px;border:1px solid var(--theme-bd);border-radius:10px;background:#fff;cursor:pointer;font-size:13.5px;text-align:left;transition:.15s}
+  .pair-item:hover{background:var(--theme-bg)}
+  .pair-item.sel{border-color:var(--theme);background:var(--theme-bg);font-weight:700}
+  .pair-item.done{opacity:.45;cursor:default;border-color:#16a34a;background:#f0fdf4}
+  .pair-item.miss{border-color:#dc2626;background:#fef2f2;animation:.shake .3s}
+  @keyframes shake{25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+  .img-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:14px 0}
+  .img-block{margin:14px 0;text-align:center}
+  .img-block img{max-width:100%;border-radius:10px;border:1px solid var(--theme-bd);box-shadow:0 4px 12px rgba(217,119,6,.12)}
+  .img-block figcaption{font-size:12.5px;color:#92400e;margin-top:6px}
+  @media(max-width:900px){.img-pair{grid-template-columns:1fr}}
+/* ── 五星学习法 · 课程分段 ── */
+.fivestar-note{font-size:13px;color:#5b6b78;margin-top:12px}
+.fs-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:14px}
+.fs-cell{border:1px solid var(--theme-bd);border-radius:12px;padding:10px 8px;text-align:center;background:var(--theme-bg)}
+.fs-cell .st{font-size:12.5px;font-weight:800;color:var(--theme-deep)}
+.fs-cell .tm{font-family:var(--font-mono,monospace);font-size:11px;color:#0f766e;margin-top:3px;font-weight:700}
+.fs-cell .ds{font-size:11.5px;color:#5b6b78;margin-top:4px;line-height:1.5}
+.seg{display:inline-block;font-size:11px;font-weight:700;font-family:var(--font-mono,monospace);background:var(--theme-bg);color:var(--theme-deep);border:1px solid var(--theme-bd);border-radius:99px;padding:2px 10px;margin-left:8px;vertical-align:middle;white-space:nowrap}
+.tl{width:100%;border-collapse:collapse;font-size:13px;margin-top:14px;background:#fff}
+.tl th,.tl td{border:1px solid #e2ece9;padding:7px 10px;text-align:left;vertical-align:top}
+.tl th{background:var(--theme-bg);color:var(--theme-deep);font-size:12.5px;white-space:nowrap}
+.tl .m{font-family:var(--font-mono,monospace);color:var(--theme-deep);font-weight:700;white-space:nowrap}
+@media(max-width:900px){.fs-grid{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="bar-in">
+    <a class="logo" href="../../../index.html"><b>课程</b>工厂</a>
+    <nav class="crumb"><a href="../../../index.html#ind">总首页</a> / <a href="../index.html">IND-03 物料分拣</a> / EXP-02</nav>
+  </div>
+</header>
+
+<div class="wrap">
+  <aside class="side">
+    <h4>本页目录 · 五星学习法</h4>
+    <a href="#s0">00 课程节奏 · 8 段微课</a>
+    <a href="#s1" class="now">01 学习目标 ①聚焦问题</a>
+    <a href="#s2">02 原理 ①聚焦 ②激活</a>
+    <a href="#s3">03 硬件与材料 ③示证新知</a>
+    <a href="#s4">04 操作步骤 ④应用新知</a>
+    <a href="#s5">05 关键命令 ④应用新知</a>
+    <a href="#s6">06 动画 ③示证新知</a>
+    <a href="#s7">07 互动 ④应用新知</a>
+    <a href="#s8">08 常见问题 ⑤融会贯通</a>
+    <a href="#s9">09 拓展 ⑤融会贯通</a>
+    <a href="#s10">10 思考题 ⑤融会贯通</a>
+    <h4>兄弟实验</h4>
+    <a href="../exp-01-case-overview/index.html">EXP-01 成果演示</a>
+    <a href="../exp-03-data-training/index.html">EXP-03 转换与训练</a>
+    <a href="../exp-04-real-robot/index.html">EXP-04 真机复现</a>
+  </aside>
+
+  <main class="content">
+    <div class="exp-head">
+      <div class="code">EXP-02 · 8 学时</div>
+      <h1>LDT-01 遥操作与数据采集</h1>
+      <p class="desc">穿戴 LDT-01 遥操作端，让从动臂忠实跟随主动臂，按「抓-拿-放」准则为双臂分拣采集高质量示范数据。数据质量 &gt; 数据数量。</p>
+      <div class="meta"><span class="tag hl">双手协同</span><span class="tag">三路相机</span><span class="tag">行为克隆数据</span></div>
+    </div>
+
+    <!-- 00 -->
+    <section class="blk" id="s0">
+      <h2><span class="no">00</span>课程节奏：五星学习法 · 8 段微课（每段 ≤ 15 min）</h2>
+      <p>本实验按<b>五星学习法</b>组织：先抛出"坏数据比数据不足更致命"的采集翻车现场<b>聚焦问题</b>，再用提线木偶与电影音画同步<b>激活旧知</b>，接着对照 LDT-01 硬件实物与左右臂主从映射动画<b>示证新知</b>，然后动手完成开机→建任务→采集→质控全流程并练配对<b>应用新知</b>，最后借常见问题与思考题<b>融会贯通</b>。全程切成 <b>8 段微课、每段不超过 15 分钟</b>，段间停顿 1~2 分钟消化；纯讲授合计约 100 分钟，其余课时用于动手实操与个别辅导。</p>
+      <div class="fs-grid">
+        <div class="fs-cell"><div class="st">① 聚焦问题</div><div class="tm">课段 1 · 12 min</div><div class="ds">"坏数据比数据不足更致命"采集翻车现场</div></div>
+        <div class="fs-cell"><div class="st">② 激活旧知</div><div class="tm">课段 2 · 8 min</div><div class="ds">提线木偶主从映射·电影音画时间对齐</div></div>
+        <div class="fs-cell"><div class="st">③ 示证新知</div><div class="tm">课段 3~4 · 27 min</div><div class="ds">LDT-01 硬件三大件 + 左右臂映射动画</div></div>
+        <div class="fs-cell"><div class="st">④ 应用新知</div><div class="tm">课段 5~7 · 40 min</div><div class="ds">采集全流程·关键命令·左右臂配对</div></div>
+        <div class="fs-cell"><div class="st">⑤ 融会贯通</div><div class="tm">课段 8 · 13 min</div><div class="ds">排障收口·拓展·思考题拔高</div></div>
+      </div>
+      <table class="tl">
+        <tr><th>课段</th><th>五星阶段</th><th>时长</th><th>对应章节</th><th>本段任务</th></tr>
+        <tr><td class="m">课段 1</td><td>聚焦问题</td><td class="m">12 min</td><td>§01 + §02 前半</td><td>抛出"坏数据比数据不足更致命"的采集翻车，明确本课目标</td></tr>
+        <tr><td class="m">课段 2</td><td>激活旧知</td><td class="m">8 min</td><td>§02 后半</td><td>用提线木偶/音画同步激活主从映射与时间对齐旧知</td></tr>
+        <tr><td class="m">课段 3</td><td>示证新知</td><td class="m">15 min</td><td>§03</td><td>对照实物认识主动臂/从动臂/相机与采集物料</td></tr>
+        <tr><td class="m">课段 4</td><td>示证新知</td><td class="m">12 min</td><td>§06</td><td>看左右臂主从映射动画，理解关节角+画面同步录制</td></tr>
+        <tr><td class="m">课段 5</td><td>应用新知</td><td class="m">15 min</td><td>§04 前半 + §05 ①②</td><td>部署→开机→遥操作就绪→新建任务，对应启动命令</td></tr>
+        <tr><td class="m">课段 6</td><td>应用新知</td><td class="m">15 min</td><td>§04 后半 + §05 ③④</td><td>示范采集→循环质控→落盘检查，对应停止/删除命令</td></tr>
+        <tr><td class="m">课段 7</td><td>应用新知</td><td class="m">10 min</td><td>§07</td><td>左右臂分工配对互动，强化"不交叉"采集纪律</td></tr>
+        <tr><td class="m">课段 8</td><td>融会贯通</td><td class="m">13 min</td><td>§08~§10</td><td>排障收口，拓展与思考题拔高迁移</td></tr>
+      </table>
+      <p class="fivestar-note">讲课提示：课段 1/2 以讲授 + 提问为主；课段 3~4 用实物 + 动画；课段 5~6 边看视频边动手；课段 7 学员独立完成；课段 8 答疑拔高。段间停顿 1~2 分钟。</p>
+    </section>
+
+    <!-- 01 学习目标 -->
+    <section class="blk" id="s1">
+      <h2><span class="no">01</span>学习目标<span class="seg">课段 1 · 聚焦问题 · 12 min</span></h2>
+      <ul class="check">
+        <li>掌握 LDT-01 硬件构成：主动臂/从动臂参数、四相机布局、工控机平台与开机自检。</li>
+        <li>独立完成「开机 → 一键启动 → 拖拽/遥操作就绪 → 新建任务 → 循环采集 → 停止」全流程。</li>
+        <li>理解主从映射原理：主动臂怎么动，从动臂就怎么动，三路相机与关节角同步落盘。</li>
+        <li>会用「本次采集失败」剔除坏示范，掌握抓-拿-放准则与左右手分工不交叉的采集纪律。</li>
+      </ul>
+    </section>
+
+    <!-- 02 原理 -->
+    <section class="blk" id="s2">
+      <h2><span class="no">02</span>原理：主从遥操作如何变成训练数据<span class="seg">课段 1 收尾 + 课段 2 · 激活旧知 · 8 min</span></h2>
+      <div class="tip amber"><span class="lab">❓ 聚焦问题（课段 1）</span>学员最常翻的车：采了上百组示范，训练后机器人却一顿一顿、甚至左手伸去抓银件——回头查 save_data 才发现：失误组没点「本次采集失败」、主从位置没对齐、任务描述写成了中文。问题不在模型，在采集纪律。带着这个痛点学完整课——到课段 6 你会亲手采出一批干净数据。</div>
+      <p>遥操作像「用大孩子的手当遥控模型」：你握着主动臂（轻、小、12bit 总线舵机），从动臂（谐波关节、19bit、500Hz）在另一侧毫米级复刻你的动作。你的每一次抓放，都以两条时间线被记录——<b>关节角序列</b>（16 个关节 + 2 个夹爪）和<b>三路相机画面</b>（头部概览 + 左右腕近景），两者按同一时间戳对齐，就构成行为克隆的「输入-标签」样本。</p>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">主从同构</div><div class="kt">主动臂与从动臂都是 7 轴，同一套关节语义，映射是位置到位置的直接对应，无需复杂逆解。</div></div>
+        <div class="kcard"><div class="kd">时间对齐</div><div class="kt">相机帧率与关节采样同步写入同一 episode，训练时一帧画面配一帧动作，错位即噪声。</div></div>
+        <div class="kcard"><div class="kd">分工纪律</div><div class="kt">左手始终负责黑色零件进左格、右手负责银色零件进右格；左右交叉会造成演示自相矛盾。</div></div>
+        <div class="kcard"><div class="kd">质控阀门</div><div class="kt">操作失误立即点「本次采集失败」，该组不入库；坏数据进训练集比数据不足更致命。</div></div>
+      </div>
+      <div class="tip teal"><span class="lab">↺ 激活旧知（课段 2）</span>回忆两件旧事：① 提线木偶——你动上面的手（主动臂），下面的木偶（从动臂）毫米级复刻，这就是主从同构映射；② 电影音画同步——画面帧和音轨按时间戳对齐，错半帧就别扭，采集时三路相机与 16 维关节角也是这样同时间戳落盘。</div>
+      <div class="tip amber"><b>生活化类比：</b>这就像用矫正牙套——牙套（从动臂）完全按牙模（主动臂动作）走位。若你在示范中途打了喷嚏（碰撞/掉落），这一口「矫正记录」就得作废，否则牙齿会被学歪。</div>
+      <div class="tip amber"><b>开机到遥操作 5 步：</b>① 清空从动臂运动范围内一切杂物 → ② 进入 <code>start_bash/02tele_and_record</code> 目录执行 <code>. ./01start_tele.sh</code> → ③ 进度条走到 100% → ④ 合上夹爪触发进入遥操作态 → ⑤ 三摄像头画面同屏即就绪。</div>
+      <div class="img-block">
+        <img src="./images/photo-ldt-remote.jpg" alt="LDT-01 遥操作端：主动臂（人操作）+ 被动支撑 + 捏合夹爪" loading="lazy">
+        <figcaption>图 2-1｜LDT-01 遥操作端：主动臂由人手握持领动，从臂跟随其动作同步执行，二指夹爪捏合 0–90mm。</figcaption>
+      </div>
+    </section>
+
+    <!-- 03 硬件与材料 -->
+    <section class="blk" id="s3">
+      <h2><span class="no">03</span>硬件与材料：吃透 00-硬件参数<span class="seg">课段 3 · 示证新知 · 15 min</span></h2>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">算力平台</div><div class="kt">i5-13400F / RTX 4060 Ti 16GB / 64GB（32×2）/ 2TB SSD，Ubuntu 22.04 + ROS2；16GB 显存足以本地跑 ACT。</div></div>
+        <div class="kcard"><div class="kd">视觉系统</div><div class="kt">CAM-1 头部 / CAM-2 左腕 / CAM-3 右腕 + CAM-S 备件，92° DFOV、全局快门、最高 1600×1300@60fps、USB 2.0 高速。</div></div>
+        <div class="kcard"><div class="kd">主动臂 ×2</div><div class="kt">7 轴总线舵机，DC12V、100Hz、12bit，运动半径 554mm——遥操作端的「指挥手」。</div></div>
+        <div class="kcard"><div class="kd">从动臂 ×2</div><div class="kt">7 轴谐波关节，DC48V、500Hz、19bit，负载 5kg、半径 850mm + 二指夹爪（0–90mm / 2.5kg / 50Hz）。</div></div>
+      </div>
+      <div class="img-pair">
+        <div class="img-block">
+          <img src="./images/photo-teleop-operator.jpg" alt="操作者穿戴 LDT-01 遥操作端示范采集" loading="lazy">
+          <figcaption>图 2-2｜遥操作采集现场：操作者穿戴 LDT-01 遥操作端，主臂领动，从臂跟随动作同步执行分拣。</figcaption>
+        </div>
+        <div class="img-block">
+          <img src="./images/photo-teleop-closeup.jpg" alt="双臂分拣桌面俯视：左右格 + 物料" loading="lazy">
+          <figcaption>图 2-3｜分拣桌面俯视：双臂就位，蓝色分格收纳盒左格收黑件、右格收银件，物料摆放在中间便于抓取。</figcaption>
+        </div>
+      </div>
+      <div class="tip amber"><b>相机与视觉配置：</b>4 个 RGB 相机（CAM-1 头部 / CAM-2 左腕 / CAM-3 右腕 / 1 备机），92° DFOV、全局快门、最高 1600×1300@60fps，构成策略输入的三路图像流。</div>
+      <p>物料清单：黑色零件 ×N、银色零件 ×N、左右分格收纳盒、卷尺（测量桌面到机械臂距离）、LDT-01 遥操作端与急停按钮。开工前清空从动臂运动范围内一切杂物。</p>
+    </section>
+
+    <!-- 04 操作步骤 -->
+    <section class="blk" id="s4">
+      <h2><span class="no">04</span>操作步骤：一次完整采集循环<span class="seg">课段 5~6 · 应用新知 · 2×15 min</span></h2>
+      <div class="flow">
+        <div class="step"><b class="n">S1</b>开机启动<br><small>密码 1 → localhost:8699 一键启动</small></div>
+        <div class="arr">→</div>
+        <div class="step"><b class="n">S2</b>遥操作就绪<br><small>01start_tele.sh → 上锁扭矩</small></div>
+        <div class="arr">→</div>
+        <div class="step"><b class="n">S3</b>新建任务<br><small>名称/描述（英文）/数量写大</small></div>
+        <div class="arr">→</div>
+        <div class="step"><b class="n">S4</b>示范采集<br><small>3 秒内握持→抓拿放→停止当前组</small></div>
+      </div>
+      <ol style="margin:14px 0 6px;padding-left:22px;line-height:1.9">
+        <li><b>部署场景（原文工厂场景默认布局）：</b>桌面左右各放一组零件（左黑右银），中间放带左右分格的收纳盒；<b>左手拿起左边的黑色零件放入左手边的格子，右手拿起右边的银色零件放入右手边的格子</b>——左右分工固定不交叉。摆好零件与收纳盒后，卷尺测量桌面到机械臂距离并记录（采集与复现场景必须一致），方位粗略测量即可，采集量够大时可容忍小范围变动。</li>
+        <li><b>开机与启动</b>：设备开机（密码 1）→ 浏览器访问 localhost:8699 → 一键启动，等待进度 100%。</li>
+        <li><b>LDT-01 就绪</b>：执行 01start_tele.sh，按界面步骤上锁扭矩；捏合夹爪解锁后即可拖动主臂。</li>
+        <li><b>预演</b>：任务面板点「预览」先跑一遍空载轨迹，确认无碰撞、路径合理。</li>
+        <li><b>正式采集</b>：点「开始数据采集」，<b>3 秒内握持操作端</b>完成一次「双手拿零件 → 双手放入对应格」，完成后点「停止当前组」。</li>
+        <li><b>循环与质控</b>：复位物料进入下一组；任何失误组立即点「本次采集失败」，该组不计入训练。</li>
+        <li><b>检查落盘</b>：数据默认存于 /home/lindenbot/save_data（编号即子目录名，最大编号 = 最新一集）。</li>
+      </ol>
+      <div class="tip amber"><b>新建任务要点：</b>① 任务管理点「新建」→ ② 名称与描述必填（建议英文，如 <code>sort_black_left_silver_right</code>）→ ③「采集数量」写大一些以支持循环采集 → ④ 保存后任务列表出现新项。</div>
+      <div class="tip amber"><b>遥操作采集要点：</b>点开始数据采集后须在 <b>3 秒内</b> 握持主动臂，三摄像头画面同屏；正常完成点「停止当前组」，失误组点「本次采集失败」排除——<b>坏数据比数据不足更致命</b>。</div>
+    </section>
+
+    <!-- 05 关键命令 -->
+    <section class="blk" id="s5">
+      <h2><span class="no">05</span>关键命令<span class="seg">随课段 5 / 6 对照使用</span></h2>
+      <pre><span class="c"># ① 启动遥操作（LDT-01 手册 · 01start_tele.sh）</span>
+cd start_bash/02tele_and_record
+. ./01start_tele.sh          <span class="c"># source 后按步骤 5.1–5.3 上锁扭矩</span>
+
+<span class="c"># ② 切换关节模式：5 = 拖拽模式（0=安全 1=位置）</span>
+ros2 service call /isaac_joint_mode arm_lifting_msgs/srv/ArmMode <span class="g">"{mode: 5}"</span>
+
+<span class="c"># ③ 停止采集并保留数据 / 停止并删除本组数据</span>
+./021data_collect_stop.sh              <span class="c"># 正常收尾</span>
+./022data_collect_stop_and_del_data.sh <span class="c"># 废弃本组</span>
+
+<span class="c"># ④ 数据落盘位置与容量（ConfigCameras.yaml）</span>
+save_base_path : /home/lindenbot/save_data
+image_save_num : 1000   <span class="c"># 50Hz 下约 20 秒；0 = 无穷</span></pre>
+      <div class="tip tealb"><b>安全红线：</b>双人制操作——一人遥操作、一人安全观察；设备周围 2 米半圆清场；急停触碰后故障码 61445（STO）需按手册复位。</div>
+    </section>
+
+    <!-- 06 动画 -->
+    <section class="blk" id="s6">
+      <h2><span class="no">06</span>动画：左右臂遥操作映射<span class="seg">课段 4 · 示证新知 · 12 min</span></h2>
+      <div class="anim-box">
+        <svg viewBox="0 0 720 240" width="100%" role="img" aria-label="左右臂主从映射动画">
+          <defs>
+            <marker id="a2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#b45309"/></marker>
+          </defs>
+          <g font-size="13" font-family="Noto Sans CJK SC, sans-serif">
+            <rect x="20" y="20" width="320" height="200" rx="12" fill="#fffbeb" stroke="#fde68a" stroke-width="2"/>
+            <text x="180" y="46" text-anchor="middle" fill="#92400e" font-weight="bold">人 · 主动臂（12bit / 100Hz）</text>
+            <rect x="380" y="20" width="320" height="200" rx="12" fill="#fffbeb" stroke="#fde68a" stroke-width="2"/>
+            <text x="540" y="46" text-anchor="middle" fill="#92400e" font-weight="bold">机 · 从动臂（19bit / 500Hz）</text>
+            <text x="70" y="78" fill="#b45309" font-weight="bold">左主动臂</text>
+            <circle cx="200" cy="120" r="16" fill="#d97706" opacity="0.85">
+              <animate attributeName="cy" values="120;170;120;90;120" dur="5s" repeatCount="indefinite"/>
+            </circle>
+            <line x1="200" y1="120" x2="200" y2="120" stroke="#b45309" stroke-width="3" stroke-linecap="round">
+              <animate attributeName="y2" values="120;170;120;90;120" dur="5s" repeatCount="indefinite"/>
+            </line>
+            <text x="430" y="78" fill="#b45309" font-weight="bold">左从动臂</text>
+            <circle cx="560" cy="120" r="16" fill="#92400e" opacity="0.9">
+              <animate attributeName="cy" values="120;170;120;90;120" dur="5s" repeatCount="indefinite"/>
+            </circle>
+            <line x1="560" y1="120" x2="560" y2="120" stroke="#78350f" stroke-width="3" stroke-linecap="round">
+              <animate attributeName="y2" values="120;170;120;90;120" dur="5s" repeatCount="indefinite"/>
+            </line>
+            <text x="70" y="205" fill="#b45309" font-weight="bold">右主动臂</text>
+            <circle cx="250" cy="190" r="14" fill="#d97706" opacity="0.6">
+              <animate attributeName="cy" values="190;150;190;205;190" dur="5s" repeatCount="indefinite"/>
+            </circle>
+            <text x="430" y="205" fill="#b45309" font-weight="bold">右从动臂</text>
+            <circle cx="610" cy="190" r="14" fill="#78350f" opacity="0.8">
+              <animate attributeName="cy" values="190;150;190;205;190" dur="5s" repeatCount="indefinite"/>
+            </circle>
+            <line x1="330" y1="120" x2="378" y2="120" stroke="#b45309" stroke-width="2" marker-end="url(#a2)"/>
+            <text x="354" y="110" text-anchor="middle" fill="#92400e" font-size="11">映射</text>
+            <rect x="470" y="55" width="140" height="2" fill="#f59e0b" opacity="0.6"/>
+            <text x="540" y="52" text-anchor="middle" fill="#a16207" font-size="10.5">三路相机 + 16 关节同步录制</text>
+          </g>
+        </svg>
+        <div class="anim-cap">动画：主动臂（左列）上下摆动，从动臂（右列）同频复刻；全过程被三路相机与关节角同时记录为一组 episode。</div>
+      </div>
+    </section>
+
+    <!-- 07 互动 -->
+    <section class="blk" id="s7">
+      <h2><span class="no">07</span>互动：左右臂分工配对<span class="seg">课段 7 · 应用新知 · 10 min</span></h2>
+      <div class="ix-panel">
+        <div class="ix-title">先点左列任意一项，再点右列它对应的搭档（配错会闪红）</div>
+        <div class="pair-box">
+          <div class="pair-col" id="colL">
+            <button class="pair-item" data-k="L">左主动臂（遥操作端）</button>
+            <button class="pair-item" data-k="C">CAM-2 左腕相机</button>
+            <button class="pair-item" data-k="S">「本次采集失败」按钮</button>
+            <button class="pair-item" data-k="T">「停止当前组」按钮</button>
+          </div>
+          <div class="pair-col" id="colR">
+            <button class="pair-item" data-k="C">回看左手指尖抓取近景</button>
+            <button class="pair-item" data-k="T">保存本组 episode 并复位</button>
+            <button class="pair-item" data-k="L">驱动左从动臂复刻动作</button>
+            <button class="pair-item" data-k="S">标记坏示范、不计入训练</button>
+          </div>
+        </div>
+        <div class="ctl-row" style="margin-top:12px">
+          <button class="btn" onclick="resetPair()">重置配对</button>
+        </div>
+        <div class="io" id="pairIo"><span class="dim">已配对 0 / 4</span></div>
+      </div>
+    </section>
+
+    <!-- 08 常见问题 -->
+    <section class="blk" id="s8">
+      <h2><span class="no">08</span>常见问题<span class="seg">课段 8 · 融会贯通 · 13 min</span></h2>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">Q 从动臂不动/不跟随？</div><div class="kt">先捏合夹爪解锁扭矩，确认已执行 01start_tele.sh 且模式正确（拖拽 mode=5）；急停被拍也会停（故障码 61445 需复位）。</div></div>
+        <div class="kcard"><div class="kd">Q 主从位置对不齐？</div><div class="kt">按 LDT-01 手册 Q&amp;A：主从不一致时重走自检流程（000check_master_arm / 000check_slave_arm、01SimRviz.sh）。</div></div>
+        <div class="kcard"><div class="kd">Q 为什么描述要英文？</div><div class="kt">任务名/描述会写入数据集 tasks 表作为训练标签，英文避免后续文本编码坑（01 采集流程明确要求英文描述）。</div></div>
+        <div class="kcard"><div class="kd">Q 数据太多显存爆了？</div><div class="kt">采集阶段控制单条时长与总数据量：本地 4060 Ti 16G 跑 ACT，量过大易 OOM——宁可采得精，不必采得多。</div></div>
+      </div>
+      <div class="tip amber"><b>LDT-01 屏显排障：</b>故障码 <code>61445</code>（STO 急停）恢复步骤 → ① 急停按钮确认未按下 → ② 屏显「主从不一致」时按自检步骤 → ③ 重启 start_tele.sh 重新上锁扭矩。</div>
+    </section>
+
+    <!-- 09 拓展 -->
+    <section class="blk" id="s9">
+      <h2><span class="no">09</span>拓展阅读<span class="seg">课段 8 · 融会贯通</span></h2>
+      <ul class="check">
+        <li>LDT-01 手册 §5：LED 红（异常）/ 黄（采集就绪）/ 绿（采集中）/ 蓝（重置）四色语义，快速定位状态。</li>
+        <li>LDT-01 手册 §6 数据处理：插补检查（DIFF_PERMITTED_MAX=28ms、MIN=14ms）保证轨迹平滑。</li>
+        <li>01-采集流程 · 家庭场景：同一套动线换任务（水果入盒），对照工厂场景理解「换场景不换流程」。</li>
+        <li>command/7_record_dual_arm.sh：工程侧录制脚本如何组织 episode_time / episode_num 等参数。</li>
+      </ul>
+    </section>
+
+    <!-- 10 思考题 -->
+    <section class="blk" id="s10">
+      <h2><span class="no">10</span>思考题 · 自测<span class="seg">课段 8 · 融会贯通</span></h2>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">✅ 完成成果</div><div class="kt">独立完成 ≥30 组合格双臂分拣示范，save_data 中编号连续、坏组已剔除。</div></div>
+        <div class="kcard"><div class="kd">🧠 原理收获</div><div class="kt">说清主从映射与时间对齐：为什么画面和动作错位半帧就会显著劣化训练。</div></div>
+        <div class="kcard"><div class="kd">🛠 技能收获</div><div class="kt">会开机/自检/建任务/采集/停止/质控六件事，能独立处理扭矩未锁与主从不同步。</div></div>
+        <div class="kcard"><div class="kd">📐 评分速览</div><div class="kt">配对互动 30% + 采集实操规范 40% + 思考题 30%。</div></div>
+      </div>
+      <div class="tip violet"><span class="lab">思考 1</span>左右手分工「不交叉」是任务约定还是技术必需？如果让左手偶尔跨界去抓银件，数据集会出现什么矛盾信号？</div>
+      <div class="tip violet"><span class="lab">思考 2</span>image_save_num 默认 1000 张 @50Hz ≈ 20 秒。若一组示范经常超过 20 秒，会造成什么现象？应改配置还是改动作节奏？</div>
+    </section>
+
+    <nav class="expnav">
+      <a class="prev" href="../exp-01-case-overview/index.html">← 上一个：EXP-01 成果演示</a>
+      <a class="next" href="../exp-03-data-training/index.html">下一个：EXP-03 数据转换与训练 →</a>
+    </nav>
+    <footer>
+      <div>IND-03 · 物料分拣应用场景 · EXP-02 LDT-01 遥操作与数据采集</div>
+      <div>8 学时 · 操作实践实验 · 基于 聆动课程指导文档《01-聆动机器人数据采集流程》《遥操作设备LDT-01软件使用流程(开发者版)》《00-聆动机器人硬件参数介绍》改编</div>
+    </footer>
+  </main>
+</div>
+
+<script>
+var pairSel = null, pairDone = 0;
+function onPair(el){
+  if(el.classList.contains('done')) return;
+  var col = el.parentElement;
+  if(!pairSel || pairSel.parentElement === col){
+    if(pairSel) pairSel.classList.remove('sel');
+    pairSel = el; el.classList.add('sel');
+    return;
+  }
+  if(pairSel.dataset.k === el.dataset.k){
+    pairSel.classList.remove('sel'); pairSel.classList.add('done'); el.classList.add('done');
+    pairDone++;
+    document.getElementById('pairIo').innerHTML = pairDone === 4
+      ? '<span class="ok">全部配对成功！主人的手、机器的手、记录与质检各居其位。</span>'
+      : '<span class="ok">配对成功 ' + pairDone + ' / 4</span>';
+  }else{
+    pairSel.classList.remove('sel');
+    el.classList.add('miss');
+    var target = el;
+    setTimeout(function(){ target.classList.remove('miss'); }, 350);
+    document.getElementById('pairIo').innerHTML = '<span class="bad">这对不搭——再想想映射/职责关系</span>';
+  }
+  pairSel = null;
+}
+function resetPair(){
+  pairSel = null; pairDone = 0;
+  document.querySelectorAll('.pair-item').forEach(function(b){ b.classList.remove('sel','done','miss'); });
+  document.getElementById('pairIo').innerHTML = '<span class="dim">已配对 0 / 4</span>';
+}
+document.querySelectorAll('.pair-item').forEach(function(b){
+  b.addEventListener('click', function(){ onPair(b); });
+});
+</script>
+<script src="../shared/tutorial.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,446 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp005-robot-arm/exp-05-action-replay/index.html
+TITLE: EXP-05 ROS2 架构与动作回放 — 机器人机械臂应用与开发
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+EXP-05 ROS2 架构与动作回放 — 机器人机械臂应用与开发
+🤖 具身智能课程 ·
+教程首页
+核心课程
+/
+机械臂应用与开发
+/ EXP-05
+本页目录
+01 问题引入：录好的动作如何原样动起来
+02 原理通俗讲解：乐团指挥与总谱
+03 关联知识点：节点拓扑 · 弧度 · offset
+04 实验目标
+05 实验环境与准备
+06 动画讲解：回放管线数据流
+07 互动讲解：弧度 ↔ PWM 双向换算台
+08 实操步骤：bringup → action_player 回放
+09 重点与易错点
+10 总结与思考
+本课程实验
+EXP-01 URDF 模型与仿真控制
+EXP-02 关节电机底层控制与应用
+EXP-03 正运动学基础
+EXP-04 逆运动学基础与 IK 解算
+EXP-05 ROS2 架构与动作回放
+EXP-06 逆运动学固定抓取
+EXP-07 视觉动态抓取
+EXP-05 · 第 3 章 · 综合性 · 4 学时
+ROS2 架构与动作回放
+换回
+ROS2 路线
+：bringup 拉起 7~8 个节点组成观察网络，
+action_player
+节点按
+pick_and_place.yaml
+总谱把 EXP-02 录的动作原样回放，play / next / stop 三个 Trigger 服务当遥控器，servo_calib GUI 消除装配偏差。
+难度 ⭐⭐ · 4 学时 · 综合性
+节点拓扑勘察
+joint_command 弧度
+action_player
+软件 offset 校准
+01
+问题引入：录好的动作如何原样动起来
+EXP-02 录好了一套"开爪 → 下探 → 合爪 → 提升"的 pick_and_place.yaml，但它是裸机世界的数据。要让整机系统执行它，需要一条完整的
+供给链
+：谁发指令？发到哪个话题？内容是弧度还是微秒？谁在中间翻译成串口帧？
+ROS2 的回答是"分工"：
+bringup
+起 7~8 个节点把底盘、IMU、里程计、状态话题全部跑起来；
+arm_controller
+单独启动、只订阅一个话题——
+/arm_controller/joint_command
+；
+action_player
+像唱总谱的乐手，逐条读 YAML 发指令。三个进程互不认识，却配合出连续动作。
+⚠️ 两条易混红线
+①
+action_player 是节点不是 launch
+（console_scripts 注册，用 ros2 run 启动）；② 本实验范围
+严禁 target_pose / pick / place
+—— 那是 EXP-06 的 IK 抓取接口，这里只回放预录点位。
+02
+原理通俗讲解：乐团指挥与总谱
+生活比喻 · 乐团
+action_player = 指挥
+指挥拿着总谱（YAML）逐小节挥棒：先抬手（play），想慢放就一拍一拍来（next），喊停就全体收声（stop）。
+生活比喻 · 播放列表
+YAML = 动作播放列表
+每条 = 五个关节的目标角 + 持续时间，和手机歌单一样：
+顺序播放
+，结构必须与 EXP-02 的 yaml 导出完全一致。
+生活比喻 · 翻译官
+arm_controller = 弧度↔脉冲翻译官
+指挥说的是"弧度"，舵机只认 μs；翻译官坐在 /joint_command 话题后面，听到弧度就组好 0xAA55 帧发下总线。
+生活比喻 · 直达车
+action_player 不坐翻译官的车
+YAML 里存的已经是
+PWM（id→μs）
+，所以 action_player
+直接发到舵机位置话题
+/car1_base_driver/bus_servo/set_position
+，跳过 arm_controller。
+两条路各走一边
+：要弧度就用 joint_command，要复现录好的脉宽就用 action_player——别以为它俩在同一条链上。
+生活比喻 · 仪表盘
+bringup = 整车通电自检
+点火开关一拧，七八个仪表同时活了（/joint_states 50Hz、/odom、/imu/data）—— bringup 就是整机的"上电自检"。
+三个 Trigger 服务像遥控器的三个键：
+服务
+行为
+类比
+/action_player/play
+按顺序连续回放整段动作（6~10 秒一个循环）
+▶ 整曲播放
+/action_player/next
+单步模式：每调一次执行一步，可逐帧检视
+⏯ 单曲循环里的"下一首"
+/action_player/stop
+立即中断后续动作，机械臂停在当前位置
+⏸ 急停按钮
+⚠️ next 不是随时能按的——它有个开关
+~/next
+在源码里做了两道前置检查：
+① 必须正在播放
+（
+self.playing == True
+）；
+② 必须开着单步模式
+。单步模式是启动参数
+step_mode
+，
+默认 False
+。所以直接
+call next
+会返回
+"Not in step mode"
+，不是坏了。正确用法是启动时就带上：
+ros2 run car1_arm_controller action_player --ros-args -p action_file:=pick_and_place.yaml -p step_mode:=true
+另一个容易踩的是
+auto_play
+：它默认
+True
+，节点起来 2 秒后会自己开始播——如果你先启动节点、再去 call play，会看到
+"Already playing"
+。
+想要手动控制，就在启动时加
+-p auto_play:=false
+。
+🔍 还有一个启动参数：loop
+loop
+默认
+False
+（播完一遍就退出循环）。轮播演示时才加
+-p loop:=true
+。注意它在源码里的位置是"整个
+for
+循环外面那层
+while
+"，所以开了 loop 之后
+~/stop
+仍是唯一的出口——急停键在循环模式下尤其重要。
+🔍 关键跃迁
+为什么"录"在裸机、"放"在 ROS2 没问题？因为两边共享同一份
+PWM↔弧度换算
+与同一套 YAML 结构 —— 接口对齐，架构随便换，这就是分层的红利。
+03
+关联知识点：节点拓扑 · 弧度 · offset
+知识点 1
+唯一入口：joint_command
+arm_controller
+只用
+/arm_controller/joint_command（sensor_msgs/JointState：position = 5 个关节的弧度）—— 不碰它，手臂绝不动。
+一个源码怪癖
+：运动时长居然是从
+effort[0]
+读的（
+if len(msg.effort)>0: duration = msg.effort[0]
+）；不填就用默认
+default_duration
+。effort 字段本该是力矩，这里被借去当时间了——发指令时想控制快慢，就得填 effort。
+知识点 2
+弧度工作位的来历
+work PWM [1500,1100,2200,1850,1500] 逐项换算：
+[0.0, −0.9424, 1.6492, 0.8246, 0.0]
+（2200 → 700×0.002356 = 1.6492）。这和
+arm_controller.go_work
+里硬编码的
+WORK_JOINTS_RAD
+完全一致——
+对账时以这 4 位小数为准
+，别四舍五入成 1.65。
+知识点 3
+零位校准 servo_offsets.yaml
+机械装配总会歪几度：servo_calib GUI 拖滑块找机械中位 → Apply 写入软件 offset（
+offset = 实测中位 PWM − 1500
+，常见量级几十 μs）。
+注意
+：课程件走"写 yaml 软件补偿"，不写舵机 EEPROM——EEPROM 写入次数有限（约 10 万次量级），不是这堂课该消耗的资源。
+# YAML 结构（必须与 EXP-02 的 export_yaml 输出一致，由 action_player._load_action 解析）
+name
+: pick_front
+# 动作组名（导出时输入的那个）
+description
+: pick_front action
+actions
+:
+  -
+name
+: pre_grasp
+duration
+: 2.0
+# 秒；臂段固定 2.0，夹爪段 1.0，home 段 3.0
+servos
+:
+0
+: 1500
+1
+: 1100
+2
+: 2200
+3
+: 1850
+4
+: 1500
+  -
+name
+: gripper_open
+duration
+: 1.0
+servos
+:
+5
+: 800
+# 夹爪单独一段：id5, PWM 800（开）
+-
+name
+: grasp_down
+    ...
+🔍 三个字段必须记准（读码得到，别凭印象）
+①
+servos
+是一个"字典"，键是舵机 ID（0~5）、值是脉宽 μs
+——不是
+pwm: [...]
+数组，也不是弧度。臂段写
+{0..4}
+五个键，夹爪段只写
+{5}
+，home 段写
+{0..5}
+六个键。
+②
+duration
+单位是秒
+，不是毫秒。
+③ 顶层必须有
+actions
+键
+——
+_load_action
+会检查这个键，缺了直接报 "missing actions key" 并返回 None。
+另外
+action_player
+加载时会做
+{int(k): int(v)}
+归一化，所以 YAML 里写带引号的键（
+"0": 1500
+）也能读；但值是字符串就会把 int() 抛出异常。
+导出后别手改数值类型，只改数字。
+⚠️ EEPROM 之殇
+offset 写进舵机寄存器受 10 万次写入寿命约束 —
+别手痒反复 Apply
+，调好一次用很久；课程件走 servo_offsets.yaml 软件补偿即可。
+04
+实验目标
+依次启动 bringup（7~8 节点）与 arm_controller，用
+ros2 node list
+/
+topic list
+/
+rqt_graph
+勘察拓扑
+理解并验证频率基线：/joint_states 50Hz、/odom 30~50Hz、/imu/data 100~200Hz
+手工发布一条
+/arm_controller/joint_command
+弧度消息让手臂移动
+启动
+action_player
+（节点）加载 pick_and_place.yaml，完成 play 连续回放与 next 单步调试
+会用 stop 急停，并能解释 YAML 改动后为何要 colcon build 才生效
+打开 servo_calib GUI 找零位，说明软件 offset 与 EEPROM 寿命的约束关系
+05
+实验环境与准备
+源码入口
+四个主入口认清
+bringup.launch.py（全节点）、arm_controller.launch.py（翻译官）、action_player（节点非 launch）、servo_calib.launch.py（校准 GUI）。
+前置产物
+EXP-02 的 YAML
+pick_and_place.yaml 已导出并 colcon build 过；没有就回 EXP-02 录一段（至少含 pre_grasp/grasp_down/lift）。
+终端规划
+至少四个终端
+T1 bringup · T2 arm_controller · T3 action_player · T4 观察与服务调用；每个终端都要 source 两次环境。
+# 归一化"频率/话题"预期（启动后自检用）
+ros2
+topic hz /joint_states
+# 预期 50Hz
+ros2
+topic hz /odom
+# 预期 30~50Hz
+ros2
+topic hz /imu/data
+# 预期 100~200Hz
+06
+动画讲解：回放管线数据流
+看一字节的旅程：YAML 总谱 → action_player →
+舵机位置话题
+→ 串口帧 → 舵机转角，五站接力。
+看清一件事
+：action_player 是
+直连舵机侧
+的，它不经过 arm_controller——YAML 里存的就是 PWM，无需翻译成弧度。
+pick_and_place
+YAML 总谱
+action_player
+节点 · 指挥
+bus_servo
+set_position · PWM
+base_driver
+组帧下发
+串口帧
+0xAA55+CRC8
+5 舵机 + 夹爪
+500~2500μs
+遥控器 · std_srvs/Trigger
+play ▶ 　next ⏯ 　stop ⏸
+/joint_states 50Hz 回传闭环
+一次 play = 总谱逐条下发 → PWM 位置话题 → 组帧 → 舵机齐动 → joint_states 汇报到位
+6~10s
+1.4% 带宽
+动画 3-1｜回放五级管线：光点依次流经 YAML → action_player → PWM 位置话题 → 组帧 → 舵机，绿色虚线是 50Hz 位置反馈闭环（
+注意：action_player 走的是舵机侧直连，不经过 arm_controller
+）
+07
+互动讲解：弧度 ↔ PWM 双向换算台
+ROS2 世界说弧度、总线世界说微秒 —— 换算台在两个世界之间当翻译，顺便预演 joint_command 消息：
+弧度脉宽对账台 · Radian ⇄ Microsecond
+joint_command 弧度（如 1.6500）
+弧度 → PWM
+J2 大臂软件 offset（度）
+叠加零位偏移
+// 预置 EXP-05 工作位 joint3 = 1.65 rad（PWM 2200 → 700×0.002356）
+1.65 rad ÷ 0.002356 + 1500 = 2200 μs ✔ 落在 [500,2500] 安全窗
+🔍 为什么先算再发
+把弧度心算成 μs 再发 joint_command，是老手的
+上机前预演习惯
+：算出 3000μs 这种越界值，就该去查 YAML 或 IK，而不是让它上总线撞限位。
+08
+实操步骤：bringup → action_player 回放
+1
+T1 启动整机：
+ros2 launch car1_bringup bringup.launch.py
+（7~8 节点上线，串口驱动与 /joint_states 都在这）
+2
+T2 启动翻译官：
+ros2 launch car1_arm_controller arm_controller.launch.py
+（不在 bringup 里，必须手动！）
+3
+T4 勘察：node list / topic list / rqt_graph 看拓扑；topic hz 核对 50Hz 基线
+4
+T3 启动总谱手：
+ros2 run car1_arm_controller action_player --ros-args -p action_file:=pick_and_place.yaml -p auto_play:=false
+5
+T4 触发回放：call play 连续执行；不稳就改 call next 单步（需 step_mode:=true）；出事 call stop
+⚠️ 为什么顺序不能反
+action_player 在
+__init__
+里就把 YAML 读进来、把 Publisher 建好了——
+它不等任何人
+。如果 bringup 还没起来（舵机位置话题没人收）或 arm_controller 没起，它照样"发得很开心"，只是没人听：手臂一动不动，日志却显示 "Playing/Done"，看起来像播放成功了。
+所以"顺序即安全顺序"不是规矩，是物理事实
+：先让听得见的人到位，再让说的开口。
+# 单手发一条弧度指令，直击 joint_command（观察手臂动没动）
+# 关节名必须是 arm_joint1~5（URDF 里的原名）；写成 joint1 控制器收不到——
+# arm_controller 只按 msg.position 的"顺序"取前 5 个数，名字写错不会报错，只会静默跑到别处
+ros2
+topic pub /arm_controller/joint_command sensor_msgs/msg/JointState \
+  "{name: ['arm_joint1','arm_joint2','arm_joint3','arm_joint4','arm_joint5'], position: [0.0,-0.9424,1.6492,0.8246,0.0], effort: [3.0]}"
+# effort[0] 是本次运动时长（秒）——这不是笔误，源码里真的借用了 effort 字段当 duration
+# 三个遥控器（Trigger 请求体为空花括号）
+ros2
+service call /action_player/play std_srvs/srv/Trigger
+"{}"
+ros2
+service call /action_player/next std_srvs/srv/Trigger
+"{}"
+ros2
+service call /action_player/stop std_srvs/srv/Trigger
+"{}"
+# 零位校准 GUI（找机械中位 → Apply，写入 servo_offsets.yaml）
+ros2
+launch calibration servo_calib.launch.py
+⚠️ YAML 改完必须重装
+action_player 用
+get_package_share_directory
+找
+install/
+里的 YAML —— 改了源文件不
+colcon build --packages-select car1_arm_controller
+，跑的还是旧总谱。
+09
+重点与易错点
+💡 本实验最大重点
+启动顺序即安全顺序
+：先 bringup 整机状态，再 arm_controller 翻译官，最后 action_player 总谱手 —— 顺序反了，指令没人接，手臂僵在半空还以为坏了。
+⚠️ 常见坑
+现象 → 解法
+把 action_player 当 launch
+ros2 launch ... action_player
+报错 → 它是节点，用
+ros2 run
++
+-p action_file:=...
+arm_controller 没起
+发 joint_command 手臂不动 → bringup 不含它，手动
+ros2 launch car1_arm_controller arm_controller.launch.py
+误用 EXP-06 接口
+调 target_pose/pick 没反应或报类型错 → 本实验范围严禁，只用 joint_command 与三个 Trigger
+YAML 修改不生效
+回放内容还是旧的 → 源 YAML 改动后必须 colcon build 重装到 install/
+rqt_graph 空白
+图上没东西 → 节点至少要有一个订阅/发布才显示；先确认两大 launch 都开着
+零位歪斜
+work 位手臂明显偏 → servo_calib 拖滑块找机械中位再 Apply，offset 落盘 servo_offsets.yaml
+ros2 node list
+看到 bringup 全家与 arm_controller；rqt_graph 连线指向 /arm_controller/joint_command
+/joint_states 稳定
+50Hz
+，/odom 30~50Hz，/imu/data 100~200Hz
+play 一次完成 6~10 秒完整抓放循环，逐舵机平滑无抖动
+next 单步可逐条执行；stop 后手臂立即冻结在当前位置
+能口头解释：YAML 里的"点位"与 EXP-02 PWM、与弧度三者如何互相换算
+10
+总结与思考
+✅ 完成成果
+总谱回放全闭环
+bringup + arm_controller + action_player 三件套拉起，play/next/stop 三服务娴熟，YAML 换装即换动作。
+🧠 原理收获
+话题为界分层
+唯一入口 joint_command 之上是任意节点生态，之下是串口协议 —— 分层让"录"与"放"跨架构复用。
+🛠 技能收获
+拓扑勘察四件套
+node/topic list · hz · info、rqt_graph 读图、Trigger 服务调用、servo_calib 零位校准。
+❓ 排障思路
+先链路后内容
+不动 → 查 launch 顺序与控制器；乱动 → 查 YAML 单位（弧度还是 μs）与 offset 是否叠加。
+📝 思考题 1
+action_player 用的是 std_srvs/Trigger —— 请求里
+没有任何字段
+。如果想"从第 3 步开始回放"或"播放速度 × 1.5"，现有接口够用吗？说明需要自定义哪种接口（.srv 该加什么字段），并与 EXP-06 的 set_pick_target 话题方案对比。
+📝 思考题 2
+为什么零位偏差要用"软件 offset"补偿而不是直接拧紧机械结构？请从装配公差、EEPROM 10 万次写寿命、以及"换舵机后的可移植性"三个角度作答。
+CORE-05 · 机器人机械臂应用与开发 · EXP-05 ROS2 架构与动作回放
+4 学时 · 综合性 · 基于 arm_practice 实验讲义改编

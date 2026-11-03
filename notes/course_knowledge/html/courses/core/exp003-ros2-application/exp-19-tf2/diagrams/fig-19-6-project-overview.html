@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>图 19-6 · 工程全景</title>
+<style>
+:root{--bg-page:#ffffff;--text:#0f172a;--text2:#475569;--muted:#94a3b8;--border:#e2e8f0;
+  --teal:#0891b2;--green:#059669;--purple:#7c3aed;--orange:#ea580c;--red:#e11d48;--gray:#64748b;
+  --teal-bg:rgba(8,145,178,.08);--green-bg:rgba(5,150,105,.08);--purple-bg:rgba(124,58,237,.08);
+  --orange-bg:rgba(234,88,12,.10);--red-bg:rgba(225,29,72,.08);--gray-bg:rgba(100,116,139,.08)}
+*{box-sizing:border-box}
+body{margin:0;background:#fff;color:var(--text);font-family:system-ui,"PingFang SC","Microsoft YaHei",sans-serif;padding:16px 14px 12px}
+.hd h1{font-size:15px;margin:0 0 4px}
+.hd .q{font-size:12px;color:var(--text2);margin:0}
+svg{width:100%;height:auto;display:block}
+.t{font:600 12.5px system-ui,sans-serif;fill:var(--text)}
+.s{font:400 10.5px system-ui,sans-serif;fill:var(--text2)}
+.l{font:600 10.5px ui-monospace,Consolas,monospace;fill:var(--text2)}
+.bnd{font:700 11px system-ui,sans-serif;fill:var(--green)}
+.dock{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.dock span{font-size:11.5px;border-radius:999px;padding:3px 10px;line-height:1.6}
+.ok{background:#ecfdf5;color:#047857;border:1px solid #a7f3d0}
+.warn{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca}
+.evid{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}
+.ft{font-size:10.5px;color:var(--muted);margin-top:8px;text-align:right}
+</style>
+</head>
+<body>
+<div class="hd">
+  <h1>图 19-6 · 工程全景：一条 launch、两个话题、五步验证</h1>
+  <p class="q">本图回答的问题：display.launch.py 动了哪些文件、谁发 /tf 与 /tf_static、五步各验证链路的哪一段？</p>
+</div>
+<svg viewBox="0 0 800 470" role="img" aria-label="工程全景框架图：launch 读入 URDF，robot_state_publisher 发布两条话题，三件工具订阅验证">
+  <defs>
+    <marker id="v-p" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#7c3aed"/></marker>
+    <marker id="v-o" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#ea580c"/></marker>
+    <marker id="v-t" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#0891b2"/></marker>
+    <marker id="v-g" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#059669"/></marker>
+    <marker id="v-r" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#e11d48"/></marker>
+  </defs>
+
+  <!-- 左上：命令入口 -->
+  <rect x="30" y="30" width="330" height="60" rx="6" fill="#fff"/>
+  <rect x="30" y="30" width="330" height="60" rx="6" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1.5"/>
+  <text class="t" x="195" y="54" text-anchor="middle">ros2 launch car1_description</text>
+  <text class="s" x="195" y="76" text-anchor="middle">display.launch.py · 终端 A 一次拉起 3 节点</text>
+
+  <line x1="195" y1="90" x2="195" y2="130" stroke="var(--teal)" stroke-width="1.5" marker-end="url(#v-t)"/>
+  <text class="l" x="205" y="114">启动</text>
+
+  <!-- 节点边界 -->
+  <rect x="26" y="134" width="396" height="296" rx="12" fill="none" stroke="var(--green)" stroke-width="1.2" stroke-dasharray="8,4"/>
+  <text class="bnd" x="38" y="154">launch 进程 · car1_description（gui · rsp · rviz2 同拉）</text>
+
+  <!-- 源文件 -->
+  <rect x="52" y="168" width="344" height="56" rx="6" fill="#fff"/>
+  <rect x="52" y="168" width="344" height="56" rx="6" fill="var(--purple-bg)" stroke="var(--purple)" stroke-width="1.5"/>
+  <text class="t" x="224" y="191" text-anchor="middle">car1.urdf ＋ display.launch.py</text>
+  <text class="s" x="224" y="211" text-anchor="middle">所有边写在 URDF；launch 读入为 robot_description</text>
+
+  <line x1="224" y1="224" x2="224" y2="264" stroke="var(--purple)" stroke-width="1.5" marker-end="url(#v-p)"/>
+  <text class="l" x="234" y="250">解析 · 分发边</text>
+
+  <!-- 发布者 -->
+  <rect x="52" y="268" width="344" height="56" rx="6" fill="#fff"/>
+  <rect x="52" y="268" width="344" height="56" rx="6" fill="var(--green-bg)" stroke="var(--green)" stroke-width="1.5"/>
+  <text class="t" x="224" y="291" text-anchor="middle">robot_state_publisher</text>
+  <text class="s" x="224" y="311" text-anchor="middle">fixed→/tf_static 一次 · 活动（+/joint_states）→/tf 持续</text>
+
+  <!-- 备选：一行命令 -->
+  <rect x="52" y="352" width="344" height="60" rx="6" fill="#fff"/>
+  <rect x="52" y="352" width="344" height="60" rx="6" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1.5" stroke-dasharray="6,4"/>
+  <text class="t" x="224" y="375" text-anchor="middle">static_transform_publisher（免代码）</text>
+  <text class="s" x="224" y="396" text-anchor="middle">--frame-id 父 --child-frame-id 子 · 案例外临时加边用</text>
+  <line x1="224" y1="350" x2="224" y2="326" stroke="var(--teal)" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#v-t)"/>
+  <text class="l" x="234" y="342">等价效果</text>
+
+  <!-- 两条话题 -->
+  <line x1="426" y1="196" x2="456" y2="196" stroke="var(--orange)" stroke-width="1.5" marker-end="url(#v-o)"/>
+  <rect x="460" y="160" width="166" height="68" rx="6" fill="#fff"/>
+  <rect x="460" y="160" width="166" height="68" rx="6" fill="var(--orange-bg)" stroke="var(--orange)" stroke-width="1.5"/>
+  <text class="t" x="543" y="184" text-anchor="middle">/tf_static 话题</text>
+  <text class="s" x="543" y="204" text-anchor="middle">fixed 边 · 一次性发布</text>
+  <text class="s" x="543" y="220" text-anchor="middle">Transient Local · 后到者补收</text>
+
+  <line x1="426" y1="286" x2="456" y2="286" stroke="var(--orange)" stroke-width="1.5" marker-end="url(#v-o)"/>
+  <rect x="460" y="250" width="166" height="68" rx="6" fill="#fff"/>
+  <rect x="460" y="250" width="166" height="68" rx="6" fill="var(--orange-bg)" stroke="var(--orange)" stroke-width="1.5"/>
+  <text class="t" x="543" y="274" text-anchor="middle">/tf 话题</text>
+  <text class="s" x="543" y="294" text-anchor="middle">活动边 · 持续刷新</text>
+  <text class="s" x="543" y="310" text-anchor="middle">KeepLast · 只取最新值</text>
+
+  <!-- 验证三件套 -->
+  <rect x="646" y="56" width="134" height="60" rx="6" fill="#fff"/>
+  <rect x="646" y="56" width="134" height="60" rx="6" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1.5"/>
+  <text class="t" x="713" y="80" text-anchor="middle">tf2_echo</text>
+  <text class="s" x="713" y="102" text-anchor="middle">第⑤步 · Translation 对账</text>
+
+  <rect x="646" y="150" width="134" height="60" rx="6" fill="#fff"/>
+  <rect x="646" y="150" width="134" height="60" rx="6" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1.5"/>
+  <text class="t" x="713" y="174" text-anchor="middle">view_frames</text>
+  <text class="s" x="713" y="196" text-anchor="middle">第④步 · frames.pdf 树形</text>
+
+  <rect x="646" y="244" width="134" height="60" rx="6" fill="#fff"/>
+  <rect x="646" y="244" width="134" height="60" rx="6" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1.5"/>
+  <text class="t" x="713" y="268" text-anchor="middle">rviz2 · TF Display</text>
+  <text class="s" x="713" y="290" text-anchor="middle">第④步 · 轴向与帧名</text>
+
+  <line x1="626" y1="194" x2="640" y2="86" stroke="var(--orange)" stroke-width="1.5" marker-end="url(#v-o)"/>
+  <line x1="643" y1="150" x2="643" y2="116" stroke="var(--orange)" stroke-width="1.5" marker-end="url(#v-o)"/>
+  <line x1="643" y1="280" x2="643" y2="304" stroke="var(--orange)" stroke-width="1.5" marker-end="url(#v-o)"/>
+  <line x1="626" y1="284" x2="640" y2="244" stroke="var(--orange)" stroke-width="1.5" marker-end="url(#v-o)"/>
+  <text class="l" x="632" y="132" transform="rotate(-80 632 132)">订阅两条话题</text>
+
+  <!-- 风险 -->
+  <rect x="444" y="368" width="336" height="60" rx="6" fill="#fff"/>
+  <rect x="444" y="368" width="336" height="60" rx="6" fill="var(--red-bg)" stroke="var(--red)" stroke-width="1.5" stroke-dasharray="6,4"/>
+  <text class="t" x="612" y="392" text-anchor="middle" fill="var(--red)">launch 要活着 · 名字/顺序任一处写错 → 查不到</text>
+  <text class="s" x="612" y="412" text-anchor="middle">未 source · Ctrl+C 关掉 launch · laser_Frame 大小写 · 父子互换</text>
+  <line x1="543" y1="318" x2="543" y2="366" stroke="var(--red)" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#v-r)"/>
+  <text class="l" x="553" y="346" fill="var(--red)">对不上</text>
+
+  <text class="s" x="400" y="456" text-anchor="middle">URDF 写边 → robot_state_publisher 发进两条话题 → 五步各查一段——谁都不用维护全树</text>
+</svg>
+<div class="dock">
+  <span class="ok">✅ 结论：URDF 写边、robot_state_publisher 发边，两条话题供五步复读</span>
+  <span class="warn">⚠️ 风险：launch 未起 / 关掉 · frame 名大小写 · 父子顺序三类高频错</span>
+  <span class="evid">🔍 验证：02 节 3 步现象 · 04 节五步实测</span>
+</div>
+<div class="ft">EXP-19 · TF2 坐标系变换</div>
+<script>
+(function(){if(window===parent)return;function send(){try{parent.postMessage({type:'figh',h:document.body.scrollHeight},'*')}catch(e){}}window.addEventListener('load',send);window.addEventListener('resize',function(){clearTimeout(window.__fighT);window.__fighT=setTimeout(send,120)});send();})();
+</script>
+</body>
+</html>

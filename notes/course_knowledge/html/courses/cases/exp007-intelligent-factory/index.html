@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>EXP007 机器人小车智能工厂综合项目 · 课程首页</title>
+<style>
+:root{
+  --bg-base:#f8fafc;--bg-card:#fff;--bg-soft:#f1f5f9;--bg-tint:#eef4ff;
+  --border:#e2e8f0;--border-hover:#94a3b8;
+  --accent-blue:#2563eb;--accent-cyan:#0891b2;--accent-teal:#0d9488;
+  --accent-amber:#d97706;--accent-rose:#e11d48;--accent-violet:#7c3aed;
+  --text-primary:#0f172a;--text-body:#334155;--text-secondary:#64748b;--text-muted:#94a3b8;
+  --shadow-glow:0 8px 24px rgba(37,99,235,.10);
+  --font-mono:'Cascadia Code','JetBrains Mono',Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg-base);color:var(--text-body);
+  font-family:"Noto Sans CJK SC","PingFang SC","Microsoft YaHei","Segoe UI",system-ui,sans-serif;
+  background-image:
+    radial-gradient(ellipse 60% 40% at 50% -5%,rgba(37,99,235,.05),transparent),
+    radial-gradient(ellipse 50% 35% at 100% 5%,rgba(13,148,136,.04),transparent);
+}
+/* Topbar */
+.topbar{position:sticky;top:0;z-index:50;height:60px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 40px;background:rgba(255,255,255,.85);backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;color:var(--text-primary);font-size:15px}
+.logo .dot{width:9px;height:9px;border-radius:50%;background:var(--accent-blue);animation:pulse 2.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.crumb{font-size:13px;color:var(--text-muted)}
+.crumb b{color:var(--text-secondary);font-weight:500}
+/* Hero */
+.hero{max-width:960px;margin:0 auto;padding:56px 40px 8px;text-align:center}
+.hero .eyebrow{display:inline-block;font-size:12.5px;letter-spacing:.14em;color:var(--accent-blue);
+  background:var(--bg-tint);border:1px solid #dbeafe;border-radius:100px;padding:5px 14px;font-family:var(--font-mono)}
+.hero h1{margin:18px 0 14px;font-size:40px;line-height:1.2;color:var(--text-primary);font-weight:800}
+.hero h1 .grad{background:linear-gradient(90deg,var(--accent-blue),var(--accent-cyan),var(--accent-teal));
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.hero p{max-width:720px;margin:0 auto;font-size:16px;line-height:1.8;color:var(--text-secondary)}
+.badges{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:22px 0 0}
+.badge{font-size:12.5px;padding:5px 12px;border-radius:100px;background:var(--bg-card);
+  border:1px solid var(--border);color:var(--text-secondary)}
+/* Stats */
+.stats{max-width:960px;margin:34px auto 0;padding:0 40px}
+.stats-inner{display:flex;background:var(--bg-card);border:1px solid var(--border);border-radius:14px;
+  box-shadow:0 1px 3px rgba(0,0,0,.04);overflow:hidden}
+.stat{flex:1;text-align:center;padding:20px 8px}
+.stat+.stat{border-left:1px solid var(--border)}
+.stat .num{font-size:34px;font-weight:800;color:var(--accent-blue)}
+.stat .num.t{color:var(--accent-teal)} .stat .num.c{color:var(--accent-cyan)} .stat .num.a{color:var(--accent-amber)}
+.stat .lbl{font-size:13px;color:var(--text-secondary);margin-top:3px}
+/* Section */
+.section{max-width:1200px;margin:0 auto;padding:52px 40px 10px}
+.section-head{display:flex;align-items:baseline;gap:14px;margin-bottom:22px}
+.section-head h2{margin:0;font-size:22px;color:var(--text-primary)}
+.section-head .sub{font-size:13.5px;color:var(--text-muted)}
+/* Cards */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:20px}
+.card{position:relative;background:var(--bg-card);border:1px solid var(--border);border-radius:14px;
+  padding:24px 24px 20px;cursor:pointer;overflow:hidden;
+  transition:.28s cubic-bezier(.4,0,.2,1)}
+.card::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;transform:scaleX(0);transform-origin:left;
+  background:linear-gradient(90deg,var(--accent-blue),var(--accent-cyan));transition:transform .35s cubic-bezier(.4,0,.2,1)}
+.card:hover{transform:translateY(-4px);box-shadow:var(--shadow-glow);border-color:var(--border-hover)}
+.card:hover::before{transform:scaleX(1)}
+.card .code{font-family:var(--font-mono);font-size:12px;font-weight:600;color:var(--accent-blue);
+  background:var(--bg-tint);border-radius:6px;padding:3px 8px;display:inline-block}
+.card h3{margin:14px 0 8px;font-size:18px;color:var(--text-primary)}
+.card p{margin:0;font-size:13.5px;line-height:1.7;color:var(--text-secondary)}
+.card .meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.tag{font-size:12px;padding:3px 10px;border-radius:100px;background:var(--bg-soft);
+  border:1px solid var(--border);color:var(--text-secondary)}
+.tag.violet{color:var(--accent-violet);border-color:#ede9fe;background:#f5f3ff}
+.tag.teal{color:var(--accent-teal);border-color:#ccfbf1;background:#f0fdfa}
+.hint{display:flex;justify-content:space-between;align-items:center;margin-top:16px;
+  padding-top:14px;border-top:1px dashed var(--border);font-size:12.5px;color:var(--text-muted)}
+.hint .go{color:var(--accent-blue);font-weight:600}
+/* Exp list */
+.explist{max-height:0;overflow:hidden;transition:max-height .4s cubic-bezier(.4,0,.2,1);margin-top:0}
+.card.expanded .explist{max-height:520px}
+.explist ul{list-style:none;margin:16px 0 0;padding:0}
+.explist li{display:flex;align-items:center;gap:12px;padding:11px 12px;margin-bottom:8px;
+  background:var(--bg-soft);border:1px solid var(--border);border-radius:10px;
+  font-size:13.5px;color:var(--text-body);text-decoration:none;transition:.28s}
+.explist li:hover{border-color:var(--accent-blue);background:var(--bg-tint);transform:translateX(4px)}
+.explist .no{font-family:var(--font-mono);font-size:11.5px;font-weight:700;color:#fff;
+  background:var(--accent-blue);border-radius:6px;padding:3px 7px;flex:none}
+.explist .dur{margin-left:auto;font-size:11.5px;color:var(--text-muted);flex:none}
+.stars{color:var(--accent-amber);font-size:12px;letter-spacing:2px}
+/* Tech pills */
+.tech{max-width:1200px;margin:0 auto;padding:48px 40px 8px;text-align:center}
+.tech h2{font-size:20px;color:var(--text-primary);margin:0 0 18px}
+.pills{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.pill{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--text-secondary);
+  background:var(--bg-card);border:1px solid var(--border);border-radius:100px;padding:7px 15px;
+  transition:.28s}
+.pill i{width:6px;height:6px;border-radius:50%;background:var(--accent-cyan);flex:none}
+.pill:hover{border-color:var(--accent-blue);color:var(--accent-blue)}
+/* Footer */
+footer{max-width:1200px;margin:56px auto 0;padding:24px 40px 40px;border-top:1px solid var(--border);
+  text-align:center;font-size:12.5px;color:var(--text-muted)}
+/* Reveal */
+.reveal{opacity:0;transform:translateY(16px);transition:opacity .5s,transform .5s}
+.reveal.visible{opacity:1;transform:none}
+@media (max-width:760px){
+  .topbar,.hero,.stats,.section,.tech,footer{padding-left:20px;padding-right:20px}
+  .hero h1{font-size:29px}
+  .stats-inner{flex-wrap:wrap}.stat{flex:1 1 50%;border-left:none!important}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="logo" href="../../index.html" style="text-decoration:none"><span class="dot"></span>具身智能课程 · 科普教程</a>
+  <div class="crumb">实验目录 · <b>EXP007 智能工厂综合项目</b></div>
+</div>
+
+<header class="hero">
+  <span class="eyebrow">EXPERIMENT 007 · 综合实战</span>
+  <h1>机器人小车 <span class="grad">智能工厂综合项目</span></h1>
+  <p>四个实验串成一条完整闭环：让小车先看懂环境（建图导航），再看懂目标（视觉抓取），还能听懂人话（语音大模型），最终把"一句话任务"变成抓在手里的实物。</p>
+  <div class="badges">
+    <span class="badge">📚 4 个实验</span>
+    <span class="badge">⏱️ 32 学时</span>
+    <span class="badge">🤖 硬件：小车 C1</span>
+    <span class="badge">🧵 能力闭环：感知 → 决策 → 执行</span>
+  </div>
+</header>
+
+<section class="stats reveal">
+  <div class="stats-inner">
+    <div class="stat"><div class="num">4</div><div class="lbl">实验项目</div></div>
+    <div class="stat"><div class="num c">32</div><div class="lbl">总学时</div></div>
+    <div class="stat"><div class="num t">5+</div><div class="lbl">核心模块</div></div>
+    <div class="stat"><div class="num a">1</div><div class="lbl">完整任务闭环</div></div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-head">
+    <h2>实验卡片</h2>
+    <span class="sub">点击卡片展开实验列表 · 进入实验页查看原理讲解与动画</span>
+  </div>
+  <div class="grid">
+
+    <article class="card reveal" onclick="toggleCard(this)">
+      <span class="code">EXP-01</span>
+      <h3>建图与导航</h3>
+      <p>小车如何在陌生工厂里"画出地图"并规划路线？从激光雷达到 SLAM、A* 与 Nav2，一次讲清"它怎么知道往哪走"。</p>
+      <div class="meta"><span class="tag teal">SLAM</span><span class="tag">Nav2</span><span class="tag">A* 寻路</span></div>
+      <div class="explist">
+        <ul>
+          <li>
+            <span class="no">01</span>
+            激光 SLAM 建图原理与实操
+            <span class="stars">★★★</span>
+            <a class="dur" href="./exp-01-slam-nav/index.html" style="color:var(--accent-blue);text-decoration:none">进入 →</a>
+          </li>
+        </ul>
+      </div>
+      <div class="hint"><span class="exp-hint">1 个实验 · 含原理动画 + 互动 Demo</span><span class="go">展开 ▾</span></div>
+    </article>
+
+    <article class="card reveal" onclick="toggleCard(this)">
+      <span class="code">EXP-02</span>
+      <h3>视觉识别与抓取</h3>
+      <p>HSV 颜色分割为什么能"认出"目标？识别结果如何变成机械臂的一次准确抓取？</p>
+      <div class="meta"><span class="tag">HSV 检测</span><span class="tag violet">坐标变换 TF</span></div>
+      <div class="explist">
+        <ul>
+          <li><span class="no">01</span>目标检测与抓取位姿计算<span class="stars">★★☆</span><span class="dur">建设中</span></li>
+        </ul>
+      </div>
+      <div class="hint"><span class="exp-hint">1 个实验 · 建设中</span><span class="go">展开 ▾</span></div>
+    </article>
+
+    <article class="card reveal" onclick="toggleCard(this)">
+      <span class="code">EXP-03</span>
+      <h3>语音交互与大模型</h3>
+      <p>离线语音如何唤醒？一句话里的意图怎样被大模型理解成"去 A 点取方块"这样的结构化指令？</p>
+      <div class="meta"><span class="tag violet">LLM 意图解析</span><span class="tag">离线 ASR</span></div>
+      <div class="explist">
+        <ul>
+          <li><span class="no">01</span>离线语音 + 大模型意图解析<span class="stars">★★☆</span><span class="dur">建设中</span></li>
+        </ul>
+      </div>
+      <div class="hint"><span class="exp-hint">1 个实验 · 建设中</span><span class="go">展开 ▾</span></div>
+    </article>
+
+    <article class="card reveal" onclick="toggleCard(this)">
+      <span class="code">EXP-04</span>
+      <h3>综合闭环实战</h3>
+      <p>"去蓝色方块那里"——一句话如何驱动导航、视觉、抓取、语音四条链路协同完成任务？</p>
+      <div class="meta"><span class="tag teal">状态机</span><span class="tag">全链路集成</span></div>
+      <div class="explist">
+        <ul>
+          <li><span class="no">01</span>语音控制导航抓取全闭环<span class="stars">★★★</span><span class="dur">建设中</span></li>
+        </ul>
+      </div>
+      <div class="hint"><span class="exp-hint">1 个实验 · 建设中</span><span class="go">展开 ▾</span></div>
+    </article>
+
+  </div>
+</section>
+
+<section class="tech reveal">
+  <h2>技术栈</h2>
+  <div class="pills">
+    <span class="pill"><i></i>ROS 2</span><span class="pill"><i></i>SLAM Toolbox</span>
+    <span class="pill"><i></i>Nav2</span><span class="pill"><i></i>A* / Theta*</span>
+    <span class="pill"><i style="background:var(--accent-violet)"></i>大语言模型</span>
+    <span class="pill"><i style="background:var(--accent-teal)"></i>TF2 坐标变换</span>
+    <span class="pill"><i></i>OpenCV HSV</span><span class="pill"><i style="background:var(--accent-amber)"></i>离线语音</span>
+    <span class="pill"><i></i>three.js</span><span class="pill"><i></i>状态机</span>
+  </div>
+</section>
+
+<footer>
+  EXP007 · 机器人小车智能工厂综合项目 · 输出目录 training/output（样例）
+</footer>
+
+<script>
+function toggleCard(card){
+  var open=card.classList.contains('expanded');
+  document.querySelectorAll('.card.expanded').forEach(function(c){
+    c.classList.remove('expanded');
+    var h=c.querySelector('.exp-hint'); if(h) h.dataset.orig&&(h.textContent=h.dataset.orig);
+    var g=c.querySelector('.go'); if(g) g.textContent='展开 ▾';
+  });
+  if(!open){
+    card.classList.add('expanded');
+    var hint=card.querySelector('.exp-hint');
+    if(hint){ hint.dataset.orig=hint.dataset.orig||hint.textContent; hint.textContent='点击空白处收起'; }
+    var go=card.querySelector('.go'); if(go) go.textContent='收起 ▴';
+  }
+}
+var io=new IntersectionObserver(function(es){
+  es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('visible'); io.unobserve(e.target);} });
+},{threshold:.12});
+document.querySelectorAll('.reveal').forEach(function(el){io.observe(el)});
+</script>
+</body>
+</html>

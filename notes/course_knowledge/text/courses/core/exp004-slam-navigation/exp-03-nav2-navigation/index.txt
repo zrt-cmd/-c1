@@ -1,0 +1,275 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp004-slam-navigation/exp-03-nav2-navigation/index.html
+TITLE: EXP-03 · Nav2 机器人导航 — 机器人 SLAM 与自主导航
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+EXP-03 · Nav2 机器人导航 — 机器人 SLAM 与自主导航
+🧠 具身智能课程 ·
+教程首页
+核心课程
+/
+SLAM 与自主导航
+/ EXP-03
+本页目录
+01 问题引入：给了地图，它怎么自己走
+02 原理通俗讲解：五大服务器与代价地图
+03 关联知识点
+04 实验目标
+05 实验环境与准备
+06 动画讲解：全局路径与膨胀绕障
+07 互动讲解：全局规划 vs 局部控制对比台
+08 实操步骤：navigation.launch 与 2D Goal
+09 重点与易错点（故障排查）
+10 总结与思考
+CH1 · 建模与建图
+EXP-01 原理与 URDF
+EXP-02 SLAM Toolbox 建图
+CH2 · 定位与导航
+EXP-03 Nav2 导航
+EXP-04 AMCL 定位
+EXP-05 DWA/TEB 避障
+CH3 · 进阶
+EXP-06 多点导航
+EXP-07 RTAB-Map 3D
+EXP-03 · 第 2 章 · 综合性 · 8 学时
+Nav2 机器人导航
+实验 2 我们给了小车一张地图。这节课让小车"学会看地图自己走路"——你在 RViz 里点一个目标点，它自己规划路线、自己转弯、自己躲开静态障碍，安全到达。这背后是 Nav2 导航栈在工作。
+难度 ⭐⭐⭐ · 8 学时
+Nav2
+代价地图
+行为树
+Lifecycle
+01
+问题引入：给了地图，它怎么自己走
+地图存好了（map_01.yaml），目标也明确了（"从这走到那"），但中间一系列决策没人替小车做：
+1
+从 A 到 B 有好几条路，走哪条又短又好又不贴墙？（路径规划）
+2
+路线是"理想的线"，车有宽度、会打滑，轮子不能压线就走（控制）
+3
+走到一半被椅子挡了、卡住了、快撞了——谁负责转个身、退一步？（恢复行为）
+4
+Nav2 把这些拆成五个专职服务器，用一棵"行为树"当总指挥串起来
+💡 一句话读懂
+导航 = 地图 + 定位 + 全局规划（看大路）+ 局部控制（握方向盘）+ 恢复行为（遇事不慌）。地图差一点、定位歪一点，后面全白搭——这就是"导航三要素"。
+02
+原理通俗讲解：五大服务器与代价地图
+🚚 快递车队的分工
+把 Nav2 想成一支车队：
+planner（导航员）
+摊开地图画出"大路"；
+controller（司机）
+握着方向盘盯着眼前 3 米，随时微调别压线；
+bt_navigator（总调度）
+是对讲机里的队长，按行为树剧本指挥"先规划、再开、偏了就转正"；
+behavior（救援队）
+处理事故——被堵了原地转一圈看清、原地等一等；
+velocity_smoother（安全员）
+把司机的猛踩油门抹平成平顺的速度曲线，防止急动打滑。
+服务器
+白话类比
+本项目配置
+planner_server
+导航员（画大路）
+ThetaStarPlanner，期望 20 Hz 出图（行为树按 1 Hz 触发重规划）
+controller_server
+司机（握方向）
+DWB（FollowPath），
+20 Hz
+控制循环
+bt_navigator
+总调度（对讲机）
+navigate_to_pose_without_backup.xml / navigate_through_poses_without_backup.xml
+behavior_server
+救援队
+spin / drive_on_heading / assisted_teleop / wait（
+未启用 backup
+）
+velocity_smoother
+安全员（抹平速度）
+max_velocity [0.4, 0, 3.0]，输出到 controller/cmd_vel
+代价地图一
+全局 costmap（看大路）
+坐标系 map，覆盖整张地图：static 静态层 + obstacle 障碍层 + inflation 膨胀层（inflation_radius 0.18 m），1.0 Hz 更新。
+代价地图二
+局部 costmap（看眼前）
+坐标系 odom，3 m × 3 m 滚动窗口跟着车跑：voxel_layer 体素层（z_voxels 16）+ inflation 层，
+5 Hz
+刷新，装实时雷达点。
+膨胀的含义
+离墙越近代价越高
+像地图周围撒一圈"热力晕"：0=空闲、1~252 按 cost_scaling_factor 4.0 衰减、254 障碍、255 未知。规划宁愿绕远也不进红区，车就不贴墙。
+Lifecycle
+节点也有待机
+unconfigured → inactive（已配置未出力）→ active（干活）：两个 lifecycle_manager（localization / navigation）autostart 一键把 map_server、amcl 与五个服务器逐个激活。
+速度链路
+谁在真正驱动车
+controller_server 发 cmd_vel_nav → velocity_smoother 平滑 → 改名 controller/cmd_vel → 底盘 odom_publisher 收。teleop 走的才是 /cmd_vel。
+03
+关联知识点
+知识点 1
+导航三要素
+地图质量、定位准确、速度约束——任何一环掉链子，症状都是"走歪/撞墙/乱转"。
+知识点 2
+goal 容差
+到点判定 xy 0.10 m、yaw 0.1 rad：不是"毫米级必须踩点"，留了合理误差带。
+知识点 3
+footprint 车形轮廓
+[[0.18,0.135],…] 底盘真实外廓（半长 0.18 m、半宽 0.135 m）参与碰撞检测——比圆形近似更贴墙也不剐蹭。
+知识点 4
+进度检查 progress_checker
+required_movement_radius 0.1、movement_time_allowance 10.0 s：10 秒挪不到 10 cm 就喊"卡了"，交给行为树恢复分支处理。
+知识点 5
+两个 Action 接口
+navigate_to_pose 单点；navigate_through_poses 一串点（EXP-06 用它）。两者由同一颗 bt_navigator 注册提供。
+知识点 6
+map 与 odom 的分工
+map 系"绝对世界"（AMCL 修正会跳变），odom 系"平滑里程"（局部控制用）——机器人导航标准双系。
+知识点 7
+为什么没有 backup
+本车是麦轮可横移，行为树文件名直接叫 without_backup，恢复只做"清代价地图 → 转 1.57 rad 找路 → 等 5 秒"，不后退。
+04
+实验目标
+跑通
+navigation.launch.py map:=map_01
+，五个服务器全部 active
+RViz 中手动给初始位姿与目标点，小车
+自主规划、自主到达
+（误差 < 0.10 m）
+读懂全局 / 局部两张 costmap 的帧系、尺寸、层数与刷新率差异
+用命令行
+action send_goal
+发一次目标，观察 feedback
+独立排查三类故障：贴墙走、原地转、规划失败
+05
+实验环境与准备
+项目
+要求
+地图
+EXP-02 产出的 map_01.pgm + map_01.yaml（通过四标准验收的图）；放在
+slam/car1_slam/maps/
+下
+软件包
+car1_navigation（navigation.launch.py + config/nav2_params.yaml + 两棵行为树 XML）
+硬件
+小车 C1 满电、3 m × 3 m 以上空旷平整场地、人在旁监护
+前置实验
+EXP-02 建图验收通过；理解 AMCL 默认初始位姿（0,0,0）
+RViz
+launch 自带 navigation.rviz：Map / Path / 两张 Costmap / PoseArray（/particle_cloud）/ LaserScan 已配好
+06
+动画讲解：全局路径与膨胀绕障
+青色折线 = planner 画的全局路径（避开膨胀热区）；小车沿线前进，到障碍近前被
+膨胀层（橙色晕圈）
+顶着走"外圈"，绝不贴死墙。
+全局路径（青线）× 膨胀层（橙晕）× 机器人跟踪
+纸箱(254)
+膨胀 0.18m · 代价渐变 1~252
+planner · ThetaStar 全局路径
+起点
+目标 · 容差0.10m
+DWB controller 20Hz 跟线（局部代价地图 5Hz 刷新） · 轮子永不进入橙色热区
+动画 3-1｜全局路径绕开膨胀圈（7 秒循环）：代价高的橙区是规划器的"此路不通"，晕圈宽度 = inflation_radius
+07
+互动讲解：全局规划 vs 局部控制对比台
+同样一个"卡住"症状，两层的职责完全不同——点按钮切换场景，看各层该背锅还是该出手：
+双层职责对照台 · Planner vs Controller
+✅ 正常到达
+🧱 症状：贴墙走
+🌀 症状：原地转圈
+🚫 症状：规划失败
+// 选择一个场景，对照"全局层 / 局部层 / 定位层"三方会诊
+正常流：bt_navigator 收 goal → planner 全图寻路 → controller 跟线 → 到点误差 < 0.10m
+💡 排障口诀
+"走没走对看全局（膨胀/规划），走没走稳看局部（DWB/平滑），走没走歪看定位（AMCL/初始位姿）。"
+先分层、再猜参数，比瞎改快十倍。
+08
+实操步骤：navigation.launch 与 2D Goal
+1
+终端 1：带地图启动导航栈；AutoStart 把五个服务器从 inactive 拉到 active
+2
+RViz：先用「2D Pose Estimate」给初始位姿，再用「2D Goal Pose」点目标——小车出发
+3
+观察全局/局部 costmap、绿色全局线与本地轨迹；用命令行接口复核
+# ① 启动导航（map 参数是 maps/ 目录下的地图名，不含 .yaml 后缀）
+ros2
+launch car1_navigation navigation.launch.py map:=map_01
+# ② 自检五大服务器与定位节点是否就位
+ros2
+node list |
+grep
+-E
+"planner|controller|bt_navigator|behavior|amcl|map_server|velocity_smoother"
+# ③ 查看某服务器生命周期状态（预期 active）
+ros2
+lifecycle get /planner_server
+# ④ 命令行发一个目标（与 RViz 点目标等价）
+ros2
+action send_goal /navigate_to_pose nav2_msgs/action/NavigateToPose \
+"{pose: {header: {frame_id: 'map'}, pose: {position: {x: 1.0, y: 1.0}, orientation: {w: 1.0}}}}"
+# ⑤ 看速度有没有真的下发到车（注意：平滑后的名字是 controller/cmd_vel）
+ros2
+topic echo /controller/cmd_vel
+# 现场手势：rviz 顶部工具栏 2D Pose Estimate → Nav2 Goal（若配置里是 2D Goal Pose 同理）
+🔍 一个容易误解的细节
+navigation.launch.py
+并没有
+用 TimerAction 延迟拉 rviz，而是按 bringup → lidar → localization（map_server + amcl）→ navigation（五个服务器）→ rviz 的顺序同时拉起，谁先就绪由 lifecycle_manager 的 autostart 与 bond 机制保证。真正带
+TimerAction(period=10.0)
+的是建图用的 slam.launch.py。
+09
+重点与易错点（故障排查）
+症状
+可能原因 → 解法
+A · 贴墙走/蹭墙
+膨胀半径太小或没生效 → 查 inflation_layer 与 inflation_radius（0.18），确认 footprint 已设
+B · 原地打转不走
+局部最小值/定位漂了 → 给准初始位姿（2D Pose Estimate），看 ParticleCloud 是否聚拢
+C · 规划失败"No valid plan"
+目标落在障碍/未知区、地图过期 → 重新点目标；确认用的是最新保存的 map_01
+到点差一截就报成功
+goal 容差 xy 0.10 m 是正常范围；要更准调 goal_checker
+速度一冲一冲
+velocity_smoother 未起 → node list 查 /velocity_smoother，看 max_velocity 限幅
+卡在 inactive
+lifecycle_manager 未 autostart 或 bond 断了 →
+ros2 lifecycle set /xxx activate
+手动激活并查该节点日志
+五大服务器
+全部 active
+，/map 正常加载 map_01
+RViz 点目标后小车
+自主到达
+，全局路径自动绕开障碍热区
+能指着两张 costmap 说出
+map vs odom 帧系、尺寸、频率
+差异
+能画清速度链路
+cmd_vel_nav → velocity_smoother → controller/cmd_vel → 底盘
+三个安全习惯：满电出发、
+人跟车
+、改参数先重启导航栈
+记住红线：
+导航不与建图（slam.launch）同开
+——定位靠 AMCL 吃静态地图
+⚠️ 安全底线
+小车是实体：每次发目标前先扫一眼场地；窄道测试时手悬停在急停 Ctrl+C 上；改完参数必须整栈重启再验证。
+10
+总结与思考
+✅ 完成成果
+点一下，车就到
+navigation.launch 跑通，RViz 与命令行双通道发目标均成功到点。
+🧠 原理收获
+五服务器 + 双 costmap
+规划/控制/调度/恢复/平滑各司其职，全局看大路、局部看眼前。
+🛠 技能收获
+导航栈自省与发目标
+node list 过滤、lifecycle get、action send_goal 带 frame_id 的完整姿势。
+❓ 排障思路
+三层会诊法
+全局层（膨胀/规划）→ 局部层（DWB/平滑）→ 定位层（AMCL/初始位姿），对症下药。
+📝 思考题 1
+全局 costmap 在 map 帧、局部 costmap 在 odom 帧，为什么这样分工？假如把局部窗口也挂到 map 帧，AMCL 一次位置跳变会造成什么后果？
+📝 思考题 2
+goal 容差设成 xy 0.10 m、yaw 0.1 rad——对"送到快递柜前 10 cm"来说够用吗？对"把饮料放进格子"呢？不同任务该怎么重新定这组容差？
+CORE-04 · 机器人 SLAM 与自主导航 · EXP-03 Nav2 机器人导航
+8 学时 · 综合性 · 基于 slam_practice 实验讲义改编

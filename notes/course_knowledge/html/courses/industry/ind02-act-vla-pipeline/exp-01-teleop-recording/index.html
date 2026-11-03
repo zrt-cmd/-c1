@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-01 遥操作与数据采集 · IND-02 双臂采训推全流程</title>
+<link rel="stylesheet" href="../shared/tutorial.css?v=3">
+<style>
+:root{
+  --theme:#7c3aed; --theme-deep:#6d28d9; --theme-bg:#f5f3ff; --theme-bd:#ddd6fe;
+}
+body{overflow-x:clip}
+figure{margin:14px 0;text-align:center}
+figure img{max-width:100%;border:1px solid var(--line,#e2e8f0);border-radius:10px;display:block;margin:0 auto}
+figcaption{font-size:12.5px;color:var(--mute,#64748b);margin-top:6px}
+.vbox{margin:14px 0;text-align:center;min-width:0}
+.vbox video{display:block;margin:0 auto;max-width:100%;max-height:560px;width:auto;border-radius:12px;border:1px solid var(--theme-bd);background:#000}
+.vduo{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:14px 0;align-items:start}
+.vduo .vbox{margin:0}
+.vcap{font-size:12.5px;color:var(--mute,#64748b);margin-top:6px}
+.tag.hl{background:#ede9fe;color:#6d28d9}
+.img-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:14px 0}
+.img-block{margin:14px 0;text-align:center;min-width:0}
+.img-block img{max-width:100%;border-radius:10px;box-shadow:0 4px 12px rgba(15,23,42,.12)}
+.img-block figcaption{font-size:12.5px;color:var(--mute,#64748b);margin-top:6px}
+.blk{min-width:0;overflow-x:hidden}
+pre{max-width:100%;min-width:0;overflow-x:auto}
+.content{overflow-x:hidden;min-width:0}
+@media(max-width:900px){.vduo{grid-template-columns:1fr}.img-pair{grid-template-columns:1fr}}
+/* ── 五星学习法 · 课程分段 ── */
+.fivestar-note{font-size:13px;color:#5b6b78;margin-top:12px}
+.fs-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:14px}
+.fs-cell{border:1px solid var(--theme-bd);border-radius:12px;padding:10px 8px;text-align:center;background:var(--theme-bg)}
+.fs-cell .st{font-size:12.5px;font-weight:800;color:var(--theme-deep)}
+.fs-cell .tm{font-family:var(--font-mono,monospace);font-size:11px;color:#0f766e;margin-top:3px;font-weight:700}
+.fs-cell .ds{font-size:11.5px;color:#5b6b78;margin-top:4px;line-height:1.5}
+.seg{display:inline-block;font-size:11px;font-weight:700;font-family:var(--font-mono,monospace);background:var(--theme-bg);color:var(--theme-deep);border:1px solid var(--theme-bd);border-radius:99px;padding:2px 10px;margin-left:8px;vertical-align:middle;white-space:nowrap}
+.tl{width:100%;border-collapse:collapse;font-size:13px;margin-top:14px;background:#fff}
+.tl th,.tl td{border:1px solid #e2ece9;padding:7px 10px;text-align:left;vertical-align:top}
+.tl th{background:var(--theme-bg);color:var(--theme-deep);font-size:12.5px;white-space:nowrap}
+.tl .m{font-family:var(--font-mono,monospace);color:var(--theme-deep);font-weight:700;white-space:nowrap}
+@media(max-width:900px){.fs-grid{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">🧠 双臂采训推全流程 · <i>教程首页</i></div>
+  <div class="crumb"><a href="../../../index.html#ind">📚 开发者教程首页</a> › <a href="../index.html">IND-02 课程首页</a> › <span class="here">EXP-01 遥操作与数据采集</span></div>
+</div>
+
+<div class="wrap">
+  <aside class="side">
+    <h4>实验目录 · 五星学习法</h4>
+    <a href="#s0">00 课程节奏 · 8 段微课</a>
+    <a class="now" href="#s1">§1 实验目标 ①聚焦问题</a>
+    <a href="#s2">§2 核心原理 ①聚焦 ②激活</a>
+    <a href="#s3">§3 环境与材料 ③示证新知</a>
+    <a href="#s4">§4 实操步骤（含视频）④应用新知</a>
+    <a href="#s5">§5 关键命令 ④应用新知</a>
+    <a href="#s6">§6 动画演示 ③示证新知</a>
+    <a href="#s7">§7 互动练习 ④应用新知</a>
+    <a href="#s8">§8 常见问题 ⑤融会贯通</a>
+    <a href="#s9">§9 拓展阅读 ⑤融会贯通</a>
+    <a href="#s10">§10 思考题 ⑤融会贯通</a>
+    <h4 style="margin-top:18px">本课其他实验</h4>
+    <a href="../exp-02-act-training/index.html">EXP-02 ACT 模型训练</a>
+    <a href="../exp-03-cloud-inference/index.html">EXP-03 云服务器与推理</a>
+    <a href="../exp-04-vla-model/index.html">EXP-04 VLA 大模型</a>
+  </aside>
+
+  <main class="content">
+    <div class="exp-head">
+      <div class="code">EXP-01 · TELEOP &amp; RECORDING</div>
+      <h1 class="h1">遥操作与数据采集</h1>
+      <p class="desc">让人类操作员"穿"进机器人身体：主机遥操纵主臂、从臂模仿复现，再把每一次示教录成 LeRobot 数据集——这是端到端学习（ACT / VLA）全部智能的源头。</p>
+      <div class="meta"><span class="tag">8 学时</span><span class="tag">难度 ★☆☆</span><span class="tag hl">本课视频重点</span><span class="tag">对应指导文档 06 / 07 / 08 / 09 章</span></div>
+    </div>
+
+    <!-- 00 -->
+    <section class="blk" id="s0">
+      <h2><span class="no">00</span>课程节奏：五星学习法 · 8 段微课（每段 ≤ 15 min）</h2>
+      <p>本实验按<b>五星学习法</b>组织：先用一个真实故障<b>聚焦问题</b>，再<b>激活旧知</b>（串口权限、校准文件、视频编码），接着<b>示证新知</b>（主从臂 + 三摄像头 + 人在环数据流），然后动手<b>应用新知</b>完成单臂/双臂遥操作与数据采集，最后借排障与拓展<b>融会贯通</b>。全程切成 <b>8 段微课、每段不超过 15 分钟</b>，段间停顿 1~2 分钟消化；纯讲授合计约 100 分钟，其余课时用于动手实操与个别辅导。</p>
+      <div class="fs-grid">
+        <div class="fs-cell"><div class="st">① 聚焦问题</div><div class="tm">课段 1 · 12 min</div><div class="ds">"录了半天数据集是空的/从臂一动不动"故障现场</div></div>
+        <div class="fs-cell"><div class="st">② 激活旧知</div><div class="tm">课段 2 · 8 min</div><div class="ds">串口权限 · 校准文件 · SVT-AV1 视频编码落盘</div></div>
+        <div class="fs-cell"><div class="st">③ 示证新知</div><div class="tm">课段 3~4 · 27 min</div><div class="ds">主从臂+三摄像头实物 + 人在环数据流动画</div></div>
+        <div class="fs-cell"><div class="st">④ 应用新知</div><div class="tm">课段 5~7 · 40 min</div><div class="ds">单臂→双臂遥操作 + 数据采集 + 参数估算</div></div>
+        <div class="fs-cell"><div class="st">⑤ 融会贯通</div><div class="tm">课段 8 · 13 min</div><div class="ds">排障口诀 · 拓展脚本化 · 思考题</div></div>
+      </div>
+      <table class="tl">
+        <tr><th>课段</th><th>五星阶段</th><th>时长</th><th>对应章节</th><th>本段任务</th></tr>
+        <tr><td class="m">课段 1</td><td>聚焦问题</td><td class="m">12 min</td><td>§01 + §02 前半</td><td>抛出"录了半天数据集是空的/从臂不动"故障，明确本课要解决的目标</td></tr>
+        <tr><td class="m">课段 2</td><td>激活旧知</td><td class="m">8 min</td><td>§02 后半</td><td>用串口权限、校准文件、视频编码三条旧知解释故障成因</td></tr>
+        <tr><td class="m">课段 3</td><td>示证新知</td><td class="m">15 min</td><td>§03</td><td>对照实物认识主从臂、三摄像头、校准文件与章节对应表</td></tr>
+        <tr><td class="m">课段 4</td><td>示证新知</td><td class="m">12 min</td><td>§06（回看 §02 流程）</td><td>看懂"主从控制→多模态感知→数据落盘"人在环数据流</td></tr>
+        <tr><td class="m">课段 5</td><td>应用新知</td><td class="m">15 min</td><td>§04 前半 + §5 命令① + 视频 1</td><td>授权串口、单臂遥操作 60 Hz 跟随（边看视频边动手）</td></tr>
+        <tr><td class="m">课段 6</td><td>应用新知</td><td class="m">15 min</td><td>§04 后半 + §5 命令②③④⑤ + 视频 2</td><td>复制 4 份校准、双臂遥操作、单臂/双臂数据采集循环</td></tr>
+        <tr><td class="m">课段 7</td><td>应用新知</td><td class="m">10 min</td><td>§07</td><td>采集参数估算器自测，算清"录多久、占多大"</td></tr>
+        <tr><td class="m">课段 8</td><td>融会贯通</td><td class="m">13 min</td><td>§08~§10</td><td>排障口诀收口，脚本化拓展与思考题拔高迁移</td></tr>
+      </table>
+      <p class="fivestar-note">讲课提示：课段 1/2 以讲授 + 提问为主；课段 3~4 用实物 + 动画；课段 5~6 边看视频边动手；课段 7 学员独立完成；课段 8 答疑拔高。段间停顿 1~2 分钟。</p>
+    </section>
+
+    <section class="blk" id="s1">
+      <h2><span class="no">01</span>实验目标<span class="seg">课段 1 · 聚焦问题 · 12 min</span></h2>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">目标 A</div><p>完成单臂遥操作：授权串口后用 <code>lerobot-teleoperate</code> 让 SO101 从臂实时跟随主臂，观察 60 Hz 控制闭环与关节位置回显。</p></div>
+        <div class="kcard"><div class="kd">目标 B</div><p>完成双臂遥操作：先复制四份校准文件再以 <code>bi_so100_follower / bi_so100_leader</code> 启动，实现 12 关节同步主从控制。</p></div>
+        <div class="kcard"><div class="kd">目标 C</div><p>完成单臂 / 双臂数据采集：用 <code>lerobot-record</code> 录制规范 episode，理解"录制→复位→编码入库"的循环节奏。</p></div>
+        <div class="kcard"><div class="kd">验收</div><p>本地缓存中出现可读的 LeRobot 数据集（含 task 文本、状态序列与视频），且 episode 数量达标（ACT 建议最少 50 组）。</p></div>
+      </div>
+      <div class="tip violet"><span class="lab">提示</span>本实验是全课地基：EXP-02 的训练、EXP-03 的推理、EXP-04 的 VLA 全部消费这里产出的数据集。</div>
+      <p>四条目标对应四段验收证据：连接日志（SO101 connected）、12 关节回显表、录制循环日志（Recording → Reset → Map 100%）、以及缓存目录中可打开的 parquet + 视频——每条都要截图进实验报告。</p>
+    </section>
+
+    <section class="blk" id="s2">
+      <h2><span class="no">02</span>核心原理：人在环数据流<span class="seg">课段 1 收尾 + 课段 2 · 激活旧知 · 8 min</span></h2>
+      <div class="tip amber"><span class="lab">❓ 聚焦问题（课段 1）</span>学员现场最常踩的坑：<b>双臂遥操作启动后从臂一动不动</b>，或者<b>录了半小时发现缓存目录里数据集是空的</b>——明明命令跑完了，episode 数却是 0。问题出在哪？带着这两个故障听完全课，到课段 6 你会亲手让示教数据稳稳落盘。</div>
+      <p>把机器人想成一双刚学会拿筷子的手：它还不知道"怎么抓"，但人类操作员知道。遥操作就是给人的手上绑一根"提线"——你动主臂（leader），从臂（follower）像镜子一样跟着动，把"抓-拿-放"的完整手艺原样录下来。</p>
+      <p>整条数据流分三段：<b>①主从控制</b>——主臂编码器读出 6 个关节角度，经串口发给从臂执行，循环速率约 60 Hz（日志显示 <code>time: 16.72ms (60 Hz)</code>）；<b>②多模态感知</b>——左右手腕摄像头 + 头部摄像头把 <code>640×480 / 30 fps</code> 画面同时写入；<b>③数据落盘</b>——每一帧的机器人状态、动作、任务文本与视频被打包成一个 episode，任务结束后的复位期（reset）不算入有效片段。</p>
+      <p>存储路径在 <code>~/.cache/huggingface/lerobot/&lt;学生名&gt;/&lt;数据集名&gt;/</code>。录制暂停时视频还要经过 SVT-AV1 编码（日志出现 <code>Map: 100%|…| 479/479</code> 与 <code>SVT-AV1 Encoder Lib v3.0.0</code>），此时机械臂不要动，等 <code>Recording episode 1</code> 出现再开始下一条。</p>
+      <p>为什么强调两套频率：关节指令跑 60 Hz 是为了跟手不滞后，图像停在 30 fps 是为了给编码和落盘留带宽——两者由同一个 episode 时间戳对齐，任何一路掉帧都会让"这一帧该出哪只手"的对应关系错位。</p>
+      <div class="tip teal"><span class="lab">↺ 激活旧知（课段 2）</span>回忆三条旧知：① 串口设备默认无读写权限，<code>sudo chmod 666 /dev/arm*</code> 才能打开；② 校准文件按 robot id 命名存放，双臂要复制成 bimanual 左/右四份；③ 视频用 SVT-AV1 编码落盘，<code>Map: 100%</code> 期间不能碰机械臂。三条合起来，正好解释课段 1 那两个故障。</div>
+      <div class="img-block">
+        <img src="./images/photo-teleop-single.jpeg" alt="单臂遥操作工位实物照：操作员手持主臂、从臂在桌面跟随执行" loading="lazy">
+        <div class="img-block figcaption">图 1-1｜单臂遥操作工位实景：操作员手持主臂（leader）发出 60 Hz 关节指令，从臂（follower）在桌面实时跟随执行，腕部摄像头与显示器构成视觉反馈闭环（第 06 章）</div>
+      </div>
+    </section>
+
+    <section class="blk" id="s3">
+      <h2><span class="no">03</span>环境与材料<span class="seg">课段 3 · 示证新知 · 15 min</span></h2>
+      <ul class="check">
+        <li><span class="ok">✓</span>硬件：LZ-XL01 平台（SO101/SO100 主从机械臂）+ 3 台 USB 摄像头（<code>/dev/cam_left</code>、<code>/dev/cam_right</code>、<code>/dev/cam_head</code>）</li>
+        <li><span class="ok">✓</span>前置任务：已完成"机械臂串口"识别与"主从臂校准"（校准文件保存在 <code>~/.cache/huggingface/lerobot/calibration/</code>）</li>
+        <li><span class="ok">✓</span>软件：LeRobot 0.4.1，<code>conda activate lerobot</code> 环境</li>
+        <li><span class="ok">✓</span>串口设备：<code>/dev/arm_slave_left|right</code>（从臂）、<code>/dev/arm_master_left|right</code>（主臂）</li>
+        <li><span class="ok">✓</span>参考资料：指导文件第 06～09 章 + 本页两段指导视频</li>
+        <li><span class="ok">✓</span>数据集口径：两条任务链路分别用 <code>liming/put_cube_plate</code> 与 <code>test/bimanual_pick_place</code>（§5 命令原文），分别对应本课单臂、双臂两条实验线</li>
+      </ul>
+      <p>章节与资源的对应关系，边学边对号：</p>
+      <table>
+        <tr><th>指导章节</th><th>核心动作</th><th>本页资源</th></tr>
+        <tr><td>第 06 章《单臂遥操作》</td><td>串口授权、单臂主从连接与 60 Hz 跟随</td><td>视频 1 · 图 2-1 · §5 命令①</td></tr>
+        <tr><td>第 07 章《双臂遥操作》</td><td>复用 4 份校准文件、bimanual 启动与 12 关节回显</td><td>视频 2 · 图 4-1 · §5 命令②③</td></tr>
+        <tr><td>第 08 章《单臂数据采集》</td><td>lerobot-record 录制循环（5 组示教）</td><td>图 5-1 · §5 命令④</td></tr>
+        <tr><td>第 09 章《双臂数据采集》</td><td>三摄像头 + 12 关节的双臂 episode 录制</td><td>§5 命令⑤ · §7 估算器</td></tr>
+      </table>
+      <div class="tip amber"><span class="lab">注意</span>ssh 无图形界面时启动日志出现 <code>Headless environment detected</code> 属于正常；这是 pynput 键盘监听的显示环境警告，不影响采集。</div>
+      <p>操作熟练线（自检用）：不看笔记 5 分钟内完成"授权串口 → 单臂跟随 → Ctrl+C 干净退出"一轮，并能指出 4 份校准文件各自的存放路径。</p>
+    </section>
+
+    <section class="blk" id="s4">
+      <h2><span class="no">04</span>实操步骤（含指导视频）<span class="seg">课段 5~6 · 应用新知 · 2×15 min</span></h2>
+      <div class="flow">
+        <div class="step"><div class="n">先看视频</div>观看《单臂遥操作》，建立 60 Hz 主从跟随的直觉。<div class="arr"></div></div>
+        <div class="step"><div class="n">Step 1</div>授权串口：<code>sudo chmod 666 /dev/arm*</code>，然后跑单臂遥操作命令（见 §5），确认打印 <code>SO101Leader connected / SO101Follower connected</code>。<div class="arr"></div></div>
+        <div class="step"><div class="n">Step 2</div>Ctrl+C 停止（日志打印 disconnected 即正常），再看《双臂遥操作》视频。<div class="arr"></div></div>
+        <div class="step"><div class="n">Step 3</div>双臂前置：执行 4 条 mkdir + cp 命令，把单臂校准文件复制成 bimanual 左/右文件名（见 §5）。<div class="arr"></div></div>
+        <div class="step"><div class="n">Step 4</div>启动双臂遥操作；若未开始多按几下回车；Ctrl+C <b>只能按一次</b>等待自动退出。<div class="arr"></div></div>
+        <div class="step"><div class="n">Step 5</div>开始采集：单臂任务 <code>Put red cube into plate</code>（5 组），双臂任务 <code>Lift the dish lid, put in the red block, and cover the lid.</code>（3 组），录制循环见 §5 命令。<div class="arr"></div></div>
+      </div>
+      <p>观看两段视频时各抓一个细节：视频 1 看操作员如何用回车确认校准、视频 2 看双臂 12 关节回显表的左右对称结构——这两处正是 §8 排错表的高频出错点。</p>
+      <div class="vduo">
+        <div class="vbox">
+          <video controls preload="metadata" poster="../../../../media/industry/ind02-act-vla-pipeline/exp-01-teleop-recording/videos/单臂遥操作-poster.jpg">
+            <source src="../../../../media/industry/ind02-act-vla-pipeline/exp-01-teleop-recording/videos/单臂遥操作.mp4" type="video/mp4">
+            您的浏览器不支持视频播放。
+          </video>
+          <div class="vcap">指导视频 1｜单臂遥操作（第 06 章配套，720×1280 竖屏实录）</div>
+        </div>
+        <div class="vbox">
+          <video controls preload="metadata" poster="../../../../media/industry/ind02-act-vla-pipeline/exp-01-teleop-recording/videos/双臂遥操作-poster.jpg">
+            <source src="../../../../media/industry/ind02-act-vla-pipeline/exp-01-teleop-recording/videos/双臂遥操作.mp4" type="video/mp4">
+            您的浏览器不支持视频播放。
+          </video>
+          <div class="vcap">指导视频 2｜双臂遥操作（第 07 章配套，12 关节同步主从控制）</div>
+        </div>
+      </div>
+      <div class="img-block">
+        <img src="./images/photo-teleop-dual.jpeg" alt="双臂遥操作现场实物照：操作员穿双臂主臂外骨骼、从臂在桌面同步跟随" loading="lazy">
+        <div class="img-block figcaption">图 4-1｜双臂遥操作现场实景：操作员双手各持一套主臂（leader），左右两套从臂（follower）同步跟随，12 关节位置回显在终端 <code>display_data=true</code> 表中实时刷新（第 07 章）</div>
+      </div>
+    </section>
+
+    <section class="blk" id="s5">
+      <h2><span class="no">05</span>关键命令<span class="seg">随课段 5 / 6 对照使用</span></h2>
+      <p>所有命令均取自 LZ-XL01 指导文件原文，可直接粘贴到 <code>lerobot</code> 终端。</p>
+      <pre><span class="c"># ── 单臂遥操作（第 06 章）</span>
+conda activate lerobot
+sudo chmod 666 /dev/arm*
+lerobot-teleoperate \
+  --robot.type=so101_follower --robot.port=/dev/arm_slave_left \
+  --robot.id=left_follower_arm \
+  --teleop.type=so101_leader --teleop.port=/dev/arm_master_left \
+  --teleop.id=left_leader_arm
+
+<span class="c"># ── 双臂前置：复制 4 份校准文件（第 07 章，必须先执行）</span>
+mkdir -p ~/.cache/huggingface/lerobot/calibration/robots/so100_follower/
+mkdir -p ~/.cache/huggingface/lerobot/calibration/teleoperators/so100_leader/
+cp ~/.cache/huggingface/lerobot/calibration/robots/so101_follower/left_follower_arm.json \
+   ~/.cache/huggingface/lerobot/calibration/robots/so100_follower/bimanual_follower_left.json
+<span class="g">（right 从臂、左/右主臂 4 个文件同理，共 4 条 cp）</span>
+
+<span class="c"># ── 双臂遥操作（第 07 章）</span>
+lerobot-teleoperate \
+  --robot.type=bi_so100_follower \
+  --robot.left_arm_port=/dev/arm_slave_left \
+  --robot.right_arm_port=/dev/arm_slave_right \
+  --robot.id=bimanual_follower \
+  --teleop.type=bi_so100_leader \
+  --teleop.left_arm_port=/dev/arm_master_left \
+  --teleop.right_arm_port=/dev/arm_master_right \
+  --teleop.id=bimanual_leader --display_data=true
+
+<span class="c"># ── 单臂数据采集（第 08 章）</span>
+rm -rf /home/lz-xl01/.cache/huggingface/lerobot/liming/put_cube_plate
+lerobot-record \
+  --robot.type=so101_follower --robot.port=/dev/arm_slave_left \
+  --robot.id=left_follower_arm \
+  --robot.cameras="{left: {index: 0, fps: 30, width: 640, height: 480, video_backend: av}, \
+side: {index: 2, fps: 30, width: 640, height: 480, video_backend: av}}" \
+  --teleop.type=so101_leader --teleop.port=/dev/arm_master_left \
+  --teleop.id=left_leader_arm --display_data=true \
+  --dataset.repo_id=liming/put_cube_plate --dataset.num_episodes=5 \
+  --dataset.single_task="Put red cube into plate" --dataset.push_to_hub=false \
+  --dataset.episode_time_s=16 --dataset.reset_time_s=6
+
+<span class="c"># ── 双臂数据采集（第 09 章，三摄像头 + 12 关节）</span>
+lerobot-record \
+  --robot.type=bi_so100_follower \
+  --robot.left_arm_port=/dev/arm_slave_left \
+  --robot.right_arm_port=/dev/arm_slave_right \
+  --robot.id=bimanual_follower \
+  --teleop.type=bi_so100_leader \
+  --teleop.left_arm_port=/dev/arm_master_left \
+  --teleop.right_arm_port=/dev/arm_master_right \
+  --teleop.id=bimanual_leader \
+  --robot.cameras="{left: {index: 0, ...}, \
+right: {index: 3, ...}, side: {index: 5, ...}}" \
+  --dataset.repo_id=test/bimanual_pick_place --dataset.num_episodes=3 \
+  --dataset.single_task="Lift the dish lid, put in the red block, and cover the lid." \
+  --dataset.episode_time_s=16 --dataset.reset_time_s=6 \
+  --dataset.push_to_hub=false --display_data=true</pre>
+      <div class="tip amber"><span class="lab">节奏要点</span><b>num_episodes ≥ 50 才够 ACT 训练</b>；每条录完在 reset 期把方块放回原位；SVT-AV1 编码期间（<code>Map: 100%…</code>）不要碰机械臂。</div>
+      <p>摄像头 index 说明：单臂链路用 <code>left: 0</code> 与 <code>side: 2</code> 两路，双臂链路用 <code>left: 0 / right: 3 / side: 5</code> 三路——顺序并非连续编号，是指导文档实测可用的插口位置，换机器后先逐个试出可用 index 再写进命令。</p>
+      <div class="img-pair">
+        <div class="img-block">
+          <img src="./images/photo-record-single.jpeg" alt="单臂数据采集全景实物照：双摄像头、红方块、蓝碗、灰垫" loading="lazy">
+          <div class="img-block figcaption">(a) 单臂数据采集工位全景：双路摄像头（左/侧）对准灰垫上的红方块与蓝碗，从臂在桌面待命</div>
+        </div>
+        <div class="img-block">
+          <img src="./images/photo-record-single-grasp.jpeg" alt="单臂夹爪夹住红方块、绿盘在旁的实拍" loading="lazy">
+          <div class="img-block figcaption">(b) 任务执行瞬间：从臂夹爪精准夹起红方块，绿盘在旁等待放入——每条 episode 都从相同摆位出发</div>
+        </div>
+      </div>
+      <p style="text-align:center;font-size:12.5px;color:var(--mute,#64748b);margin-top:-8px">图 5-1｜单臂数据采集实物照：Put red cube into plate 任务的初始摆位与执行瞬间（第 08 章）</p>
+      <p>对照图 5-1 记录初始摆位：方块与盘子的相对位置、桌面反光、摄像头角度三项要在所有 episode 中保持一致——摆位漂移是 EXP-02 loss 忽高忽低的常见隐形原因。</p>
+    </section>
+
+    <section class="blk" id="s6">
+      <h2><span class="no">06</span>动画演示：人在环数据流<span class="seg">课段 4 · 示证新知 · 12 min</span></h2>
+      <div class="anim-box">
+        <svg viewBox="0 0 760 260" width="100%">
+          <defs>
+            <marker id="a1" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 Z" fill="#7c3aed"/></marker>
+            <marker id="a2" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 Z" fill="#0d9488"/></marker>
+          </defs>
+          <rect x="30" y="95" width="140" height="70" rx="12" fill="#f5f3ff" stroke="#7c3aed" stroke-width="2"/>
+          <text x="100" y="125" text-anchor="middle" font-size="15" font-weight="bold" fill="#6d28d9">操作员 + 主臂</text>
+          <text x="100" y="148" text-anchor="middle" font-size="12" fill="#64748b">leader · 6 关节编码</text>
+          <rect x="310" y="95" width="140" height="70" rx="12" fill="#f5f3ff" stroke="#7c3aed" stroke-width="2"/>
+          <text x="380" y="125" text-anchor="middle" font-size="15" font-weight="bold" fill="#6d28d9">从臂 follower</text>
+          <text x="380" y="148" text-anchor="middle" font-size="12" fill="#64748b">跟随执行 · 60 Hz</text>
+          <rect x="580" y="30" width="150" height="64" rx="12" fill="#ecfdf5" stroke="#0d9488" stroke-width="2"/>
+          <text x="655" y="58" text-anchor="middle" font-size="14" font-weight="bold" fill="#0f766e">三路摄像头</text>
+          <text x="655" y="79" text-anchor="middle" font-size="12" fill="#64748b">640×480 · 30fps</text>
+          <rect x="580" y="166" width="150" height="64" rx="12" fill="#f5f3ff" stroke="#6d28d9" stroke-width="2"/>
+          <text x="655" y="194" text-anchor="middle" font-size="14" font-weight="bold" fill="#6d28d9">episode 数据集</text>
+          <text x="655" y="215" text-anchor="middle" font-size="12" fill="#64748b">状态+动作+视频+task</text>
+          <line x1="172" y1="130" x2="304" y2="130" stroke="#7c3aed" stroke-width="2.5" marker-end="url(#a1)"/>
+          <text x="238" y="120" text-anchor="middle" font-size="12" fill="#6d28d9">串口指令</text>
+          <circle r="7" fill="#7c3aed">
+            <animate attributeName="cx" values="176;300" dur="1.4s" repeatCount="indefinite"/>
+            <animate attributeName="cy" values="130;130" dur="1.4s" repeatCount="indefinite"/>
+          </circle>
+          <path d="M452 130 C 525 130, 545 70, 576 60" fill="none" stroke="#0d9488" stroke-width="2.5" marker-end="url(#a2)"/>
+          <circle r="7" fill="#0d9488">
+            <animate attributeName="cx" values="456;574" dur="1.6s" begin="0.4s" repeatCount="indefinite"/>
+            <animate attributeName="cy" values="130;62" dur="1.6s" begin="0.4s" repeatCount="indefinite"/>
+          </circle>
+          <path d="M655 96 L655 160" fill="none" stroke="#0d9488" stroke-width="2.5" marker-end="url(#a2)"/>
+          <circle r="7" fill="#0d9488">
+            <animate attributeName="cx" values="655;655" dur="1.1s" begin="1s" repeatCount="indefinite"/>
+            <animate attributeName="cy" values="98;158" dur="1.1s" begin="1s" repeatCount="indefinite"/>
+          </circle>
+          <path d="M580 226 C 470 250, 260 250, 176 172" fill="none" stroke="#d97706" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#a1)"/>
+          <text x="380" y="248" text-anchor="middle" font-size="12" fill="#b45309">reset 复位期（不计入 episode）</text>
+        </svg>
+        <div class="anim-cap">图 6-1｜人在环采集动画：主臂指令 → 从臂跟随 → 视频与状态一并落入数据集 → reset 回放原点</div>
+      </div>
+      <p>注意虚线回路：采集是"一条做完、复位、再做下一条"的循环，复位期保证每条 episode 从相同初始状态出发——这直接决定 EXP-02 训练时数据分布是否干净。</p>
+      <p>看动画时对照两条实线：紫色实线是串口指令流（人 → 从臂，60 Hz），绿色实线是视觉流（摄像头 → 数据集，30 fps）——两条流在同一时间轴上对齐落盘，才构成"图像 + 状态 + 动作"三元组。</p>
+    </section>
+
+    <section class="blk" id="s7">
+      <h2><span class="no">07</span>互动练习：采集参数估算器<span class="seg">课段 7 · 应用新知 · 10 min</span></h2>
+      <div class="ix-panel">
+        <div class="ix-title">调整任务时长与复位时长，估算总采集时长与数据量</div>
+        <div class="ctl-row">
+          <label>episode 数 <input type="range" id="ixEp" min="3" max="100" value="50" oninput="ixCalc()"> <b id="ixEpV">50</b></label>
+          <label>任务时长(s) <input type="range" id="ixT" min="6" max="40" value="16" oninput="ixCalc()"> <b id="ixTV">16</b></label>
+          <label>复位时长(s) <input type="range" id="ixR" min="2" max="20" value="6" oninput="ixCalc()"> <b id="ixRV">6</b></label>
+        </div>
+        <div class="io">
+          <span>总时长：<b id="ixTime">—</b></span>
+          <span>仅任务时长：<b id="ixTask">—</b></span>
+          <span>视频粗估：<b id="ixSize">—</b></span>
+          <span id="ixJudge" class="dim">—</span>
+        </div>
+        <p style="margin-top:8px;font-size:13px;color:#64748b">提示：ACT 官方建议 <b>至少 50 组</b> episode；三摄像头 × 640×480×30fps 的视频每小时粗估 1.5～2 GB（编码后）。</p>
+      </div>
+      <script>
+      function ixCalc(){
+        var ep=+ixEp.value,t=+ixT.value,r=+ixR.value;
+        ixEpV.textContent=ep;ixTV.textContent=t;ixRV.textContent=r;
+        var total=ep*(t+r);
+        ixTime.textContent=Math.floor(total/60)+" 分 "+(total%60)+" 秒";
+        ixTask.textContent=Math.floor(ep*t/60)+" 分";
+        ixSize.textContent="≈"+(ep*t*3*0.06/60).toFixed(1)+" GB";
+        var j=document.getElementById('ixJudge');
+        if(ep<50){j.className='bad';j.textContent='低于 ACT 建议的 50 组，策略容易过拟合';}
+        else if(ep<80){j.className='ok';j.textContent='达到基本线，可先训练再逐步加数据';}
+        else{j.className='ok';j.textContent='数据充足，适合 ACT / VLA 两条路线';}
+      }
+      ixCalc();
+      </script>
+      <p>估算器的意义：把"录多久"换算成"坐多久"——按示例参数 50 组约 19 分钟纯任务时长，加上摆位与重录冗余，按半小时备课；若要 300 组消融数据（§9 ⑤），需按 2 小时以上排期。</p>
+    </section>
+
+    <section class="blk" id="s8">
+      <h2><span class="no">08</span>常见问题<span class="seg">课段 8 · 融会贯通 · 13 min</span></h2>
+      <ul class="check">
+        <li><span class="ok">✓</span><b>串口打不开</b>：先 <code>sudo chmod 666 /dev/arm*</code>；设备号变了就 <code>ls /dev/arm*</code> 重查。</li>
+        <li><span class="ok">✓</span><b>双臂一动不动</b>：多半没复制 4 份校准文件，或启动后没按回车；启动提示 Mismatch 时按 ENTER 使用已有校准文件。</li>
+        <li><span class="ok">✓</span><b>显示 Mismatch between calibration values…</b>：直接 ENTER（沿用 id 对应文件）；只有想重刷电机才输入 <code>c</code>。</li>
+        <li><span class="ok">✓</span><b>退出时报 gRPC ERROR / winit DISPLAY / FATAL: exception not rethrown</b>：清理期的正常噪音，确认已打印 Exiting 即可。</li>
+        <li><span class="ok">✓</span><b>数据集是空的</b>：检查 <code>dataset.repo_id</code> 命名、是否录入超过 episode_time_s 的时长，以及缓存目录 <code>~/.cache/huggingface/lerobot/&lt;名&gt;/&lt;集&gt;/</code>。</li>
+        <li><span class="ok">✓</span><b>摄像头 index 被占用</b>：画面黑屏或启动报无法打开设备时，用 <code>ls /dev/video*</code> 核对，并关掉其他占用该 index 的预览程序（含上次未退净的采集终端）。</li>
+        <li><span class="ok">✓</span><b>主从臂对调（动左出右）</b>：校准文件复制或串口号弄混，核对 <code>/dev/arm_slave_left|right</code> 与 <code>/dev/arm_master_left|right</code> 不要交叉。</li>
+      </ul>
+      <p>围绕启动、运行、收尾三个时段，把高频报错压成一张"望闻问切"表：</p>
+      <table>
+        <tr><th>症状段（启动 / 运行 / 收尾）</th><th>先查什么</th><th>一行处置</th></tr>
+        <tr><td>启动：设备不存在</td><td><code>ls /dev/arm* /dev/cam_*</code></td><td>udev 规则未生效就重新插拔并 chmod 666</td></tr>
+        <tr><td>启动：连接后立刻断开</td><td>主从臂供电与共地</td><td>检查电源适配器与 USB Hub 是否独立供电</td></tr>
+        <tr><td>运行：从臂抖动 / 跟随滞后</td><td>校准文件是否张冠李戴</td><td>左臂文件绝不能 cp 给右臂，按 id 对号入座</td></tr>
+        <tr><td>运行：摄像头黑屏</td><td>index 是否被占用</td><td>关掉占用 index 的预览程序，核对 left/side 编号</td></tr>
+        <tr><td>收尾：数据集缺视频</td><td>编码是否被强制中断</td><td>等 Map 100% 编完再退出，重新录制最后一条</td></tr>
+        <tr><td>运行：主从方向对调</td><td>左右串口是否交叉</td><td>slave_left↔master_left 对号，重新插拔后重查设备号</td></tr>
+      </table>
+      <div class="tip amber"><span class="lab">排错口诀</span>串口先授权、校准先复制、回车别漏按、编码别碰臂、退出只按一次。</div>
+    </section>
+
+    <section class="blk" id="s9">
+      <h2><span class="no">09</span>拓展阅读<span class="seg">课段 8 · 融会贯通</span></h2>
+      <div class="tip violet"><span class="lab">深入</span>① LeRobot 官方脚本目录 <code>lerobot-0.4.1/command/</code> 中的 <code>4_record_left_arm.sh</code> 展示了量产式采集的参数组织：脚本化 repo_id、num_episodes、single_task，适合规模化采数；② <code>calibration/</code> 目录结构（robots / teleoperators 分层）解释了为什么换机器要重拷校准文件；③ 真实工程里采集后要用 <code>dataset-browser</code> / parquet 抽查动作是否抖动，坏 episode 及时删除。</div>
+      <div class="tip violet"><span class="lab">延伸</span>④ 摄像头 <code>video_backend=av</code>（PyAV）负责把原始帧实时编码进数据集，换 backend 会改变落盘格式与 CPU 占用——采集机 CPU 吃紧时优先排查这里；⑤ 同一任务采到 300 组以上时，建议按"操作员 / 时段 / 摆位"分桶打 repo_id 前缀，方便 EXP-02 做数据消融；⑥ 熟练后可对照 <code>dataset.features</code> 输出，把双臂 12 关节 + 3 图像 + 任务文本的张量形状抄进实验报告，为 EXP-02 的输入层讲解做铺垫。</div>
+      <div class="tip violet"><span class="lab">延伸</span>⑦ 把本页五段命令整理成 <code>record_single.sh</code> / <code>record_bimanual.sh</code> 两个脚本（照抄 <code>command/</code> 目录风格），下个班开课直接换 repo_id 复用——采集脚本化是走向量产采数的第一步。</div>
+    </section>
+
+    <section class="blk" id="s10">
+      <h2><span class="no">10</span>思考题<span class="seg">课段 8 · 融会贯通</span></h2>
+      <div class="tip violet"><span class="lab">思考 1</span>为什么 <code>reset_time_s</code>（复位期）必须存在？如果任务中途失败、把失败动作也录进了 episode，会给 EXP-02 的训练带来什么后果？</div>
+      <div class="tip violet"><span class="lab">思考 2</span>单臂任务只需两路视频，双臂任务却要三路（左/右/头）摄像头。结合"人做家务时眼睛看哪里"想一动：头部摄像头提供的信息，是手腕摄像头无法替代的吗？为什么？</div>
+      <p>答题提示：先在纸上画出两种摄像头的视野范围（手腕随关节转动、头顶固定俯视），再对照 §6 动画里"图像流"的落盘顺序作答；两题都要引用本页日志或截图里的具体证据。</p>
+    </section>
+
+    <nav class="expnav">
+      <a href="../index.html">← 返回课程首页</a>
+      <a href="../exp-02-act-training/index.html">下一实验：EXP-02 数据整理与 ACT 模型训练 →</a>
+    </nav>
+
+    <footer>
+      <div>IND-02 · 双臂采训推全流程（ACT / VLA）· EXP-01 遥操作与数据采集</div>
+      <div>8 学时 · 入门实验 · 基于 LZ-XL01 指导文档第 06～09 章《单臂遥操作 / 双臂遥操作 / 单臂数据采集 / 双臂数据采集》改编</div>
+    </footer>
+  </main>
+</div>
+
+<script src="../shared/tutorial.js" defer></script>
+</body>
+</html>

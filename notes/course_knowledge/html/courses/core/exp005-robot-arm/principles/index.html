@@ -1,0 +1,1440 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>抓取原理实验室 · CORE-05</title>
+<style>
+:root{
+  --bg-base:#f8fafc; --bg-surface:#ffffff; --bg-muted:#f1f5f9;
+  --text-primary:#0f172a; --text-secondary:#475569; --text-muted:#94a3b8;
+  --rose:#e11d48; --blue:#2563eb; --teal:#0d9488; --amber:#d97706; --violet:#7c3aed;
+  --ok:#059669; --bad:#dc2626; --border:#e2e8f0;
+  --font:'Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif;
+  --mono:'Cascadia Code','JetBrains Mono',Consolas,monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:var(--font);background:var(--bg-base);color:var(--text-primary);line-height:1.7}
+a{text-decoration:none;color:inherit}
+.topbar{position:sticky;top:0;z-index:50;background:rgba(248,250,252,.94);backdrop-filter:blur(8px);border-bottom:1px solid var(--border)}
+.topbar-in{max-width:1160px;margin:0 auto;padding:.65rem 1.4rem;display:flex;justify-content:space-between;align-items:center;gap:1rem}
+.logo{font-weight:800;font-size:.92rem}
+.logo span{color:var(--rose)}
+.crumb{font-size:.84rem;color:var(--text-secondary)}
+.crumb a:hover{color:var(--rose)}
+.wrap{max-width:1160px;margin:0 auto;padding:1.6rem 1.4rem}
+.hero{background:linear-gradient(130deg,#0f172a 0%,#4c1d3d 55%,#be123c 100%);color:#fff;border-radius:18px;padding:2rem 1.8rem;margin-bottom:1.6rem}
+.hero .eyebrow{font-size:.75rem;letter-spacing:.26em;opacity:.75}
+.hero h1{font-size:clamp(1.4rem,3vw,2rem);font-weight:900;margin:.5rem 0 .6rem}
+.hero p{opacity:.88;font-size:.95rem;max-width:860px}
+.hero .bades{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.9rem}
+.hero .bade{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.3);padding:.22rem .8rem;border-radius:999px;font-size:.8rem}
+.mod{background:var(--bg-surface);border:1px solid var(--border);border-radius:16px;margin-bottom:1.6rem;overflow:hidden;scroll-margin-top:70px}
+.mod-head{padding:1.1rem 1.4rem .9rem;border-bottom:1px dashed var(--border);background:linear-gradient(180deg,#fff,#fafcfe)}
+.mod-head .k{font-size:.7rem;letter-spacing:.22em;font-weight:800}
+.mod-head h2{font-size:1.25rem;font-weight:800;margin:.2rem 0 .35rem}
+.mod-head .goal{font-size:.88rem;color:var(--text-secondary)}
+.mod-head .goal b{color:var(--rose)}
+.mod-body{padding:1.1rem 1.4rem 1.4rem}
+.case{background:#fff7ed;border:1px solid #fed7aa;border-left:4px solid var(--amber);border-radius:10px;padding:.7rem .95rem;font-size:.86rem;margin-bottom:1rem}
+.case b{color:#b45309}
+.case .src{display:block;margin-top:.25rem;font-size:.76rem;color:#9a6c2c}
+.grid2{display:grid;grid-template-columns:1.15fr .85fr;gap:1rem}
+.grid2.rev{grid-template-columns:.85fr 1.15fr}
+@media(max-width:900px){.grid2,.grid2.rev{grid-template-columns:1fr}}
+.panel{background:var(--bg-muted);border:1px solid var(--border);border-radius:12px;padding:.85rem .95rem}
+.panel h4{font-size:.85rem;font-weight:800;margin-bottom:.5rem;display:flex;align-items:center;gap:.4rem}
+.panel h4::before{content:"";width:.5rem;height:.5rem;border-radius:50%;background:var(--rose)}
+.ctl-row{display:flex;flex-wrap:wrap;gap:.55rem .9rem;align-items:center;margin:.5rem 0}
+.ctl{font-size:.78rem;color:var(--text-secondary);display:flex;align-items:center;gap:.4rem;white-space:nowrap}
+.ctl input[type=range]{width:130px;accent-color:var(--rose)}
+.ctl input[type=number]{width:76px;font-family:var(--mono);font-size:.78rem;padding:.18rem .3rem;border:1px solid var(--border);border-radius:6px;background:#fff}
+.ctl output{font-family:var(--mono);font-size:.76rem;color:var(--rose);min-width:3.4em}
+select{font-size:.78rem;padding:.24rem .4rem;border:1px solid var(--border);border-radius:6px;background:#fff}
+.btn{border:none;border-radius:8px;padding:.4rem .85rem;font-size:.8rem;font-weight:700;cursor:pointer;background:var(--rose);color:#fff;transition:.15s}
+.btn:hover{filter:brightness(1.08);transform:translateY(-1px)}
+.btn.ghost{background:#fff;color:var(--text-secondary);border:1px solid var(--border)}
+.btn.ghost:hover{border-color:var(--rose);color:var(--rose)}
+.btn.blue{background:var(--blue)}
+.btn.teal{background:var(--teal)}
+.btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
+canvas{background:#fff;border:1px solid var(--border);border-radius:10px;display:block;max-width:100%}
+.io{font-family:var(--mono);font-size:.76rem;background:#111827;color:#d1fae5;border-radius:10px;padding:.65rem .8rem;white-space:pre-wrap;line-height:1.75;overflow-x:auto}
+.io .k{color:#fda4af}.io .warn{color:#fcd34d}.io .bad{color:#fca5a5}
+.math{background:#0f172a;color:#cbd5e1;font-family:var(--mono);font-size:.78rem;border-radius:10px;padding:.7rem .85rem;line-height:1.9;overflow-x:auto}
+.math .hl{color:#fda4af}
+.math .hlb{color:#93c5fd}
+.tip{font-size:.8rem;color:var(--text-secondary);background:var(--bg-muted);border:1px dashed var(--border);border-radius:10px;padding:.6rem .8rem;margin-top:.8rem}
+.tip b{color:var(--rose)}
+.chips{display:flex;flex-wrap:wrap;gap:.45rem;margin-top:.7rem}
+.chip{font-size:.76rem;background:#fff;border:1px solid var(--border);border-radius:999px;padding:.2rem .7rem;color:var(--text-secondary)}
+.chip.ok{border-color:#a7f3d0;background:#ecfdf5;color:#047857}
+.chip.bad{border-color:#fecaca;background:#fef2f2;color:#b91c1c}
+.chip a{color:inherit;text-decoration:underline dotted}
+.linkrow{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.9rem;padding-top:.8rem;border-top:1px dashed var(--border)}
+.lbtn{font-size:.78rem;background:#fff;border:1px solid var(--border);border-radius:999px;padding:.28rem .8rem;color:var(--blue);transition:.15s}
+.lbtn:hover{border-color:var(--blue);background:#eff6ff}
+/* outline table */
+.tbl{width:100%;border-collapse:collapse;font-size:.82rem;background:var(--bg-surface)}
+.tbl th{background:var(--bg-muted);color:var(--text-secondary);font-size:.72rem;letter-spacing:.05em;text-align:left;padding:.55rem .7rem;border-bottom:1px solid var(--border);white-space:nowrap}
+.tbl td{padding:.55rem .7rem;border-bottom:1px dashed var(--border);color:var(--text-secondary);vertical-align:top}
+.tbl tr:last-child td{border-bottom:none}
+.tbl .m{font-family:var(--mono);font-weight:800;color:var(--rose);white-space:nowrap}
+.tbl a{color:var(--blue)}
+/* TF tree */
+.tftree{display:flex;align-items:center;gap:2px;flex-wrap:wrap;font-family:var(--mono);font-size:.68rem;margin:.4rem 0}
+.tfnode{background:#fff;border:1.5px solid var(--border);border-radius:6px;padding:.2rem .45rem;color:var(--text-secondary);transition:.2s;white-space:nowrap}
+.tfnode.hot{border-color:var(--rose);background:#fff1f2;color:var(--rose);font-weight:700;box-shadow:0 0 0 3px rgba(225,29,72,.12)}
+.tfedge{color:var(--text-muted);font-size:.7rem}
+.tfedge.hot{color:var(--rose);font-weight:700}
+/* matrix */
+.mtx{display:inline-grid;grid-template-columns:repeat(4,auto);gap:.1rem .8rem;font-family:var(--mono);font-size:.75rem;background:#fff;border:1px solid var(--border);border-radius:8px;padding:.5rem .7rem}
+.mtx span{padding:.05rem .15rem;text-align:right}
+/* stages */
+.stages{display:flex;flex-wrap:wrap;gap:.4rem}
+.stage{font-size:.75rem;border:1.5px solid var(--border);background:#fff;border-radius:999px;padding:.26rem .75rem;cursor:pointer;color:var(--text-secondary);transition:.15s;font-weight:600}
+.stage:hover{border-color:var(--rose);color:var(--rose)}
+.stage.on{border-color:var(--rose);background:var(--rose);color:#fff;box-shadow:0 3px 10px rgba(225,29,72,.3)}
+.stage.done{border-color:#a7f3d0;background:#ecfdf5;color:#047857}
+#m5-view{width:100%;height:430px;border:1px solid var(--border);border-radius:12px;background:#eef2f7;display:block}
+.tabs{display:flex;gap:.4rem;margin-bottom:.7rem}
+.tab{font-size:.8rem;padding:.32rem .9rem;border-radius:8px;border:1px solid var(--border);background:#fff;cursor:pointer;color:var(--text-secondary);font-weight:700}
+.tab.on{background:var(--text-primary);border-color:var(--text-primary);color:#fff}
+footer{border-top:1px solid var(--border);background:var(--bg-surface);margin-top:2rem}
+.foot-in{max-width:1160px;margin:0 auto;padding:1.1rem 1.4rem;display:flex;justify-content:space-between;font-size:.8rem;color:var(--text-secondary);flex-wrap:wrap;gap:.5rem}
+.reveal{opacity:0;transform:translateY(18px);transition:.5s ease}
+.reveal.show{opacity:1;transform:none}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-in">
+    <a class="logo" href="../index.html">🎓 具身智能课程 · <span>抓取原理实验室</span></a>
+    <div class="crumb"><a href="../index.html">← 返回机械臂课程首页</a></div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<section class="hero reveal">
+  <div class="eyebrow">CORE-05 · PRINCIPLE LAB · 原理补充模块（新增）</div>
+  <h1>机械臂抓取 · 原理实验室</h1>
+  <p>把"抓取"拆回六个原理：<b>坐标系与 TF → 正运动学 → 逆运动学 → 轨迹与分步移动 → 六阶段抓取（3D）→ 视觉定位</b>。每个模块 = 一句原理 + 一个讲义真实案例 + 一台可拖可调的交互演示；数学概念（坐标变换、运动学、轨迹插值）全部配交互式图示，滑块一动、数值与图形同步变。3D 部分基于 three.js 本地渲染，离线可用。</p>
+  <div class="bades">
+    <span class="bade">🧩 6 个原理模块</span><span class="bade">🎯 每模块 1 个讲义案例</span><span class="bade">🎚 全参数滑块可调</span><span class="bade">🤖 three.js 3D 抓取台</span><span class="bade">📐 数学公式互动图示</span>
+  </div>
+</section>
+
+<!-- ============ 教学大纲 ============ -->
+<section class="mod reveal" id="outline">
+  <div class="mod-head">
+    <div class="k" style="color:var(--teal)">TEACHING OUTLINE · 教学大纲</div>
+    <h2>新增模块总览：目标 · 案例 · 交互方案 · 衔接</h2>
+    <p class="goal">下表即本补充内容的结构化大纲；每行可点击跳入对应模块，"衔接"列指回 7 个实验页的真实章节锚点。</p>
+  </div>
+  <div class="mod-body" style="padding-top:.8rem">
+    <div style="overflow-x:auto;border:1px solid var(--border);border-radius:12px">
+    <table class="tbl">
+      <thead><tr><th>模块</th><th>教学目标</th><th>对应案例（讲义出处）</th><th>可视化 / 交互方案</th><th>与现有教程衔接</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="m"><a href="#m1">M1 坐标系与 TF 变换</a></td>
+          <td>同一空间点在 base_link 与相机光学系下的两套读数互换；理解 4×4 齐次变换"乘点"与 REP-103 轴向差异</td>
+          <td>EXP-07 视觉链：相机系点 (0,0,0.5) → base_link (0.55,0,0.40)（讲义·实验7 步骤4）；EXP-06 set_pick_target 必须写 frame_id='base_link'（实验6 步骤1）</td>
+          <td>TF 树路径高亮 + 源/目标系查询；外参滑块（平移 t_x/t_z、俯仰 γ）驱动双面板（俯视+侧视）实时重投影；旋转矩阵数值联动</td>
+          <td><a href="../exp-01-urdf-simulation/index.html#s3">EXP-01 §TF 链与角色</a> · <a href="../exp-06-fixed-grasp/index.html#s8">EXP-06 §实操</a></td>
+        </tr>
+        <tr>
+          <td class="m"><a href="#m2">M2 正运动学 FK</a></td>
+          <td>"关节角 → 末端坐标"的确定性映射；会用 2R 平面模型手算并与代码互验；理解 PWM↔rad 换算</td>
+          <td>EXP-02/05 安全红线"抓取前先预演"：pwm_to_fk_demo 输入五路 PWM 2150/1200/2200/2275/1500（讲义·实验5 步骤2）</td>
+          <td>5 路 PWM 滑块（500~2500）→ 实时换算弧度 → 双视图（俯视 x-y、侧视 r-z）画连杆；公式逐项高亮联动</td>
+          <td><a href="../exp-03-kinematics/index.html#s7">EXP-03 §FK 试算台</a> · <a href="../exp-03-kinematics/index.html#s8">EXP-03 §实操</a></td>
+        </tr>
+        <tr>
+          <td class="m"><a href="#m3">M3 逆运动学 IK</a></td>
+          <td>三段式解析思路（q1 指向 → 2R 余弦定理 → pitch 补偿）；多解（肘上/肘下）与不可达判定；闭环验证意识</td>
+          <td>EXP-06 固定抓取目标 (0.28, 0, 0.10)、pitch=180° 即四元数 {0,1,0,0}（讲义·实验6 步骤1）</td>
+          <td>侧视工作平面内<b>拖拽目标点</b> → 实时解出 θ1/θ2/θ3 与余弦定理代入过程；肘上/下切换；一键"喂回 FK"闭环测毫米误差；附 DLS 阻尼 λ 迭代动画</td>
+          <td><a href="../exp-03-kinematics/index.html#s6">EXP-03 §动画</a> · <a href="../exp-04-ik-solver/index.html#s8">EXP-04 §实操</a></td>
+        </tr>
+        <tr>
+          <td class="m"><a href="#m4">M4 轨迹与分步移动</a></td>
+          <td>理解"为什么不能一步到位"：插值、限位、PWM 安全边界；看懂 _move_stepwise 的 40%/60% 分段逻辑</td>
+          <td>EXP-06 分步移动：J1 偏转 &gt;0.05 rad 时先单动 J1（40% 时长）再动 J2–J5（60%）（讲义·实验6 知识点 6.1.3）；EXP-05 YAML 逐行回放同理</td>
+          <td>q(t) 曲线可调：起点/终点/总时长/分段开关/平滑度/限位开关；t 指针播放 + 侧视小棒人同步；PWM 越界实时红警</td>
+          <td><a href="../exp-05-action-replay/index.html#s8">EXP-05 §回放实操</a> · <a href="../exp-06-fixed-grasp/index.html#s6">EXP-06 §六阶段动画</a></td>
+        </tr>
+        <tr>
+          <td class="m"><a href="#m5">M5 六阶段抓取 · 3D</a></td>
+          <td>以 three.js 观察机械臂结构、运动姿态与完整抓取过程；把 gripper_depth / pre_grasp_height 的语义变成"看得见的位置"</td>
+          <td>EXP-06 _execute_pick 六步：开爪 → 移到 z+pre_h → 下探 z−gripper_depth → 合爪 → 退回 z+pre_h → 移到 post_grasp_pose（讲义·实验6 知识点 6.3.2），目标 (0.28,0,0.10)、放置点 (0.059,0.074,0.219)</td>
+          <td>three.js 3D 视口（可旋转缩放）：结构模式下 3 关节滑块调姿态 + TF 三色轴开关；抓取模式下六阶段按钮/自动播放 + 参数滑块（gripper_depth、pre_grasp_height、目标点）实时重算 IK 并动画执行，附 TCP 读数与坐标四元数</td>
+          <td><a href="../exp-06-fixed-grasp/index.html#s7">EXP-06 §参数调优台</a> · <a href="../exp-06-fixed-grasp/index.html#s8">EXP-06 §实操</a> · <a href="../exp-01-urdf-simulation/index.html#s8">EXP-01 §URDF 联动</a></td>
+        </tr>
+        <tr>
+          <td class="m"><a href="#m6">M6 视觉定位</a></td>
+          <td>掌握抓取链的"眼睛"：HSV 为什么抗光照、阈值怎么调；针孔反投影从 (u,v,d) 到 (X,Y,Z)；再经 TF 换算给 IK</td>
+          <td>EXP-07 全链路：红色两段 HSV 阈值 (0,100,80)~(15,255,255)∪(160,100,80)~(180,255,255)、fx=fy=614/cx=320/cy=240、深度 uint16 mm÷1000、性能基线成功率 &gt;85%（讲义·实验7 步骤2/3 与步骤12）</td>
+          <td>合成场景实时 HSV 掩膜（H/S/V 双段滑块 + 质心拾取）→ 深度 d、焦距 fx 滑块 + 点击像素 → 反投影相机系 → 一键 TF 到 base_link，俯视图画目标点</td>
+          <td><a href="../exp-07-visual-grasp/index.html#s7">EXP-07 §HSV 调参台</a> · <a href="../exp-07-visual-grasp/index.html#s6">EXP-07 §三乐章动画</a></td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+    <div class="tip"><b>使用建议：</b>按 M1→M6 顺序过一遍（正好是抓取数据流：定位 → 求解 → 运动 → 抓 → 看）；每模块先读"案例"再玩演示，最后点底部回链到对应实验页完成实操。数学弱的读者先拖滑块看现象，再对照公式逐项核——每个公式的每一项都有对应滑块实时改写。</div>
+  </div>
+</section>
+
+<!-- ============ M1 ============ -->
+<section class="mod reveal" id="m1">
+  <div class="mod-head">
+    <div class="k" style="color:var(--rose)">MODULE 1 · 坐标变换</div>
+    <h2>M1 · 坐标系与 TF 变换链：同一个点，两套读数</h2>
+    <p class="goal"><b>教学目标：</b>① 说清 base_link 与 camera_depth_optical_frame 的轴向差异（REP-103）；② 会读 4×4 齐次变换并手动"乘"一个点；③ 明白抓取链里为什么视觉算出的点必须先 transform 到 base_link 才能喂给 IK。</p>
+  </div>
+  <div class="mod-body">
+    <div class="case">
+      <b>🎯 案例（讲义 · 实验7 步骤4「TF 坐标变换」）：</b>深度反投影先得到<b>相机系</b>的点——把红色方块放在相机前 0.5m，点是 <code>(0, 0, 0.5)</code>；而抓取 IK 只认 <b>base_link</b>，经过 TF 变换后同一个点变成 <code>(0.55, 0, 0.40)</code>。帧链：<code>map → odom → base_link → link1…link5 → tcp_link → camera_depth_optical_frame</code>（相机在腕末端——眼在手）。
+      <span class="src">出处：EXP005_lab_guide.md 实验7 · transform_to_base_link() / tf_buffer.transform()；实验6 步骤1：set_pick_target 消息必须写 frame_id:'base_link'。</span>
+    </div>
+
+    <div class="tftree panel" id="tfTree" style="margin-bottom:.9rem">
+      <span class="tfnode">map</span><span class="tfedge">→</span><span class="tfnode">odom</span><span class="tfedge">→</span><span class="tfnode">base_link</span><span class="tfedge">→</span><span class="tfnode">link1</span><span class="tfedge">→</span><span class="tfnode">link2</span><span class="tfedge">→</span><span class="tfnode">link3</span><span class="tfedge">→</span><span class="tfnode">link4</span><span class="tfedge">→</span><span class="tfnode">link5</span><span class="tfedge">→</span><span class="tfnode">tcp_link</span><span class="tfedge">→</span><span class="tfnode" id="tfCam">camera_depth_optical_frame</span>
+      <div style="font-size:.72rem;color:var(--text-muted);margin-top:.35rem">红色高亮 = 当前查询路径 <b>base_link ⇄ camera_depth_optical_frame</b>（点进去的每一"跳"都被 tf_buffer.lookup_transform 自动拼接）</div>
+    </div>
+
+    <div class="grid2">
+      <div class="panel">
+        <h4>交互① · 点的搬运：拖滑块看两套读数怎么变</h4>
+        <div class="ctl-row">
+          <label class="ctl">相机俯仰 γ <input type="range" id="m1g" min="-45" max="0" step="1" value="0"><output id="m1go">0°</output></label>
+          <label class="ctl">平移 tₓ <input type="range" id="m1tx" min="0" max="0.25" step="0.01" value="0.05"><output id="m1txo">0.05</output></label>
+          <label class="ctl">平移 t_z <input type="range" id="m1tz" min="0.1" max="0.6" step="0.01" value="0.40"><output id="m1tzo">0.40</output></label>
+          <label class="ctl">前向距离 d <input type="range" id="m1d" min="0.2" max="1" step="0.01" value="0.5"><output id="m1do">0.50</output></label>
+          <label class="ctl">偏角 θc <input type="range" id="m1th" min="-40" max="40" step="1" value="18"><output id="m1tho">18°</output></label>
+        </div>
+        <div class="ctl-row">
+          <button class="btn" onclick="m1Preset(0)">📐 讲义例子 (0,0,0.5)</button>
+          <button class="btn ghost" onclick="m1Preset(1)">🧮 像素(640,420) 近似 θc≈27°</button>
+          <label class="ctl">显示：<select id="m1show"><option value="both">俯视+侧视</option><option value="top">俯视 x-y</option><option value="side">侧视 x-z</option></select></label>
+        </div>
+        <canvas id="m1cv" width="640" height="320"></canvas>
+        <div class="io" id="m1io" style="margin-top:.6rem"></div>
+      </div>
+      <div class="panel">
+        <h4>交互② · 变换矩阵：数值随滑块联动</h4>
+        <div class="math">
+P₀ = [ <span class="hl" id="m1pc">0.000, 0.000, 0.500</span> ]ᵀ   <span class="dim" style="color:#64748b">// 相机系读数</span><br>
+R = Rot_Y(<span class="hl" id="m1gg">0°</span>) · R₀ ,&nbsp; R₀ = <span class="hlb">X←Z, Y←−X, Z←−Y</span> <span style="color:#64748b">// REP-103 光学系</span><br>
+<span class="hlb">P_base = R · P₀ + t</span> ,&nbsp; t = [<span class="hl" id="m1tt">0.05, 0, 0.40</span>]
+        </div>
+        <div class="math" style="margin-top:.5rem">
+T<sub>cam→base</sub> =<br>
+<div class="mtx" id="m1mtx" style="background:#0f172a;border-color:#334155;color:#e2e8f0;margin-top:.3rem"></div>
+        </div>
+        <div class="tip">
+          <b>怎么读：</b>点列向量左乘矩阵 = "换语言"。γ=0、t=(0.05,0,0.40) 时输入讲义例子恰好得到 <b>(0.55, 0, 0.40)</b> ——这就是抓取链每 30ms 真实跑一遍的运算。把 γ 调离 0 再看读数：<b>外参歪一点，抓取点就系统性偏移一截</b>（对应讲义"手眼标定未接入则用 URDF 固定外参"的提醒）。
+        </div>
+      </div>
+    </div>
+
+    <div class="tip"><b>数学直觉：</b>旋转矩阵每一列是新坐标系的一个轴在旧坐标系里的坐标；求逆变换在刚体情形 = 旋转转置 + 平移反号，所以 TF 查询 <code>(A→B)</code> 与 <code>(B→A)</code> 永远互逆，点换来换去总能量得回同毫米。</div>
+    <div class="linkrow">
+      <a class="lbtn" href="../exp-01-urdf-simulation/index.html#s10">→ EXP-01 §06 动手任务：看 TF 树</a>
+      <a class="lbtn" href="../exp-01-urdf-simulation/index.html#s3">→ EXP-01 §03 关节 · 限位 · 角色</a>
+      <a class="lbtn" href="../exp-07-visual-grasp/index.html#s8">→ EXP-07 §08 分阶段启动与服务触发（案例实操）</a>
+      <a class="lbtn" href="../exp-06-fixed-grasp/index.html#s8">→ EXP-06 §08 预演→目标→pick/place（frame_id 实操）</a>
+    </div>
+  </div>
+</section>
+
+<!-- M1 script -->
+<script>
+var M1={p:[0,0,0.5],T:null};
+function m1RotY(a){var c=Math.cos(a),s=Math.sin(a);return [[c,0,s],[0,1,0],[-s,0,c]];}
+function m1R0(){return [[0,0,1],[-1,0,0],[0,-1,0]];} // R0 * p : (z, -x, -y)
+function m1Mmul(A,B){var C=[[0,0,0],[0,0,0],[0,0,0]];for(var i=0;i<3;i++)for(var j=0;j<3;j++){var v=0;for(var k=0;k<3;k++)v+=A[i][k]*B[k][j];C[i][j]=v;}return C;}
+function m1Mv(A,p){return [A[0][0]*p[0]+A[0][1]*p[1]+A[0][2]*p[2],A[1][0]*p[0]+A[1][1]*p[1]+A[1][2]*p[2],A[2][0]*p[0]+A[2][1]*p[1]+A[2][2]*p[2]];}
+function m1Preset(k){
+  if(k===0){
+    // 讲义例子：P_cam=(0,0,0.5) → (0.55,0,0.40)
+    document.getElementById('m1g').value=0;document.getElementById('m1tx').value=0.05;
+    document.getElementById('m1tz').value=0.40;document.getElementById('m1d').value=0.5;
+    document.getElementById('m1th').value=0;
+  }else{
+    // 像素 (640,420)：X=(640-320)*0.5/614≈0.26m → 二维简化折算 θc≈27°
+    document.getElementById('m1g').value=0;document.getElementById('m1tx').value=0.05;
+    document.getElementById('m1tz').value=0.40;document.getElementById('m1d').value=0.56;
+    document.getElementById('m1th').value=27;
+  }
+  m1Upd();
+}
+function m1Upd(){
+  var g=parseFloat(document.getElementById('m1g').value)*Math.PI/180;
+  var tx=parseFloat(document.getElementById('m1tx').value),tz=parseFloat(document.getElementById('m1tz').value);
+  var th=parseFloat(document.getElementById('m1th').value)*Math.PI/180,d=parseFloat(document.getElementById('m1d').value);
+  document.getElementById('m1go').value=document.getElementById('m1g').value+'°';
+  document.getElementById('m1txo').value=tx.toFixed(2);document.getElementById('m1tzo').value=tz.toFixed(2);
+  document.getElementById('m1do').value=d.toFixed(2);document.getElementById('m1tho').value=document.getElementById('m1th').value+'°';
+  // 相机系点：前向 d、水平摆 θc（简化：相机系 Z 前、X 右）
+  var p0=[Math.sin(th)*d, 0, Math.cos(th)*d];
+  document.getElementById('m1pc').textContent=p0.map(function(v){return v.toFixed(3);}).join(', ');
+  document.getElementById('m1gg').textContent=document.getElementById('m1g').value+'°';
+  document.getElementById('m1tt').textContent=tx.toFixed(3)+', 0, '+tz.toFixed(3);
+  var R=m1Mmul(m1RotY(g),m1R0());
+  var pb=m1Mv(R,p0); pb=[pb[0]+tx,pb[1]+0,pb[2]+tz];
+  M1.p=pb;M1.R=R;M1.t=[tx,0,tz];
+  // 4x4 display
+  var el=document.getElementById('m1mtx'),html='';
+  for(var i=0;i<3;i++)for(var j=0;j<3;j++)html+='<span>'+R[i][j].toFixed(3)+'</span><span>'+(j===0?(i===0?tx.toFixed(3):(i===1?'0.000':tz.toFixed(3))):'')+'</span>';
+  html+='<span>0</span><span>0</span><span>0</span><span>1</span>';
+  el.innerHTML=html;
+  // IO
+  var atK=(Math.abs(g)<1e-6&&Math.abs(tx-0.05)<1e-9&&Math.abs(tz-0.40)<1e-9);
+  var isExample=atK && Math.abs(p0[0])<0.002 && Math.abs(p0[2]-0.5)<0.01;
+  document.getElementById('m1io').innerHTML=
+    '相机系 P_cam = ('+p0.map(function(v){return v.toFixed(3);}).join(', ')+')\n'
+    +'base_link 下  P = (<span class="k">'+pb[0].toFixed(3)+', '+pb[1].toFixed(3)+', '+pb[2].toFixed(3)+'</span>) m\n'
+    + (isExample? '✓ 与讲义例子一致：轴前 0.5m → (0.55, 0, 0.40)（讲义·实验7 步骤4 示例）'
+       : atK? '外参 = 讲义标定值 (γ=0, t=0.05/0.40)；当前输入非示例点 —— 点上方「讲义例子」按钮可复现 (0.55, 0, 0.40)'
+       : '⚠ 外参已偏离讲义标定值——读数随之变化，这正是"标定不准 → 抓取系统性偏移"的机理');
+  m1Draw();
+}
+function m1Draw(){
+  var cv=document.getElementById('m1cv'),ctx=cv.getContext('2d');
+  var W=cv.width,H=cv.height;ctx.clearRect(0,0,W,H);
+  var mode=document.getElementById('m1show').value;
+  var g=parseFloat(document.getElementById('m1g').value)*Math.PI/180;
+  var tx=parseFloat(document.getElementById('m1tx').value),tz=parseFloat(document.getElementById('m1tz').value);
+  ctx.font='11px Consolas,monospace';
+  var drawTop=true,drawSide=true;
+  if(mode==='top')drawSide=false; if(mode==='side')drawTop=false;
+  function Pview(ox,oy,sx,sy,title){ctx.fillStyle='#fff';ctx.fillRect(ox-2,oy-sy-18,sx+4,sy+22);ctx.strokeStyle='#94a3b8';ctx.lineWidth=1;ctx.strokeRect(ox-2,oy-sy-18,sx+4,sy+22);ctx.fillStyle='#475569';ctx.fillText(title,ox,oy-sy-6);}
+  // side view
+  if(drawSide){
+    var ox=90,oy=270,sx=460,sy=200;var xmax=1.1,zmax=0.9;
+    Pview(ox-60,oy,sx+90,sy+30,'侧视 x-z（base_link：X 前 →，Z 上 ↑）');
+    ctx.strokeStyle='#e2e8f0';
+    for(var i=0;i<=5;i++){var X=ox+i/5*sx;ctx.beginPath();ctx.moveTo(X,oy-sy);ctx.lineTo(X,oy);ctx.stroke();}
+    ctx.strokeStyle='#475569';ctx.lineWidth=1.6;
+    ctx.beginPath();ctx.moveTo(ox,oy);ctx.lineTo(ox+sx,oy);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(ox,oy);ctx.lineTo(ox,oy-sy);ctx.stroke();
+    // base link marker
+    ctx.fillStyle='#0f172a';ctx.fillRect(ox-6,oy-8,12,8);
+    ctx.fillStyle='#475569';ctx.fillText('base_link 原点',ox+6,oy+10);
+    // camera
+    var cx=ox+tx/xmax*sx, cy=oy-(tz)/zmax*sy;
+    ctx.fillStyle='#2563eb';ctx.beginPath();ctx.arc(cx,cy,6,0,7);ctx.fill();
+    ctx.fillText('相机光学系',cx+8,cy-4);
+    // fov cone by gamma
+    var gdeg=parseFloat(document.getElementById('m1g').value);
+    ctx.strokeStyle='rgba(37,99,235,.55)';ctx.lineWidth=1.4;
+    ctx.beginPath();ctx.moveTo(cx,cy);
+    var ex=cx+Math.cos((gdeg)*Math.PI/180)*150, ey=cy-Math.sin(gdeg*Math.PI/180)*150;
+    ctx.lineTo(Math.min(ex,ox+sx),ey);ctx.stroke();
+    // point
+    var pb=M1.p||[0,0,0];
+    var px=ox+pb[0]/xmax*sx, py=oy-pb[2]/zmax*sy;
+    ctx.fillStyle='#e11d48';ctx.beginPath();ctx.arc(px,py,5,0,7);ctx.fill();
+    ctx.fillStyle='#e11d48';ctx.fillText('点 P ('+pb[0].toFixed(2)+', '+pb[2].toFixed(2)+')',px+8,py+12);
+    // link line cam->P
+    ctx.strokeStyle='rgba(225,29,72,.4)';ctx.setLineDash([4,3]);
+    ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(px,py);ctx.stroke();ctx.setLineDash([]);
+  }
+  // top view
+  if(drawTop){
+    var ox=90,oy=270,s=200,xmax=1.1;
+    Pview(ox-60,oy,s+90,s+30,'俯视 x-y（X 前 →，Y 左 ↑）');
+    ctx.strokeStyle='#e2e8f0';
+    for(var i=0;i<=5;i++){var X=ox+i/5*s;ctx.beginPath();ctx.moveTo(X,oy-s);ctx.lineTo(X,oy);ctx.stroke();}
+    ctx.strokeStyle='#475569';ctx.lineWidth=1.6;
+    ctx.beginPath();ctx.moveTo(ox,oy);ctx.lineTo(ox+s,oy);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(ox,oy);ctx.lineTo(ox,oy-s);ctx.stroke();
+    ctx.fillStyle='#0f172a';ctx.fillRect(ox-6,oy-6,12,6);
+    var pb2=M1.p||[0,0,0];
+    var py=oy-(pb2[1]+0.55)/1.1*s/1, px=ox+pb2[0]/xmax*s;
+    // y range -0.55..0.55 → oy 中心画?
+    py=oy-(pb2[1])/ (s/ (1.1)) *0.5; // simplify: map y to ±90px
+    py=oy-(pb2[1]/1.1)*s*0.82;
+    ctx.fillStyle='#e11d48';ctx.beginPath();ctx.arc(px,py,5,0,7);ctx.fill();
+    ctx.fillStyle='#e11d48';ctx.fillText('P y='+pb2[1].toFixed(2),px+8,py-6);
+    ctx.fillStyle='#2563eb';ctx.beginPath();ctx.arc(ox+tx/1.1*s,oy-0,6,0,7);ctx.fill();
+    ctx.fillStyle='#475569';ctx.fillText('相机（在腕上，本图取基座前向投影）',ox+10,oy-14);
+  }
+}
+['m1g','m1tx','m1tz','m1d','m1th','m1show'].forEach(function(id){document.getElementById(id).addEventListener('input',m1Upd);});
+m1Upd();
+</script>
+
+<!-- ============ M2 ============ -->
+<section class="mod reveal" id="m2">
+  <div class="mod-head">
+    <div class="k" style="color:var(--blue)">MODULE 2 · 正运动学</div>
+    <h2>M2 · 正运动学 FK：从「舵机脉宽」到「指尖坐标」</h2>
+    <p class="goal"><b>教学目标：</b>① 建立"关节角 → 末端坐标"是<b>唯一确定</b>的正向映射这一直觉；② 会用 2R 平面模型手算 TCP 并与代码互验；③ 把 PWM↔弧度换算 <code>rad=(PWM−1500)×0.002356</code> 变成肌肉记忆。</p>
+  </div>
+  <div class="mod-body">
+    <div class="case">
+      <b>🎯 案例（讲义 · 实验5 步骤2「端到端工具脚本」+ 实验5 安全红线）：</b>上真机前先"纸上预演"——对 <code>pwm_to_fk_demo.py</code> 喂入五路脉宽 <code>2150 1200 2200 2275 1500</code>，不发任何指令，纯数学算出末端在哪，确认不撞桌再动臂。下面把这组真实案例值做成了默认滑块。
+      <span class="src">出处：EXP005_lab_guide.md 实验5 步骤2（pwm_to_fk_demo.py）；换算式出自实验2 知识点 2.1.2 / 实验3 知识点 3.2.2。</span>
+    </div>
+
+    <div class="grid2">
+      <div class="panel">
+        <h4>交互 · 5 路 PWM 滑块实时正解（教学 2R+yaw 模型）</h4>
+        <div class="ctl-row">
+          <label class="ctl">J1 底座 <input type="range" id="f1" min="500" max="2500" step="5" value="2150"><output id="f1o">2150</output></label>
+          <label class="ctl">J2 大臂 <input type="range" id="f2" min="500" max="2500" step="5" value="1200"><output id="f2o">1200</output></label>
+          <label class="ctl">J3 小臂 <input type="range" id="f3" min="500" max="2500" step="5" value="2200"><output id="f3o">2200</output></label>
+          <label class="ctl">J4 腕俯仰 <input type="range" id="f4" min="500" max="2500" step="5" value="2275"><output id="f4o">2275</output></label>
+          <label class="ctl">J5 腕旋转 <input type="range" id="f5" min="500" max="2500" step="5" value="1500"><output id="f5o">1500</output></label>
+        </div>
+        <div class="ctl-row">
+          <button class="btn blue" onclick="fkCase()">🔬 载入讲义案例值</button>
+          <button class="btn ghost" onclick="fkHome()">🏠 回中位 [1500×5]</button>
+          <span id="fkSafe"></span>
+        </div>
+        <canvas id="fkCv" width="640" height="300"></canvas>
+        <div class="math" style="margin-top:.6rem">
+θ<sub>i</sub> = (<span class="hl">PWM<sub>i</sub></span> − 1500) × <span class="hl">0.002356</span> &nbsp;→&nbsp; θ = [<span id="fkRad">…</span>] rad<br>
+r = L1·cos θ₂ + L2·cos(θ₂+θ₃) , &nbsp; z = d + L1·sin θ₂ + L2·sin(θ₂+θ₃) , &nbsp; <span class="hlb">x = r·cos θ₁ , y = r·sin θ₁</span><br>
+<span style="color:#64748b">L1=0.105 , L2=0.180 , d=0.085 （讲义 2R 简化口径，同 EXP-03 试算台）</span>
+        </div>
+        <div class="io" id="fkIo"></div>
+      </div>
+      <div class="panel">
+        <h4>读图：俯视看"扫到哪"，侧视看"伸多高"</h4>
+        <canvas id="fkCv2" width="360" height="300"></canvas>
+        <div class="tip"><b>判达：</b>虚线圈 = 参考球 r<sub>max</sub>=0.4m（讲义·工作空间扫描口径，来自 demo_fk_ik 参考值）。指尖落在圈外，IK 大概率报 <span style="color:#b91c1c">unreachable</span>。</div>
+        <div class="tip"><b>安全联动：</b>任一路 PWM 变红 = 超出 500~2500 机械限位区间——这正是讲义第一条安全红线要求"发之前先心算对应角度"的原因：换算不过来，就上滑块先看。</div>
+      </div>
+    </div>
+
+    <div class="tip"><b>为什么 FK 是"简单"的：</b>它是纯代入——同一组角算一万次结果都一样（确定、无迭代、μs 级）。真正难的反过来：知道指尖在哪，关节该怎么弯？→ 进 M3。</div>
+    <div class="linkrow">
+      <a class="lbtn" href="../exp-03-kinematics/index.html#s7">→ EXP-03 §07 FK 正解试算台（同模型对照）</a>
+      <a class="lbtn" href="../exp-03-kinematics/index.html#s8">→ EXP-03 §08 实操：仿真器 + demo_fk_ik.py</a>
+      <a class="lbtn" href="../exp-02-serial-pwm/index.html#s2">→ EXP-02 §02 舵机伺服系统与 PWM↔弧度换算（换算出处）</a>
+    </div>
+  </div>
+</section>
+
+<!-- ============ M3 ============ -->
+<section class="mod reveal" id="m3">
+  <div class="mod-head">
+    <div class="k" style="color:var(--violet)">MODULE 3 · 逆运动学</div>
+    <h2>M3 · 逆运动学 IK：把「想放哪」反算成「怎么弯」</h2>
+    <p class="goal"><b>教学目标：</b>① 走一遍 car1 三段式解析法（指向 → 2R 余弦定理 → pitch 补偿的前两段）；② 看懂<b>多解</b>（肘上/肘下）与<b>不可达</b>的几何判据；③ 会做 IK→FK <b>闭环验证</b>；④ 感受 DLS 数值法阻尼 λ 的作用。</p>
+  </div>
+  <div class="mod-body">
+    <div class="case">
+      <b>🎯 案例（讲义 · 实验6 步骤1）：</b>固定抓取把目标直接发给臂：<code>set_pick_target</code> 写 <code>position {x: 0.28, y: 0.0, z: 0.10}</code>、<code>orientation {x:0, y:1, z:0, w:0}</code>（= pitch 180°，夹爪垂直朝下）。IK 必须在几十毫秒内把这一个点翻成 5 个关节角——下面红点就是它。
+      <span class="src">出处：EXP005_lab_guide.md 实验6 步骤1（ros2 topic pub 示例）；三段式推导见实验4 步骤2（ik-analytical.js）。</span>
+    </div>
+
+    <div class="grid2">
+      <div class="panel">
+        <h4>交互① · 在工作平面里拖目标点（红点可拖！）</h4>
+        <div class="ctl-row">
+          <label class="ctl">x <input type="number" id="ix" value="0.28" step="0.01"></label>
+          <label class="ctl">y <input type="number" id="iy" value="0.00" step="0.01"></label>
+          <label class="ctl">z <input type="number" id="iz" value="0.10" step="0.01"></label>
+          <button class="btn" onclick="ikCase()">🎯 载入抓取目标点</button>
+          <label class="ctl">肘姿 <select id="ikEl"><option value="1">Elbow UP（凸）</option><option value="-1">Elbow DOWN（凹）</option></select></label>
+        </div>
+        <canvas id="ikCv" width="640" height="360" style="cursor:crosshair"></canvas>
+        <div class="io" id="ikIo"></div>
+        <div class="ctl-row" style="margin-top:.6rem">
+          <button class="btn blue" onclick="ikSolve()">① 解析 IK 求解</button>
+          <button class="btn teal" onclick="ikClose()">② 把解喂回 FK · 闭环验证</button>
+          <label class="ctl"><input type="checkbox" id="ikAsin"> 启用 asin 偏置补偿（讲义式，d=0.085）</label>
+        </div>
+        <div class="math" style="margin-top:.5rem">
+<span class="hlb">第一段</span> q₁ = atan2(y, x) [− asin(d/√(x²+y²))]<br>
+<span class="hlb">第二段</span> D² = ρ² + (z−d)² ; &nbsp; cos q₃ = (D² − L1² − L2²) / (2·L1·L2) = <span class="hl" id="ikCos">—</span><br>
+&nbsp;&nbsp;&nbsp;q₃ = ±acos(·)（肘姿选 ±）, &nbsp; q₂ = atan2(z−d, ρ) − atan2(L2·sin q₃, L1+L2·cos q₃)<br>
+<span style="color:#64748b">（第三段 PHI=pitch−(q2+q3) 分给 q4/q5 —— 姿态解见 EXP-03 讲解，本台先攻位置）</span>
+        </div>
+      </div>
+      <div class="panel">
+        <h4>交互② · DLS 数值法：阻尼 λ 起什么作用</h4>
+        <div class="ctl-row">
+          <label class="ctl">λ 阻尼 <input type="range" id="dlL" min="1" max="100" step="1" value="10"><output id="dlLo">0.10</output></label>
+          <button class="btn blue" onclick="dlsStart()">▶ 从折叠姿态迭代逼近</button>
+          <button class="btn ghost" onclick="dlsReset()">重置</button>
+        </div>
+        <canvas id="dlCv" width="360" height="260"></canvas>
+        <div class="io" id="dlIo"></div>
+        <div class="tip"><b>参数调试指引：</b>λ 拖小（&lt;0.03）→ 步子迈太大，越过目标来回横跳；λ 拖大（&gt;0.5）→ 每步挪一点点，稳但慢；讲义默认 <b>λ=0.1</b>，奇异（臂快伸直）附近靠它兜底不发散。这就是"解析法快而挑构型、数值法慢而皮实"的一体两面（讲义·实验4 4.2.2）。</div>
+        <div class="tip"><b>闭环的含义：</b>点"喂回 FK"后误差应显示 ≈0.00mm——数学上自洽。<b>但"求解成功 ≠ 解准确"</b>：实臂还要过模型一致性、机械间隙、标定这几关（讲义·实验5 闭环实测的教训，故验收线单独列在实验报告里）。</div>
+      </div>
+    </div>
+
+    <div class="linkrow">
+      <a class="lbtn" href="../exp-03-kinematics/index.html#s6">→ EXP-03 §06 动画：关节角叠加求末端</a>
+      <a class="lbtn" href="../exp-03-kinematics/index.html#s8">→ EXP-03 §08 实操：解析 vs DLS 对比</a>
+      <a class="lbtn" href="../exp-04-ik-solver/index.html#s8">→ EXP-04 §08 实操：interactive_ik_test --direct（真机验证闭环）</a>
+      <a class="lbtn" href="#m5">→ M5 · 求出的角去 3D 里动起来</a>
+    </div>
+  </div>
+</section>
+
+<!-- M2+M3 scripts -->
+<script>
+/* ===== shared 2R model ===== */
+var L1=0.105,L2=0.180,D0=0.085,KPW=0.002356;
+function fkPlanar(t2,t3){return {r:L1*Math.cos(t2)+L2*Math.cos(t2+t3), z:D0+L1*Math.sin(t2)+L2*Math.sin(t2+t3),
+  p1:[L1*Math.cos(t2), D0+L1*Math.sin(t2)]};}
+function ik2R(rho,z,el){ // returns {ok,q2,q3,why}
+  var dz=z-D0, D2=rho*rho+dz*dz, D=Math.sqrt(D2);
+  var lim=L1+L2, low=Math.abs(L2-L1);
+  if(D>lim+1e-9||D<low-1e-9) return {ok:false,why:'D='+D.toFixed(3)+'m 不在 ['+low.toFixed(2)+', '+lim.toFixed(2)+'] 内 → 无解（工作空间外）',D:D};
+  var c=(D2-L1*L1-L2*L2)/(2*L1*L2); c=Math.max(-1,Math.min(1,c));
+  var q3=el*Math.acos(c);
+  var q2=Math.atan2(dz,rho)-Math.atan2(L2*Math.sin(q3),L1+L2*Math.cos(q3));
+  return {ok:true,q2:q2,q3:q3,c:c,D:D};
+}
+/* ===== M2 FK ===== */
+function fkVals(){var v=[];for(var i=1;i<=5;i++)v.push(parseFloat(document.getElementById('f'+i).value));return v;}
+function fkCase(){[2150,1200,2200,2275,1500].forEach(function(p,i){document.getElementById('f'+(i+1)).value=p;});fkUpd();}
+function fkHome(){[1500,1500,1500,1500,1500].forEach(function(p,i){document.getElementById('f'+(i+1)).value=p;});fkUpd();}
+function fkUpd(){
+  var v=fkVals(),rad=v.map(function(p,i){document.getElementById('f'+(i+1)+'o').value=p;return (p-1500)*KPW;});
+  document.getElementById('fkRad').textContent=rad.map(function(r){return r.toFixed(3);}).join(', ');
+  var t1=rad[0],t2=rad[1],t3=rad[2];
+  var f=fkPlanar(t2,t3);
+  var x=f.r*Math.cos(t1),y=f.r*Math.sin(t1),z=f.z;
+  var safe=v.every(function(p){return p>=500&&p<=2500;});
+  document.getElementById('fkSafe').innerHTML=safe?'<span class="chip ok">✓ 5 路全在 500~2500 安全区</span>':'<span class="chip bad">✗ 有限位越界（滑块拉满本身即演示越界）</span>';
+  document.getElementById('fkIo').innerHTML=
+   'PWM ['+v.join(', ')+'] μs\n→ rad ['+rad.map(function(r){return r.toFixed(3);}).join(', ')+']\n'
+   +'→ 指尖 TCP = (<span class="k">'+x.toFixed(4)+', '+y.toFixed(4)+', '+z.toFixed(4)+'</span>) m\n'
+   +'→ 离底座中心 √(x²+y²+z²) = '+Math.sqrt(x*x+y*y+z*z).toFixed(4)+' m　'
+   +(Math.sqrt(x*x+y*y+z*z)<=0.4?'<span class="k">≤0.4 ✓ 可达圈内</span>':'<span class="bad">＞0.4 ⚠ 参考圈外</span>')
+   +'\n<span class="warn">// 这就是 pwm_to_fk_demo 不发一帧指令、只算数的"预演"</span>';
+  FKPOS={x:x,y:y,z:z};fkDrawSide(t1,t2,t3,x,y,z);fkDrawTop(t1,x,y);
+}
+var FKPOS={x:0,y:0,z:0};
+function fkDrawSide(t1,t2,t3,x,y,z){
+  var cv=document.getElementById('fkCv'),c=cv.getContext('2d'),W=cv.width,H=cv.height;
+  c.clearRect(0,0,W,H);c.font='11px Consolas,monospace';
+  var ox=50,oy=H-40,s=560/0.55; // 0..0.55m → 560px, 轴高
+  var ozy=H-40;
+  // grid
+  c.strokeStyle='#eef2f7';for(var g=0;g<=5;g++){var X=ox+g/5*0.5*s;c.beginPath();c.moveTo(X,20);c.lineTo(X,ozy);c.stroke();}
+  c.strokeStyle='#475569';c.lineWidth=1.6;
+  c.beginPath();c.moveTo(ox,ozy);c.lineTo(W-10,ozy);c.stroke();
+  c.beginPath();c.moveTo(ox,ozy);c.lineTo(ox,20);c.stroke();
+  c.fillStyle='#475569';c.fillText('侧视 r-z（肩关节原点在 (0, d=0.085)）',ox,14);
+  for(var m=0;m<=5;m++){var mm=m*0.1;c.fillStyle='#94a3b8';c.fillText(mm.toFixed(1)+'m',ox+mm*s-8,ozy+14);c.fillText(mm.toFixed(1),ox-24,ozy-mm*s+4);}
+  // d offset
+  c.fillStyle='#0f172a';c.fillRect(ox-7,ozy-8,14,8);
+  c.strokeStyle='#94a3b8';c.setLineDash([3,3]);c.beginPath();c.moveTo(ox,ozy-D0*s);c.lineTo(ox+26,ozy-D0*s);c.stroke();c.setLineDash([]);
+  c.fillText('d=0.085',ox+30,ozy-D0*s+4);
+  // plane position projected (r uses cos? side shows r=√(x²+y²)... planar r with yaw doesn't change (r same) — draw planar
+  var f=fkPlanar(t2,t3);
+  var X0=ox,Y0=ozy-D0*s;
+  var X1=ox+f.p1[0]*s, Y1=ozy-f.p1[1]*s;
+  var X2=ox+f.r*s, Y2=ozy-f.z*s;
+  c.strokeStyle='#dc2626';c.lineWidth=4;c.lineCap='round';
+  c.beginPath();c.moveTo(X0,Y0);c.lineTo(X1,Y1);c.stroke();
+  c.strokeStyle='#2563eb';c.lineWidth=3.5;
+  c.beginPath();c.moveTo(X1,Y1);c.lineTo(X2,Y2);c.stroke();
+  c.fillStyle='#0f172a';c.beginPath();c.arc(X1,Y1,4,0,7);c.fill();
+  c.fillStyle='#e11d48';c.beginPath();c.arc(X2,Y2,6,0,7);c.fill();
+  c.fillText('TCP (r='+f.r.toFixed(3)+', z='+f.z.toFixed(3)+')',X2+8,Y2-6);
+  // reachable band arc
+  c.strokeStyle='rgba(5,150,105,.5)';c.setLineDash([6,4]);c.lineWidth=1.5;
+  c.beginPath();c.arc(X0,Y0,(L1+L2)*s,-0.15*Math.PI,0.55*Math.PI);c.stroke();c.setLineDash([]);
+  c.fillStyle='#059669';c.fillText('L1+L2=0.285 外缘',X0+(L1+L2)*s-60,Y0-6);
+}
+function fkDrawTop(t1,x,y){
+  var cv=document.getElementById('fkCv2'),c=cv.getContext('2d'),W=cv.width,H=cv.height;
+  c.clearRect(0,0,W,H);c.font='11px Consolas,monospace';
+  var cx=W/2,cy=H/2+10,s=240/0.45; // 0.45m → 240px 直径半径
+  c.strokeStyle='#e2e8f0';c.lineWidth=1;
+  c.beginPath();c.arc(cx,cy,0.4*s,0,7);c.stroke();
+  c.setLineDash([5,4]);c.strokeStyle='#059669';c.beginPath();c.arc(cx,cy,0.4*s,0,7);c.stroke();c.setLineDash([]);
+  c.beginPath();c.moveTo(cx-0.44*s,cy);c.lineTo(cx+0.44*s,cy);c.moveTo(cx,cy-0.44*s);c.lineTo(cx,cy+0.44*s);c.stroke();
+  c.fillStyle='#475569';c.fillText('俯视 x-y（虚圈 r_max=0.4m）',10,14);
+  c.fillStyle='#0f172a';c.beginPath();c.arc(cx,cy,5,0,7);c.fill();
+  var PX=cx+x*s, PY=cy-y*s;
+  c.strokeStyle='rgba(225,29,72,.55)';c.lineWidth=2;
+  c.beginPath();c.moveTo(cx,cy);c.lineTo(PX,PY);c.stroke();
+  c.fillStyle='#e11d48';c.beginPath();c.arc(PX,PY,5,0,7);c.fill();
+  c.fillText('θ₁='+(t1*180/Math.PI).toFixed(1)+'°',PX+7,PY-5);
+  var reach=Math.sqrt(x*x+y*y);
+  c.fillStyle= reach<=0.4?'#047857':'#b91c1c';
+  c.fillText('ρ='+reach.toFixed(3)+'m',10,H-8);
+}
+['f1','f2','f3','f4','f5'].forEach(function(id){document.getElementById(id).addEventListener('input',fkUpd);});
+fkUpd();
+
+/* ===== M3 IK ===== */
+var IK={x:0.28,z:0.10,el:1,q:null,hist:null};
+function ikCase(){document.getElementById('ix').value=0.28;document.getElementById('iy').value=0;document.getElementById('iz').value=0.10;ikSolve();}
+function ikRead(){IK.x=parseFloat(document.getElementById('ix').value)||0;IK.y=parseFloat(document.getElementById('iy').value)||0;IK.z=parseFloat(document.getElementById('iz').value)||0;}
+var IKCV_S={ox:60,oy:318,s:520}; // px per m: r:0..0.5→..., z 0..0.5
+function ik2px(rho,z){var S=IKCV_S;return [S.ox+rho/0.5*530, S.oy-z/0.52*290];}
+function px2ik(px,py){var S=IKCV_S;return {rho:Math.max(0,Math.min(0.52,(px-S.ox)/530*0.5)), z:Math.max(0,Math.min(0.52,(S.oy-py)/290*0.52))};}
+function ikSolve(){
+  ikRead();IK.el=parseInt(document.getElementById('ikEl').value);
+  var rho=Math.sqrt(IK.x*IK.x+IK.y*IK.y);
+  var q1=Math.atan2(IK.y,IK.x);
+  if(document.getElementById('ikAsin').checked&&rho>1e-6) q1=q1-Math.asin(Math.min(1,D0/rho));
+  var res=ik2R(rho,IK.z,IK.el);
+  IK.q={q1:q1,q2:res.ok?res.q2:0,q3:res.ok?res.q3:0};
+  IK.res=res;IK.rho=rho;
+  document.getElementById('ikCos').textContent=res.ok?res.c.toFixed(4):'—';
+  ikShow();
+}
+function ikClose(){
+  if(!IK.res){ikSolve();}
+  if(!IK.res.ok){ikShow('no');return;}
+  var f=fkPlanar(IK.q.q2,IK.q.q3);
+  var e=Math.sqrt(Math.pow(f.r-IK.rho,2)+Math.pow(f.z-IK.z,2))*1000;
+  IK.err=e; ikShow();
+}
+function ikShow(mode){
+  var io=document.getElementById('ikIo');
+  if(IK.res&&!IK.res.ok){
+    io.innerHTML='<span class="bad">✗ '+(IK.res?IK.res.why:'无解')+'</span>\n目标 ρ='+(IK.rho||0).toFixed(3)+' z='+IK.z.toFixed(3)
+      +'\n→ 工作空间 = 以肩为心、内径 |L2−L1|=0.075 / 外径 L1+L2=0.285 的圆环（俯仰方向的环带）'
+      +'\n<span class="warn">// 案例点 (0.28,0,0.10)：ρ=0.280 恰贴外缘——再远 5mm 就无解，这叫"边界"</span>';
+    IKDRAW={ok:false};ikDraw();return;
+  }
+  var q=IK.q,r=IK.res;
+  var line1='① q₁ = atan2('+IK.y.toFixed(2)+', '+IK.x.toFixed(2)+') = '+(q.q1*180/Math.PI).toFixed(2)+'°'
+    +(document.getElementById('ikAsin').checked?' − asin(0.085/'+(IK.rho).toFixed(3)+') → '+(q.q1*180/Math.PI).toFixed(2)+'°':'（未启用偏置补偿）');
+  var line2b='② D='+r.D.toFixed(4)+' m , cos q₃ = '+(r.D*r.D-L1*L1-L2*L2).toFixed(5)+'/'+(2*L1*L2).toFixed(5)+' = '+r.c.toFixed(4)
+    +' → q₃ = '+(q.q3*180/Math.PI).toFixed(2)+'° , q₂ = '+(q.q2*180/Math.PI).toFixed(2)+'°（'+(IK.el>0?'肘 UP':'肘 DOWN')+'）';
+  var line3;
+  if(IK.err===undefined||IK.err===null){
+    line3='③ 闭环：点「喂回 FK」验证';
+  }else{
+    line3='③ 闭环误差 = <span class="'+(IK.err<1?'k':'bad')+'">'+IK.err.toFixed(3)+' mm</span> '
+     +(IK.err<1?'✓ 数学自洽（≈0）；实臂残差来自模型/标定，见讲义实验5':'✗ 异常——检查坐标系或参数');
+  }
+  io.innerHTML=line1+'\n'+line2b+'\n'+line3
+    +'\n<span class="warn">// 多解演示：切肘 UP/DOWN，同一红点、两套 q₂q₃——FK 回算都落在红点上</span>';
+  IKDRAW={ok:true,x:IK.x,z:IK.z,rho:IK.rho,q1:q.q1,q2:q.q2,q3:q.q3,p1:[IK.rho?0:0,0]};
+  // compute joint world points for drawing
+  var f=fkPlanar(q.q2,q.q3);
+  IKDRAW.p1=[L1*Math.cos(q.q2),D0+L1*Math.sin(q.q2)];
+  IKDRAW.p2=[f.r,f.z];
+  ikDraw();
+}
+var IKDRAW={ok:false};
+function ikDraw(){
+  var cv=document.getElementById('ikCv'),c=cv.getContext('2d'),W=cv.width,H=cv.height;
+  c.clearRect(0,0,W,H);c.font='11px Consolas,monospace';
+  var S=IKCV_S;
+  // workspace annulus (rho>=0 half)
+  c.save();
+  var pO=ik2px(0,0);
+  // draw ring: circles radius inner 0.075 outer 0.285 centered at shoulder (rho=0,z=D0)
+  for(var a=-90;a<=90;a+=3){
+    var rr=a*Math.PI/180;
+  }
+  // sample polygon
+  c.beginPath();
+  for(var ang=-Math.PI/2;ang<=Math.PI/2+0.001;ang+=0.05){var P=ik2px((L1+L2)*Math.cos(ang),D0+(L1+L2)*Math.sin(ang));if(ang===-Math.PI/2)c.moveTo(P[0],P[1]);else c.lineTo(P[0],P[1]);}
+  for(var ang2=Math.PI/2;ang2>=-Math.PI/2-0.001;ang2-=0.05){var P2=ik2px(Math.abs(L2-L1)*Math.cos(ang2),D0+Math.abs(L2-L1)*Math.sin(ang2));c.lineTo(P2[0],P2[1]);}
+  c.closePath();
+  c.fillStyle='rgba(5,150,105,.10)';c.fill();
+  c.strokeStyle='rgba(5,150,105,.55)';c.lineWidth=1.4;c.stroke();
+  c.restore();
+  // axes
+  var AX=ik2px(0,0),AY=ik2px(0,0);
+  c.strokeStyle='#475569';c.lineWidth=1.5;
+  c.beginPath();c.moveTo(S.ox,S.oy);c.lineTo(W-8,S.oy);c.stroke();
+  c.beginPath();c.moveTo(S.ox,S.oy);c.lineTo(S.ox,16);c.stroke();
+  c.fillStyle='#475569';c.fillText('工作平面 ρ(z=前向投影距离) — z（绿色环带 = 可达工作空间）',S.ox,12);
+  c.fillStyle='#94a3b8';
+  for(var m=0;m<=5;m++){c.fillText((m*0.1).toFixed(1),S.ox+m*0.1/0.5*530-8,S.oy+14);c.fillText((m*0.1).toFixed(1),S.ox-26,S.oy-m*0.1/0.52*290+4);}
+  // shoulder & d
+  c.fillStyle='#0f172a';c.fillRect(S.ox-6,S.oy-0.085/0.52*290-6,12,6);
+  c.fillStyle='#94a3b8';c.fillText('肩 (0, 0.085)',S.ox+8,S.oy-0.085/0.52*290-8);
+  // target
+  var T=ik2px(IKDRAW.rho!==undefined?IKDRAW.rho:(IK.rho!==undefined?IK.rho:IK.x), IKDRAW.z!==undefined?IKDRAW.z:(IK.z!==undefined?IK.z:0.1));
+  c.fillStyle='#e11d48';c.beginPath();c.arc(T[0],T[1],7,0,7);c.fill();
+  c.fillStyle='#fff';c.fillRect(T[0]-22,T[1]-20,44,14);
+  c.fillStyle='#e11d48';c.fillText('目标',T[0]-12,T[1]-9);
+  if(IKDRAW.ok){
+    var H0=ik2px(0,D0),H1=ik2px(IKDRAW.p1[0],IKDRAW.p1[1]),H2=ik2px(IKDRAW.p2[0],IKDRAW.p2[1]);
+    c.strokeStyle='#dc2626';c.lineWidth=4;c.lineCap='round';
+    c.beginPath();c.moveTo(H0[0],H0[1]);c.lineTo(H1[0],H1[1]);c.stroke();
+    c.strokeStyle='#2563eb';c.lineWidth=3.5;
+    c.beginPath();c.moveTo(H1[0],H1[1]);c.lineTo(H2[0],H2[1]);c.stroke();
+    // target crosshair link
+    c.strokeStyle='rgba(225,29,72,.35)';c.setLineDash([4,4]);c.beginPath();c.moveTo(H2[0],H2[1]);c.lineTo(T[0],T[1]);c.stroke();c.setLineDash([]);
+    c.fillStyle='#0f172a';c.beginPath();c.arc(H1[0],H1[1],4,0,7);c.fill();
+    c.fillStyle='#7c3aed';c.beginPath();c.arc(H2[0],H2[1],5,0,7);c.fill();
+    c.fillText((IK.el>0?'肘 UP':'肘 DOWN'),H1[0]+6,H1[1]-6);
+  }
+  c.fillStyle='#475569';c.fillText('拖拽红点改变目标 · 或用上方数字输入精确坐标',W-300,H-8);
+}
+// drag
+(function(){
+  var cv=document.getElementById('ikCv'),drag=false;
+  function ev(e){var r=cv.touches?cv.getBoundingClientRect():cv.getBoundingClientRect();
+    var cx=(e.touches?e.touches[0].clientX:e.clientX)-r.left;
+    var cy=(e.touches?e.touches[0].clientY:e.clientY)-r.top;
+    cx*=cv.width/r.width;cy*=cv.height/r.height;return [cx,cy];}
+  function down(e){drag=true;move(e);e.preventDefault();}
+  function move(e){if(!drag)return;var p=ev(e);var v=px2ik(p[0],p[1]);
+    document.getElementById('ix').value=v.rho.toFixed(3);
+    document.getElementById('iz').value=v.z.toFixed(3);
+    document.getElementById('iy').value=0;
+    IK.err=null;ikSolve();e.preventDefault();}
+  function up(){drag=false;}
+  cv.addEventListener('mousedown',down);cv.addEventListener('mousemove',move);
+  window.addEventListener('mouseup',up);
+  cv.addEventListener('touchstart',down,{passive:false});cv.addEventListener('touchmove',move,{passive:false});
+  window.addEventListener('touchend',up);
+})();
+['ix','iy','iz','ikEl'].forEach(function(id){document.getElementById(id).addEventListener('input',function(){IK.err=null;ikSolve();});});
+document.getElementById('ikAsin').addEventListener('change',function(){IK.err=null;ikSolve();});
+ikSolve();
+
+/* ===== DLS demo ===== */
+var DLS={q:[0.2,-0.2],anim:null,steps:0,target:[0.24,0.16]};
+function dlsReset(){DLS.q=[0.2,-0.2];DLS.steps=0;if(DLS.anim){clearInterval(DLS.anim);DLS.anim=null;}dlsDraw();document.getElementById('dlIo').innerHTML='就绪：点「迭代逼近」看 λ 的作用';}
+function dlsP(q){var f=fkPlanar(q[0],q[1]);return [f.r,f.z-D0];} // 相对肩
+function dlsJ(q){var e=1e-5;
+  var p=dlsP(q),p1=dlsP([q[0]+e,q[1]]),p2=dlsP([q[0],q[1]+e]);
+  return [[(p1[0]-p[0])/e,(p2[0]-p[0])/e],[(p1[1]-p[1])/e,(p2[1]-p[1])/e]];}
+function dlsStart(){
+  if(DLS.anim){clearInterval(DLS.anim);DLS.anim=null;}
+  var lam=parseFloat(document.getElementById('dlL').value)/100;
+  DLS.steps=0;DLS.hist=[];
+  var io=document.getElementById('dlIo');
+  io.innerHTML='λ='+lam.toFixed(2)+' 迭代中…';
+  DLS.anim=setInterval(function(){
+    var p=dlsP(DLS.q),T=DLS.target,e=[T[0]-p[0],T[1]-p[1]];
+    var err=Math.hypot(e[0],e[1]);
+    if(err<0.001||DLS.steps>400){
+      clearInterval(DLS.anim);DLS.anim=null;
+      io.innerHTML='λ='+lam.toFixed(2)+' 经 <span class="k">'+DLS.steps+'</span> 步，误差 '+err.toFixed(4)+' m'
+        +'\n'+(DLS.steps>400?'<span class="bad">未收敛（400 步超时）→ λ 太小，步长失控</span>':(lam<0.04?'<span class="warn">步数偏多且轨迹抖——λ 过小，接近奇异时易振荡</span>':lam>0.5?'<span class="warn">稳但每步很小 → λ 偏大，牺牲速度换稳定</span>':'<span class="k">收敛良好（讲义推荐量级 λ≈0.1）</span>'));
+      dlsDraw();return;}
+    var J=dlsJ(DLS.q);
+    // Jt (J Jt + λ²I)^-1 e   (2x2)
+    var a=J[0][0]*J[0][0]+J[0][1]*J[0][1],b=J[0][0]*J[1][0]+J[0][1]*J[1][1],
+        c2=J[1][0]*J[0][0]+J[1][1]*J[0][1],d=J[1][0]*J[1][0]+J[1][1]*J[1][1];
+    // M = J Jt  (symmetric 2x2): m00,m01,m11
+    var m00=a+lam*lam,m01=b,m11=d+lam*lam;
+    var det=m00*m11-m01*m01;if(Math.abs(det)<1e-9){dlsReset();return;}
+    var i00=m11/det,i01=-m01/det,i11=m00/det;
+    var y0=i00*e[0]+i01*e[1],y1=i01*e[0]+i11*e[1];
+    var dq=[J[0][0]*y0+J[1][0]*y1, J[0][1]*y0+J[1][1]*y1];
+    DLS.q[0]+=dq[0];DLS.q[1]+=dq[1];DLS.steps++;
+    dlsDraw();
+  },25);
+  dlsDraw();
+}
+function dlsDraw(){
+  var cv=document.getElementById('dlCv'),c=cv.getContext('2d'),W=cv.width,H=cv.height;
+  c.clearRect(0,0,W,H);c.font='11px Consolas,monospace';
+  var ox=40,oy=H-36,s=290/0.36;
+  c.strokeStyle='#e2e8f0';c.beginPath();c.moveTo(ox,oy);c.lineTo(W-8,oy);c.moveTo(ox,oy);c.lineTo(ox,14);c.stroke();
+  c.fillStyle='#475569';c.fillText('2R 迭代示意（相对肩坐标，m）',ox,12);
+  var H0=[ox,oy],H1v=dlsP([DLS.q[0],DLS.q[1]]),H2v=dlsP(DLS.q);
+  function toPx(p){return [ox+p[0]*s, oy-p[1]*s];}
+  var A1=toPx(dlsP([DLS.q[0],0]).length?dlsP([DLS.q[0],DLS.q[1]]):[0,0]);
+  // 拆两杆：根姿态 q2 全给第一杆
+  var mid=[L1*Math.cos(DLS.q[0]), L1*Math.sin(DLS.q[0])];
+  var end=[mid[0]+L2*Math.cos(DLS.q[0]+DLS.q[1]), mid[1]+L2*Math.sin(DLS.q[0]+DLS.q[1])];
+  var P0=[ox,oy],P1=toPx(mid),P2=toPx(end);
+  c.strokeStyle='#dc2626';c.lineWidth=4;c.lineCap='round';c.beginPath();c.moveTo(P0[0],P0[1]);c.lineTo(P1[0],P1[1]);c.stroke();
+  c.strokeStyle='#2563eb';c.lineWidth=3;c.beginPath();c.moveTo(P1[0],P1[1]);c.lineTo(P2[0],P2[1]);c.stroke();
+  var Tv=toPx([DLS.target[0]+0.0, DLS.target[1]]);
+  c.fillStyle='#e11d48';c.beginPath();c.arc(Tv[0],Tv[1],6,0,7);c.fill();
+  c.strokeStyle='rgba(225,29,72,.4)';c.setLineDash([3,3]);c.beginPath();c.moveTo(P2[0],P2[1]);c.lineTo(Tv[0],Tv[1]);c.stroke();c.setLineDash([]);
+  c.fillStyle='#475569';c.fillText('e='+Math.hypot(DLS.target[0]-end[0],DLS.target[1]-end[1]).toFixed(4)+' m / 步数 '+DLS.steps,ox+6,24);
+}
+document.getElementById('dlL').addEventListener('input',function(){
+  document.getElementById('dlLo').value=(this.value/100).toFixed(2);});
+dlsReset();
+</script>
+
+<!-- ============ M4 ============ -->
+<section class="mod reveal" id="m4">
+  <div class="mod-head">
+    <div class="k" style="color:var(--teal)">MODULE 4 · 轨迹规划</div>
+    <h2>M4 · 轨迹与分步移动：为什么不能「一条指令甩到位」</h2>
+    <p class="goal"><b>教学目标：</b>① 理解轨迹 = 角度随时间的函数 q(t)，插值决定"怎么走"；② 看懂 car1 的分步策略 <code>_move_stepwise</code>（40%/60% 分时）；③ 会用限位与 PWM 安全边界检查一条轨迹是否"能发"。</p>
+  </div>
+  <div class="mod-body">
+    <div class="case">
+      <b>🎯 案例（讲义 · 实验6 知识点 6.1.3「分步移动」+ 实验3 动作回放）：</b><code>_move_stepwise()</code>——当底座目标转角超过 <b>0.05 rad</b> 时，先只转 J1（占总时长 <b>40%</b>），转到位再动 J2–J5（<b>60%</b>）；这样大扫动不会带着小臂横甩撞物。EXP-05 的 action_player 回放 YAML 也是同一思想：一帧一帧<b>分时</b>下发，而不是并发齐射。
+      <span class="src">出处：EXP005_lab_guide.md 实验6 知识点 6.1.3（arm_controller.py `_move_stepwise`）；安全红线"目标位姿必须逐步逼近"见讲义实验1 注意事项。</span>
+    </div>
+
+    <div class="grid2">
+      <div class="panel">
+        <h4>交互 · q(t) 轨迹示波器（拖滑块改轨迹，按播放看小臂走）</h4>
+        <div class="ctl-row">
+          <label class="ctl">J1 起 <input type="range" id="t1s" min="-180" max="180" step="5" value="-60"><output id="t1so">-60°</output></label>
+          <label class="ctl">J1 终 <input type="range" id="t1e" min="-180" max="180" step="5" value="75"><output id="t1eo">75°</output></label>
+          <label class="ctl">J2 起 <input type="range" id="t2s" min="-90" max="90" step="5" value="-30"><output id="t2so">-30°</output></label>
+          <label class="ctl">J2 终 <input type="range" id="t2e" min="-90" max="90" step="5" value="45"><output id="t2eo">45°</output></label>
+        </div>
+        <div class="ctl-row">
+          <label class="ctl">总时长 T <input type="range" id="tT" min="0.5" max="6" step="0.1" value="3"><output id="tTo">3.0s</output></label>
+          <label class="ctl"><input type="checkbox" id="tStep" checked> 分步模式（40%/60%）</label>
+          <label class="ctl"><input type="checkbox" id="tSm" checked> 平滑加减速</label>
+          <label class="ctl"><input type="checkbox" id="tLim" checked> 软限位 ±135°</label>
+          <button class="btn teal" id="tPlay">▶ 播放</button>
+          <button class="btn ghost" id="tStop">⏸ / 复位</button>
+        </div>
+        <canvas id="tCv" width="640" height="270"></canvas>
+        <div class="io" id="tIo"></div>
+      </div>
+      <div class="panel">
+        <h4>同步动画：上视基座转角、侧视大臂俯仰</h4>
+        <canvas id="tCvA" width="360" height="130"></canvas>
+        <canvas id="tCvB" width="360" height="130" style="margin-top:.5rem"></canvas>
+        <div class="tip"><b>PWM 安全门：</b>读数区实时按 <code>PWM = θ/0.002356 + 1500</code> 换算并检查 500~2500。把 J1 终点拖到 ±180°、打开限位再看曲线——超出 ±135°（J3 实际限位量级）的轨迹段会被<b>钳位</b>，这就是"软件软限位先替你挡一道"。</div>
+        <div class="tip"><b>对比实验：</b>取消"分步"→ 两条曲线同时起跑，基座带着大臂横甩（真实场景=撞桌上物）；勾选分步→红线先走完蓝线才起步。<b>平滑加减速</b>关掉是直线斜坡，开则是 S 形缓入缓出——对应讲义"逐步逼近、小步试"的工程化表达。</div>
+      </div>
+    </div>
+
+    <div class="linkrow">
+      <a class="lbtn" href="../exp-05-action-replay/index.html#s8">→ EXP-05 §08 bringup → action_player 回放（分时下发实操）</a>
+      <a class="lbtn" href="../exp-06-fixed-grasp/index.html#s6">→ EXP-06 §06 抓取六阶段动画（轨迹的"语义版"）</a>
+      <a class="lbtn" href="#m5">→ M5 · 让这条轨迹在 3D 里跑起来</a>
+    </div>
+  </div>
+</section>
+
+<!-- ============ M5 ============ -->
+<section class="mod reveal" id="m5">
+  <div class="mod-head">
+    <div class="k" style="color:var(--amber)">MODULE 5 · THREE.JS 3D 抓取台</div>
+    <h2>M5 · 六阶段抓取 · 3D 可视化：结构、姿态与"下探深度"的真身</h2>
+    <p class="goal"><b>教学目标：</b>① 认识机械臂结构与每个关节的转轴方向（可开 TF 三色轴）；② 按讲义六步走一遍完整 pick 序列；③ 把 <code>gripper_depth</code> / <code>pre_grasp_height</code> 从抽象参数变成<b>看得见的两段高度差</b>；④ 目标点滑到不可达区，亲眼看到 IK 拒绝作业。</p>
+  </div>
+  <div class="mod-body">
+    <div class="case">
+      <b>🎯 案例（讲义 · 实验6 知识点 6.3.2 `_execute_pick()` 六步）：</b>开爪 → 移到 <code>z+pre_grasp_height</code> → 下探到 <code>z−gripper_depth</code> → 合爪 → 退回 <code>z+pre_grasp_height</code> → 移到 <code>post_grasp_pose</code>。目标点即案例值 (0.28, 0, 0.10)（pitch 180° 夹爪朝下），放置点 (0.059, 0.074, 0.219)。节点默认参数：<code>gripper_depth=0.0</code>（tcp 停在检测表面）、<code>pre_grasp_height=0.03</code>。
+      <span class="src">出处：EXP005_lab_guide.md 实验6 步骤1 命令示例、知识点 6.2/6.3；arm_controller.py 实际参数declare（工作区源码已核）。注意 lift_height 虽声明但源码未使用——抬升实由"退回 pre 高度"完成。</span>
+    </div>
+
+    <div class="tabs">
+      <div class="tab on" id="tabS" onclick="m5Tab('S')">🏗 结构 · 姿态模式</div>
+      <div class="tab" id="tabG" onclick="m5Tab('G')">✊ 六阶段抓取模式</div>
+      <label class="ctl" style="margin-left:auto"><input type="checkbox" id="m5Axes" checked> 显示关节坐标轴（TF 直觉）</label>
+    </div>
+
+    <div class="grid2 rev">
+      <div>
+        <canvas id="m5-view"></canvas>
+        <div class="io" id="m5io" style="margin-top:.55rem;height:96px"></div>
+      </div>
+      <div>
+        <!-- structure panel -->
+        <div class="panel" id="pnlS">
+          <h4>结构模式 · 3 关节滑块直接摆姿态（更细的角进实验页）</h4>
+          <div class="ctl-row">
+            <label class="ctl">J1 底座偏航 <input type="range" id="q1s" min="-180" max="180" step="1" value="-30"><output id="q1so">-30°</output></label>
+          </div>
+          <div class="ctl-row">
+            <label class="ctl">J2 大臂（水平起） <input type="range" id="q2s" min="-80" max="130" step="1" value="60"><output id="q2so">60°</output></label>
+          </div>
+          <div class="ctl-row">
+            <label class="ctl">J3 小臂（相对大臂） <input type="range" id="q3s" min="-150" max="150" step="1" value="-110"><output id="q3so">-110°</output></label>
+          </div>
+          <div class="ctl-row">
+            <button class="btn ghost" onclick="m5Pose(0,-54,94)">🏠 真机待命位（work PWM 姿态）</button>
+            <button class="btn ghost" onclick="m5Pose(0,0,0)">🤲 展平水平伸（易撞前方）</button>
+            <button class="btn ghost" onclick="m5Pose(0,-10,21)">🎯 案例点 IK 解（肘 UP）</button>
+          </div>
+          <div class="io" id="m5ioS"></div>
+          <div class="tip"><b>看轴向：</b>RGB 三色轴 = X 红 / Y 绿 / Z 蓝（REP-103）。转动 J1 时腕部坐标轴整体绕 Z 转——"TF 随动"就是 M1 里说的实时性；相机坐标轴插在腕上，所以臂一低头，<b>相机看到的世界也跟着变</b>（眼在手）。</div>
+        </div>
+        <!-- grasp panel -->
+        <div class="panel" id="pnlG" style="display:none">
+          <h4>抓取模式 · 先调参，再按六步走</h4>
+          <div class="ctl-row">
+            <label class="ctl">目标 x <input type="range" id="gx" min="0.12" max="0.28" step="0.005" value="0.28"><output id="gxo">0.28</output></label>
+            <label class="ctl">目标 y <input type="range" id="gy" min="-0.15" max="0.15" step="0.005" value="0"><output id="gyo">0.00</output></label>
+            <label class="ctl">目标 z（检测面） <input type="range" id="gz" min="0.04" max="0.22" step="0.005" value="0.10"><output id="gzo">0.10</output></label>
+          </div>
+          <div class="ctl-row">
+            <label class="ctl">gripper_depth <input type="range" id="gd" min="-0.03" max="0.06" step="0.005" value="0"><output id="gdo">0.000</output></label>
+            <label class="ctl">pre_grasp_height <input type="range" id="gph" min="0" max="0.10" step="0.005" value="0.03"><output id="gpho">0.030</output></label>
+          </div>
+          <div class="stages" id="m5stages">
+            <button class="stage" data-s="0">复位</button>
+            <button class="stage" data-s="1">1 开爪</button>
+            <button class="stage" data-s="2">2 接近 z+pre</button>
+            <button class="stage" data-s="3">3 下探 z−depth</button>
+            <button class="stage" data-s="4">4 合爪</button>
+            <button class="stage" data-s="5">5 抬升退回</button>
+            <button class="stage" data-s="6">6 到 post_grasp</button>
+          </div>
+          <div class="ctl-row" style="margin-top:.6rem">
+            <button class="btn" id="m5auto">▶ 自动播放六步</button>
+            <button class="btn ghost" id="m5rst">↺ 复位现场</button>
+          </div>
+          <div class="io" id="m5ioG"></div>
+          <div class="tip"><b>调参观察：</b><b>pre_grasp_height</b> 拉到 0.10 → 第 2/5 步的"悬停高度"明显变高（防撞桌但费时间）；<b>gripper_depth</b> 为正 → 第 3 步钻到检测面以下（夹得深、防打滑）；为负（如讲义配置 -0.033 的语义）→ 反而抬高、适合浅盘物。x 拖过 0.28 视野可即刻变红——就是"工作空间外"。</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="linkrow">
+      <a class="lbtn" href="../exp-06-fixed-grasp/index.html#s6">→ EXP-06 §06 抓取六阶段动画（2D 对照）</a>
+      <a class="lbtn" href="../exp-06-fixed-grasp/index.html#s7">→ EXP-06 §07 抓取参数调优台（真机参数）</a>
+      <a class="lbtn" href="../exp-06-fixed-grasp/index.html#s8">→ EXP-06 §08 实操：预演→目标→pick/place</a>
+      <a class="lbtn" href="../exp-01-urdf-simulation/index.html#s8">→ EXP-01 §04 URDF 联动（结构的"真身"）</a>
+    </div>
+  </div>
+</section>
+
+<!-- M4 script -->
+<script>
+var TT={t:0,playing:false,tmr:null};
+function tR(id){return parseFloat(document.getElementById(id).value);}
+function tV(){ // gather + clamp
+  var lim=document.getElementById('tLim').checked?135:180;
+  function cl(v){return Math.max(-lim,Math.min(lim,v));}
+  return {a1s:cl(tR('t1s')),a1e:cl(tR('t1e')),a2s:cl(tR('t2s')),a2e:cl(tR('t2e')),T:tR('tT'),
+    step:document.getElementById('tStep').checked,sm:document.getElementById('tSm').checked,lim:lim};
+}
+function tEase(u,sm){return sm?u*u*(3-2*u):u;}
+function tCurve(s,e,ta,tb,t){
+  if(t<=ta)return s;
+  if(t>=tb)return e;
+  var u=(t-ta)/(tb-ta);var eu=tEase(u,document.getElementById('tSm').checked);
+  return s+(e-s)*eu;
+}
+function tAt(t){
+  var v=tV(),q1,q2;
+  if(v.step){q1=tCurve(v.a1s,v.a1e,0,0.4*v.T,t);
+    q2=tCurve(v.a2s,v.a2e,(t<=0.4*v.T?t:0.4*v.T),v.T,t);}
+  else{q1=tCurve(v.a1s,v.a1e,0,v.T,t);q2=tCurve(v.a2s,v.a2e,0,v.T,t);}
+  return {q1:q1,q2:q2,v:v};
+}
+function tDraw(){
+  var v=tV();
+  ['t1s','t1e','t2s','t2e'].forEach(function(id,i){document.getElementById(id+'o').value=tR(id)+'°';});
+  document.getElementById('tTo').value=v.T.toFixed(1)+'s';
+  var cv=document.getElementById('tCv'),c=cv.getContext('2d'),W=cv.width,H=cv.height;
+  c.clearRect(0,0,W,H);c.font='11px Consolas,monospace';
+  var ox=46,oy=H-30,sw=W-70,sh=H-56,ymin=-180,ymax=180;
+  function px(t){return ox+t/v.T*sw;} function py(d){return oy-(d-ymin)/(ymax-ymin)*sh;}
+  // bands
+  if(v.step){c.fillStyle='rgba(225,29,72,.06)';c.fillRect(ox,oy-sh,0.4*v.T/v.T*sw,sh);
+    c.fillStyle='#b91c1c';c.fillText('J1 独走 40%',ox+6,16);c.fillStyle='#2563eb';c.fillText('J2 接力 60%',ox+0.42*sw,16);}
+  c.strokeStyle='#e2e8f0';c.lineWidth=1;
+  [-180,-90,0,90,180,270].forEach(function(d){if(d>ymax||d<ymin)return;c.beginPath();c.moveTo(ox,py(d));c.lineTo(ox+sw,py(d));c.stroke();c.fillStyle='#94a3b8';c.fillText(d+'°',4,py(d)+4);});
+  // limits
+  if(v.lim){c.strokeStyle='#dc2626';c.setLineDash([5,4]);
+    [-135,135].forEach(function(d){c.beginPath();c.moveTo(ox,py(d));c.lineTo(ox+sw,py(d));c.stroke();});
+    c.setLineDash([]);c.fillStyle='#dc2626';c.fillText('软限位 ±135°（PWM 500/2500）',ox+sw-170,py(135)-4);}
+  // curves
+  function line(fn,color){c.strokeStyle=color;c.lineWidth=2.4;c.beginPath();
+    for(var i=0;i<=200;i++){var t=i/200*v.T;var dd=fn(t);if(dd===undefined)continue;var X=px(t),Y=py(dd);if(i===0||fn(t-0.001*v.T)===undefined)c.moveTo(X,Y);else c.lineTo(X,Y);}c.stroke();}
+  line(function(t){return tAt(t).q1;},'#e11d48');
+  line(function(t){return tAt(t).q2;},'#2563eb');
+  c.strokeStyle='#475569';c.lineWidth=1.4;c.strokeRect(ox,oy-sh,sw,sh);
+  // scanline
+  var cur=tAt(TT.t);
+  c.strokeStyle='#0f172a';c.lineWidth=1.2;c.beginPath();c.moveTo(px(TT.t),oy-sh);c.lineTo(px(TT.t),oy);c.stroke();
+  c.fillStyle='#e11d48';c.beginPath();c.arc(px(TT.t),py(cur.q1),4,0,7);c.fill();
+  c.fillStyle='#2563eb';c.beginPath();c.arc(px(TT.t),py(cur.q2),4,0,7);c.fill();
+  c.fillStyle='#475569';c.fillStyle='#475569';c.fillText('q(t)：红 J1 / 蓝 J2 · t='+TT.t.toFixed(2)+'s / '+v.T.toFixed(1)+'s',ox,14);
+  // IO with PWM gate
+  function pwm(deg){return deg*Math.PI/180/KPW+1500;}
+  var p1=pwm(cur.q1),p2=pwm(cur.q2);
+  var ok1=p1>=500&&p1<=2500,ok2=p2>=500&&p2<=2500;
+  document.getElementById('tIo').innerHTML=
+    't='+TT.t.toFixed(2)+'s　q1='+cur.q1.toFixed(1)+'° ('+(cur.q1*Math.PI/180).toFixed(3)+' rad)　q2='+cur.q2.toFixed(1)+'°\n'
+    +'PWM: J1=<span class="'+(ok1?'k':'bad')+'">'+p1.toFixed(0)+'μs</span>　J2=<span class="'+(ok2?'k':'bad')+'">'+p2.toFixed(0)+'μs</span>　'
+    +(ok1&&ok2?'✓ 500~2500 内':'<span class="bad">✗ 越界，禁发！</span>')
+    +'\n'+(v.step?'分步开：0~'+(0.4*v.T).toFixed(2)+'s 只动 J1，蓝线趴着；之后 Q2 接力。':'分步关：两关节同时起跑——基座带着小臂横甩。')
+    +'\n<span class="k">// ±135° × rad 换算恰是 ±1000μs + 中位 1500 → 机械限位和数学在这里对上了</span>';
+  tMiniDraw(cur);
+}
+function tMiniDraw(cur){
+  // top view yaw
+  var c1=document.getElementById('tCvA').getContext('2d'),W=360,H=130;
+  c1.clearRect(0,0,W,H);c1.font='11px Consolas,monospace';
+  var cx=W/2,cy=H/2+6,R=48;
+  c1.strokeStyle='#e2e8f0';c1.beginPath();c1.arc(cx,cy,R+14,0,7);c1.stroke();
+  var v=tV();
+  function arm(deg,color,label,x0){c1.save();c1.translate(x0,H/2+8);
+    c1.strokeStyle='#e2e8f0';c1.beginPath();c1.arc(0,0,44,0,7);c1.stroke();
+    c1.setLineDash([3,3]);c1.strokeStyle='#94a3b8';c1.beginPath();c1.moveTo(0,0);c1.lineTo(44,0);c1.stroke();c1.setLineDash([]);
+    var a=deg*Math.PI/180;
+    c1.strokeStyle=color;c1.lineWidth=3;c1.beginPath();c1.moveTo(0,0);c1.lineTo(44*Math.cos(a),-44*Math.sin(a));c1.stroke();
+    c1.fillStyle='#475569';c1.fillText(label+' '+deg.toFixed(0)+'°',-30,-54);c1.restore();}
+  arm(cur.q1,'#e11d48','俯视 J1',W/2);
+  // side
+  var c2=document.getElementById('tCvB').getContext('2d');
+  c2.clearRect(0,0,W,H);c2.font='11px Consolas,monospace';
+  var x0=50,y0=H-30;
+  c2.strokeStyle='#e2e8f0';c2.beginPath();c2.moveTo(10,y0);c2.lineTo(W-10,y0);c2.stroke();
+  c2.strokeStyle='#475569';c2.lineWidth=1.4;c2.beginPath();c2.moveTo(10,y0);c2.lineTo(W-10,y0);c2.stroke();
+  function link(deg,color,ox2){var a=deg*Math.PI/180;
+    c2.strokeStyle=color;c2.lineWidth=4;c2.beginPath();c2.moveTo(ox2,y0);c2.lineTo(ox2+66*Math.cos(a),y0-66*Math.sin(a));c2.stroke();
+    c2.fillStyle='#0f172a';c2.beginPath();c2.arc(ox2,y0,4,0,7);c2.fill();}
+  function ghost(deg,color,ox2){var a=deg*Math.PI/180;c2.strokeStyle=color+'55';c2.setLineDash([3,3]);c2.lineWidth=2;
+    c2.beginPath();c2.moveTo(ox2,y0);c2.lineTo(ox2+66*Math.cos(a),y0-66*Math.sin(a));c2.stroke();c2.setLineDash([]);}
+  ghost(v.a2s,'#94a3b8',110);ghost(v.a2e,'#94a3b8',110);
+  link(cur.q2,'#dc2626',110);
+  c2.fillStyle='#475569';c2.fillText('侧视 J2（灰虚线 = 起/终点，当前 '+cur.q2.toFixed(0)+'°）',14,16);
+  c2.fillStyle='#475569';c2.fillText('俯视 J1()',14,14);
+}
+function tPlay(){
+  if(TT.playing){clearInterval(TT.tmr);TT.playing=false;document.getElementById('tPlay').textContent='▶ 播放';return;}
+  TT.playing=true;document.getElementById('tPlay').textContent='⏸ 暂停';
+  TT.tmr=setInterval(function(){
+    var v=tV();TT.t+=0.033;
+    if(TT.t>=v.T){TT.t=v.T;clearInterval(TT.tmr);TT.playing=false;document.getElementById('tPlay').textContent='▶ 播放';}
+    tDraw();
+  },33);
+}
+document.getElementById('tPlay').addEventListener('click',tPlay);
+document.getElementById('tStop').addEventListener('click',function(){clearInterval(TT.tmr);TT.playing=false;document.getElementById('tPlay').textContent='▶ 播放';TT.t=0;tDraw();});
+['t1s','t1e','t2s','t2e','tT','tStep','tSm','tLim'].forEach(function(id){document.getElementById(id).addEventListener('input',tDraw);});
+tDraw();
+</script>
+
+<script src="three.min.js"></script>
+<script src="OrbitControls.js"></script>
+<script>
+/* ===== M5 three.js 3D 抓取台 ===== */
+var M5={mode:'S',anim:null,stage:0,auto:null,pose:{q1:-0.5236,q2:1.047,q3:-1.92,gap:0.05},
+        target:{x:0.28,y:0,z:0.10},gd:0,gph:0.03,tcp:{x:0,y:0,z:0},err:null};
+var L2T=0.045; // tcp 段（腕部到指尖中心）
+function m5Log(s){document.getElementById('m5io').innerHTML=s;}
+function m5Tab(m){
+  M5.mode=m;
+  document.getElementById('tabS').className='tab'+(m==='S'?' on':'');
+  document.getElementById('tabG').className='tab'+(m==='G'?' on':'');
+  document.getElementById('pnlS').style.display=m==='S'?'':'none';
+  document.getElementById('pnlG').style.display=m==='G'?'':'none';
+  if(m==='G'){m5SyncTarget(true);} else {m5FromSliders();}
+}
+function m5Pose(a,b,c){document.getElementById('q1s').value=a;document.getElementById('q2s').value=b;document.getElementById('q3s').value=c;m5FromSliders();}
+function m5FromSliders(){
+  var q1=parseFloat(document.getElementById('q1s').value)*Math.PI/180;
+  var q2=parseFloat(document.getElementById('q2s').value)*Math.PI/180;
+  var q3=parseFloat(document.getElementById('q3s').value)*Math.PI/180;
+  ['q1s','q2s','q3s'].forEach(function(id){document.getElementById(id+'o').value=document.getElementById(id).value+'°';});
+  m5SetPose({q1:q1,q2:q2,q3:q3,gap:0.02});
+  var f=fkPlanar(q2,q3);
+  document.getElementById('m5ioS').innerHTML=
+   'θ = ['+(q1*180/Math.PI).toFixed(1)+', '+(q2*180/Math.PI).toFixed(1)+', '+(q3*180/Math.PI).toFixed(1)+']°\n'
+   +'教学 FK 指尖 = ('+(f.r*Math.cos(q1)).toFixed(3)+', '+(f.r*Math.sin(q1)).toFixed(3)+', '+f.z.toFixed(3)+') m\n'
+   +'<span class="k">// 结构模式直接指定角（正解）；抓取模式反过来（逆解）— M2 与 M3 的两种问法</span>';
+}
+function m5SetPose(p){
+  M5.pose.q1=p.q1;M5.pose.q2=p.q2;M5.pose.q3=p.q3;
+  if(p.gap!==undefined)M5.pose.gap=p.gap;
+  m5Apply();
+}
+function m5Apply(){
+  var p=M5.pose;
+  if(!M5.yaw)return;
+  M5.yaw.rotation.z=p.q1;
+  M5.j2.rotation.y=-p.q2;
+  M5.j3.rotation.y=-p.q3;
+  M5.jw.rotation.y=(Math.PI/2+p.q2+p.q3); // 腕部绝对朝下（pitch 180° 对应）
+  M5.fL.position.y=p.gap/2;M5.fR.position.y=-p.gap/2;
+  var v=new THREE.Vector3();M5.tcpObj.getWorldPosition(v);
+  M5.tcp={x:v.x,y:v.y,z:v.z};
+}
+/* ---- stages ---- */
+function m5StageTCP(s){
+  var t=M5.target,gd=M5.gd,ph=M5.gph;
+  var post={x:0.059,y:0.074,z:0.219};
+  switch(s){
+    case 0:return {x:0.14,y:0,z:0.19,gap:0.02};      // 复位（折叠待命）
+    case 1:return {x:t.x,y:t.y,z:t.z+ph,gap:0.05};   // 开爪（原地/近旁，先进接近位）
+    case 2:return {x:t.x,y:t.y,z:t.z+ph,gap:0.05};   // 接近 z+pre
+    case 3:return {x:t.x,y:t.y,z:t.z-gd,gap:0.05};   // 下探 z-gripper_depth
+    case 4:return {x:t.x,y:t.y,z:t.z-gd,gap:0.012};  // 合爪
+    case 5:return {x:t.x,y:t.y,z:t.z+ph,gap:0.012};  // 退回 z+pre
+    case 6:return {x:post.x,y:post.y,z:post.z,gap:0.012}; // post_grasp_pose
+  }
+}
+function m5IKpos(tg){ // → pose or null
+  var rho=Math.sqrt(tg.x*tg.x+tg.y*tg.y);
+  if(rho>1e-6&&rho<0.06)rho=0.06;
+  var r=ik2R(rho,tg.z,1);
+  if(!r.ok)return {fail:r.why};
+  return {q1:Math.atan2(tg.y,tg.x),q2:r.q2,q3:r.q3,gap:tg.gap};
+}
+var M5STAGE_NAMES=['复位','① 开爪','② 移到 z+pre_grasp_height','③ 下探到 z−gripper_depth','④ 合爪','⑤ 退回 z+pre_grasp_height','⑥ 移到 post_grasp_pose'];
+function m5Goto(s){
+  M5.stage=s;
+  var tg=m5StageTCP(s);
+  var pose=m5IKpos(tg);
+  var boxes=document.querySelectorAll('#m5stages .stage');
+  boxes.forEach(function(b){var i=parseInt(b.dataset.s);b.classList.toggle('on',i===s);b.classList.toggle('done',i<s);});
+  var io=document.getElementById('m5ioG');
+  if(pose.fail){
+    M5.err=pose.fail;
+    io.innerHTML='<span class="bad">✗ '+M5STAGE_NAMES[s]+'：IK 拒绝 — '+pose.fail+'</span>\n目标 ('+tg.x.toFixed(3)+', '+tg.y.toFixed(3)+', '+tg.z.toFixed(3)+') 在工作空间外（回 M3 边界概念）\n<span class="warn">// 真机上这一步会被安全逻辑拦下，而不是"尽力一下"</span>';
+    return;
+  }
+  M5.err=null;
+  m5Animate(pose,650,function(){
+    io.innerHTML='当前：'+M5STAGE_NAMES[s]+'\n阶段目标 TCP = ('+tg.x.toFixed(3)+', '+tg.y.toFixed(3)+', '+tg.z.toFixed(3)+') m　夹爪开度 '+tg.gap.toFixed(3)+' m\n实际 TCP = ('+M5.tcp.x.toFixed(3)+', '+M5.tcp.y.toFixed(3)+', '+M5.tcp.z.toFixed(3)+') m'
+      +'\n<span class="k">期望四元数 pitch 180° {0,1,0,0} ⇒ 夹爪轴竖直向下（本台腕部恒定朝下）</span>';
+  });
+}
+function m5Animate(pose,dur,cb){
+  if(M5.anim)cancelAnimationFrame(M5.anim);
+  var from={q1:M5.pose.q1,q2:M5.pose.q2,q3:M5.pose.q3,gap:M5.pose.gap};
+  // 角度差归一化到 ±π
+  function norm(a){var r=Math.atan2(Math.sin(a),Math.cos(a));return r;}
+  var dq1=norm(pose.q1-from.q1),dq2=norm(pose.q2-from.q2),dq3=norm(pose.q3-from.q3),dg=(pose.gap-from.gap);
+  var t0=performance.now();
+  function step(now){
+    var u=Math.min(1,(now-t0)/dur);var e=u<0.5?2*u*u:1-Math.pow(-2*u+2,2)/2;
+    M5.pose.q1=from.q1+dq1*e;M5.pose.q2=from.q2+dq2*e;M5.pose.q3=from.q3+dq3*e;M5.pose.gap=from.gap+dg*e;
+    M5ApplySliders();m5Apply();
+    if(u<1){M5.anim=requestAnimationFrame(step);}else{M5.anim=null;if(cb)cb();}
+  }
+  M5.anim=requestAnimationFrame(step);
+}
+function M5ApplySliders(){ // 把当前 pose 反映到结构滑块（联动显示）
+  document.getElementById('q1s').value=(M5.pose.q1*180/Math.PI).toFixed(0);
+  document.getElementById('q2s').value=(M5.pose.q2*180/Math.PI).toFixed(0);
+  document.getElementById('q3s').value=(M5.pose.q3*180/Math.PI).toFixed(0);
+}
+function m5SyncTarget(apply){
+  var x=parseFloat(document.getElementById('gx').value),
+      y=parseFloat(document.getElementById('gy').value),
+      z=parseFloat(document.getElementById('gz').value);
+  M5.gd=parseFloat(document.getElementById('gd').value);
+  M5.gph=parseFloat(document.getElementById('gph').value);
+  document.getElementById('gxo').value=x.toFixed(3);
+  document.getElementById('gyo').value=y.toFixed(3);
+  document.getElementById('gzo').value=z.toFixed(3);
+  document.getElementById('gdo').value=M5.gd.toFixed(3);
+  document.getElementById('gpho').value=M5.gph.toFixed(3);
+  M5.target={x:x,y:y,z:z};
+  if(M5.cube){
+    M5.cube.position.set(x,y,Math.max(z,0.05)/2);
+    M5.cube.scale.z=Math.max(z,0.05)/0.10;
+  }
+  if(apply&&M5.stage>0){m5Goto(M5.stage);}
+}
+/* buttons */
+document.querySelectorAll('#m5stages .stage').forEach(function(b){
+  b.addEventListener('click',function(){clearInterval(M5.auto);M5.auto=null;document.getElementById('m5auto').textContent='▶ 自动播放六步';m5Goto(parseInt(b.dataset.s));});
+});
+document.getElementById('m5auto').addEventListener('click',function(){
+  if(M5.auto){clearInterval(M5.auto);M5.auto=null;this.textContent='▶ 自动播放六步';return;}
+  var s=0;var self=this;self.textContent='⏸ 停止';
+  m5Goto(0);
+  M5.auto=setInterval(function(){
+    s++;if(s>6){clearInterval(M5.auto);M5.auto=null;self.textContent='▶ 自动播放六步';
+      document.getElementById('m5ioG').innerHTML='✓ 六步走完 —— 这就是一次完整 pick（讲义 6.3.2）。放置松爪由 /place 服务开爪完成。';return;}
+    m5Goto(s);
+  },1500);
+});
+document.getElementById('m5rst').addEventListener('click',function(){
+  clearInterval(M5.auto);M5.auto=null;document.getElementById('m5auto').textContent='▶ 自动播放六步';
+  ['gx','gy'].forEach(function(){});
+  document.getElementById('gx').value=0.28;document.getElementById('gy').value=0;document.getElementById('gz').value=0.10;
+  document.getElementById('gd').value=0;document.getElementById('gph').value=0.03;
+  m5SyncTarget(false);m5Goto(0);
+});
+['q1s','q2s','q3s'].forEach(function(id){document.getElementById(id).addEventListener('input',function(){
+  if(M5.anim){cancelAnimationFrame(M5.anim);M5.anim=null;}
+  if(M5.mode==='S')m5FromSliders();});
+});
+['gx','gy','gz','gd','gph'].forEach(function(id){document.getElementById(id).addEventListener('input',function(){m5SyncTarget(true);});});
+document.getElementById('m5Axes').addEventListener('change',function(){
+  if(M5.axes)M5.axes.forEach(function(a){a.visible=this.checked;},this);
+});
+/* ---- scene ---- */
+function m5Init(){
+  var canvas=document.getElementById('m5-view');
+  var renderer;
+  try{renderer=new THREE.WebGLRenderer({canvas:canvas,antialias:true});}
+  catch(e){m5Log('<span class="bad">当前环境不支持 WebGL，3D 视口不可用（2D 模块不受影响）</span>');return;}
+  var W=canvas.clientWidth||760,H=430;
+  renderer.setSize(W,H,false);renderer.setClearColor(0xeef2f7,1);
+  var scene=new THREE.Scene();
+  var cam=new THREE.PerspectiveCamera(45,W/H,0.05,20);
+  cam.up.set(0,0,1);
+  cam.position.set(0.62,-0.62,0.5);
+  var ctrl=new THREE.OrbitControls(cam,renderer.domElement);
+  ctrl.target.set(0.12,0,0.14);ctrl.update();ctrl.enableDamping=true;
+  scene.add(new THREE.AmbientLight(0xffffff,0.75));
+  var dl=new THREE.DirectionalLight(0xffffff,0.7);dl.position.set(1,-0.8,1.6);scene.add(dl);
+  // table
+  var table=new THREE.Mesh(new THREE.BoxGeometry(0.9,0.9,0.03),new THREE.MeshStandardMaterial({color:0xd8cfc0}));
+  table.position.z=-0.015;scene.add(gridHelper(scene));
+  // grid
+  function gridHelper(sc){var g=new THREE.GridHelper(0.9,18,0xcbd5e1,0xe2e8f0);g.rotation.x=Math.PI/2;g.position.z=0.001;return g;}
+  scene.add(table);
+  // 目标红块（顶面 = 检测面 z）
+  var cube=new THREE.Mesh(new THREE.BoxGeometry(0.05,0.05,0.10),new THREE.MeshStandardMaterial({color:0xef4444}));
+  cube.position.set(0.28,0,0.05);scene.add(cube);M5.cube=cube;
+  // 放置点 ghost
+  var ghost=new THREE.Mesh(new THREE.SphereGeometry(0.012,16,16),new THREE.MeshStandardMaterial({color:0x7c3aed,transparent:true,opacity:0.6}));
+  ghost.position.set(0.059,0.074,0.219);scene.add(ghost);
+  var ghostLb=mkLabel('post (0.059,0.074,0.219)',0x7c3aed);ghostLb.position.set(0.059,0.074,0.24);scene.add(ghostLb);
+  var tgLb=mkLabel('target',0xe11d48);tgLb.position.set(0.28,0,0.16);scene.add(tgLb);M5.tgLb=tgLb;
+  function mkLabel(txt,color){
+    var cv=document.createElement('canvas');cv.width=256;cv.height=64;var x=cv.getContext('2d');
+    x.font='28px sans-serif';x.fillStyle='#0f172a';x.fillText(txt,4,40);
+    var sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(cv)}));sp.scale.set(0.16,0.04,1);return sp;
+  }
+  // arm
+  var matR=new THREE.MeshStandardMaterial({color:0xdc2626}),matB=new THREE.MeshStandardMaterial({color:0x2563eb}),
+      matD=new THREE.MeshStandardMaterial({color:0x334155}),matG=new THREE.MeshStandardMaterial({color:0x94a3b8});
+  function link(len,mat){var m=new THREE.Mesh(new THREE.BoxGeometry(len,0.035,0.035),mat);m.position.x=len/2;return m;}
+  var base=new THREE.Mesh(new THREE.CylinderGeometry(0.055,0.06,0.085,28),matD);
+  base.rotation.x=Math.PI/2;base.position.z=0.0425;scene.add(base);
+  var yaw=new THREE.Group();yaw.position.z=0.085;scene.add(yaw);
+  var turret=new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.045,0.04,24),matG);
+  turret.rotation.x=Math.PI/2;turret.position.z=0;yaw.add(turret);
+  var j2=new THREE.Group();yaw.add(j2);
+  j2.add(link(0.105,matR));
+  var elbow=new THREE.Mesh(new THREE.SphereGeometry(0.022,18,18),matD);j2.add(elbow);
+  var j3=new THREE.Group();j3.position.x=0.105;j2.add(j3);
+  j3.add(link(0.180,matB));
+  var wrist=new THREE.Mesh(new THREE.BoxGeometry(0.05,0.05,0.05),matD);wrist.position.x=0.155;j3.add(wrist);
+  var jw=new THREE.Group();jw.position.x=0.180;j3.add(jw); // 腕/夹爪组：姿态朝下（link2 末端 = 教学 TCP）
+  var palm=new THREE.Mesh(new THREE.BoxGeometry(0.02,0.06,0.05),matG);palm.position.x=0.01;jw.add(palm);
+  var fL=new THREE.Mesh(new THREE.BoxGeometry(0.05,0.008,0.03),matG);fL.position.set(0.045,0.025,0);jw.add(fL);
+  var fR=fL.clone();fR.position.y=-0.025;jw.add(fR);
+  var tcpObj=new THREE.Object3D();tcpObj.position.x=0.180;j3.add(tcpObj);
+  // axes
+  var axes=[];
+  [[j2,0],[j3,0],[jw,0]].forEach(function(pair){var a=new THREE.AxesHelper(0.055);a.visible=true;pair[0].add(a);axes.push(a);});
+  var camAx=new THREE.AxesHelper(0.04);jw.add(camAx);axes.push(camAx); // 相机系（眼在手）
+  var camBody=new THREE.Mesh(new THREE.BoxGeometry(0.03,0.04,0.03),new THREE.MeshStandardMaterial({color:0x0ea5e9}));
+  camBody.position.set(0.02,0,0.045);jw.add(camBody); // 相机装腕上
+  M5.yaw=yaw;M5.j2=j2;M5.j3=j3;M5.jw=jw;M5.fL=fL;M5.fR=fR;M5.tcpObj=tcpObj;M5.axes=axes;M5.ctrl=ctrl;
+  m5SyncTarget(false);
+  m5FromSliders();
+  m5Goto(0);
+  m5Log('3D 就绪：拖动旋转 / 滚轮缩放。切「抓取模式」看六步。');
+  var st={t0:performance.now()};
+  (function loop(now){
+    ctrl.update();renderer.render(scene,cam);
+    if(M5.mode==='S'){
+      var p=M5.tcp;
+      // 结构模式持续刷新 TCP 实无数（不刷 io 以免闪烁，节流）
+      if(now-st.t0>200){st.t0=now;
+        var el=document.getElementById('m5ioS');
+        var tx=el.textContent.split('\n')[1];
+        el.textContent=el.textContent.replace(/实际 TCP.*/,'');
+      }
+    }
+    requestAnimationFrame(loop);
+  })(performance.now());
+}
+if(document.readyState!=='loading')m5Init();else document.addEventListener('DOMContentLoaded',m5Init);
+
+</script>
+
+<!-- ============ M6 ============ -->
+<section class="mod reveal" id="m6">
+  <div class="mod-head">
+    <div class="k" style="color:var(--blue)">MODULE 6 · 视觉定位</div>
+    <h2>M6 · 视觉定位三件套：HSV 掩膜 → 深度反投影 → TF 进 base_link</h2>
+    <p class="goal"><b>教学目标：</b>① 会调 HSV 阈值解释"检测不到/误检"两个经典故障；② 手算针孔反投影 <code>X=(u−cx)·d/fx</code>；③ 把三步串成 EXP-07 的完整定位链——抓取的"看见"就这三步。</p>
+  </div>
+  <div class="mod-body">
+    <div class="case">
+      <b>🎯 案例（讲义 · 实验7 步骤2/3/4 + 步骤12 性能基线）：</b>目标认<b>红色</b>，两段并集阈值（红在 H 环两端）：<code>[0,100,80]~[15,255,255]</code> ∪ <code>[160,100,80]~[180,255,255]</code>；内参 <code>fx=fy=614, cx=320, cy=240</code>（HP60C，640×480）；深度图 uint16 单位 mm，除以 1000 得米；OBSERVE 阶段须在 <b>&lt;1s</b> 内完成"HSV+反投影+TF"三件套，整链成功率基线 <b>&gt;85%</b>。
+      <span class="src">出处：EXP005_lab_guide.md 实验7 知识点 7.1.2/7.2（pixel_to_camera_frame）、步骤4（transform_to_base_link）、步骤12 性能基线表；阈值实参见工作区 visual_grasp.launch.py（已核）。</span>
+    </div>
+
+    <div class="grid2">
+      <div class="panel">
+        <h4>交互① · HSV 掩膜实验台（滑块动、掩膜立即变、质心跟着走）</h4>
+        <div class="ctl-row">
+          <label class="ctl">H 主段上限 <input type="range" id="hHi" min="5" max="45" step="1" value="15"><output id="hHio">15</output></label>
+          <label class="ctl">H 副段 = 主+160 <output id="h2o">160~175</output></label>
+          <label class="ctl">S ≥ <input type="range" id="sMin" min="0" max="255" step="5" value="100"><output id="sMino">100</output></label>
+          <label class="ctl">V ≥ <input type="range" id="vMin" min="0" max="255" step="5" value="80"><output id="vMino">80</output></label>
+          <button class="btn" onclick="m6Def()">↩ 恢复讲义默认</button>
+        </div>
+        <div style="display:flex;gap:.7rem;flex-wrap:wrap">
+          <div><div style="font-size:.72rem;color:var(--text-secondary)">RGB 场景（点击拾取像素 u,v）</div>
+            <canvas id="m6src" width="320" height="240" style="width:300px;image-rendering:pixelated;cursor:crosshair"></canvas></div>
+          <div><div style="font-size:.72rem;color:var(--text-secondary)">inRange 掩膜（白=命中，十字=质心）</div>
+            <canvas id="m6mask" width="320" height="240" style="width:300px;image-rendering:pixelated"></canvas></div>
+        </div>
+        <div class="io" id="m6io" style="margin-top:.55rem"></div>
+      </div>
+      <div class="panel">
+        <h4>交互② · 深度反投影 → TF 到 base_link</h4>
+        <div class="ctl-row">
+          <label class="ctl">拾取像素 <output id="uvo">(—)</output></label>
+          <label class="ctl">深度 d <input type="range" id="m6d" min="0.2" max="1" step="0.01" value="0.5"><output id="m6do">0.50m</output></label>
+          <label class="ctl">焦距 fx <input type="range" id="m6fx" min="400" max="900" step="2" value="614"><output id="m6fxo">614</output></label>
+        </div>
+        <div class="math">
+K = [ fx 0 cx ; 0 fy cy ; 0 0 1 ] = [ <span class="hl" id="m6mf">614</span> · · <span class="hl">320</span> ; · <span class="hl" id="m6mf2">614</span> · <span class="hl">240</span> ]<br>
+<span class="hlb">X = (u−cx)·d / fx , Y = (v−cy)·d / fy , Z = d</span><br>
+深度图 <span class="hl">uint16 mm ÷1000 → m</span>（HP60C，最低 0.1m，常有 0 空洞）
+        </div>
+        <div class="math" style="margin-top:.5rem">
+TF 桥接（光学系→base_link，γ=0 外参对齐讲义例子）：<br>
+X_b = <span class="hlb">Z</span> + 0.05 , &nbsp; Y_b = <span class="hlb">−X</span> , &nbsp; Z_b = <span class="hlb">−Y</span> + 0.40
+        </div>
+        <canvas id="m6top" width="360" height="170" style="margin-top:.55rem"></canvas>
+        <div class="io" id="m6io2"></div>
+        <div class="tip"><b>故障演练：</b>把 S 拉到 200 以上 → 红块变"褪色"部分被滤掉、质心跳动甚至消失（≈现场打强光/过曝）；H 上限拉到 40+ → 橙色干扰块也被当目标（≈换了物体颜色没改参数）。讲义对策就两条：<b>先宽后窄</b>调六个阈值、换颜色光照改 4 个参数（7.6.2）。</div>
+      </div>
+    </div>
+
+    <div class="tip"><b>为什么用 HSV 不用 RGB：</b>V（明暗）与 H（色种）分离——关灯只降 V，红块的 H 纹丝不动，阈值不用跟着重调；这就是掩膜台拖 V 滑块时"只是整体变暗、红块始终被选中"的原理（讲义 7.1.1）。<b>OBSERVE&lt;1s</b> 的时间预算里，这三步每步都必须是"一次遍历"级别的便宜操作。</div>
+    <div class="linkrow">
+      <a class="lbtn" href="../exp-07-visual-grasp/index.html#s7">→ EXP-07 §07 HSV 掩膜调参台（同阈值联动）</a>
+      <a class="lbtn" href="../exp-07-visual-grasp/index.html#s6">→ EXP-07 §06 观察-移动-抓取三乐章动画</a>
+      <a class="lbtn" href="../exp-07-visual-grasp/index.html#s8">→ EXP-07 §08 分阶段启动与服务触发（端到端）</a>
+      <a class="lbtn" href="#m1">→ 回 M1 · 这次变换的矩阵原理</a>
+      <a class="lbtn" href="#m5">→ 到 M5 · 定位结果交给 3D 抓取</a>
+    </div>
+  </div>
+</section>
+
+<script>
+/* ===== M6 视觉定位 ===== */
+var m6Base=null,m6Pick=null;
+function m6SceneDraw(){
+  var cv=document.getElementById('m6src'),c=cv.getContext('2d');
+  // wall
+  var g=c.createLinearGradient(0,0,0,240);g.addColorStop(0,'#9db8d4');g.addColorStop(.45,'#c7d5e4');g.addColorStop(.46,'#c9b393');g.addColorStop(1,'#a78f6e');
+  c.fillStyle=g;c.fillRect(0,0,320,240);
+  // desk stripes
+  c.strokeStyle='rgba(120,95,60,.25)';
+  for(var y=110;y<240;y+=14){c.beginPath();c.moveTo(0,y);c.lineTo(320,y);c.stroke();}
+  // red block (target)
+  c.fillStyle='#e8352a';c.fillRect(196,124,54,54);
+  c.fillStyle='rgba(255,255,255,.25)';c.fillRect(196,124,54,14);
+  // orange distractor
+  c.fillStyle='#f59e0b';c.fillRect(70,140,42,42);
+  // blue distractor
+  c.fillStyle='#3b82f6';c.beginPath();c.arc(140,70,22,0,7);c.fill();
+  // noise
+  var seed=7;function rnd(){seed=(seed*16807)%2147483647;return seed/2147483647;}
+  for(var i=0;i<240;i++){var nx=rnd()*320,ny=rnd()*240,gv=Math.floor(rnd()*255);
+    c.fillStyle='rgba('+gv+','+gv+','+gv+','+(0.12+rnd()*0.2)+')';c.fillRect(nx,ny,2,2);}
+  c.fillStyle='rgba(15,23,42,.75)';c.font='11px sans-serif';c.fillText('640×480 模拟视场 @320×240 预览 · 红目标 / 橙+蓝干扰',6,14);
+  m6Base=c.getImageData(0,0,320,240);
+}
+function rgb2hsv(r,g,b){
+  var mx=Math.max(r,g,b),mn=Math.min(r,g,b),d=mx-mn,h=0;
+  if(d>0){
+    if(mx===r)h=((g-b)/d)%6;else if(mx===g)h=(b-r)/d+2;else h=(r-g)/d+4;
+    h*=30; if(h<0)h+=180; // OpenCV H 0~180
+  }
+  return [h, mx>0?d/mx*255:0, mx];
+}
+function m6Def(){document.getElementById('hHi').value=15;document.getElementById('sMin').value=100;document.getElementById('vMin').value=80;m6Upd();}
+function m6Upd(){
+  if(!m6Base)m6SceneDraw();
+  var hi=parseInt(document.getElementById('hHi').value),
+      lo=parseInt(document.getElementById('sMin').value),
+      vo=parseInt(document.getElementById('vMin').value);
+  document.getElementById('hHio').value=hi;
+  document.getElementById('h2o').textContent=(160)+'~'+(160+hi);
+  document.getElementById('sMino').value=lo;
+  document.getElementById('vMino').value=vo;
+  var src=m6Base.data;
+  var cv=document.getElementById('m6src'),ctx=cv.getContext('2d');
+  var out=ctx.createImageData(320,240),od=out.data;
+  var mc=document.getElementById('m6mask'),mcx=mc.getContext('2d');
+  var mo=mcx.createImageData(320,240),md=mo.data;
+  var cnt=0,sx=0,sy=0,matched,cnt2=0;
+  for(var i=0;i<src.length;i+=4){
+    var r=src[i],g=src[i+1],b=src[i+2];
+    var hsv=rgb2hsv(r,g,b),H=hsv[0],S=hsv[1],V=hsv[2];
+    matched=(S>=lo&&V>=vo&&((H<=hi)||(H>=160&&H<=160+hi)));
+    od[i]=r;od[i+1]=g;od[i+2]=b;od[i+3]=255;
+    if(matched){od[i]=Math.min(255,r+40);md[i]=255;md[i+1]=255;md[i+2]=255;md[i+3]=255;
+      var px=(i/4)%320,py=Math.floor((i/4)/320);sx+=px;sy+=py;cnt++;}
+    else{md[i]=10;md[i+1]=10;md[i+2]=14;md[i+3]=255;}
+  }
+  var cx2=cnt?sx/cnt:0, cy2=cnt?sy/cnt:0;
+  // crosshair on src
+  ctx.putImageData(out,0,0);
+  if(cnt>30){ctx.strokeStyle='#22c55e';ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.moveTo(cx2-12,cy2);ctx.lineTo(cx2+12,cy2);ctx.moveTo(cx2,cy2-12);ctx.lineTo(cx2,cy2+12);ctx.stroke();
+    ctx.strokeRect(cx2-3,cy2-3,6,6);
+    ctx.fillStyle='#16a34a';ctx.fillText('('+(cx2*2|0)+','+(cy2*2|0)+')@640',cx2+8,cy2-8);}
+  mcx.putImageData(mo,0,0);
+  if(cnt>30){mcx.strokeStyle='#22c55e';mcx.lineWidth=1.5;
+    mcx.beginPath();mcx.moveTo(cx2-12,cy2);mcx.lineTo(cx2+12,cy2);mcx.moveTo(cx2,cy2-12);mcx.lineTo(cx2,cy2+12);mcx.stroke();}
+  if(!m6Pick&&cnt>30)m6Pick=[cx2*2,cy2*2];
+  document.getElementById('m6io').innerHTML=
+    '掩膜命中 '+cnt+' px（占 '+(cnt/768).toFixed(1)+'%）　质心 = ('+(cx2*2|0)+', '+(cy2*2|0)+') @640 像素坐标\n'
+    +(cnt<30?'<span class="bad">✗ 目标丢了！阈值太紧 —— 就是现场"检测不到目标"的复现</span>':'<span class="k">✓ inRange 两段并集命中；形态学开运算还会抹掉孤立噪点（7.1.2）</span>')
+    +'\n<span class="warn">// 讲义对策：放宽 lower、收紧 upper 先宽后窄（实验7 步骤2 易错点）</span>';
+  m6Proj();
+}
+function m6Proj(){
+  var d=parseFloat(document.getElementById('m6d').value),
+      fx=parseFloat(document.getElementById('m6fx').value),fy=614,cx=320,cy=240;
+  document.getElementById('m6do').value=d.toFixed(2)+'m';
+  document.getElementById('m6fxo').value=fx;
+  document.getElementById('m6mf').textContent=fx;document.getElementById('m6mf2').textContent=fy;
+  var P=m6Pick||[220,150];
+  document.getElementById('uvo').textContent='(u,v)=('+P[0]+', '+P[1]+')';
+  var X=(P[0]-cx)*d/fx, Y=(P[1]-cy)*d/fy, Z=d;
+  var Xb=Z+0.05, Yb=-X, Zb=-Y+0.40;
+  document.getElementById('m6io2').innerHTML=
+    '相机光学系 (X,Y,Z) = ('+X.toFixed(3)+', '+Y.toFixed(3)+', '+Z.toFixed(3)+') m\n'
+    +'TF → base_link = (<span class="k">'+Xb.toFixed(3)+', '+Yb.toFixed(3)+', '+Zb.toFixed(3)+'</span>) m\n'
+    +((Math.abs((P[0]-320))<8&&Math.abs((P[1]-240))<8&&Math.abs(d-0.5)<0.011)?'✓ 接近讲义例子：中心前 0.5m → (0.55, 0, 0.40)（实验7 步骤4）'
+      :'该点接下来会被 set_pick_target(frame_id=base_link) 存下，等 Trigger 下发 IK —— 就到了 M3/M5 的地盘');
+  // top view
+  var t=document.getElementById('m6top'),tc=t.getContext('2d'),W=360,H=170;
+  tc.clearRect(0,0,W,H);tc.font='11px Consolas,monospace';
+  var ox=30,oy=H-26,s=250/0.7;
+  tc.strokeStyle='#e2e8f0';tc.beginPath();tc.moveTo(ox,oy);tc.lineTo(W-8,oy);tc.moveTo(ox,oy);tc.lineTo(ox,12);tc.stroke();
+  tc.fillStyle='#475569';tc.fillText('俯视：目标在 base_link 的 (x, y)（x 前向）',ox+4,10);
+  for(var m=0;m<=4;m++){tc.fillStyle='#94a3b8';tc.fillText((m*0.15).toFixed(2),ox+m*0.15*s-8,oy+13);}
+  var PX=ox+Xb*s, PY=oy-Yb*s*1;
+  if(PX<ox){PX=ox;PY=oy;}
+  tc.fillStyle='#e11d48';tc.beginPath();tc.arc(PX,PY,6,0,7);tc.fill();
+  tc.fillStyle='#0f172a';tc.beginPath();tc.arc(ox,oy,4,0,7);tc.fill();
+  tc.fillStyle='#475569';tc.fillStyle='#475569';tc.fillText('base',ox+6,oy-6);
+  tc.fillStyle='#e11d48';tc.fillText('('+Xb.toFixed(2)+', '+Yb.toFixed(2)+')',PX+8,PY-6);
+}
+['hHi','sMin','vMin'].forEach(function(id){document.getElementById(id).addEventListener('input',m6Upd);});
+['m6d','m6fx'].forEach(function(id){document.getElementById(id).addEventListener('input',m6Proj);});
+document.getElementById('m6src').addEventListener('click',function(e){
+  var r=this.getBoundingClientRect();
+  var x=Math.round((e.clientX-r.left)*(this.width/r.width)),
+      y=Math.round((e.clientY-r.top)*(this.height/r.height));
+  m6Pick=[x*2,y*2];m6Proj();
+});
+m6SceneDraw();m6Upd();
+</script>
+
+
+</div>
+
+<footer>
+  <div class="foot-in">
+    <span>🎓 CORE-05 · 机械臂抓取 · 原理实验室（新增模块 M1~M6）</span>
+    <span><a href="../index.html">课程首页</a> · 案例全部出自 EXP005 实验讲义 · three.js r128 本地渲染</span>
+  </div>
+</footer>
+
+<script>
+var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('show');io.unobserve(e.target);}});},{threshold:.08});
+document.querySelectorAll('.reveal').forEach(function(el){io.observe(el);});
+</script>
+</body>
+</html>

@@ -1,0 +1,39 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp003-ros2-application/exp-15-rviz2/diagrams/fig-15-2-project-overview.html
+TITLE: 图 15-2 · 工程全景
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+图 15-2 · 工程全景
+图 15-2 · 工程全景：源文件、三节点、话题与画面
+本图回答的问题：一条 launch 命令背后，哪些文件和节点在动，数据从哪流到画面？
+源文件 · car1_description 包
+car1 URDF 模型
+xacro 描述 · link/joint 树
+display.launch.py
+启动剧本 · 三个 Node Action
+car1.rviz 配置
+Fixed Frame=base_footprint
+节点 · ros2 launch 一次拉起
+robot_state_publisher
+读 URDF 算 link 变换
+joint_state_publisher_gui
+滑块喂关节角
+rviz2（消费者）
+-d 加载 car1.rviz
+加载模型
+拉起
+拉起
+拉起 -d
+按配置
+/joint_states
+话题与画面
+/tf · /tf_static · /robot_description
+坐标变换与模型描述（话题）
+三维视口画面
+Grid · RobotModel · TF
+发布
+订阅·变换
+按 Display 绘制
+✅ 结论：launch 一次拉起生产者（jsp+rsp）与消费者（rviz2），数据经话题汇入画面
+⚠️ 风险：只开 rviz2 = 只有消费者，/tf 与话题根本不存在
+🔍 验证：04 节第 3/6/8 步 node list、topic list、tf2_echo 实测
+EXP-15 · rviz2 三维可视化

@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EXP-09 · 全功能快速验证 — 智慧工厂装货分拣码垛综合项目</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+:root{
+  --theme:#ea580c;
+  --theme-deep:#c2410c;
+  --theme-bg:#ffedd5;
+  --theme-bd:#fed7aa;
+}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit" title="返回课程首页">🧠 具身智能课程 · <i>教程首页</i></a>
+  <div class="crumb"><a href="../../../index.html#case">综合项目</a> / <a href="../index.html">智慧工厂装货分拣码垛</a> / EXP-09</div>
+</div>
+
+<div class="wrap">
+<aside class="side">
+  <h4>本页目录</h4>
+  <a href="#s1" class="now">01 问题引入</a>
+  <a href="#s2">02 原理通俗讲解</a>
+  <a href="#s3">03 关联知识点</a>
+  <a href="#s4">04 实验目标</a>
+  <a href="#s5">05 实验环境与准备</a>
+  <a href="#s6">06 动画讲解</a>
+  <a href="#s7">07 互动讲解</a>
+  <a href="#s8">08 实操步骤</a>
+  <a href="#s9">09 重点与易错点</a>
+  <a href="#s10">10 总结与思考</a>
+  <h4 style="margin-top:22px">CASE-01 · 智慧工厂</h4>
+  <a href="../exp-01-requirements/index.html">EXP-01 需求分析</a>
+  <a href="../exp-02-architecture/index.html">EXP-02 五节点架构</a>
+  <a href="../exp-03-interface-design/index.html">EXP-03 接口设计</a>
+  <a href="../exp-04-voice-integration/index.html">EXP-04 语音交互集成</a>
+  <a href="../exp-05-visual-loading/index.html">EXP-05 视觉自适应装货</a>
+  <a href="../exp-06-sorting/index.html">EXP-06 智能分拣</a>
+  <a href="../exp-07-palletizing/index.html">EXP-07 自主码垛</a>
+  <a href="../exp-08-emergency-stop/index.html">EXP-08 危险检测与急停</a>
+  <a href="../exp-09-full-verification/index.html">EXP-09 全功能快速验证</a>
+</aside>
+
+<main class="content">
+  <div class="exp-head">
+    <span class="code">EXP-09 · 第 3 章 · 综合性 · 8 学时</span>
+    <h1>全功能快速验证：一条命令启动 · 四链路闭环 · 干净停止</h1>
+    <p class="desc">收官实验：ros2 launch 一键拉起 bringup→arm_controller→peripherals→eai_factory 全系统，
+    用 7 个模块开关按需裁剪；以"语音触发 + 服务触发"双通道验证装货/分拣/码垛/急停四条全链路闭环
+    （含"任务完成"播报反馈），最后用 stop_eai_factory.sh 清理并排查残留——对应需求 R10 工程化验收。</p>
+    <div class="meta">
+      <span class="tag hl">🚀 一键启动编排</span>
+      <span class="tag">7 开关模块化</span>
+      <span class="tag">四链路闭环验证</span>
+      <span class="tag">语音+服务双通道</span>
+      <span class="tag">stop 脚本清理排查</span>
+    </div>
+  </div>
+
+  <section class="blk" id="s1">
+    <h2><span class="no">01</span>问题引入：零件都好，整机呢？</h2>
+    <p>前八个实验分别验证了需求、架构、接口、语音、视觉、分拣、码垛、急停——每个单件都合格，
+    但把它们拼成一台"智慧工厂"整机时，问题往往出在<strong>接缝</strong>处：启动顺序乱了谁先谁后？
+    内存不够要关哪些模块？任务完成了谁说话？下次启动报"串口被占用"是谁没扫干净？
+    本实验就是出厂前的<strong>整机路试</strong>：一条命令启动、四条链路跑通、一个脚本收工。</p>
+    <p>源讲义对"完成"给了明确定义：不会出现"抓完了没人说话"的断头链路——
+    grasp 发 <code>task|done</code> → 调度器映射中文话术 → /eai_factory/speak → TTS 播报，
+    这个闭环是 R1/R7 在系统级的最终验收面。</p>
+  </section>
+
+  <section class="blk" id="s2">
+    <h2><span class="no">02</span>原理通俗讲解：剧组开机与收工清单</h2>
+    <div class="kgrid">
+      <div class="kcard"><div class="kd">场记打板</div><div class="kt">分阶段有序开机</div>
+        <p>拍戏要先架灯、再通电、后开摄影机——launch 也分阶段：<strong>底层系统</strong>（car1_bringup 底盘+控制器
+        → car1_arm_controller → car1_peripherals 雷达+相机，经 IncludeLaunchDescription 在
+        <code>start_base:=true</code> 时包含）→ <strong>eai_factory 节点</strong>。后者因依赖不同分两类：
+        voice/vision/grasp/conveyor 要 venv 里的 sherpa_onnx、cv2 4.11，用 ExecuteProcess 以
+        <code>/home/iflytek/ros2_venv/bin/python3</code> 直跑 .py；scheduler/safety 依赖干净，用标准 Node 入口点。
+        最后 <code>start_viz:=true</code> 延时 5s 拉起 rqt_image_view。</p></div>
+      <div class="kcard"><div class="kd">七个开关</div><div class="kt">按需裁剪省资源</div>
+        <p>start_base / start_viz / start_voice / start_vision / start_grasp / start_conveyor / start_radar
+        （前六默认 true，<strong>radar 默认 false</strong>）。语义实例：<code>start_voice:=false</code>
+        省下 LLM ~500MB；<code>start_base:=false + start_radar:=true</code> 只测安全节点；
+        <code>start_viz:=false</code> 无头服务器不报 rqt 错。<strong>像行李打包：长途全带，出门买菜只带钥匙</strong>。</p></div>
+      <div class="kcard"><div class="kd">四条对讲</div><div class="kt">双通道闭环验证</div>
+        <p>装货（视觉抓取）/ 分拣（固定八步）/ 码垛（送料+抓取编排）/ 急停（雷达联锁）四链路，
+        每条都可<strong>语音与服务二选一</strong>触发（同走 _run_task，等价），完成播报由
+        _grasp_status_cb 映射 load→装货完成 / sort→分拣完成 / palletize→码垛完成。
+        验证法：入口双通道 + 中间看状态话题 + 出口听播报，三段都对齐才算闭环。</p></div>
+      <div class="kcard"><div class="kd">扫尾</div><div class="kt">停得干净才算完</div>
+        <p>异常退出会残留节点、底层进程与 flask_server（LLM 服务 8080），继续占着总线舵机/串口/麦——
+        下次启动必然"地址被占用"。<code>stop_eai_factory.sh</code> 五段清理：杀 launch 主进程 →
+        7 个 eai_factory 节点（按文件名精确 pkill）→ flask_server → 底层系统 → 兜底清 8080 端口 →
+        自查输出<strong>"已全部清理干净"</strong>。用完电的插头要拔——这就是 R10 的工程纪律。</p></div>
+    </div>
+  </section>
+
+  <section class="blk" id="s3">
+    <h2><span class="no">03</span>关联知识点</h2>
+    <div class="kgrid">
+      <div class="kcard"><div class="kd">LLM 就绪</div><div class="kt">Qwen3.5-0.8B · 8080</div>
+        <p>模型文件 <code>Qwen3.5-0.8B_w4a16_g128_rk3576.rkllm</code>，
+        llm_server.auto_start=true 自动拉起；启动后等 <code>ss -tlnp | grep 8080</code> 就绪，
+        语音链路才可用（加载约几十秒，别当成卡死）。</p></div>
+      <div class="kcard"><div class="kd">混编启动源</div><div class="kt">74-94 / L99-146 / L149-160</div>
+        <p>launch 文件三段：7 个 DeclareLaunchArgument 开关（L73-86）、底座三包 include 与雷达独立拉（L89-94）、
+        五节点编排与 rqt 延时（L99-160）。</p></div>
+      <div class="kcard"><div class="kd">资源账</div><div class="kt">500MB + 显示器依赖</div>
+        <p>语音/LLM 约 500MB 常驻；rqt GUI 需显示器；全功能启动（底盘+臂+雷达+相机+语音+视觉+流水线）
+        要确认内存/供电充足，不够就开关裁剪。</p></div>
+      <div class="kcard"><div class="kd">排查三板斧</div><div class="kt">进程 → 接口 → 日志</div>
+        <p>stop 自查残留 → <code>ros2 node/topic/service list</code> 看接口在不在 → 分节点日志定位。
+        典型：语音无响应先查 8080 与麦克风占用。</p></div>
+    </div>
+  </section>
+
+  <section class="blk" id="s4">
+    <h2><span class="no">04</span>实验目标</h2>
+    <ul class="check">
+      <li>掌握一键启动与 bringup→arm_controller→peripherals→eai_factory 分阶段启动顺序，能读懂启动日志时序。</li>
+      <li>掌握 7 开关语义，能按场景给出省内存/低内存/全功能三种启动组合。</li>
+      <li>完成装货/分拣/码垛/急停四链路闭环验证（语音+服务双通道），核对"装货完成/分拣完成/码垛完成"播报。</li>
+      <li>掌握 stop_eai_factory.sh 停止清理与残留排查（进程、8080 端口、node list 三验收）。</li>
+    </ul>
+  </section>
+
+  <section class="blk" id="s5">
+    <h2><span class="no">05</span>实验环境与准备</h2>
+    <ul class="check">
+      <li>全硬件就位：麦克纳姆底盘 + 5DOF 机械臂 + 夹爪 + 激光雷达 + RGB-D 相机 + 语音阵列 +
+      流水线电机 M1 + 光电 GPIO17 + AprilTag（id=3, tag36h11, 0.025m）。</li>
+      <li>先验自查（任一缺失先回对应实验补课）：
+      <pre>ls /home/iflytek/models/rkllm/Qwen3.5-0.8B_w4a16_g128_rk3576.rkllm
+/home/iflytek/ros2_venv/bin/python3 --version     <span class="y"># 3.10</span>
+sudo bash scripts/setup_conveyor_gpio.sh          <span class="c"># GPIO 幂等导出</span></pre></li>
+      <li>环境已 source 且构建过：
+      <pre>source /opt/ros/humble/setup.bash
+source /home/iflytek/ros2_ws/install/setup.bash
+<span class="c"># 若报找不到包：colcon build --packages-select eai_factory</span></pre></li>
+      <li>物料就位：装货区贴码货物、分拣取料点物品（与打点一致）、流水线起始端物品、雷达前方空旷。</li>
+      <li>内存/供电确认充足；实机抓取纪律：手离抓取区域。</li>
+    </ul>
+  </section>
+
+  <section class="blk" id="s6">
+    <h2><span class="no">06</span>动画讲解：启动编排与四链路全景</h2>
+    <div class="anim-box">
+<svg viewBox="0 0 720 310" xmlns="http://www.w3.org/2000/svg">
+  <text x="20" y="26" font-size="15" fill="#94a3b8">一键启动编排（分阶段时序）</text>
+  <rect x="30" y="44" width="150" height="34" rx="7" fill="#0f172a"/>
+  <text x="105" y="65" font-size="11" fill="#fdba74" text-anchor="middle">① bringup 底盘+控制器</text>
+  <rect x="200" y="44" width="140" height="34" rx="7" fill="#0f172a"/>
+  <text x="270" y="65" font-size="11" fill="#fdba74" text-anchor="middle">② arm_controller</text>
+  <rect x="360" y="44" width="150" height="34" rx="7" fill="#0f172a"/>
+  <text x="435" y="65" font-size="11" fill="#fdba74" text-anchor="middle">③ peripherals 雷达+相机</text>
+  <rect x="530" y="44" width="160" height="34" rx="7" fill="#ffedd5" stroke="#ea580c" stroke-width="2"/>
+  <text x="610" y="65" font-size="11" fill="#9a3412" text-anchor="middle">④ voice(LLM 几十秒)</text>
+  <rect x="30" y="94" width="180" height="34" rx="7" fill="#ffedd5" stroke="#ea580c" stroke-width="2"/>
+  <text x="120" y="115" font-size="11" fill="#9a3412" text-anchor="middle">⑤ scheduler 入口点</text>
+  <rect x="230" y="94" width="160" height="34" rx="7" fill="#ffedd5" stroke="#ea580c" stroke-width="2"/>
+  <text x="310" y="115" font-size="11" fill="#9a3412" text-anchor="middle">⑥ safety 入口点</text>
+  <rect x="410" y="94" width="280" height="34" rx="7" fill="#ffedd5" stroke="#ea580c" stroke-width="2"/>
+  <text x="550" y="115" font-size="11" fill="#9a3412" text-anchor="middle">⑦ vision/grasp/conveyor (venv) → 5s 后 rqt</text>
+  <line x1="180" y1="61" x2="200" y2="61" stroke="#ea580c" stroke-width="2"/>
+  <line x1="340" y1="61" x2="360" y2="61" stroke="#ea580c" stroke-width="2"/>
+  <line x1="510" y1="61" x2="530" y2="61" stroke="#ea580c" stroke-width="2"/>
+  <line x1="105" y1="78" x2="105" y2="94" stroke="#ea580c" stroke-width="2"/>
+  <line x1="210" y1="111" x2="230" y2="111" stroke="#ea580c" stroke-width="2"/>
+  <line x1="390" y1="111" x2="410" y2="111" stroke="#ea580c" stroke-width="2"/>
+  <circle r="7" fill="#ea580c">
+    <animate attributeName="cx" values="105;270;435;610;120;310;550;105" dur="7s" repeatCount="indefinite"/>
+    <animate attributeName="cy" values="61;61;61;61;111;111;111;61" dur="7s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="1;1;1;1;1;1;1;0" dur="7s" repeatCount="indefinite"/>
+  </circle>
+  <text x="20" y="168" font-size="15" fill="#94a3b8">四链路闭环：入口（语音/服务）→ 中间状态 → 出口播报/联锁</text>
+  <g font-size="11">
+    <rect x="30" y="186" width="320" height="34" rx="7" fill="#ffedd5" stroke="#fed7aa"/>
+    <text x="44" y="207" fill="#9a3412">装货：语音&"装货"/start_load → vision 检测 → 抓放 → "装货完成"</text>
+    <rect x="30" y="228" width="320" height="34" rx="7" fill="#ffedd5" stroke="#fed7aa"/>
+    <text x="44" y="249" fill="#9a3412">分拣：语音&"分拣"/start_sort → 固定八步 → "分拣完成"</text>
+    <rect x="370" y="186" width="320" height="34" rx="7" fill="#ffedd5" stroke="#fed7aa"/>
+    <text x="384" y="207" fill="#9a3412">码垛：语音&"码垛"/start_palletize → 送料→sensor→抓取 → "码垛完成"</text>
+    <rect x="370" y="228" width="320" height="34" rx="7" fill="#fee2e2" stroke="#dc2626"/>
+    <text x="384" y="249" fill="#b91c1c">急停：雷达 60°/20cm/0.5s → danger → 停臂停带 → 移开回 work</text>
+  </g>
+  <rect x="30" y="272" width="660" height="26" rx="6" fill="#0f172a"/>
+  <text x="360" y="289" font-size="11" fill="#fdba74" text-anchor="middle">收工：bash scripts/stop_eai_factory.sh → 节点/8080/底层逐段清理 → "已全部清理干净"</text>
+</svg>
+    </div>
+    <div class="anim-cap">图 9-1　上：launch 分阶段开机时序（光点走一遍 = 一次系统启动，橙框为有等待点的阶段）；中：四条链路各有"双通道入口 + 状态中继 + 播报/联锁出口"的同构结构；下：收工清理是验收的最后一环。</div>
+  </section>
+
+  <section class="blk" id="s7">
+    <h2><span class="no">07</span>互动讲解：验证 checklist 进度台</h2>
+    <p>按实验六步走，逐步点亮验收项；每步含预期输出与失败时的排查线索：</p>
+    <div class="ix-panel">
+      <div class="ix-title">🎛️ 全功能验证 checklist</div>
+      <div class="ctl-row">
+        <button class="btn" onclick="checkOne()">下一步 ▸</button>
+        <button class="btn" onclick="checkAll()">全部完成 ⏩</button>
+        <button class="btn" onclick="resetCheck()">复位</button>
+      </div>
+      <div class="io" id="checkIo">共 6 步：启动 → 装货 → 分拣 → 码垛 → 急停 → 清理。点击"下一步"逐项验收……</div>
+    </div>
+    <div class="tip tealb" style="margin-top:14px"><span class="lab">判据</span>
+      每条链路的通过判据都是三段对齐：<strong>入口有响应（回话/返回 success）＋中间状态话题按序出现＋出口有播报或联锁动作</strong>。
+      任何一段缺失都算链路断，不要只听了播报就打勾。</div>
+  </section>
+
+  <section class="blk" id="s8">
+    <h2><span class="no">08</span>实操步骤</h2>
+    <div class="flow">
+      <div class="step"><div class="n">1</div><div><strong>全功能一键启动</strong>
+<pre>source /opt/ros/humble/setup.bash
+source /home/iflytek/ros2_ws/install/setup.bash
+ros2 launch eai_factory eai_factory.launch.py
+<span class="c"># 观察：bringup → arm_controller → peripherals → voice(LLM) →</span>
+<span class="c">#      scheduler/safety/vision/grasp/conveyor → 约5s 后 rqt 画面</span>
+ros2 node list | grep eai_factory
+ros2 service list | grep -E "start_(load|sort|palletize)"</pre></div></div>
+      <div class="step"><div class="n">2</div><div><strong>装货链路（视觉）</strong>：装货区放贴码（tag id=3）货物，
+      rqt 画面见检测框 → <code>ros2 service call /eai_factory/start_load std_srvs/srv/Trigger</code>
+      （或语音"小飞小飞 → 装货"）→ 观察观察位→检测→抓→放→回 work→播报"装货完成"，
+      终端 <code>[SCHEDULER] task load done — announce "装货完成"</code>，status <code>load|done</code>。</div></div>
+      <div class="step"><div class="n">3</div><div><strong>分拣链路（固定点位）</strong>：按打点位置摆物品 →
+      <code>start_sort</code> 或语音"分拣" → 开爪→到位→闭爪→抬 0.03→放置→抬 0.05→回 work→"分拣完成"；
+      连续 2 次验证稳定性。</div></div>
+      <div class="step"><div class="n">4</div><div><strong>码垛链路（编排）</strong>：物品备在流水线起始端 →
+      <code>start_palletize</code> 或语音"码垛"（听到指令后<strong>立即</strong>放货，防 30s 超时）
+      → 送料 running → 光电遮挡 sensor_blocked → 固定抓取 → <code>palletize|done</code> → "码垛完成"。</div></div>
+      <div class="step"><div class="n">5</div><div><strong>急停联动</strong>：任务执行中在雷达正前方 20cm 内放障碍 ≥0.5s →
+      grasp 日志 <code>SAFETY DANGER — stopping grasp</code>、conveyor <code>belt + arm stopped</code>、
+      <code>enable_torque: [0,0,0,0,0,0]</code> → 移开 → recover + [1,1,1,1,1,1] + go_work →
+      重新触发任务验证可用；顺手做一次"任务中语音打断 vs 雷达危险"的优先级对照。</div></div>
+      <div class="step"><div class="n">6</div><div><strong>停止清理与残留排查</strong>
+<pre>bash scripts/stop_eai_factory.sh
+<span class="y"># 结尾应显示"已全部清理干净"</span>
+ros2 node list                 <span class="c"># 无 eai_factory 节点</span>
+ss -tlnp | grep 8080           <span class="c"># 无输出</span>
+ps aux | grep -E "voice_node|flask_server|eai_factory" | grep -v grep</pre>
+      再人为制造一例故障（如 <code>start_voice:=false</code> 启动后下发语音指令），按
+      进程→接口→日志三板斧定位并记录排查过程。</div></div>
+    </div>
+  </section>
+
+  <section class="blk" id="s9">
+    <h2><span class="no">09</span>重点与易错点</h2>
+    <div class="tip amber"><span class="lab">诊断</span>"启动不起来"先三问：source 了吗（找不到包）？
+    build 了吗？上次清干净了吗（8080/串口/麦克风被占）？"链路不通"先看<strong>哪个环节的状态话题先断的</strong>。</div>
+    <table>
+      <tr><th>现象</th><th>根因</th><th>处理</th></tr>
+      <tr><td>报 ament/找不到包</td><td>未 source 或未 build</td><td>两个 source；<code>colcon build --packages-select eai_factory</code></td></tr>
+      <tr><td>语音无响应</td><td>LLM 8080 未就绪 / 麦克风被残留占用</td><td><code>ss -tlnp | grep 8080</code> 等就绪；先跑 stop 脚本清残留</td></tr>
+      <tr><td>启动"卡住"几十秒</td><td>LLM 模型加载属正常耗时</td><td>等 8080；或 <code>start_voice:=false</code> 跳过验证其他链路</td></tr>
+      <tr><td>无显示器环境 rqt 报错</td><td>start_viz 默认 true</td><td><code>start_viz:=false</code></td></tr>
+      <tr><td>视觉装货检测不到</td><td>光照/距离/角度或 tag id 不符</td><td>rqt 校准；确认 yaml tag_id: 3；查 detected 话题</td></tr>
+      <tr><td>分拣/码垛抓偏</td><td>物品偏离打点 or 堆叠高度变化</td><td>重摆物品或重新打点更新 observe_pose（yaml L85/L89）</td></tr>
+      <tr><td>任务中危险不触发</td><td>障碍不在雷达正前方 ±30°</td><td>对准雷达 0° 中心，10-20cm 保持 ≥0.5s</td></tr>
+      <tr><td>下次启动串口被占</td><td>只 Ctrl+C 没跑 stop 脚本</td><td><code>bash scripts/stop_eai_factory.sh</code> 后重启</td></tr>
+    </table>
+    <ul class="check">
+      <li>评分自测（源讲义 15/30/35/10/10）：原理 15、步骤与命令日志 30、四链路现象 35、清理排查记录 10、思考题 10。</li>
+      <li>三种启动组合要都能复现：全功能（默认）/ 省内存（voice+viz off）/ 低内存雷达（base off + radar on）。</li>
+      <li>全程安全纪律：手离抓取区、急停验证前机械臂安全位、恢复时手不扶臂、码垛物料与打点一致。</li>
+    </ul>
+  </section>
+
+  <section class="blk" id="s10">
+    <h2><span class="no">10</span>总结与思考</h2>
+    <div class="kgrid">
+      <div class="kcard"><div class="kd">启动</div><div class="kt">分阶段 + 7 开关</div><p>两套依赖两套启动方式，开关即资源预算旋钮。</p></div>
+      <div class="kcard"><div class="kd">验证</div><div class="kt">四链路 · 双通道 · 三段对齐</div><p>入口响应、中继状态、出口播报/联锁缺一不可。</p></div>
+      <div class="kcard"><div class="kd">安全</div><div class="kt">danger 贯穿全场</div><p>急停不只在 EXP-08——任何链路都要在任务中触发一次联锁。</p></div>
+      <div class="kcard"><div class="kd">收工</div><div class="kt">stop 脚本三验收</div><p>进程无残留、8080 空闲、node list 干净，才叫实验结束。</p></div>
+    </div>
+    <div class="tip violet" style="margin-top:14px"><span class="lab">思考 1</span>
+      start_radar 默认 false 而 start_base 默认 true，这两个默认值分别服务什么使用场景？
+      (提示：完整系统开箱即用 vs 低内存单测安全模块，从"谁最常被单独调试"倒推。)</div>
+    <div class="tip violet"><span class="lab">思考 2</span>
+      四条链路里"完成播报"都由调度器基于 grasp/status 的 done 触发——如果某次抓取以
+      <code>task|failed</code> 结束（而非 done），现在的闭环会怎样？用户会察觉吗？
+      这暴露了 R7"完成必须播报"的哪个盲区，你会补什么？</div>
+  </section>
+
+  <nav class="expnav">
+    <a href="../exp-08-emergency-stop/index.html" class="prev">← EXP-08 危险检测与急停</a>
+    <a href="../index.html" class="next">返回 课程目录 · 智慧工厂装货分拣码垛 →</a>
+  </nav>
+
+  <footer>
+    <span>CASE-01 · 智慧工厂装货分拣码垛 · EXP-09 全功能快速验证</span>
+    <span>8 学时 · 综合性 · 基于 llm_practice 实验讲义改编</span>
+  </footer>
+</main>
+</div>
+
+<script>
+var CHECK_ITEMS = [
+  ['① 一键启动', 'ros2 launch ... 无报错；node list 含 voice/scheduler/safety/vision/grasp/conveyor；start_* 服务齐；safety/status=safe。失败线索：source/build/残留。'],
+  ['② 装货链路', '入口 start_load success:true（或语音"装货"）→ rqt 见 tag36h11 检测框 → grasp status load|done → 播报"装货完成"。失败线索：detected 话题、tag_id、pick_offset。'],
+  ['③ 分拣链路', '入口 start_sort → 固定八步日志无缺行 → sort|done → "分拣完成"；连跑 2 次均稳。失败线索：打点位姿、提前开爪、lift_height。'],
+  ['④ 码垛链路', '入口 start_palletize → running → sensor_blocked → palletize|done → "码垛完成"；30s 内物品上带。失败线索：清沿/防抖/急停标志。'],
+  ['⑤ 急停联动', '任务中雷达正前方 20cm 持续 0.5s → SAFETY DANGER 停臂 + enable_torque=[0]*6 → 移开 recover + [1,1,1,1,1,1] + go_work → 重触发可用；语音打断与危险并存时危险优先。'],
+  ['⑥ 清理排查', 'stop_eai_factory.sh 输出"已全部清理干净"；node list 无 eai_factory、8080 空闲、ps 无 flask_server 残留。任一残留 → 手动 pkill + 端口清理后复核。']
+];
+var checkStep = 0;
+function checkOne(){
+  checkStep = Math.min(checkStep + 1, CHECK_ITEMS.length);
+  renderCheck();
+}
+function checkAll(){
+  checkStep = CHECK_ITEMS.length;
+  renderCheck();
+}
+function resetCheck(){
+  checkStep = 0;
+  document.getElementById('checkIo').innerHTML = '共 6 步：启动 → 装货 → 分拣 → 码垛 → 急停 → 清理。点击"下一步"逐项验收……';
+}
+function renderCheck(){
+  var lines = [];
+  for(var i = 0; i < checkStep; i++){
+    lines.push('<span class="ok">[PASS] ' + CHECK_ITEMS[i][0] + '</span>\n<span class="dim">　　' + CHECK_ITEMS[i][1] + '</span>');
+  }
+  lines.push('<span class="warn">进度 ' + checkStep + '/6' + (checkStep < 6 ? ' — 待验：' + CHECK_ITEMS[checkStep][0] : ' — 全链路闭环达成，报告可交') + '</span>');
+  document.getElementById('checkIo').innerHTML = lines.join('\n');
+}
+</script>
+<script src="../shared/tutorial.js" defer></script>
+</body>
+</html>

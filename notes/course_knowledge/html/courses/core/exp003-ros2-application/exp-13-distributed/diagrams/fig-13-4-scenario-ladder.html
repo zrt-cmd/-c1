@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>图 13-4 · 场景全景：四级组网选型</title>
+<style>
+:root{--bg-page:#ffffff;--bg-card:#fff;--text:#0f172a;--text2:#475569;--muted:#94a3b8;
+  --border:#e2e8f0;--teal:#0891b2;--green:#059669;--purple:#7c3aed;--orange:#ea580c;--red:#e11d48;--gray:#64748b;
+  --teal-bg:rgba(8,145,178,.08);--green-bg:rgba(5,150,105,.08);--purple-bg:rgba(124,58,237,.08);
+  --orange-bg:rgba(234,88,12,.10);--gray-bg:rgba(100,116,139,.08);--red-bg:rgba(225,29,72,.08)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg-page);color:var(--text);font-family:system-ui,"PingFang SC","Microsoft YaHei",sans-serif;padding:16px 14px 12px}
+.hd{margin-bottom:6px}
+.hd h1{font-size:15px;margin:0 0 4px}
+.hd .q{font-size:12px;color:var(--text2);margin:0}
+svg{width:100%;height:auto;display:block}
+.t{font:600 12.5px system-ui,sans-serif;fill:var(--text)}
+.s{font:400 10.5px system-ui,sans-serif;fill:var(--text2)}
+.l{font:600 10.5px ui-monospace,Consolas,monospace;fill:var(--text2)}
+.r{font:700 10px system-ui,sans-serif;fill:#b91c1c}
+.dock{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.dock span{font-size:11.5px;border-radius:999px;padding:3px 10px;line-height:1.6}
+.ok{background:#ecfdf5;color:#047857;border:1px solid #a7f3d0}
+.warn{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca}
+.evid{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}
+.ft{font-size:10.5px;color:var(--muted);margin-top:8px;text-align:right}
+</style>
+</head>
+<body>
+<div class="hd">
+  <h1>图 13-4 · 场景全景：从教室到开放日的四级组网选型</h1>
+  <p class="q">本图回答的问题：规模与网络环境变了，什么时候换划圈、什么时候加前缀、什么时候改单播、什么时候上服务器？</p>
+</div>
+<svg viewBox="0 0 760 540" role="img" aria-label="四级组网发现方案选型全景图">
+  <!-- 规模轴 -->
+  <line x1="34" y1="56" x2="34" y2="500" stroke="#94a3b8" stroke-width="1.5"/>
+  <polygon points="34,46 29,58 39,58" fill="#94a3b8"/>
+  <text class="l" x="34" y="34" text-anchor="middle">规模↑</text>
+  <text class="s" x="34" y="524" text-anchor="middle">台数与无线环境</text>
+
+  <!-- 列标题 -->
+  <text class="l" x="159" y="60" text-anchor="middle" fill="#0891b2">场 景</text>
+  <text class="l" x="445" y="60" text-anchor="middle" fill="#059669">选型方案</text>
+  <text class="l" x="671" y="60" text-anchor="middle" fill="#64748b">落地案例</text>
+
+  <!-- 第一级 -->
+  <rect x="54" y="76" width="210" height="74" rx="6" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1.5"/>
+  <text class="t" x="159" y="104" text-anchor="middle">教学机房 · 6 组同场</text>
+  <text class="s" x="159" y="126" text-anchor="middle">整组要独立 · 话题名还要统一</text>
+  <line x1="264" y1="113" x2="332" y2="113" stroke="var(--green)" stroke-width="1.5"/>
+  <text class="l" x="298" y="104" text-anchor="middle" fill="#059669">分组划圈</text>
+  <rect x="334" y="76" width="230" height="74" rx="6" fill="var(--green-bg)" stroke="var(--green)" stroke-width="1.5"/>
+  <text class="t" x="449" y="104" text-anchor="middle">整组换 ROS_DOMAIN_ID</text>
+  <text class="s" x="449" y="126" text-anchor="middle">每组发一个域号（1~6）</text>
+  <line x1="564" y1="113" x2="596" y2="113" stroke="var(--gray)" stroke-width="1.5"/>
+  <text class="l" x="580" y="104" text-anchor="middle" fill="#64748b">落地</text>
+  <rect x="598" y="76" width="148" height="74" rx="6" fill="var(--gray-bg)" stroke="var(--gray)" stroke-width="1.5" stroke-dasharray="6,4"/>
+  <text class="s" x="672" y="104" text-anchor="middle">6 组同叫 /cmd_vel</text>
+  <text class="s" x="672" y="126" text-anchor="middle">互相看不见，不串台</text>
+
+  <!-- 第二级 -->
+  <rect x="54" y="188" width="210" height="74" rx="6" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1.5"/>
+  <text class="t" x="159" y="216" text-anchor="middle">同域 · 6 车联动群控</text>
+  <text class="s" x="159" y="238" text-anchor="middle">要指哪打哪 · 还要能一键全发</text>
+  <line x1="264" y1="225" x2="332" y2="225" stroke="var(--green)" stroke-width="1.5"/>
+  <text class="l" x="298" y="216" text-anchor="middle" fill="#059669">同网寻址</text>
+  <rect x="334" y="188" width="230" height="74" rx="6" fill="var(--green-bg)" stroke="var(--green)" stroke-width="1.5"/>
+  <text class="t" x="449" y="216" text-anchor="middle">同域 + namespace 前缀</text>
+  <text class="s" x="449" y="238" text-anchor="middle">/robot01/cmd_vel …</text>
+  <line x1="564" y1="225" x2="596" y2="225" stroke="var(--gray)" stroke-width="1.5"/>
+  <text class="l" x="580" y="216" text-anchor="middle" fill="#64748b">落地</text>
+  <rect x="598" y="188" width="148" height="74" rx="6" fill="var(--gray-bg)" stroke="var(--gray)" stroke-width="1.5" stroke-dasharray="6,4"/>
+  <text class="s" x="672" y="216" text-anchor="middle">按车发 robot01</text>
+  <text class="s" x="672" y="238" text-anchor="middle">循环 6 前缀 = 群控</text>
+
+  <!-- 第三级 -->
+  <rect x="54" y="300" width="210" height="74" rx="6" fill="var(--red-bg)" stroke="var(--red)" stroke-width="1.5"/>
+  <text class="t" x="159" y="326" text-anchor="middle">无线 802.11 组控</text>
+  <text class="r" x="159" y="344" text-anchor="middle">组播限速 · 无 ACK · 随机丢</text>
+  <text class="s" x="159" y="362" text-anchor="middle">车一跑动发现就"时好时坏"</text>
+  <line x1="264" y1="337" x2="332" y2="337" stroke="var(--green)" stroke-width="1.5"/>
+  <text class="l" x="298" y="328" text-anchor="middle" fill="#059669">无线绕障</text>
+  <rect x="334" y="300" width="230" height="74" rx="6" fill="var(--green-bg)" stroke="var(--green)" stroke-width="1.5"/>
+  <text class="t" x="449" y="326" text-anchor="middle">Fast DDS XML 固定对端</text>
+  <text class="s" x="449" y="348" text-anchor="middle">initialPeers 单播逐台宣告</text>
+  <line x1="564" y1="337" x2="596" y2="337" stroke="var(--gray)" stroke-width="1.5"/>
+  <text class="l" x="580" y="328" text-anchor="middle" fill="#64748b">落地</text>
+  <rect x="598" y="300" width="148" height="74" rx="6" fill="var(--gray-bg)" stroke="var(--gray)" stroke-width="1.5" stroke-dasharray="6,4"/>
+  <text class="s" x="672" y="326" text-anchor="middle">peers.xml 写 6 个 IP</text>
+  <text class="s" x="672" y="348" text-anchor="middle">发现不再赌组播</text>
+
+  <!-- 第四级 -->
+  <rect x="54" y="412" width="210" height="74" rx="6" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1.5"/>
+  <text class="t" x="159" y="440" text-anchor="middle">开放日 · 40 车跨教室</text>
+  <text class="s" x="159" y="462" text-anchor="middle">名单排不下 · 组播风暴不可控</text>
+  <line x1="264" y1="449" x2="332" y2="449" stroke="var(--green)" stroke-width="1.5"/>
+  <text class="l" x="298" y="440" text-anchor="middle" fill="#059669">百台上量</text>
+  <rect x="334" y="412" width="230" height="74" rx="6" fill="var(--green-bg)" stroke="var(--green)" stroke-width="1.5"/>
+  <text class="t" x="449" y="440" text-anchor="middle">DISCOVERY_SERVER 集中</text>
+  <text class="s" x="449" y="462" text-anchor="middle">主备两台 · 容灾互备</text>
+  <line x1="564" y1="449" x2="596" y2="449" stroke="var(--gray)" stroke-width="1.5"/>
+  <text class="l" x="580" y="440" text-anchor="middle" fill="#64748b">落地</text>
+  <rect x="598" y="412" width="148" height="74" rx="6" fill="var(--gray-bg)" stroke="var(--gray)" stroke-width="1.5" stroke-dasharray="6,4"/>
+  <text class="s" x="672" y="440" text-anchor="middle">全部单播到服务器</text>
+  <text class="s" x="672" y="462" text-anchor="middle">主挂备切 · 发现不断</text>
+
+  <text class="l" x="380" y="512" text-anchor="middle" fill="#94a3b8">递进规则：规模 ↑ 或 组播环境 ↓ → 沿 ①划圈 → ②前缀 → ③XML 单播 → ④服务器 逐级上移</text>
+</svg>
+<div class="dock">
+  <span class="ok">✅ 结论：分组划圈、群控寻址、无线单播、上量集中——四级各管一段，不混用</span>
+  <span class="warn">⚠️ 风险：无线上赌组播 = 随机丢发现；40 车仍全组播 = 发现风暴</span>
+  <span class="evid">🔍 验证：02/04 三终端（第 1 级）· 本节 namespace/XML 命令 · 组排台 server 场景（第 4 级）</span>
+</div>
+<div class="ft">EXP-13 · ROS2 分布式通讯</div>
+</body>
+</html>

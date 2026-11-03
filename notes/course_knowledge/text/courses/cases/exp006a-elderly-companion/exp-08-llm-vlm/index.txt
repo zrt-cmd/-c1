@@ -1,0 +1,299 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/cases/exp006a-elderly-companion/exp-08-llm-vlm/index.html
+TITLE: EXP-08 · LLM 对话与 VLM 复核 — 老人跌倒监护综合项目
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+EXP-08 · LLM 对话与 VLM 复核 — 老人跌倒监护综合项目
+🧠 具身智能课程 ·
+教程首页
+综合项目
+/
+老人跌倒监护
+/ EXP-08
+本页目录
+01 问题引入：告警之外，还要会"对话"和"复核"
+02 原理通俗讲解：端侧大脑、记忆条与会诊医生
+03 关联知识点：LLM 服务 · 滑动窗口 · VLM 复核
+04 实验目标
+05 实验环境与准备
+06 动画讲解：流式链路、记忆窗口与图文复核
+07 互动讲解：多轮对话与复核沙盘
+08 实操步骤：llm_chat_test 与 vlm_demo
+09 重点与易错点
+10 总结与思考
+CH1 · 需求与配置
+EXP-01 需求分析
+EXP-02 分层架构
+EXP-03 配置详解
+CH2 · 感知与交互
+EXP-04 语音交互
+EXP-05 检测与姿态
+EXP-06 跌倒状态机
+CH3 · 告警与验证
+EXP-07 告警证据链
+EXP-08 LLM·VLM
+EXP-09 全功能验证
+EXP-08 · 第 3 章 · 综合性 · 8 学时
+LLM 对话与 VLM 复核：让监护系统"会说话、会复核"
+跌倒误报会让告警变"狼来了"，冷冰冰的机器播报也安抚不了老人。本实验在端侧跑起
+RKLLM + Qwen3.5-0.8B
+（ctypes 加载 librkllmrt.so、Flask 发 OpenAI 兼容接口、逐 token SSE 流式），用
+滑动窗口拼接
+解决 NLU 单条输入的健忘问题，再接
+RKLLMVisionJudge 图文复核
+（vlm.enabled 默认关，按需开）。拆解 server_manager 端口避让与 503 繁忙，并存路由优先级 ALERT＞ASK＞SPEAKING＞闲聊。
+难度 ⭐⭐⭐ · 8 学时
+RKLLM Qwen3.5
+滑动窗口 max_history=6
+SSE 流式
+VLM 复核默认关
+01
+问题引入：告警之外，还要会"对话"和"复核"
+前面实验已让系统"看得见、判得准、喊得响"，但两根刺还扎着：一是
+误报
+——老人弯腰系鞋带被判跌倒，半夜反复报警把全家吵醒；二是
+安抚缺失
+——只会重复一句硬邦邦的告警语。理想监护应该：跌倒时
+先多问一句确认
+（VLM 看图复核），无事时能
+陪老人聊两句
+（LLM 闲聊），且全程
+不出家门、不上传云端
+。
+1
+端侧 NPU 跑 Qwen3.5-0.8B：对话闲聊、语音安抚、上下文记忆
+2
+滑动窗口把多轮历史拼成一条，治愈"系统记不住我刚才说的话"
+3
+VLM 复核：跌倒候选帧交给"会诊医生"再看一眼，降低误报
+4
+安全优先的并存路由：告警 > 询问 > 播报 > 闲聊，永不抢麦
+💡 一个类比
+整套 LLM/VLM 链路像给家里请了一位
+住家护工
+：会陪聊（对话）、记得你刚说过什么（记忆窗口）、看到可疑情况会先凑近看一眼再喊人（视觉复核）—— 而且这位护工
+从不把家里的事说出去
+（端侧推理）。
+02
+原理通俗讲解：端侧大脑、记忆条与会诊医生
+RKLLM 端侧推理
+把"大块头"压缩进工控机的书包
+Qwen3.5-0.8B 用 w4a16 量化后权重仅约 0.4G，带激活共约
+1.5G
+的 .rkllm 文件，由 ctypes 直接加载
+/usr/lib/librkllmrt.so
+塞进 NPU —— 像把整本词典压缩成口袋书，推理全在板上完成，一个字节都不外发。
+滑动窗口
+手心上贴一张"记忆便利贴"
+RKLLM 的 get_last_input() 每次只吐最后一条 user 消息，天然健忘。LLMChat 于是取
+[-2×max_history:] 条历史
+拼成「用户：…\n小飞：…」的对话记录，前面加上"请根据上下文自然回答最后一句"的指示 —— 便利贴只留最近几条，旧的撕掉（max_history=6，存两层各 12 条即截断）。
+流式 SSE
+打字机式的回信
+回调 callback_impl 逐 token 累积 global_text，Flask 端点以
+data: {...delta.content...}
+逐段下发、以
+data: [DONE]
+收尾，LLMClient 用纯标准库 urlopen 消费 —— 用户看到回答"一个字一个字蹦出来"，而不是等全文憋 30 秒。客户端 SSE 解析失败还会自动降级非流式（chat.py L56-L59）。
+VLM 复核
+喊人之前先看一眼照片
+RKLLMVisionJudge 懒加载：收到请求才花 10-60s 载入 1.3G 视觉模型。图片缩到 448×448 → 视觉编码器 →
+196=(448/32)² 个 patch、每片 1024 维
+嵌入，以 <img>…</img> 标记塞进多模态接口；回答三分类 fall/not_fall/uncertain（含"是"不含"否"→0.8 等规则）。
+🔔 人文关怀与隐私底线
+对话与图像全在
+端侧
+处理，不依赖公网云 —— 老人的居家影像与言语不出户。vlm.enabled
+默认 false
+不是偷懒：LLM 1.5G + VLM 1.3G ≈ 3.0G+，2G/4G 内存的板子慎开；先把核心监护跑稳，按硬件余量再开复核。
+03
+关联知识点：LLM 服务 · 滑动窗口 · VLM 复核
+知识点
+内容
+源码锚点
+llm_server RKLLM 初始化
+ctypes.CDLL('/usr/lib/librkllmrt.so')；模型 Qwen3.5-0.8B_w4a16_g128_rk3576.rkllm ≈1.5G；采样 temperature 0.8 / top_p 0.9 / top_k 1（贪心）/ repeat_penalty 1.1 / max_context_len 4096，可按请求覆盖；callback_impl 逐 token 累积 global_text 即天然流式
+llm_server.py L15-L16（CDLL）、L213-L232（回调）、L259-L272（采样参数）、L617-L621（按请求覆盖）
+Flask OpenAI 兼容层
+GET /v1/models 返回模型清单；POST /v1/chat/completions 输出 SSE：data: {...delta.content...} → data: [DONE]；lock+isBlocking 串行化 RKLLM 推理，撞上并发即 503 server busy
+llm_server.py L584-L596（/v1/models）、L598-L690（/v1/chat/completions）
+2.1.4 滑动窗口拼接
+get_last_input() 只取最后一条新增 user → LLMChat 取 [-2*max_history:] 历史拼「用户：xxx\n小飞：xxx」单条 content，前缀「以下是一段对话记录，请根据上下文自然回答最后一句，不要复述记录」；存储层 >2*max_history+8 截断；reset 全清
+chat.py L36-L46（拼接+指示）、L43（窗口截断）、L68-L69（存储截断）、L139-L140（reset）；llm_client.py L59-L145
+server_manager 生命周期
+pick_free_port 从 8080 起 connect_ex 探测 20 个；_port_open+_models_ok GET /v1/models 判断可复用；Popen 拉起日志隔离 runs/logs/llm_server.log；就绪轮询每 2s、超时 120s；stop() terminate→wait(5)→kill，只杀自己拉起的
+server_manager.py L33-L40、L42-L53、L85-L99、L106-L110、L113-L125
+2.1.5 VLM 复核
+VisionJudge 协议 + FakeVisionJudge 恒 uncertain 兜底；RKLLMVisionJudge 懒加载 _load 10-60s；PROMPT「图中的人是否摔倒了？只回答'是'或'否'或'不确定'，然后写一句理由。」；三分类含"是"不含"否"→fall(0.8)/含"否"→not_fall(0.8)/不确定或报错→uncertain(0.5 或 0.0)；异常全捕获返 uncertain 主流程不崩；config vlm.enabled 默认 false
+vision_judge.py L23-L25（PROMPT）、L34-L44（协议+Fake）、L243（懒加载）、L388-L399（异常兜底）；config/fall_config.yaml L12-L16
+并存与优先级
+告警/播报/闲聊共用 plughw:3,0 分时发声；优先级 ALERT＞ASK＞SPEAKING＞LLM 闲聊（安全设计非 bug）；monitor 三接口 on_kws / on_asr / has_ask_session 是耦合点
+fall/monitor.py（三接口注册）；server_manager 端口避让 llm.server.port
+04
+实验目标
+能说清 RKLLM 初始化到 SSE 流式输出的
+完整链路
+，并解释为何逐 token 回调天然支持打字机效果
+能手绘滑动窗口数据流：get_last_input 只给最后一条 → 拼 [-2×max_history] 历史 → 两层截断 → reset
+能实测多轮上下文（先说"我叫张三"再问"我叫什么名字"得到正确回答）并解释失忆排查路径
+能完成 vlm.enabled 切换与 vlm_demo 实测，读懂 vision/llm 耗时与三分类置信度
+能解释端口避让（pick_free_port）与 503 串行策略，按优先级原则排查"抢麦"问题
+05
+实验环境与准备
+1
+硬件：RK3576 工控主机（建议 4G 内存及以上）；确认 NPU 驱动
+cat /sys/kernel/debug/rknpu/version
+2
+确认模型文件存在：config L145 model_path 指向 Qwen3.5-0.8B_w4a16_g128_rk3576.rkllm（≈1.5G）
+3
+读配置：
+grep -A12 "^llm:" config/fall_config.yaml
+（server/采样/max_history/system_prompt）与 vlm 段（默认 enabled: false）
+4
+预留端口 8080（或让 pick_free_port 自动避让）；用 ss -tlnp | grep 8080 确认无残留
+5
+留足磁盘与内存：首次加载 30-60s、日志落 runs/logs/llm_server.log；改配置前备份 yaml
+06
+动画讲解：流式链路、记忆窗口与图文复核
+流式请求链路: client → Flask → RKLLM → SSE
+LLMClient
+/v1/chat/completions
+chat() 拼窗口
+librkllmrt
+NPU
+回调 callback_impl 逐 token 累积 → data: {...delta.content...} → data: [DONE]；lock 串行，撞并发 → 503 server busy
+滑动窗口: LLMChat 取 [-2*max_history= 12 条] 拼成单条记录（max_history=6）
+turn-3 记忆
+turn-2
+被截断
+用户：我叫张三
+小飞：好的张三
+用户：我叫什么名字→
+get_last_input() 只送最后一条 user；前缀指示「根据上下文自然回答最后一句，不要复述记录」；存储 >12+8 截断，reset 全清
+VLM 复核（vlm.enabled 默认 false，懒加载 10-60s）
+候选帧
+crop+margin
+448×448 RGB
+→ 196×1024 嵌入
+<img>…</img> + 问句
+「图中的人是否摔倒了？」
+fall .8
+not .8
+uncertain .5（异常→兜底 Fake 也返 uncertain）
+优先级仲裁: ALERT > ASK > SPEAKING > 闲聊 —— 安全事件永远压过"陪聊"（安全设计，不是 bug）
+动画 8-1：上——一次流式问答从 LLMClient 到 NPU 再到 SSE 的五跳，绿色光点是 token 在链上跑，锁保证同时只有一个请求进 RKLLM（撞上就 503）；中——记忆便利贴：窗口只带最近 12 条、旧条目淡出被截断，"我叫张三"被拼进记录所以后面问名字能答对；下——VLM 懒加载复核：候选帧→448²→196 个 patch→多模态问句→三分类，异常永远兜底 uncertain，红灯表示这才是安全底线。
+07
+互动讲解：多轮对话与复核沙盘
+🕹️ 多轮对话与复核沙盘 · LLM Bench —— 模拟记忆窗口的累积/截断，体验 VLM 与 503 节流
+🗣 说「你好」
+🗣 说「我叫张三」
+❓ 问「我叫什么名字」
+⏩ 灌满 7 轮看截断
+📷 开 VLM 复核
+🚦 模拟并发 503
+↺ reset
+🔔 试试灌满再 reset
+L43 按 [-2×max_history] 截窗口、L68-L69 存储层 >20 条再剪 —— 两层裁剪让"便利贴"永远轻薄；reset 后再问名字，小飞就不认识张三了，这正是
+窗口即记忆
+的直观证明。
+08
+实操步骤：llm_chat_test 与 vlm_demo
+1
+grep 出 llm: 与 vlm: 两段配置，核对 model_path 与 max_history=6
+2
+llm_chat_test --prompt 单发：看日志拉起 → 就绪 8080 → [5.9s] 流式回复
+3
+进交互模式实测上下文：自我介绍 → 问名字 → reset 再问，对比窗口效果
+4
+curl /v1/models、ss -tlnp 确认服务；再开"python -m http.server 8080"验证避让
+5
+sed 打开 vlm.enabled，跑 vlm_demo 实测三分类与复核耗时
+6
+并存测试（语音+LLM+推流）后 pkill -9 清理，ps 复核
+# ① 配置确认（config L145 模型路径 / L151 max_history；vlm 默认 enabled: false）
+cd ~/ros2_ws/src/xflz_eai_car1/app/elderly_companion
+grep -A 12 "^llm:" config/fall_config.yaml
+grep -A 6 "vlm:" config/fall_config.yaml
+# ② 单发测试（真实输出: 拉起日志 → 就绪 8080 → 流式回复）
+python3 apps/llm_chat_test.py --prompt
+"你好，你是谁？"
+# [INFO] 拉起 llm_server … [INFO] llm_server 就绪 (port 8080)
+# [5.9s] 回复: 你好！我是 Qwen3.5，很高兴认识你！
+# ③ 交互模式（输入 reset 清窗口 / exit 退出；真实会话）
+python3 apps/llm_chat_test.py
+# 你: 我叫张三   → [1.6s] 小飞: 好的，张三！很高兴认识你。
+# 你: 我叫什么名字 → [1.6s] 小飞: 你好，张三！   ← 滑动窗口在起作用
+# ④ 服务探活与端口避让测试
+curl http://127.0.0.1:8080/v1/models
+ss -tlnp | grep 8080
+# 另开终端: python3 -m http.server 8080 挡住 8080 → 重跑 ② 应自动避让到 8081
+# ⑤ 打开 VLM 复核并实测（10-60s 懒加载，首次偏慢属正常）
+sed -i
+'s/enabled: false.*# 真 VLM/enabled: true  # 真 VLM/'
+config/fall_config.yaml
+python3 apps/vlm_demo.py --image testdata/fall_1.png
+# VLM: vision 0.87s, llm 3.76s, answer='是' → label=fall  confidence=0.8
+# ⑥ 并存与清理
+ps aux | grep llm_server
+pkill -9 -f llm_server
+# 残留时强制清，ss -tlnp 复核 8080 已释放
+💡 记录要点
+记下三种耗时：模型首次加载（30-60s）、单轮回复（[1.6s]/[5.9s]）、VLM vision+llm（0.87s+3.76s）—— 报告里用数据说明端侧 LLM "够用但不快"，以及为什么告警链路绝不能阻塞等它。
+09
+重点与易错点
+system_prompt 不要乱改
+（config L149）：它定义了"小飞"的人格与回答边界
+窗口有两层截断
+：取用 [-2×max_history]、存储 >2×max_history+8 —— 调 max_history 会同时影响两者
+VLM 复核是"辅助第二意见"
+：uncertain 是合法答案，主流程靠它兜底而不是被它卡死
+优先级不可倒挂
+：闲聊永远压不过 ALERT/ASK，否则复核/告警会被长回复堵死
+现象
+原因
+解决
+启动超过 30s 甚至卡死
+model_path 错（config L145）/ NPU 驱动异常 / 模型与固件不匹配
+核对路径与文件 1.5G；cat /sys/kernel/debug/rknpu/version 查驱动
+问"我叫什么名字"答不上
+没走 LLMChat 拼接（直喂 get_last_input）/ 历史超出窗口被截
+确认走 chat() 全链路；检查 max_history 与是否误 reset
+OOM / 整机卡死
+LLM 1.5G + VLM 1.3G ≈ 3.0G+，2G 内存板撑不住
+2G 板保持 vlm.enabled=false；4G 板开前 free -h 预算
+报 503 server busy
+RKLLM 推理串行锁，前一个请求未返回
+属设计预期；客户端 chat.py L56-L59 会自动降级非流式重试
+8080 端口腾不出来
+上次 llm_server 残留 / 被无关服务占用
+ss -tlnp 找 pid；pkill -9 -f llm_server；或靠 pick_free_port 避让
+vlm_demo 一直 uncertain
+图片模糊、裁剪没带全人体（crop_margin 太小）/ 模型懒加载未完成
+换 testdata/fall_1.png 标准图对照；等待 _load 完成再看耗时日志
+忘了早期对话内容
+滑动窗口本性：老条目按 L43/L68 两层截断出窗
+属正常行为；确需长期记忆要另做持久化（本课不涉及）
+端口探测逻辑排错难
+_port_open+_models_ok 要"既在听、又应答 /v1/models"
+用 curl /v1/models 复刻探测条件，凡 200 且含模型名才判可复用
+10
+总结与思考
+✅ 完成成果
+四件交付
+llm_chat_test 单发+交互记录（含真实耗时）、滑动窗口时序笔记、vlm_demo 三分类输出截图、端口避让与 503 现象记录表。
+🧠 原理收获
+端侧+窗口+仲裁
+RKLLM 量化模型如何在 NPU 上以 1.5G 体积跑起来；单条输入的 LLM 如何靠"拼接历史+前缀指示"获得上下文；多路发声如何靠优先级仲裁不打架。
+🛠 技能收获
+服务治理三板斧
+端口探测与自动避让（connect_ex / /v1/models 探活）、日志隔离拉起与干净收尸（terminate→wait→kill）、SSE 与非流式双模客户端的用法。
+❓ 排障思路
+四问定位法
+起不来？查 model_path/NPU。记不住？查窗口与 reset。摄像头复核怪？看 uncertain 条件与 crop。嘴上打架？查优先级与 plughw:3,0 分时锁。
+🟣 思考题 1
+RKLLM 的 get_last_input() 明明只给最后一条消息，为什么 LLMChat 不直接把完整历史当 messages 数组传入，而是拼成「用户：…\n小飞：…」的单条文本 + 前缀指示（chat.py L36-L46）？这种"拼接代偿"方案牺牲了什么（提示：ChatML 结构、逐轮流式接口），又换来了什么？
+🟣 思考题 2
+server_manager 发现 8080 已有服务且 /v1/models 应答 →
+直接复用
+，哪怕那是别人启动的旧模型。这在实验里方便，在生产里有什么隐患？再推一步：假如把并存路由改成"闲聊优先于 ALERT"，老人催促小飞讲笑话时恰逢真跌倒会发生什么？
+CASE-03 · 老人跌倒监护 · EXP-08 LLM 对话与 VLM 复核
+8 学时 · 综合性 · 基于 elderly_companion 实验讲义改编

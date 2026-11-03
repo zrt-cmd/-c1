@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-03 · TTS 语音合成 — 机器人自然语言交互应用</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+:root{--theme:#7c3aed;--theme-deep:#6d28d9;--theme-bg:#ede9fe;--theme-bd:#ddd6fe}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit" title="返回课程首页">🧠 具身智能课程 · <i>教程首页</i></a>
+  <div class="crumb"><a href="../../../index.html#core">核心课程</a> / <a href="../index.html">自然语言交互应用</a> / EXP-03</div>
+</div>
+
+<div class="wrap">
+
+<aside class="side">
+  <h4>本页目录</h4>
+  <a href="#s1" class="now">01 问题引入：只会"听"不会"说"的机器人</a>
+  <a href="#s2">02 原理通俗讲解：把文字变成声音的两级工厂</a>
+  <a href="#s3">03 关联知识点</a>
+  <a href="#s4">04 实验目标</a>
+  <a href="#s5">05 实验环境与准备</a>
+  <a href="#s6">06 动画讲解：文本 → 音素 → 梅尔谱 → 波形</a>
+  <a href="#s7">07 互动讲解：语速 · 音量 · 发音人调节台</a>
+  <a href="#s8">08 实操步骤：合成第一句机器人语音</a>
+  <a href="#s9">09 重点与易错点</a>
+  <a href="#s10">10 总结与思考</a>
+  <h4>CORE-03 · 自然语言交互</h4>
+  <a href="../exp-01-mic-array-wakeup/index.html">EXP-01 六麦阵列串口唤醒</a>
+  <a href="../exp-02-asr/index.html">EXP-02 ASR 语音识别</a>
+  <a href="../exp-03-tts/index.html">EXP-03 TTS 语音合成</a>
+  <a href="../exp-04-voice-dialog/index.html">EXP-04 端到端语音对话</a>
+  <a href="../exp-05-llm-understanding/index.html">EXP-05 大模型语义理解</a>
+  <a href="../exp-06-emotion-perception/index.html">EXP-06 情绪感知</a>
+</aside>
+
+<main class="content">
+
+<div class="exp-head">
+  <span class="code">EXP-03 · 第 1 章 · 设计性 · 4 学时</span>
+  <h1>TTS 语音合成：让机器人开口说话</h1>
+  <p class="desc">机器人听懂了，还得<b>用自然的人声回答</b>。本实验拆解 <b>Matcha-TTS 声学模型 + Vocos 声码器</b>两级工厂：文本正则化与 rule_fsts 规则（日期/数字/电话读法）、梅尔谱预测、波形重建，再到混音、音量 dB 换算与 <b>RTF 实时率</b>调优；过程中会踩到"单声道却两倍速播放"这类经典硬件坑。</p>
+  <div class="meta">
+    <span class="tag hl">难度 ⭐⭐ · 4 学时</span>
+    <span class="tag">Matcha-TTS</span><span class="tag">Vocos 声码器</span>
+    <span class="tag">梅尔谱 · RTF</span><span class="tag">amixer 混音</span>
+  </div>
+</div>
+
+<!-- 01 -->
+<section class="blk" id="s1">
+  <h2><span class="no">01</span>问题引入：只会"听"不会"说"的机器人</h2>
+  <p>前两个实验让机器人能听、能转成文字。但如果它回答时屏幕上打印一行字——用户就得<b>盯着一台会说话的机器看字幕</b>，交互感瞬间归零。语音输出的三道坎：</p>
+  <div class="flow">
+    <div class="step"><span class="n">1</span><b>读不对</b>：文本里"2026年9月24日"该念成"二〇二六……"还是"两千零二十六……"？数字、日期、英文缩写都要先"正读"</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span><b>合成慢</b>：一句 10 秒的话算了 30 秒，对话根本没法进行——速度必须跟上语速</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span><b>播不对</b>：好不容易合成的语音，从阵列喇叭放出来变成"快放 2 倍 + 音量爆破"——采样率/声道与硬件不匹配</div>
+  </div>
+  <div class="tip amber"><span class="lab">💡 解法总览</span>课程用 <b>Matcha-TTS（文本→梅尔谱）</b>与 <b>Vocos（梅尔谱→波形）</b>两级神经网络接力，配合 rule_fsts 文本正则、RTF 性能指标与 ALSA 混音链，把"文字变声音"做成一条能实时通车的生产线。</div>
+</section>
+
+<!-- 02 -->
+<section class="blk" id="s2">
+  <h2><span class="no">02</span>原理通俗讲解：把文字变成声音的两级工厂</h2>
+  <p><b>生活比喻：做饭。</b>文字是菜单，声音是菜品。一级工厂把菜单翻译成<b>菜谱</b>（先放什么后放什么、几分钟火候），二级工厂照着菜谱把菜炒出来。TTS 管线正是这样两级结构：</p>
+  <div class="flow">
+    <div class="step"><span class="n">1</span><b>文本正规化 = 翻译菜单</b>：rule_fsts 规则文件把 "2026"→"二零二六"、"+86 10…"→逐位读法、日期/电话各自套读法，让神经网络只面对"可读的字"</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span><b>Matcha 声学模型 = 出菜谱</b>：把规范化文本编码成音素序列，按扩散式流程"画"出一张<b>梅尔谱图</b>——横轴时间、纵轴频率的"声音热力图"，规定了每个时刻各频率该有多响</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span><b>Vocos 声码器 = 照谱炒菜</b>：读入梅尔谱，一步式生成 16kHz 原始波形采样点——决定声音的"音色质感"（像不同厨师炒同一张菜谱，风味仍有差别）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span><b>后处理 = 装盘上桌</b>：float→int16 量化、单声道复制成双声道、tanh 软削幅防爆音、按 dB 目标调音量，送 ALSA 播放</div>
+  </div>
+  <table>
+    <thead><tr><th>概念</th><th>生活类比</th><th>本实验对应</th></tr></thead>
+    <tbody>
+      <tr><td>文本正则化</td><td>把"3碗"念成"三碗"而不是"三点"</td><td>rule_fsts：number-zh / date-zh / phone-zh</td></tr>
+      <tr><td>梅尔谱</td><td>声音的"乐高设计图"</td><td>Matcha 输出：时间 × 梅尔频带的特征矩阵</td></tr>
+      <tr><td>声码器</td><td>按设计图 3D 打印</td><td>Vocos：梅尔谱 → 16kHz 波形</td></tr>
+      <tr><td>RTF 实时率</td><td>炒菜用时 ÷ 菜品时长</td><td>合成耗时/音频时长，<b>0.25~0.40 达标</b>（&lt;1 才能实时）</td></tr>
+      <tr><td>增益（dB）</td><td>拧音量旋钮的角度</td><td><code>pct_to_db = 20·log10(pct/100)</code>，-96dB 为静音下限</td></tr>
+    </tbody>
+  </table>
+  <div class="tip tealb"><span class="lab">🔍 为什么分两级</span>梅尔谱只有几十个频带，是"压缩过的声音图纸"——直接由文本一步到位生成波形，模型要学的东西太多、又慢又糊。<b>先画图、再填色</b>的两段式让每一步都可单独换更强的模型，这是现代 TTS 的通用骨架。</div>
+</section>
+
+<!-- 03 -->
+<section class="blk" id="s3">
+  <h2><span class="no">03</span>关联知识点</h2>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">模型</div><div class="kt">Matcha-TTS + Vocos</div><p><code>model-steps-3.onnx</code>（声学模型，扩散 3 步加速）+ <code>vocos-16khz-univ.onnx</code>（万用声码器，16kHz 单域）。</p></div>
+    <div class="kcard"><div class="kd">音频</div><div class="kt">采样率与声道</div><p>管线内 16kHz 单声道 float；阵列 I2S 播放常要求立体声——<code>np.column_stack([mono,mono]).ravel()</code> 复制声道，<b>少复制会 2 倍速快放</b>（s9 详解）。</p></div>
+    <div class="kcard"><div class="kd">音量</div><div class="kt">百分比 ↔ dB 与混音链</div><p>软件增益 <code>20·log10(pct/100)</code>（-96dB 截底）；硬件经 <code>amixer</code> 分控 Output 1 / Output 2 / PCM / Speaker 多级，播放前对照确认目标通道。</p></div>
+    <div class="kcard"><div class="kd">性能</div><div class="kt">RTF 与流式分句</div><p>RTF=合成耗时÷音频时长，目标 0.25~0.40；配合 EXP-04 的按标点分句，句子级流式合成掩盖延迟。</p></div>
+    <div class="kcard"><div class="kd">参数</div><div class="kt">speed / sid / gain</div><p><code>--speed</code> 语速（时间轴伸缩）、<code>--sid</code> 发音人 ID、<code>--playback-volume</code> 播放音量、<code>--gain</code> 合成内增益。</p></div>
+    <div class="kcard"><div class="kd">自测</div><div class="kt">audio_test.py</div><p>先用它单独验证"播放链"是否正常，把故障域从 TTS 模型与声卡播放中切开，二分定位问题。</p></div>
+  </div>
+</section>
+
+<!-- 04 -->
+<section class="blk" id="s4">
+  <h2><span class="no">04</span>实验目标</h2>
+  <ul class="check">
+    <li>能默写 TTS 五步管线（文本正则 → 编码 → 梅尔谱 → 声码器 → 后处理播放）并说明每步输入输出</li>
+    <li>用 <code>python3 tts_test.py --text "…"</code> 合成并播放第一句机器人语音，听感清晰无爆音</li>
+    <li>验证 rule_fsts：同一句里混入日期与数字，确认按中文习惯读出（而非逐位蹦）</li>
+    <li>调整 <code>--speed</code> / <code>--sid</code> / <code>--playback-volume</code>，听辨语速、发音人与响度变化</li>
+    <li>实测 RTF：记录 5 句长短语料的合成耗时，判断是否落在 0.25~0.40 达标区间</li>
+    <li>复现并修复"单声道两倍速播放"故障：解释声道不匹配的原理并写出修复三行</li>
+  </ul>
+</section>
+
+<!-- 05 -->
+<section class="blk" id="s5">
+  <h2><span class="no">05</span>实验环境与准备</h2>
+  <pre><span class="c"># ① 模型就位（声学模型 + 声码器 + 规则文件）</span>
+<span class="g">ls</span> models/tts/
+<span class="y">model-steps-3.onnx   vocos-16khz-univ.onnx   rule_fsts/  lexicon.txt</span>
+
+<span class="c"># ② 播放链自检：放一段已知正常的测试音（不经过 TTS 模型）</span>
+<span class="g">python3</span> audio_test.py --play ref_16k.wav
+<span class="y">[audio] playing ref_16k.wav on plughw:4,0 ... OK</span>
+
+<span class="c"># ③ 查看当前 ALSA 各通道音量（对比实验前后）</span>
+<span class="g">amixer</span> sget Master | head -5
+<span class="g">amixer</span> sget Output          <span class="c"># 阵列侧混音控件名以 amixer 管单为准</span>
+
+<span class="c"># ④ 依赖</span>
+<span class="g">pip3</span> install onnxruntime numpy soundfile sounddevice</pre>
+  <div class="tip"><span class="lab">💡 准备清单</span>录一段你自己的朗读做"听感对照组"；准备三类测试文本：<b>纯短句、含数字日期、含英文缩写</b>——分别暴露正则、节奏与发音三类问题。先跑 audio_test.py 把"喇叭会不会响"与"TTS 好不好"解耦。</div>
+</section>
+
+<!-- 06 -->
+<section class="blk" id="s6">
+  <h2><span class="no">06</span>动画讲解：文本 → 音素 → 梅尔谱 → 波形</h2>
+  <p class="lead">看一句"今天是2026年9月24日"的旅程：数字先被 rule_fsts 规范成中文读法 → 音素序列进入 Matcha 逐帧"画"出梅尔谱 → Vocos 把热力图逐列翻译为振荡波形 → 打包成 16kHz 音频流出喇叭。</p>
+  <div class="anim-box">
+    <svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="TTS 文本到波形合成动画">
+      <rect x="8" y="8" width="704" height="284" rx="12" fill="#111827" stroke="#334155"/>
+      <!-- ① 文本正则 -->
+      <text x="105" y="40" text-anchor="middle" font-size="13" font-weight="700" fill="#c4b5fd">① 文本正则</text>
+      <rect x="20" y="62" width="170" height="66" rx="10" fill="#1e293b" stroke="#475569"/>
+      <text x="105" y="88" text-anchor="middle" font-size="11.5" fill="#cbd5e1">"今天是 2026年9月"</text>
+      <text x="105" y="108" text-anchor="middle" font-size="11.5" fill="#cbd5e1">24日"</text>
+      <g opacity="0" font-size="10.5" fill="#4ade80">
+        <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.2;0.7;1" dur="4s" repeatCount="indefinite"/>
+        <text x="105" y="152" text-anchor="middle">rule_fsts → "二零二六年九月二十四日"</text>
+      </g>
+      <line x1="196" y1="95" x2="232" y2="95" stroke="#475569" stroke-width="2" stroke-dasharray="6 5">
+        <animate attributeName="stroke-dashoffset" values="0;-22" dur="1.1s" repeatCount="indefinite"/>
+      </line>
+
+      <!-- ② Matcha -->
+      <text x="310" y="40" text-anchor="middle" font-size="13" font-weight="700" fill="#c4b5fd">② Matcha · 梅尔谱</text>
+      <rect x="238" y="62" width="146" height="120" rx="10" fill="#0b1220" stroke="#7c3aed" stroke-width="2"/>
+      <g>
+        <rect x="246" y="70" width="12" height="14" fill="#7c3aed"><animate attributeName="opacity" values="0.2;0.95;0.2" dur="1.8s" repeatCount="indefinite"/></rect>
+        <rect x="260" y="70" width="12" height="14" fill="#a855f7"><animate attributeName="opacity" values="0.2;0.9;0.2" dur="1.8s" begin="0.2s" repeatCount="indefinite"/></rect>
+        <rect x="274" y="70" width="12" height="14" fill="#312e81"><animate attributeName="opacity" values="0.3;0.8;0.3" dur="1.8s" begin="0.4s" repeatCount="indefinite"/></rect>
+        <rect x="246" y="86" width="12" height="14" fill="#c4b5fd"><animate attributeName="opacity" values="0.3;1;0.3" dur="1.8s" begin="0.3s" repeatCount="indefinite"/></rect>
+        <rect x="260" y="86" width="12" height="14" fill="#7c3aed"><animate attributeName="opacity" values="0.2;0.9;0.2" dur="1.8s" begin="0.5s" repeatCount="indefinite"/></rect>
+        <rect x="288" y="86" width="12" height="14" fill="#312e81"><animate attributeName="opacity" values="0.2;0.7;0.2" dur="1.8s" begin="0.7s" repeatCount="indefinite"/></rect>
+        <rect x="252" y="102" width="12" height="14" fill="#312e81"><animate attributeName="opacity" values="0.2;0.75;0.2" dur="1.8s" begin="0.6s" repeatCount="indefinite"/></rect>
+        <rect x="274" y="102" width="12" height="14" fill="#a855f7"><animate attributeName="opacity" values="0.2;0.9;0.2" dur="1.8s" begin="0.8s" repeatCount="indefinite"/></rect>
+        <rect x="296" y="102" width="12" height="14" fill="#c4b5fd"><animate attributeName="opacity" values="0.25;0.95;0.25" dur="1.8s" begin="1s" repeatCount="indefinite"/></rect>
+        <rect x="246" y="118" width="12" height="14" fill="#312e81"><animate attributeName="opacity" values="0.2;0.7;0.2" dur="1.8s" begin="0.9s" repeatCount="indefinite"/></rect>
+        <rect x="268" y="118" width="12" height="14" fill="#7c3aed"><animate attributeName="opacity" values="0.2;0.85;0.2" dur="1.8s" begin="1.1s" repeatCount="indefinite"/></rect>
+        <rect x="290" y="118" width="12" height="14" fill="#a855f7"><animate attributeName="opacity" values="0.2;0.8;0.2" dur="1.8s" begin="1.3s" repeatCount="indefinite"/></rect>
+        <rect x="252" y="134" width="12" height="14" fill="#312e81"/>
+        <rect x="274" y="134" width="12" height="14" fill="#312e81"/>
+        <rect x="296" y="134" width="12" height="14" fill="#4c1d95"/>
+        <rect x="246" y="150" width="12" height="14" fill="#1e1b4b"/>
+        <rect x="268" y="150" width="12" height="14" fill="#312e81"/>
+        <rect x="290" y="150" width="12" height="14" fill="#312e81"/>
+      </g>
+      <text x="311" y="202" text-anchor="middle" font-size="10.5" fill="#94a3b8">时间 × 梅尔频带 · 每步生成一帧</text>
+      <line x1="392" y1="95" x2="428" y2="95" stroke="#475569" stroke-width="2" stroke-dasharray="6 5">
+        <animate attributeName="stroke-dashoffset" values="0;-22" dur="1.1s" repeatCount="indefinite"/>
+      </line>
+
+      <!-- ③ Vocos -->
+      <text x="541" y="40" text-anchor="middle" font-size="13" font-weight="700" fill="#c4b5fd">③ Vocos · 16kHz 波形</text>
+      <rect x="434" y="62" width="214" height="120" rx="10" fill="#0b1220" stroke="#334155"/>
+      <g stroke="#4ade80" stroke-width="2.6" fill="none">
+        <path d="M 444 122 q 7 -44 14 0 t 14 0 t 14 0 t 14 0 t 14 0 t 14 0 t 14 0 t 14 0 t 14 0 t 14 0 t 14 0 t 14 0 t 14 0 t 14 0">
+          <animate attributeName="stroke-dasharray" values="0 520;520 0" dur="2.6s" repeatCount="indefinite"/>
+        </path>
+        <path d="M 444 122 q 7 30 14 0 t 14 0 t 14 0 t 14 0 t 14 0 t 14 0 t 14 0 t 14 0 t 14 0 t 14 0 t 14 0 t 14 0 t 14 0 t 14 0" opacity="0.4">
+          <animate attributeName="stroke-dasharray" values="0 520;520 0" dur="2.6s" begin="0.3s" repeatCount="indefinite"/>
+        </path>
+      </g>
+      <line x1="444" y1="122" x2="638" y2="122" stroke="#334155" stroke-width="1"/>
+      <text x="541" y="202" text-anchor="middle" font-size="10.5" fill="#94a3b8">梅尔谱逐列 → 振荡采样 · float→int16</text>
+
+      <!-- ④ 后处理与播放 -->
+      <text x="360" y="234" text-anchor="middle" font-size="13" font-weight="700" fill="#c4b5fd">④ 后处理与播放</text>
+      <g fill="#1e293b" stroke="#475569">
+        <rect x="140" y="246" width="96" height="34" rx="8"/>
+        <rect x="256" y="246" width="112" height="34" rx="8"/>
+        <rect x="388" y="246" width="104" height="34" rx="8"/>
+        <rect x="512" y="246" width="104" height="34" rx="8"/>
+      </g>
+      <g font-size="10.5" fill="#cbd5e1" text-anchor="middle">
+        <text x="188" y="267">单→双声道复制</text>
+        <text x="312" y="267">tanh 软削幅防爆音</text>
+        <text x="440" y="267">音量 dB 校准</text>
+        <text x="564" y="267">ALSA → 阵列喇叭</text>
+      </g>
+      <text x="672" y="272" font-size="20" fill="#60a5fa">🔊</text>
+      <text x="36" y="150" font-size="10.5" fill="#64748b">RTF = 合成耗时 / 音频时长</text>
+      <text x="36" y="166" font-size="10.5" fill="#4ade80">达标线 ≤ 0.40 ✓</text>
+    </svg>
+  </div>
+  <div class="anim-cap">动画 3-1｜数字经 rule_fsts 变中文读法 → Matcha 逐帧点亮梅尔谱 → Vocos 波形逐步描出 → 音量/声道后处理后从阵列喇叭播出（4 秒循环）</div>
+</section>
+
+<!-- 07 -->
+<section class="blk" id="s7">
+  <h2><span class="no">07</span>互动讲解：语速 · 音量 · 发音人调节台</h2>
+  <p class="lead">选一组参数，观察合成命令、预期听感与度量指标（时间轴/响度为讲义实测的典型行为示意）：</p>
+  <div class="ix-panel">
+    <div class="ix-title">TTS 参数调节台 · Synth Control</div>
+    <div class="ctl-row">
+      <button class="btn" onclick="ttsSet('default')">🎙 默认 1.0x · sid=0</button>
+      <button class="btn ghost" onclick="ttsSet('fast')">🐇 语速 1.3x</button>
+      <button class="btn ghost" onclick="ttsSet('slow')">🐢 语速 0.8x</button>
+      <button class="btn ghost" onclick="ttsSet('loud')">📢 播放音量 50%</button>
+      <button class="btn ghost" onclick="ttsSet('sid1')">🎎 换发音人 sid=1</button>
+    </div>
+    <div class="io" id="ttsIo"><span class="dim">// 合成链: text → rule_fsts → Matcha(steps-3) → Vocos → int16 → play</span>
+<span class="ok">就绪：点选上方任一参数开始合成（时长/RTF/响度按讲义四句均值示意）</span></div>
+  </div>
+  <div class="tip violet"><span class="lab">🔬 动手算一算</span><code>pct_to_db(50)</code> = 20·log₁₀(0.5) ≈ <b>-6dB</b>；<code>pct_to_db(10)</code> ≈ -20dB。把播放音量从 100% 调到 50%，响度不是"减半"而是<b>降 6dB</b>——分贝是对数刻度，直觉会骗人。</div>
+</section>
+
+<!-- 08 -->
+<section class="blk" id="s8">
+  <h2><span class="no">08</span>实操步骤：合成第一句机器人语音</h2>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>先跑 <code>audio_test.py</code> 播放参考音频，确认声卡/喇叭链路正常（隔离播放故障）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>短句冒烟：<code>python3 tts_test.py --text "你好，我是自然语言交互机器人"</code>，听一遍是否清晰不快放</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>正则测试句（日期+数字+英文）、<code>--speed</code> / <code>--sid</code> / <code>--playback-volume</code> 扫参数，逐条记录听感</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span>测量 RTF（合成耗时 ÷ 音频时长），不达标按 s9 坑表排查</div>
+  </div>
+  <pre><span class="c"># —— 合成主链（tts_test.py 核心，节选）——</span>
+<span class="g">import</span> numpy as np, onnxruntime as ort
+text_raw = <span class="s">"今天是2026年9月24日，气温26度"</span>
+text = run_fsts(text_raw, [<span class="s">"number-zh"</span>,<span class="s">"date-zh"</span>,<span class="s">"phone-zh"</span>])  <span class="c"># 数字/日期/电话正读</span>
+tokens, durs = matcha_encoder(text)        <span class="c"># 音素 + 每音时长</span>
+mel  = matcha.run(tokens, durs, steps=3)   <span class="c"># 梅尔谱 [T, n_mels]</span>
+wav  = vocos.run(mel)                      <span class="c"># float 波形 [-1,1] @16kHz</span>
+wav  = np.tanh(wav)                        <span class="c"># 软削幅，防 &gt;1.0 削顶爆音</span>
+
+<span class="c"># —— 音量：百分比 → dB（pct_to_db）——</span>
+<span class="g">def</span> pct_to_db(pct):
+    <span class="g">if</span> pct <= 0: <span class="g">return</span> -96.0              <span class="c"># 数字音频静音下限</span>
+    <span class="g">return</span> 20 * np.log10(pct / 100)
+
+<span class="c"># —— 播放：单声道必须复制成双声道（I2S 立体声出）——</span>
+pcm = (wav * 32767).astype(np.int16)
+stereo = np.column_stack([pcm, pcm]).ravel()   <span class="c"># 关键三行之一：防 2 倍速</span>
+sd.play(stereo, samplerate=16000, device=<span class="s">"plughw:4,0"</span>)
+
+<span class="c"># —— 命令行 ——</span>
+<span class="g">python3</span> tts_test.py --text <span class="s">"你好，小飞已就位"</span>
+<span class="y">[TTS] syn 0.62s / audio 1.8s → RTF=0.34 ✓ → play plughw:4,0</span>
+<span class="g">python3</span> tts_test.py --text <span class="s">"3pm meeting, 2026-09-24"</span> --speed 1.2 --sid 1 --playback-volume 70</pre>
+  <div class="tip amber"><span class="lab">⚠️ 先听感，后指标</span>RTF 达标但声音"电音、吞字"同样是失败——听感问题优先查词典 lexicon 缺词与 rule_fsts 覆盖，其次才是模型步数（steps 增大：质量升、速度降）。</div>
+</section>
+
+<!-- 09 -->
+<section class="blk" id="s9">
+  <h2><span class="no">09</span>重点与易错点</h2>
+  <div class="tip tealb"><span class="lab">🎯 本实验三重点</span>① 五步管线与两级模型的职责切分；② "单声道直接播 = 2 倍速"的声道坑；③ 用 RTF + 听感双指标验收，而不是"响了就算通"。</div>
+  <table>
+    <thead><tr><th>⚠️ 常见坑</th><th>现象 → 解法</th></tr></thead>
+    <tbody>
+      <tr><td>2 倍速快放</td><td>声音像按了快进 → 播放缓冲按立体声排布，单声道被两帧并一帧：<code>np.column_stack([pcm,pcm]).ravel()</code></td></tr>
+      <tr><td>完全无声</td><td>合成日志正常但无声音 → 先 <code>audio_test.py</code> 验证喇叭，再查 device 是否 <code>plughw:N,0</code>、amixer 是否静音</td></tr>
+      <tr><td>音量假生效</td><td>改了 --playback-volume 没变化 → 确认操作的是哪个混音控件：Master / Output / PCM / Speaker 通道可能不同</td></tr>
+      <tr><td>爆音刺耳</td><td>大音量时"咔咔"削顶 → 检查 float&gt;1.0 是否先过 <code>tanh</code>；软件增益与 amixer 硬件增益只动一个</td></tr>
+      <tr><td>数字乱读</td><td>"2026"被逐位念 → 确认 rule_fsts 文件路径与加载顺序（数量词/日期/电话的优先级）</td></tr>
+      <tr><td>变调变快</td><td>调 --speed 后音调跟着变 → 语速靠时长缩放实现，极端值（&gt;1.5 或 &lt;0.6）会失真，走中间值</td></tr>
+      <tr><td>RTF 不达标</td><td>&gt;1.0 无法实时 → 降 steps、确认 onnxruntime 的 NNAPI/NPU EP 生效、缩短单句长度</td></tr>
+    </tbody>
+  </table>
+  <ul class="check">
+    <li>audio_test.py 与 tts_test.py 两级自检均通过，能说清两者分别验证什么</li>
+    <li>正则测试句中数字、日期按中文习惯读出，无逐位蹦读</li>
+    <li>--speed / --sid / --playback-volume 三参数的听感变化可被清晰描述并截图日志</li>
+    <li>5 句语料 RTF 全部 ≤ 0.4，且声音无爆音、无快放</li>
+    <li>能白板默写"声道不匹配导致 2 倍速"的三行修复代码</li>
+  </ul>
+</section>
+
+<!-- 10 -->
+<section class="blk" id="s10">
+  <h2><span class="no">10</span>总结与思考</h2>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">✅ 完成成果</div><div class="kt">机器人会说话了</div><p>文本正则 → Matcha → Vocos → 播放，全链出声且参数可控。</p></div>
+    <div class="kcard"><div class="kd">🧠 原理收获</div><div class="kt">两级 TTS 骨架</div><p>梅尔谱作为中间表示的意义、RTF 语义、dB 对数刻度与增益链层级。</p></div>
+    <div class="kcard"><div class="kd">🛠 技能收获</div><div class="kt">音频工程排障</div><p>播放链二分自检、声道/采样率 mismatch 定位、听感与指标双轨验收。</p></div>
+    <div class="kcard"><div class="kd">➡ 去向</div><div class="kt">EXP-04 串成对话</div><p>会听也 会说了，下一步让两者在一个状态机里你来我往。</p></div>
+  </div>
+  <div class="tip violet"><span class="lab">📝 思考题 1</span>RTF=0.35 表示"1 秒音频花 0.35 秒合成"。若大模型每生成 15 个字就送来一个分句（约 4 秒音频），整轮回复 100 字 —— 合成算力总体够用吗？<b>为什么还要分句流式</b>？（提示：延迟公式 = 等句时间 + 合成时间；与 EXP-04 的 SENTENCE_RE 分句呼应。）</div>
+  <div class="tip violet"><span class="lab">📝 思考题 2</span>如果要把回复音色从"标准播音腔"改成"亲切的客服语气"，你会动哪几层？（词典风格 / 发音人 sid / 语速节奏 / 后接的韵律控制，结合 EXP-06 情绪感知想想——语气能不能作为情绪标签的输出？）</div>
+</section>
+
+<nav class="expnav">
+  <a href="../exp-02-asr/index.html"><span class="lb">← 上一个</span>EXP-02 声学模型 ASR 语音识别</a>
+  <a class="next" href="../exp-04-voice-dialog/index.html"><span class="lb">下一个实验 →</span>EXP-04 端到端语音对话</a>
+</nav>
+
+<footer>
+  <span>CORE-03 · 机器人自然语言交互应用 · EXP-03 TTS 语音合成</span>
+  <span>4 学时 · 设计性 · 基于 speech_practice 实验讲义改编</span>
+</footer>
+
+</main>
+</div>
+
+<script>
+// TTS 参数调节台
+var presets={
+  default:{cmd:'--text "你好，小飞已就位" --speed 1.0 --sid 0', dur:1.8, syn:0.62, vol:100,
+           ear:'标准语速、默认播音人发音，清晰不快放', db:'0.0 dB（原响度）', rtf:0.34},
+  fast:{cmd:'--text "你好，小飞已就位" --speed 1.3 --sid 0', dur:1.4, syn:0.58, vol:100,
+        ear:'节奏紧凑、字间变密；再快会"吞字"，>1.5 明显失真', db:'0.0 dB', rtf:0.41},
+  slow:{cmd:'--text "你好，小飞已就位" --speed 0.8 --sid 0', dur:2.2, syn:0.66, vol:100,
+        ear:'舒缓清晰，句内停顿变长；<0.6 会出现拉扯电音', db:'0.0 dB', rtf:0.30},
+  loud:{cmd:'--text "你好，小飞已就位" --speed 1.0 --sid 0 --playback-volume 50', dur:1.8, syn:0.62, vol:50,
+        ear:'响度明显下降；tanh 软削幅下无爆音变化', db:'≈ -6.0 dB（20·log1₀0.5）', rtf:0.34},
+  sid1:{cmd:'--text "你好，小飞已就位" --speed 1.0 --sid 1', dur:1.8, syn:0.64, vol:100,
+        ear:'换发音人：音色改变、语速不变（词典与 prosody 参数随 sid 切换）', db:'0.0 dB', rtf:0.35}
+};
+function ttsSet(k){
+  var p=presets[k];
+  document.getElementById('ttsIo').innerHTML=
+'<span class="dim">$ python3 tts_test.py '+p.cmd+'</span>\n'+
+'<span class="dim">// ① rule_fsts 正则 → ② Matcha(steps=3) → ③ Vocos → ④ 播放</span>\n'+
+'<span class="ok">音频时长 '+p.dur.toFixed(1)+'s · 合成耗时 '+p.syn.toFixed(2)+'s · RTF='+p.rtf.toFixed(2)+(p.rtf<=0.4?' ✓ 达标':' ⚠ 超标')+'</span>\n'+
+'<span class="ok">播放音量 '+p.vol+'% → 增益 '+p.db+'</span>\n'+
+'<span class="warn">听感：'+p.ear+'</span>';
+}
+</script>
+<script src="../shared/tutorial.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,27 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp003-ros2-application/exp-11-time/diagrams/fig-11-2-clock-framework.html
+TITLE: 图 11-2 · 双时钟框架
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+图 11-2 · 双时钟框架
+图 11-2 · 双时钟框架：一个开关选源，一个出口取时
+本图回答的问题：use_sim_time 切换后，get_clock().now() 的时间到底从哪里来？
+use_sim_time ?
+唯一开关
+false · 默认
+true
+系统时钟 · 墙上钟
+OS 时间 · 永远匀速
+/clock 话题
+rosgraph_msgs/Clock
+Gazebo / rosbag play
+外部系统 · 仅仿真/回放
+推进/播放
+Clock · 唯一出口
+get_clock().now()
+返回 time
+你的代码 · 盖 stamp
+to_msg() → Header.stamp
+✅ 结论：只有两个时间源、一个开关、一个出口，换源不改业务代码
+⚠️ 风险：true 而无 /clock 发布 → 永久等待
+🔍 验证：04 节实操 A/B（卡死复现与 pub /clock 复活）
+EXP-11 · 时间 API 与双时钟体系

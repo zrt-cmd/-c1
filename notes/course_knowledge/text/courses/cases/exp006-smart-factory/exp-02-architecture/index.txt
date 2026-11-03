@@ -1,0 +1,379 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/cases/exp006-smart-factory/exp-02-architecture/index.html
+TITLE: EXP-02 · 五节点系统架构 — 智慧工厂装货分拣码垛综合项目
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+EXP-02 · 五节点系统架构 — 智慧工厂装货分拣码垛综合项目
+🧠 具身智能课程 ·
+教程首页
+综合项目
+/
+智慧工厂装货分拣码垛
+/ EXP-02
+本页目录
+01 问题引入：一个人干不完全场活
+02 原理通俗讲解：餐厅后厨的分工与传菜
+03 关联知识点：五节点与状态机
+04 实验目标
+05 实验环境与准备
+06 动画讲解：五节点通信拓扑
+07 互动讲解：节点职责分工台
+08 实操步骤：源码联查五节点
+09 重点与易错点
+10 总结与思考
+CASE-01 · 智慧工厂
+EXP-01 需求分析
+EXP-02 五节点系统架构
+EXP-03 接口设计
+EXP-04 语音交互集成
+EXP-05 视觉自适应装货
+EXP-06 智能分拣
+EXP-07 自主码垛
+EXP-08 危险检测与急停
+EXP-09 全功能快速验证
+EXP-02 · 第 1 章 · 设计性 · 4 学时
+五节点系统架构：把功能拆成"各管一段"的协作网
+语音、调度、抓取、流水线、安全——五个功能塞进一个脚本会怎样？本实验从
+职责单一
+出发拆出五节点（N1/N2/N-grasp/N-conveyor/N3），讲透
+话题异步 + 服务同步
+的通信拓扑，剖析 N2 调度器的三条任务路由、palletize"先送料后抓取"的
+异步编排
+与 2s 自动重试兜底，再读 launch 的 7 个开关与双启动方式。
+难度 ⭐⭐ · 4 学时
+五节点拓扑
+任务状态机
+异步编排
+launch 7 开关
+01
+问题引入：一个人干不完全场活
+设想把"听指令、记任务、抓货物、转流水线、盯安全"五件事全写进一个 Python 文件会怎样？
+1
+语音 ASR 是阻塞的——听一句话的几秒里，安全检测停摆（
+盯雷达的人去接电话了
+）
+2
+任何一处异常拖垮整个进程：语音挂了，急停也跟着挂
+3
+改一处动全身：调个抓取参数要重启全部功能
+4
+解法：按
+职责单一
+拆成五个进程（节点），只靠
+话题/服务
+通信——单点可替换、可独立启停
+💡 设计哲学
+节点 = 责任田
+：每块田只种一种庄稼（语音/调度/抓取/流水线/安全），田与田之间只走约定好的"路"（话题/服务）。这就是 ROS2 多节点架构的全部初衷：
+让"改一处"只动一处，让"坏一处"只坏一处。
+02
+原理通俗讲解：餐厅后厨的分工与传菜
+还是那家餐厅——五个后厨岗位就是五个节点，
+传菜条与对讲机
+就是两类通信方式：
+🎙 前台迎宾 = N1 语音
+只听懂话、不下厨
+KWS 唤醒 → ASR 识别 → LLM 意图分类 → 往"点单屏"（intent 话题）写一笔，播报由 TTS 完成。它
+从不直接动机械臂
+。
+🧑‍🍳 值班经理 = N2 调度器
+唯一做决策的节点
+盯着点单屏（intent），按任务分流：装货/分拣直接喊抓取（grasp/start 服务），码垛先喊传送带备料。
+轻状态机，不干重活。
+🤲 主厨 = N-grasp 抓取
+只做"抓-放"原语
+双模式：装货走视觉（AprilTag 定位），分拣/码垛走 yaml 固定点位八步法。完成发 status，
+不自作主张接新任务。
+🏭 传菜梯 = N-conveyor 流水线
+电机 + 光电传感器
+复用底盘电机 M1 + GPIO17 光电，run_until_sensor 转到遮挡就定点停，收到 danger 立即急停。
+🛡 安全员 = N3 safety
+常驻盯雷达、优先级最高
+/scan 回调内算 60° 扇区最小距离，超限
+当场双发
+：放 danger 广播 + 释放 6 舵机力矩——不请示、不排队。
+📡 对讲机 vs 提单 = 话题 vs 服务
+异步广播 vs 同步确认
+话题
+像对讲机广播（intent/danger/status 随时插话，人人可听）；
+服务
+像提单办手续（发任务必须等回执 success）。秒级阻塞的抓取用服务拿确认，状态信号用话题保畅通。
+🔍 为什么这样分工
+安全员绝不能兼职接单（N3 独立、优先级最高）；经理绝不能亲自炒菜（N2 只编排不执行）。
+决策与执行分离
+，正是"打断分层（雷达>语音）"能在架构层落地的原因。
+03
+关联知识点：任务状态机与异步编排
+节点
+职责一句话
+关键接口（方向）
+N1 eai_factory_voice
+KWS→ASR→LLM 意图→TTS 播报 / 语音打断检测
+发 A1 intent、A3 interrupt；订 A2 speak、C1 danger
+N2 eai_factory_scheduler
+任务状态机（装货/分拣/码垛），grasp 未就绪自动重试
+订 A1/A3/C1；发 A2；调 E1-E3、D 系列、F3
+N-grasp eai_factory_grasp
+双模式抓取 + R8 打断 + 雷达危险中断 + 完成状态发布
+订 set_task/interrupt/danger/vision target；发 grasp status；调 pick/place/go_work/set_gripper
+N-conveyor eai_factory_conveyor
+流水线电机 + 光电传感器定点停 + 急停
+发/订 set_motor、photo、state、emergency、danger
+N3 eai_factory_safety
+雷达自身前方扇区检测→释放舵机力矩→危险解除恢复+回 work
+订 /scan；发 C1 danger、C2 status；发 C3 舵机力矩；调 C4 go_work
+任务状态机三条路由
+（
+scheduler_node.py
+L80-L94）——N2 的
+_run_task
+极简三分支：
+def
+_run_task(self, task):
+if
+task ==
+'palletize'
+:
+        self._start_palletize_sequence()
+# 码垛：先送料后抓取（异步两步）
+elif
+task
+in
+(
+'load'
+,
+'sort'
+):
+        self._trigger_grasp(task)
+# 装货/分拣：直接触发抓取
+else
+:
+        self.get_logger().warn(f'[SCHEDULER] unknown intent: {task}')
+def
+_conveyor_state_cb(self, msg):
+# palletize：货物到达光电(sensor_blocked) -> 在取料位触发抓取
+if
+self._awaiting_sensor
+and
+msg.data ==
+'sensor_blocked'
+:
+        self._awaiting_sensor = False
+        self._trigger_grasp(
+'palletize'
+)
+异步编排
+run_until_sensor 立即返回
+N2 异步调用流水线服务后置
+_awaiting_sensor=True
+回主循环——
+不阻塞
+，等待期间仍能响应 interrupt / danger，完成信号靠
+/eai_factory/conveyor/state
+话题回调。
+自动重试
+2s 定时器 _retry_grasp
+grasp/conveyor 服务未就绪（N-grasp 启动慢）时，存
+_pending_task
+并建 2s 定时器；
+_pending_task is None
+早退防堆积，成功后置 None 并 cancel。
+launch 编排
+7 开关 + 双启动方式
+start_base/viz/voice/vision/grasp/conveyor/radar（radar 默认 false）；voice/vision/grasp/conveyor 用
+ExecuteProcess + venv python 直跑 .py
+（sherpa_onnx/cv2 4.11 依赖），scheduler/safety 用
+Node + console_scripts 入口
+。
+04
+实验目标
+掌握
+五节点职责划分与协作关系，能解释"为什么拆成五个、每个管什么、谁消费谁的数据"
+理解
+N2 任务状态机的 load/sort/palletize 三条路由与 palletize"先送料后抓取"编排
+理解
+run_until_sensor 异步送料 → 订阅 conveyor/state 等 sensor_blocked → 再触发 grasp 的机制，能说明为何不用同步阻塞
+掌握
+launch 多节点编排方法：7 个开关、venv python 直跑与 console_scripts 入口两种启动方式的差异
+独立完成
+一张 eai_factory 系统架构图与一份架构理解笔记（附源码行号）
+迁移
+：对任意多节点 ROS2 项目快速建立"节点-接口-编排"三维认知
+05
+实验环境与准备
+类别
+内容
+硬件
+B2 麦克纳姆底盘、C1 五自由度机械臂 + 夹爪（
+本实验仅阅读源码，无需上电
+）；传感器：激光雷达、RGB-D 深度相机、光电传感器
+OS / ROS
+Ubuntu 22.04 + ROS 2 Humble
+Python
+3.10；voice/vision/grasp/conveyor 运行时用
+/home/iflytek/ros2_venv/bin/python3
+直跑，scheduler/safety 走 console_scripts 入口
+核心库
+rclpy（Node、ReentrantCallbackGroup、Timer）、std_msgs、std_srvs
+阅读对象
+docs/02_架构设计.md
+、
+eai_factory/scheduler_node.py
+、
+grasp_node.py
+、
+conveyor_node.py
+、
+safety_node.py
+、
+launch/eai_factory.launch.py
+；复用包 car1_bringup / car1_arm_controller / car1_peripherals / apriltag_detector
+⚠️ 准备提示
+本实验同样是
+纯源码阅读
+；涉及 launch 命令只记录不执行。注意：一键启动会先拉起底层（bringup/arm/peripherals）再起 eai_factory 节点，底层已在跑时须加
+start_base:=false
+；venv 路径为实机路径，跨环境阅读勿照搬。
+06
+动画讲解：五节点通信拓扑与异步编排
+看两条线：
+虚线 = 话题
+（异步广播，intent/status/danger），
+实线 = 服务
+（同步确认，grasp/start、run_until_sensor）。注意 N1→N2→N-grasp/N-conveyor 的星形驱动，以及 N3
+并行广播给三方
+的独立安全通道；右下角演示 palletize 的异步两步时序。
+五节点拓扑 · 虚线话题 / 实线服务
+N1 语音
+KWS→ASR→LLM→TTS
+N2 调度器（决策中枢）
+_run_task 三条路由 + 2s 重试
+N-grasp 抓取
+视觉 / 固定八步双模式
+N-conveyor 流水线
+电机 M1 + GPIO17 光电
+N3 安全（常驻）
+订 /scan · 60°/20cm/0.5s
+intent
+start(服务)
+status
+F3 服务
+conveyor/state
+danger 广播 → N2 / N-grasp / conveyor 三方
+码垛异步时序
+① F3 run_until_sensor
+服务立即返回 ✓
+② _awaiting_sensor=True
+N2 回主循环不阻塞
+③ 流水线运转…光电遮挡
+state=sensor_blocked
+④ _conveyor_state_cb 触发
+grasp 执行码垛抓取
+⑤ grasp status=done
+N2 发 speak 完成播报
+等待期间 N2 仍可响应 interrupt / danger
+动画 2-1｜左：星形+并行拓扑，N3 的 danger 红色虚线并行广播三方；右：码垛"服务立即返回 → 话题回滚通知"的异步两步时序
+07
+互动讲解：节点职责分工台
+出现一个系统事件，应该由哪个节点响应？点击按钮做"排班"：
+节点职责分工台 · Who Handles It?
+🎙 用户喊"开始装货"
+📡 光电被遮挡
+🚨 雷达 20cm 内持续障碍
+↺ 复位
+// 点击事件，观察事件在五节点间的流转路径
+系统空闲：N3 持续监听 /scan，N2 等待 intent，其余待命
+💡 判题口诀
+听到的归 N1、决定的归 N2、动手的归 N-grasp/流水线、
+保命的归 N3
+。分不清谁该干活时，问一句"这是决策还是执行？是安全还是业务？"——安全事件永远绕过业务节点直达执行器。
+08
+实操步骤：源码联查五节点
+1
+读架构文档 docs/02，画 N1→N2→N-grasp/N-conveyor 与 N3 广播两层拓扑（60min）
+2
+通读 scheduler_node.py（247 行），标注六个关键方法与三条任务路由（60min）
+3
+剖析 grasp / conveyor / safety 类结构：双模式、两段式送料、扇区检测双发（60min）
+4
+读 launch 文件，整理 7 开关与 ExecuteProcess / Node 双启动方式对照表（60min）
+5
+绘完整架构图（五节点+复用层+接口连线+打断分层）并写行号笔记（30min）
+# ① 列出调度器全部回调/方法及行号
+grep
+-n "def _" eai_factory/scheduler_node.py
+# _run_task / _start_palletize_sequence / _conveyor_state_cb
+# _trigger_grasp / _retry_grasp / _grasp_status_cb ...
+# ② 三类执行节点的服务/话题实现位置
+grep
+-n "create_service\|create_subscription\|create_publisher" \
+  eai_factory/grasp_node.py eai_factory/conveyor_node.py eai_factory/safety_node.py
+# ③ launch 的 7 开关与两种启动方式
+grep
+-n "DeclareLaunchArgument\|ExecuteProcess\|Node(" launch/eai_factory.launch.py
+# start_base/viz/voice/vision/grasp/conveyor/radar（radar 默认 false）
+🔍 固定抓取八步（grasp_node._do_fixed_grasp 节选）
+动前先开夹爪
+——本实验只要看懂顺序设计：① 开夹爪并等完全张开 → ② 直移到示教抓取点（manual taught pose + pitch）→ ③ 闭爪抓取……后续"抬升→放置→开爪→抬升→回 work"在 EXP-06 展开。这是"先准备后动作"的安全顺序思维。
+09
+重点与易错点
+⚠️ 三大经典易错
+run_until_sensor 不是阻塞等待（异步：立即返回+完成走 state 话题）；start 服务返回 ≠ 任务完成（触发语义 vs 完成语义）；launch 只保证"启动尝试顺序"——N-grasp 启动慢于 N2 时靠
+2s 自动重试兜底
+，不要依赖启动顺序。
+⚠️ 常见坑
+现象 → 解法
+以为 palletize 是"先抓后送"
+未理解码垛取料位在流水线上 → 对照
+scheduler_node.py
+L8-L9 docstring 与 L98-L127：先 run_until_sensor 送料到取料位，等 sensor_blocked 再抓取
+start 返回 = 完成
+混淆两种语义 → grasp/start 与 run_until_sensor 都
+立即返回
+（触发），完成走 grasp/status 与 conveyor/state 话题
+分不清 ExecuteProcess 与 Node
+不了解 venv 依赖隔离 → voice 依赖 sherpa_onnx（仅 venv）、vision 依赖 cv2 4.11 必须直跑；scheduler/safety 仅标准接口用入口点
+以为重试会堆积定时器
+未看早退逻辑 →
+_retry_grasp
+先判
+_pending_task is None
+直接 return，成功重放后置 None 并 cancel 定时器（L154-L169）
+以为 N3 只跟 N2 通信
+漏看 C1/F10 → danger 广播发给 N2/N-grasp/N-conveyor 三方：流水线收到急停并调 /arm_controller/emergency_stop，抓取收到立即停止
+架构图只画节点不画接口
+接口才是连接件 → 必须标注 intent/speak/danger/grasp/start/run_until_sensor 等，与 EXP-03 接口清单呼应
+五节点拓扑图：职责、话题/服务连线、
+N3 广播三方
+无遗漏
+能不看代码讲清
+palletize 异步机制
+与
+2s 重试的触发/解除条件
+launch 7 开关默认值与典型组合（如
+start_base:=false start_voice:=false 省内存测视觉
+）
+双启动方式差异能说出原因：
+sherpa_onnx/cv2 仅 venv
+N3 停臂是
+话题直发
+（scan 回调内，无服务往返 150~220ms），回 work 才用服务
+10
+实验总结与思考
+✅ 完成成果
+架构图 + 四份分析
+五节点通信拓扑图；调度器状态机分析（三路由+异步编排+2s 重试）；三类执行节点职责对比；launch 开关与双启动对照表。
+🧠 原理收获
+决策与执行分离
+N2 只编排不执行、N3 独立最高优先；话题异步广播 + 服务同步确认的组合拳是多节点系统的标准骨架。
+🛠 技能收获
+三维架构分析法
+节点-接口-编排三维度拆解任意 ROS2 项目；异步服务+状态话题编排；定时器重试兜底模式。
+📐 评分速览
+30 / 30 / 20 / 20
+拓扑连线 30、状态机与编排分析 30、执行节点对比 20、launch 编排与架构图 20，合计 100。
+📝 思考题 1
+为什么 palletize 采用"run_until_sensor 立即返回 + 订阅 conveyor/state 感知完成"的异步方案，而不是同步阻塞等待？请结合 N2 需要实时响应 interrupt/danger 说明。
+📝 思考题 2
+_trigger_grasp 中"先发布 set_task、再调用 grasp/start 服务"的顺序依赖什么保证？如果两者走不同的 DDS 链路会发生什么？
+CASE-01 · 智慧工厂装货分拣码垛 · EXP-02 五节点系统架构
+4 学时 · 设计性 · 基于 llm_practice 实验讲义改编

@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EXP-04 · 语音交互集成 — 智慧工厂装货分拣码垛综合项目</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+:root{
+  --theme:#ea580c;
+  --theme-deep:#c2410c;
+  --theme-bg:#ffedd5;
+  --theme-bd:#fed7aa;
+}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit" title="返回课程首页">🧠 具身智能课程 · <i>教程首页</i></a>
+  <div class="crumb"><a href="../../../index.html#case">综合项目</a> / <a href="../index.html">智慧工厂装货分拣码垛</a> / EXP-04</div>
+</div>
+
+<div class="wrap">
+<aside class="side">
+  <h4>本页目录</h4>
+  <a href="#s1" class="now">01 问题引入</a>
+  <a href="#s2">02 原理通俗讲解</a>
+  <a href="#s3">03 关联知识点</a>
+  <a href="#s4">04 实验目标</a>
+  <a href="#s5">05 实验环境与准备</a>
+  <a href="#s6">06 动画讲解</a>
+  <a href="#s7">07 互动讲解</a>
+  <a href="#s8">08 实操步骤</a>
+  <a href="#s9">09 重点与易错点</a>
+  <a href="#s10">10 总结与思考</a>
+  <h4 style="margin-top:22px">CASE-01 · 智慧工厂</h4>
+  <a href="../exp-01-requirements/index.html">EXP-01 需求分析</a>
+  <a href="../exp-02-architecture/index.html">EXP-02 五节点架构</a>
+  <a href="../exp-03-interface-design/index.html">EXP-03 接口设计</a>
+  <a href="../exp-04-voice-integration/index.html">EXP-04 语音交互集成</a>
+  <a href="../exp-05-visual-loading/index.html">EXP-05 视觉自适应装货</a>
+  <a href="../exp-06-sorting/index.html">EXP-06 智能分拣</a>
+  <a href="../exp-07-palletizing/index.html">EXP-07 自主码垛</a>
+  <a href="../exp-08-emergency-stop/index.html">EXP-08 危险检测与急停</a>
+  <a href="../exp-09-full-verification/index.html">EXP-09 全功能快速验证</a>
+</aside>
+
+<main class="content">
+  <div class="exp-head">
+    <span class="code">EXP-04 · 第 2 章 · 综合性 · 6 学时</span>
+    <h1>语音交互集成：唤醒 → 识别 → 大模型意图 → 播报</h1>
+    <p class="desc">把"听得见—听得懂—说得出—能打断"四件事串成一条链：硬件唤醒词 KWS、带热词表的流式 ASR、
+    Qwen3.5-0.8B 大模型三分类意图、TTS 合成播报，以及 SPEAKING 状态下的四步打断复位（对应需求 R1 / R3 / R7 / R8）。</p>
+    <div class="meta">
+      <span class="tag hl">🎙️ 语音链路</span>
+      <span class="tag">KWS 硬件唤醒</span>
+      <span class="tag">热词表 modified_beam_search</span>
+      <span class="tag">LLM 三分类意图</span>
+      <span class="tag">SPEAKING 打断四步</span>
+    </div>
+  </div>
+
+  <section class="blk" id="s1">
+    <h2><span class="no">01</span>问题引入：为什么"听见了"却"听不懂"？</h2>
+    <p>前三个实验完成了需求、架构与接口的纸面设计，本章开始进入第 2 章"功能集成"：先让设备真正听懂人话。
+    源讲义指出，让机器"听见"很容易（ASR 转文字），难的是把自然语言映射到<strong>有限的三个任务</strong>：
+    装货（load）、分拣（sort）、码垛（palletize）。用户可能说"把箱子装上去""分一下类""堆起来"，
+    甚至因为方言口音把"码垛"说成"马舵"、把"分拣"说成"封建"。</p>
+    <p>如果靠<strong>关键字匹配</strong>，每种说法都要写一条规则，永远覆盖不全；而源讲义的需求 R3 明确规定：
+    <strong>LLM 只做意图三分类，禁止关键字匹配</strong>，且大模型只负责"映射功能"，固定话术由 TTS 播报。
+    另外 R7 要求任务结束必须语音播报，R8 要求播报途中能被一句话打断并四步复位——这些都是本实验要逐条打通的链条。</p>
+  </section>
+
+  <section class="blk" id="s2">
+    <h2><span class="no">02</span>原理通俗讲解：四人流水线传话</h2>
+    <p>把语音链路想成餐厅的"传菜口"，四个人接力：</p>
+    <div class="kgrid">
+      <div class="kcard"><div class="kd">KWS · 门童</div><div class="kt">只认一句暗号</div>
+        <p>顾客（用户）必须先喊"小飞小飞 / 小飞同学 / 芝麻开门"，门童才回头。硬件 mic_array 直接在麦克风阵列上做唤醒（voice_node L844-846），不耗主机算力；没接阵列时才退到 sherpa_onnx 软件唤醒。<strong>暗号没喊对，后面的人根本不动。</strong></p></div>
+      <div class="kcard"><div class="kd">ASR · 速记员</div><div class="kt">照着热词本听写</div>
+        <p>唤醒后先播提示音（<code>_play_prompt_then_start_asr</code> L593-612），再开始识别。识别器用
+        <strong>modified_beam_search 解码 + hotwords.txt 热词表</strong>（6 条词条 score=2.0，热词提权让"码垛/分拣"这类术语不容易被听歪）。</p></div>
+      <div class="kcard"><div class="kd">LLM · 前台接待</div><div class="kt">只回答一个英文单词</div>
+        <p><code>_llm_intent_worker</code>（L688-767）把识别文本发给本机 Qwen3.5-0.8B，提示词限定
+        <strong>只输出 load / sort / palletize / none 四选一</strong>。这正是 R3："大模型只做功能映射，不做自由对话"。</p></div>
+      <div class="kcard"><div class="kd">TTS · 播音员</div><div class="kt">固定话术，不即兴</div>
+        <p>sherpa_onnx Matcha 声学模型 + vocos 声码器（L409-432）合成固定播报。任务完成时由调度器按任务名给出
+        "装货完成 / 分拣完成 / 码垛完成"（scheduler L202-208），<strong>播报内容不经过大模型</strong>，保证话术可控（R7）。</p></div>
+    </div>
+    <div class="tip amber" style="margin-top:14px"><span class="lab">兜底</span>
+      大模型服务没起来怎么办？<code>_keyword_fallback</code>（L769-786）在 LLM 结果超时/异常时按关键字兜底，
+      且两路结果在 L746-754 仲裁——<strong>兜底永远只是兜底，正常路径必须让 LLM 出结果</strong>，否则 R3 就形同虚设。</div>
+  </section>
+
+  <section class="blk" id="s3">
+    <h2><span class="no">03</span>关联知识点</h2>
+    <div class="kgrid">
+      <div class="kcard"><div class="kd">状态机</div><div class="kt">四个状态来回走</div>
+        <p>IDLE（待机）→ LISTENING（收音）→ PROCESSING（LLM 推理）→ SPEAKING（播报），任何状态被打断都按 R8 四步复位回 LISTENING。</p></div>
+      <div class="kcard"><div class="kd">intents 映射</div><div class="kt">yaml 里的一张表</div>
+        <p><code>config/eai_factory.yaml</code> 的 voice.intents 把 load/sort/palletize 分别映射到
+        <code>/eai_factory/start_load</code>、<code>/start_sort</code>、<code>/start_palletize</code>（Trigger 服务）。</p></div>
+      <div class="kcard"><div class="kd">意图提示词</div><div class="kt">intent_hints</div>
+        <p>ASR 侧用 intent_hints 把易混词往任务靠（如"马舵"→码垛、"封建"→分拣），热词表与提示词双管齐下压低误听率。</p></div>
+      <div class="kcard"><div class="kd">eai_speak 通道</div><div class="kt">单向文字播报</div>
+        <p>调度器完成信号 done → <code>/eai_factory/speak</code>（std_msgs/String）→ voice_node 合成并播放，与前端识别解耦。</p></div>
+    </div>
+  </section>
+
+  <section class="blk" id="s4">
+    <h2><span class="no">04</span>实验目标</h2>
+    <ul class="check">
+      <li>跑通"唤醒 → 提示音 → ASR → LLM 三分类 → TTS 播报"完整链路，喊一句话能够触发对应任务服务。</li>
+      <li>验证三个唤醒词（小飞小飞 / 小飞同学 / 芝麻开门）全部生效，理解硬件唤醒与软件唤醒的差异。</li>
+      <li>对比热词表开关前后的识别效果，解释 modified_beam_search 与热词提权的作用。</li>
+      <li>在播报途中说出第二句话，观察 LISTENING/PROCESSING/SPEAKING 状态迁移与 interrupt 话题，确认 R8 四步复位。</li>
+      <li>完成 TC1~TC6 测试用例，按源讲义评分表（15/20/25/15/25）自测。</li>
+    </ul>
+  </section>
+
+  <section class="blk" id="s5">
+    <h2><span class="no">05</span>实验环境与准备</h2>
+    <ul class="check">
+      <li>工业相机 + 麦克风阵列（mic_array 支持硬件唤醒；无阵列则确认软件唤醒已编入启动分支）。</li>
+      <li>本机 LLM 服务已启动：模型 Qwen3.5-0.8B（约 500MB 常驻内存），推理端口 8080；用
+      <code>curl http://127.0.0.1:8080/v1/models</code> 确认服务在线。</li>
+      <li>热词文件 hotwords.txt 就位（6 条，score=2.0），intent_hints 在 yaml 中配置完成。</li>
+      <li>启动主程序：<code>ros2 launch eai_factory eai_factory.launch.py start_voice:=true</code>
+      （voice 开关默认即为 true，视觉/抓取等可按需关闭以缩小变量）。</li>
+      <li>观察终端日志，voice_node 启动时会按顺序打印唤醒词加载、ASR 初始化、TTS 初始化、LLM 连接等日志行。</li>
+    </ul>
+  </section>
+
+  <section class="blk" id="s6">
+    <h2><span class="no">06</span>动画讲解：状态机与四人流水线</h2>
+    <div class="anim-box">
+<svg viewBox="0 0 720 310" xmlns="http://www.w3.org/2000/svg">
+  <text x="20" y="26" font-size="15" fill="#94a3b8">voice_node 状态机（R8 打断复位）</text>
+  <rect x="30"  y="70" width="130" height="56" rx="10" fill="#ffedd5" stroke="#ea580c" stroke-width="2"/>
+  <text x="95"  y="95" font-size="14" fill="#9a3412" text-anchor="middle">IDLE</text>
+  <text x="95"  y="114" font-size="11" fill="#c2410c" text-anchor="middle">待机</text>
+  <rect x="210" y="70" width="130" height="56" rx="10" fill="#ffedd5" stroke="#ea580c" stroke-width="2"/>
+  <text x="275" y="95" font-size="14" fill="#9a3412" text-anchor="middle">LISTENING</text>
+  <text x="275" y="114" font-size="11" fill="#c2410c" text-anchor="middle">ASR 收音</text>
+  <rect x="390" y="70" width="130" height="56" rx="10" fill="#ffedd5" stroke="#ea580c" stroke-width="2"/>
+  <text x="455" y="95" font-size="14" fill="#9a3412" text-anchor="middle">PROCESSING</text>
+  <text x="455" y="114" font-size="11" fill="#c2410c" text-anchor="middle">LLM 推理</text>
+  <rect x="570" y="70" width="120" height="56" rx="10" fill="#ffedd5" stroke="#ea580c" stroke-width="2"/>
+  <text x="630" y="95" font-size="14" fill="#9a3412" text-anchor="middle">SPEAKING</text>
+  <text x="630" y="114" font-size="11" fill="#c2410c" text-anchor="middle">TTS 播报</text>
+  <line x1="160" y1="98" x2="210" y2="98" stroke="#ea580c" stroke-width="2"/>
+  <polygon points="210,98 202,94 202,102" fill="#ea580c"/>
+  <text x="185" y="88" font-size="10" fill="#64748b" text-anchor="middle">唤醒</text>
+  <line x1="340" y1="98" x2="390" y2="98" stroke="#ea580c" stroke-width="2"/>
+  <polygon points="390,98 382,94 382,102" fill="#ea580c"/>
+  <text x="365" y="88" font-size="10" fill="#64748b" text-anchor="middle">文本</text>
+  <line x1="520" y1="98" x2="570" y2="98" stroke="#ea580c" stroke-width="2"/>
+  <polygon points="570,98 562,94 562,102" fill="#ea580c"/>
+  <text x="545" y="88" font-size="10" fill="#64748b" text-anchor="middle">意图</text>
+  <path d="M 630 126 C 630 175 275 175 275 126" fill="none" stroke="#dc2626" stroke-width="2" stroke-dasharray="6 5"/>
+  <polygon points="275,126 271,136 281,135" fill="#dc2626"/>
+  <text x="455" y="168" font-size="11" fill="#dc2626" text-anchor="middle">interrupt 打断（R8 复位四步：中断播放 → 置 interrupt → 发 interrupt=true → 回 LISTENING）</text>
+  <circle r="7" fill="#ea580c">
+    <animate attributeName="cx" values="95;275;455;630;95" dur="6s" repeatCount="indefinite"/>
+    <animate attributeName="cy" values="98;98;98;98;98" dur="6s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="1;1;1;1;0" dur="6s" repeatCount="indefinite"/>
+  </circle>
+  <text x="20" y="215" font-size="15" fill="#94a3b8">端到端链路：四段接力，各司其职</text>
+  <g>
+    <rect x="30" y="235" width="150" height="50" rx="8" fill="#0f172a"/>
+    <text x="105" y="256" font-size="12" fill="#fdbA74" text-anchor="middle">KWS 唤醒词</text>
+    <text x="105" y="274" font-size="10" fill="#94a3b8" text-anchor="middle">小飞小飞 / 芝麻开门</text>
+    <rect x="205" y="235" width="150" height="50" rx="8" fill="#0f172a"/>
+    <text x="280" y="256" font-size="12" fill="#fdba74" text-anchor="middle">ASR + 热词表</text>
+    <text x="280" y="274" font-size="10" fill="#94a3b8" text-anchor="middle">modified_beam_search</text>
+    <rect x="380" y="235" width="150" height="50" rx="8" fill="#0f172a"/>
+    <text x="455" y="256" font-size="12" fill="#fdba74" text-anchor="middle">LLM 三分类</text>
+    <text x="455" y="274" font-size="10" fill="#94a3b8" text-anchor="middle">Qwen3.5-0.8B · 8080</text>
+    <rect x="555" y="235" width="135" height="50" rx="8" fill="#0f172a"/>
+    <text x="622" y="256" font-size="12" fill="#fdba74" text-anchor="middle">TTS 固定话术</text>
+    <text x="622" y="274" font-size="10" fill="#94a3b8" text-anchor="middle">Matcha + vocos</text>
+    <line x1="180" y1="260" x2="205" y2="260" stroke="#ea580c" stroke-width="2"/>
+    <line x1="355" y1="260" x2="380" y2="260" stroke="#ea580c" stroke-width="2"/>
+    <line x1="530" y1="260" x2="555" y2="260" stroke="#ea580c" stroke-width="2"/>
+  </g>
+  <circle r="6" fill="#fdba74">
+    <animate attributeName="cx" values="105;280;455;622;105" dur="5s" repeatCount="indefinite"/>
+    <animate attributeName="cy" values="260;260;260;260;260" dur="5s" repeatCount="indefinite"/>
+  </circle>
+</svg>
+    </div>
+    <div class="anim-cap">图 4-1　上：voice_node 四态状态机，红色虚线为 R8 打断复位路径；下：KWS→ASR→LLM→TTS 四段接力，光点走完一圈即一次完整交互。</div>
+  </section>
+
+  <section class="blk" id="s7">
+    <h2><span class="no">07</span>互动讲解：意图仲裁实验台</h2>
+    <p>点击下面的按钮，模拟 LLM 返回不同结果时 <code>_llm_intent_worker</code> 与兜底逻辑的仲裁过程：</p>
+    <div class="ix-panel">
+      <div class="ix-title">🎛️ 意图仲裁台（LLM 结果 vs 关键字兜底）</div>
+      <div class="ctl-row">
+        <button class="btn" onclick="intentCase('load')">LLM 返回 load</button>
+        <button class="btn" onclick="intentCase('none')">LLM 返回 none</button>
+        <button class="btn" onclick="intentCase('timeout')">LLM 超时（走兜底）</button>
+        <button class="btn" onclick="resetIntent()">复位</button>
+      </div>
+      <div class="io" id="intentIo">选择一种场景，观察仲裁分支与最终发布的服务调用……</div>
+    </div>
+    <div class="tip tealb" style="margin-top:14px"><span class="lab">要点</span>
+      无论哪条路径，最终动作都落在 intents 表的三个 Trigger 服务上——<strong>意图识别的自由度在收口处被压成三个确定动作</strong>，这就是 R1（单轮）＋R3（只分类）的组合效果。</div>
+  </section>
+
+  <section class="blk" id="s8">
+    <h2><span class="no">08</span>实操步骤</h2>
+    <div class="flow">
+      <div class="step"><div class="n">1</div><div><strong>确认 LLM 服务在线</strong>
+<pre>curl http://127.0.0.1:8080/v1/models
+<span class="c"># 返回模型清单即为在线，否则先启动 Qwen3.5-0.8B 推理服务</span></pre></div></div>
+      <div class="step"><div class="n">2</div><div><strong>检查热词与意图映射</strong>
+<pre><span class="c"># 热词表：6 条词条，score=2.0</span>
+cat hotwords.txt
+<span class="c"># intents 映射与唤醒词</span>
+grep -n -A6 "intents" config/eai_factory.yaml
+grep -n "wakeup_words" config/eai_factory.yaml</pre></div></div>
+      <div class="step"><div class="n">3</div><div><strong>带语音启动全栈</strong>
+<pre>ros2 launch eai_factory eai_factory.launch.py start_voice:=true</pre></div></div>
+      <div class="step"><div class="n">4</div><div><strong>TC1 唤醒三连测</strong>：依次喊"小飞小飞""小飞同学""芝麻开门"，每次都应听到提示音并看到 LISTENING 输出。</div></div>
+      <div class="step"><div class="n">5</div><div><strong>TC2~TC3 意图三分类</strong>：依次说"开始装货""执行分拣""开始码垛"，用 <code>ros2 service list | grep eai_factory</code> 与日志确认三个 Trigger 服务被分别调用，播报对应固定话术。</div></div>
+      <div class="step"><div class="n">6</div><div><strong>TC4 热词对比</strong>：临时停用热词表再念"码垛"，观察误识别率变化，之后恢复。</div></div>
+      <div class="step"><div class="n">7</div><div><strong>TC5 打断测试</strong>：触发一次任务播报，在 SPEAKING 期间说出"小飞小飞"，终端应出现
+<code>VOICE INTERRUPT — stopping ...</code> 类日志，播放停止并回 LISTENING，随后可再次下发指令（R8）。</div></div>
+      <div class="step"><div class="n">8</div><div><strong>TC6 全链路时序</strong>：不看终端，仅凭"唤醒音 → 识别停顿 → 播报"三段听感复述状态机走向，并与日志时间戳对照。</div></div>
+    </div>
+  </section>
+
+  <section class="blk" id="s9">
+    <h2><span class="no">09</span>重点与易错点</h2>
+    <div class="tip amber"><span class="lab">诊断</span>先分清是<strong>哪一段</strong>坏了：唤醒没反应查 KWS/阵列，识别错查热词，意图错查 LLM 是否在线，没播报查 eai_speak 订阅与 TTS 初始化日志。</div>
+    <table>
+      <tr><th>现象</th><th>根因</th><th>处理</th></tr>
+      <tr><td>喊唤醒词无反应</td><td>未接 mic_array 却期望硬件唤醒，或 start_voice:=false</td><td>确认启动开关与唤醒分支，看启动日志加载了哪个唤醒源</td></tr>
+      <tr><td>"码垛"被识别成"马舵"</td><td>热词表未生效或 score 未提权</td><td>核对 hotwords.txt（6 条 score=2.0）与 intent_hints</td></tr>
+      <tr><td>"分拣"听成"封建"</td><td>同上；声学相近词仅靠 ASR 兜不住</td><td>热词＋intent_hints 双份配置，测试时按热词优先</td></tr>
+      <tr><td>说了指令没动作</td><td>LLM 服务 8080 未启动，且兜底也没命中关键字</td><td><code>curl /v1/models</code> 探活后再测，兜底不可当主路径</td></tr>
+      <tr><td>播报无法打断</td><td>打断分支只在 SPEAKING 生效，时序没踩上；或播放器未接入 interrupt</td><td>对照 L636-661 四步，确认 interrupt_event 与话题发布</td></tr>
+      <tr><td>完成播报话术不对</td><td>自定义播报绕过了 done→speak 固定映射</td><td>沿用 scheduler L202-208 的"装货/分拣/码垛完成"三句固定话术（R7）</td></tr>
+    </table>
+    <ul class="check">
+      <li>评分自测（源讲义 15/20/25/15/25）：链路完整性 15、唤醒与识别 20、意图三分类 25、打断复位 15、全链路时序与报告 25。</li>
+      <li>报告必须附终端日志时间戳，证明"唤醒—识别—意图—动作—播报"五段顺序无倒挂。</li>
+      <li>LLM 提示词输出若带多余句子，先在 worker 侧做取词处理，不要改提示词以外的解析逻辑。</li>
+    </ul>
+  </section>
+
+  <section class="blk" id="s10">
+    <h2><span class="no">10</span>总结与思考</h2>
+    <div class="kgrid">
+      <div class="kcard"><div class="kd">一条链</div><div class="kt">KWS → ASR → LLM → TTS</div><p>四段接力、状态机调度，听懂的前提是每段只做自己的事。</p></div>
+      <div class="kcard"><div class="kd">两道防线</div><div class="kt">热词提权 + 关键字兜底</div><p>热词守住识别端，兜底守住服务端，但主路径永远是 LLM 三分类。</p></div>
+      <div class="kcard"><div class="kd">三个确定</div><div class="kt">load / sort / palletize</div><p>自然语言的自由度最终收口为三个 Trigger 服务调用。</p></div>
+      <div class="kcard"><div class="kd">四步复位</div><div class="kt">R8 打断</div><p>断播放、置标志、发话题、回 LISTENING，顺序不能乱。</p></div>
+    </div>
+    <div class="tip violet" style="margin-top:14px"><span class="lab">思考 1</span>
+      现在是"唤醒 → 说一句 → 停"的两段式交互，如果改成持续听写（无唤醒词一直识别），会带来什么新问题？
+      提示：误触发率、隐私、以及打断语义还成不成立。</div>
+    <div class="tip violet"><span class="lab">思考 2</span>
+      如果要新增第 4 个任务"盘点（inventory）"，热词表、intent_hints、LLM 提示词、intents 映射、固定播报话术
+      五处分别要改哪里？哪一处不改会导致"识别对了但没动作"？</div>
+  </section>
+
+  <nav class="expnav">
+    <a href="../exp-03-interface-design/index.html" class="prev">← EXP-03 接口设计</a>
+    <a href="../exp-05-visual-loading/index.html" class="next">EXP-05 视觉自适应装货 →</a>
+  </nav>
+
+  <footer>
+    <span>CASE-01 · 智慧工厂装货分拣码垛 · EXP-04 语音交互集成</span>
+    <span>6 学时 · 综合性 · 基于 llm_practice 实验讲义改编</span>
+  </footer>
+</main>
+</div>
+
+<script>
+function intentCase(kind){
+  var io = document.getElementById('intentIo');
+  var lines = [];
+  if(kind === 'load'){
+    lines.push('<span class="dim">$ LLM result =&gt; "load"</span>');
+    lines.push('<span class="ok">[L746-754] 仲裁：LLM 结果有效，忽略关键字兜底</span>');
+    lines.push('<span class="ok">intents.load → ros2 service call /eai_factory/start_load</span>');
+    lines.push('<span class="dim">→ Trigger 返回 success: True, "load task triggered"</span>');
+    lines.push('<span class="b">单轮完成（R1），播报固定话术（R7）</span>');
+  } else if(kind === 'none'){
+    lines.push('<span class="dim">$ LLM result =&gt; "none"（识别到但不属于三任务）</span>');
+    lines.push('<span class="warn">仲裁：无任务意图，不触发任何服务</span>');
+    lines.push('<span class="warn">TTS 播报固定引导语，状态回到 LISTENING</span>');
+    lines.push('<span class="dim">不会进入关键字兜底（none 是合法结果，不等于失败）</span>');
+  } else {
+    lines.push('<span class="bad">$ LLM 8080 超时 / 无响应</span>');
+    lines.push('<span class="warn">[L769-786] 进入 _keyword_fallback 关键字兜底</span>');
+    lines.push('<span class="warn">识别文本含"装/货" → load；含"分/拣" → sort；含"码/垛" → palletize</span>');
+    lines.push('<span class="bad">注意：兜底命中率有限，服务离线属异常态，评分表扣分项</span>');
+    lines.push('<span class="dim">处理：curl http://127.0.0.1:8080/v1/models 探活后复测</span>');
+  }
+  io.innerHTML = lines.join('\n');
+}
+function resetIntent(){
+  document.getElementById('intentIo').innerHTML = '选择一种场景，观察仲裁分支与最终发布的服务调用……';
+}
+</script>
+<script src="../shared/tutorial.js" defer></script>
+</body>
+</html>

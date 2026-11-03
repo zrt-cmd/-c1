@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-03 · 定位与多点导航巡检 | IND-05 工业巡检应用场景</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+  :root{--theme:#059669;--theme-deep:#047857;--theme-bg:#ecfdf5;--theme-bd:#a7f3d0}
+  figure.shot{margin:18px 0;border:1px solid var(--theme-bd);border-radius:12px;overflow:hidden;background:#fff}
+  figure.shot img{display:block;width:100%;height:auto}
+  figure.shot svg{display:block;width:100%;height:auto;background:#0b1220}
+  figure.shot figcaption{padding:10px 14px;font-size:13px;color:#065f46;background:var(--theme-bg);border-top:1px solid var(--theme-bd)}
+  .tag.hl{background:var(--theme-bg);border-color:var(--theme-bd);color:var(--theme-deep)}
+/* ── 五星学习法 · 课程分段 ── */
+.fivestar-note{font-size:13px;color:#5b6b78;margin-top:12px}
+.fs-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:14px}
+.fs-cell{border:1px solid var(--theme-bd);border-radius:12px;padding:10px 8px;text-align:center;background:var(--theme-bg)}
+.fs-cell .st{font-size:12.5px;font-weight:800;color:var(--theme-deep)}
+.fs-cell .tm{font-family:var(--font-mono,monospace);font-size:11px;color:#0f766e;margin-top:3px;font-weight:700}
+.fs-cell .ds{font-size:11.5px;color:#5b6b78;margin-top:4px;line-height:1.5}
+.seg{display:inline-block;font-size:11px;font-weight:700;font-family:var(--font-mono,monospace);background:var(--theme-bg);color:var(--theme-deep);border:1px solid var(--theme-bd);border-radius:99px;padding:2px 10px;margin-left:8px;vertical-align:middle;white-space:nowrap}
+.tl{width:100%;border-collapse:collapse;font-size:13px;margin-top:14px;background:#fff}
+.tl th,.tl td{border:1px solid #e2ece9;padding:7px 10px;text-align:left;vertical-align:top}
+.tl th{background:var(--theme-bg);color:var(--theme-deep);font-size:12.5px;white-space:nowrap}
+.tl .m{font-family:var(--font-mono,monospace);color:var(--theme-deep);font-weight:700;white-space:nowrap}
+@media(max-width:900px){.fs-grid{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="bar-in">
+    <a class="logo" href="../../../index.html"><b>课程</b>巡检</a>
+    <nav class="crumb"><a href="../../../index.html#ind">总首页</a> / <a href="../index.html">IND-05 工业巡检</a> / EXP-03</nav>
+  </div>
+</header>
+<div class="wrap">
+  <aside class="side">
+    <h4>本页目录 · 五星学习法</h4>
+    <a href="#s0">00 课程节奏 · 8 段微课</a>
+    <a href="#s1" class="now">01 学习目标 ①聚焦问题</a>
+    <a href="#s2">02 原理 ①聚焦 ②激活</a>
+    <a href="#s3">03 硬件与材料 ③示证新知</a>
+    <a href="#s4">04 操作步骤 ④应用新知</a>
+    <a href="#s5">05 关键命令 ④应用新知</a>
+    <a href="#s6">06 动画 ③示证新知</a>
+    <a href="#s7">07 互动 ④应用新知</a>
+    <a href="#s8">08 常见问题 ⑤融会贯通</a>
+    <a href="#s9">09 拓展 ⑤融会贯通</a>
+    <a href="#s10">10 思考题 ⑤融会贯通</a>
+    <h4>兄弟实验</h4>
+    <a href="../exp-01-sdk-motion/index.html">EXP-01 控制与巡检准备</a>
+    <a href="../exp-02-lidar-slam/index.html">EXP-02 3D 激光建图</a>
+    <a href="../exp-04-vision-loop/index.html">EXP-04 视觉巡检闭环</a>
+  </aside>
+  <main class="content">
+    <div class="exp-head">
+      <div class="code">EXP-03 · 8 学时</div>
+      <h1>定位与多点导航巡检</h1>
+      <p class="desc">融合理论「SLAM / 定位 / 导航原理」：载入 EXP-02 地图，配置 AMCL 初始位姿与 Nav2 参数，编排多个巡检点让 Go2 依序自主到达并避障。验收标准：Go2 依序自主到达巡检点；关键技巧：每点需定位收敛后再出发。</p>
+      <div class="meta"><span class="tag hl">实践/理论</span><span class="tag">AMCL</span><span class="tag">Nav2</span><span class="tag">waypoint_follower</span></div>
+    </div>
+    <!-- 00 -->
+    <section class="blk" id="s0">
+      <h2><span class="no">00</span>课程节奏：五星学习法 · 8 段微课（每段 ≤ 15 min）</h2>
+      <p>本实验按<b>五星学习法</b>组织：先用一个真实故障<b>聚焦问题</b>，再<b>激活旧知</b>（EXP-02 地图 + 定位直觉 + 路径规划），接着<b>示证新知</b>（AMCL 粒子滤波 + Nav2 分层），然后动手<b>应用新知</b>完成载图给初值到依序巡检，最后借排障与拓展<b>融会贯通</b>。全程切成 <b>8 段微课、每段不超过 15 分钟</b>，段间停顿 1~2 分钟消化；纯讲授合计约 100 分钟，其余课时用于动手实操与个别辅导。</p>
+      <div class="fs-grid">
+        <div class="fs-cell"><div class="st">① 聚焦问题</div><div class="tm">课段 1 · 12 min</div><div class="ds">"狗到错位"故障现场，带着问题开课</div></div>
+        <div class="fs-cell"><div class="st">② 激活旧知</div><div class="tm">课段 2 · 8 min</div><div class="ds">EXP-02 地图 · GPS 定位直觉 · 路径规划</div></div>
+        <div class="fs-cell"><div class="st">③ 示证新知</div><div class="tm">课段 3~4 · 27 min</div><div class="ds">AMCL 粒子滤波 + Nav2 分层 + 巡检动画</div></div>
+        <div class="fs-cell"><div class="st">④ 应用新知</div><div class="tm">课段 5~7 · 40 min</div><div class="ds">载图→给初值→等收敛→编排→依序执行</div></div>
+        <div class="fs-cell"><div class="st">⑤ 融会贯通</div><div class="tm">课段 8 · 13 min</div><div class="ds">排障口诀 · 拓展阅读 · 思考题</div></div>
+      </div>
+      <table class="tl">
+        <tr><th>课段</th><th>五星阶段</th><th>时长</th><th>对应章节</th><th>本段任务</th></tr>
+        <tr><td class="m">课段 1</td><td>聚焦问题</td><td class="m">12 min</td><td>§01 + §02 前半</td><td>抛出现场故障"狗到错位"，明确本课要解决的目标</td></tr>
+        <tr><td class="m">课段 2</td><td>激活旧知</td><td class="m">8 min</td><td>§02 后半</td><td>用 EXP-02 地图、GPS 定位直觉、路径规划三条旧知解释故障成因</td></tr>
+        <tr><td class="m">课段 3</td><td>示证新知</td><td class="m">15 min</td><td>§03</td><td>认识 map.yaml/传感器/定位初值与巡检点编排</td></tr>
+        <tr><td class="m">课段 4</td><td>示证新知</td><td class="m">12 min</td><td>§06</td><td>看懂 AMCL 粒子收敛与多点巡检依序到达动画</td></tr>
+        <tr><td class="m">课段 5</td><td>应用新知</td><td class="m">15 min</td><td>§04 S1~S3 + §05 ①②</td><td>载入地图 + 给初值 + 等粒子收敛（边讲边演）</td></tr>
+        <tr><td class="m">课段 6</td><td>应用新知</td><td class="m">15 min</td><td>§04 S4~S5 + §05 ③④</td><td>编排巡检点 + 依序执行 follow_waypoints——课段 1 的故障就此根除</td></tr>
+        <tr><td class="m">课段 7</td><td>应用新知</td><td class="m">10 min</td><td>§07</td><td>巡检点编排与到达判定自测，全通方可进入下一实验</td></tr>
+        <tr><td class="m">课段 8</td><td>融会贯通</td><td class="m">13 min</td><td>§08~§10</td><td>排障口诀收口，挑战题与思考题拔高迁移</td></tr>
+      </table>
+      <p class="fivestar-note">讲课提示：课段 1/2 以讲授 + 提问为主；课段 3~6 边讲边演（实物 / 动画 / 命令行）；课段 7 学员独立完成；课段 8 答疑拔高。段与段之间停顿 1~2 分钟，确认学员跟上再进下一段。</p>
+    </section>
+
+    <!-- 01 学习目标 -->
+    <section class="blk" id="s1">
+      <h2><span class="no">01</span>学习目标<span class="seg">课段 1 · 聚焦问题 · 12 min</span></h2>
+      <ul class="check">
+        <li>用通俗语言讲清三层分工：SLAM 画地图、AMCL 猜我在哪、Nav2 决定怎么走。</li>
+        <li>理解 AMCL 粒子滤波：一群「位置猜测」如何随激光观测淘汰收敛到真实位姿。</li>
+        <li>读懂 Nav2 的规划—控制—避障流水线，以及全向（Omni）运动模型对四足的意义。</li>
+        <li>完成初始位姿标定、Nav2 参数核对、多巡检点编排与依序送达。</li>
+        <li>掌握「定位收敛后再出发」的操作节奏，判断何时可以放心切下一个点。</li>
+      </ul>
+      <div class="tip amber"><b>素材说明：</b>本课无视频素材——官方仓库演示动图、自制 SVG 示意图与动画共同承担讲解，不虚构实拍录像。</div>
+    </section>
+    <!-- 02 原理：融合理论2 -->
+    <section class="blk" id="s2">
+      <h2><span class="no">02</span>原理：SLAM / 定位 / 导航（理论 2 融合）<span class="seg">课段 1 收尾 + 课段 2 · 激活旧知 · 8 min</span></h2>
+      <div class="tip amber"><span class="lab">❓ 聚焦问题（课段 1）</span>学员现场最常遇到的怪事：<b>巡检点明明标在表计前，狗却停在两米外拍照</b>；<code>/amcl_pose</code> 协方差一直很大，粒子满图飞。问题出在哪？带着这个故障听完全课——到课段 6 你会亲手让狗精准到位。</div>
+      <p><b>三个角色一台戏：</b>EXP-02 画好的地图是<b>「城市地图」</b>；AMCL 是<b>「我在地图的哪」的猜谜游戏</b>；Nav2 是<b>「高德导航」</b>——知道地图加知道位置，它负责规划绕障路线并把油门方向盘发给四足。缺任何一个，狗都不是巡检员，只是随机遛弯。</p>
+      <h3>AMCL：一群猜测不断淘汰</h3>
+      <p>AMCL（自适应蒙特卡洛定位）的玩法：<b>撒一把纸屑</b>——在地图各处随机撒 2000 个「我可能在这」的粒子；每个粒子都拿当前激光扫描与地图比对，「如果我真在这，看到的景象对得上吗」，对得上的留下并繁殖，对不上的直接淘汰；几轮之后，所有粒子挤成一团，那团中心就是你的位置。<b>初始一无所知时粒子满图乱飞，一旦你说「我其实在充电桩旁边」（2D Pose Estimate 给初值），粒子团会唰地收敛</b>——这就是「定位收敛」的直观含义，也是「每点需收敛后再出发」的科学依据：粒子还没抱团就发车，狗会拿着错误位置自信地撞墙。</p>
+      <h3>Nav2：高德地图导航的机器人版</h3>
+      <p>Nav2 收到目标点后干三件事：<b>①全局规划</b>（在栅格地图上画出理论最优路线）→ <b>②局部控制</b>（controller 按周期算每一步往哪迈，go2_ros2_sdk 参数里 controller_frequency 为 3.0Hz，匹配四足步态节奏）→ <b>③实时避障</b>（代价地图里突然出现人/纸箱，局部规划当场绕开）。四足 Go2 可横移平移，所以用 <b>nav2_amcl::OmniMotionModel</b>（全向运动模型）比差速小车模型更贴合；多点巡检则交给 <b>nav2_waypoint_follower</b>——「把这串点按顺序走完，每到一个可以停一停」。</p>
+      <div class="tip tealb"><b>一句话版本：</b>SLAM=画地图；AMCL=地图上自拍定位（一群猜测不断淘汰）；Nav2=高德地图导航（规划+避障+踩油门）；waypoint_follower=批量下单「一口气巡完 N 个点」。</div>
+      <div class="tip teal"><span class="lab">↺ 激活旧知（课段 2）</span>回忆三条旧知：① <b>EXP-02 产出的 map.yaml</b>（栅格地图是定位的底图）；② <b>GPS 定位直觉</b>（知道大致位置才能精确定位）；③ <b>路径规划</b>（两点间走最优路线）。三条合起来，正好解释课段 1 那个故障。</div>
+      <figure class="shot">
+        <img src="./images/fig-go2sdk-rviz-map.png" alt="go2_ros2_sdk 在 RViz 中的建图与导航地图" loading="lazy">
+        <figcaption>图 3-1｜go2_ros2_sdk 在 RViz 中呈现的场地地图与机器人位姿（abizovnuralem/go2_ros2_sdk 仓库 README 官方截图）：AMCL 正是把「机器人小箭头」钉在这张图的正确位置上。</figcaption>
+      </figure>
+      <figure class="shot">
+        <svg viewBox="0 0 720 240" role="img" aria-label="AMCL 粒子滤波三阶段示意图">
+          <g font-size="13" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif">
+            <defs><marker id="a05f31" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#34d399"/></marker></defs>
+            <text x="180" y="34" fill="#6ee7b7" font-weight="bold">① 初始：粒子满图乱撒</text>
+            <text x="540" y="34" fill="#fbbf24" font-weight="bold">② 观测淘汰 → ③ 收敛抱团</text>
+            <rect x="40" y="52" width="280" height="170" rx="10" fill="#0b1220" stroke="#334155"/>
+            <rect x="400" y="52" width="280" height="170" rx="10" fill="#0b1220" stroke="#334155"/>
+            <g fill="#38bdf8"><circle cx="80" cy="80" r="3.5"/><circle cx="140" cy="70" r="3.5"/><circle cx="210" cy="90" r="3.5"/><circle cx="285" cy="75" r="3.5"/><circle cx="75" cy="130" r="3.5"/><circle cx="130" cy="150" r="3.5"/><circle cx="205" cy="135" r="3.5"/><circle cx="290" cy="145" r="3.5"/><circle cx="95" cy="195" r="3.5"/><circle cx="165" cy="200" r="3.5"/><circle cx="245" cy="190" r="3.5"/><circle cx="300" cy="205" r="3.5"/><circle cx="110" cy="105" r="3.5"/><circle cx="255" cy="115" r="3.5"/><circle cx="175" cy="120" r="3.5"/><circle cx="60" cy="165" r="3.5"/></g>
+            <text x="180" y="236" fill="#94a3b8" font-size="11">max_particles=2000，激光对不上的快速淘汰</text>
+            <line x1="326" y1="140" x2="394" y2="140" stroke="#34d399" stroke-width="3" marker-end="url(#a05f31)"/>
+            <g stroke="#334155"><path d="M420,100 L500,90"/><path d="M660,90 L575,105"/><path d="M430,195 L510,180"/></g>
+            <g fill="#f87171" opacity="0.85"><circle cx="430" cy="75" r="3.5"/><circle cx="655" cy="70" r="3.5"/><circle cx="425" cy="150" r="3.5"/><circle cx="660" cy="160" r="3.5"/><circle cx="560" cy="196" r="3.5"/></g>
+            <text x="430" y="66" fill="#f87171" font-size="10">✗ 淘汰</text>
+            <text x="646" y="62" fill="#f87171" font-size="10">✗ 淘汰</text>
+            <g fill="#34d399" opacity="0.5"><animate attributeName="opacity" values="0.2;1;1" dur="3s" repeatCount="indefinite"/><circle cx="530" cy="120" r="3"/><circle cx="545" cy="132" r="3"/><circle cx="516" cy="134" r="3"/><circle cx="538" cy="112" r="3"/><circle cx="552" cy="122" r="3"/><circle cx="524" cy="146" r="3"/><circle cx="540" cy="148" r="3"/><circle cx="512" cy="122" r="3"/></g>
+            <circle cx="534" cy="130" r="8" fill="none" stroke="#fbbf24" stroke-width="2.5"/>
+            <text x="534" y="134" fill="#fbbf24" font-size="10" font-weight="bold">真值</text>
+            <text x="540" y="236" fill="#94a3b8" font-size="11">绿团抱团＝定位收敛；黄圈=真实位姿</text>
+          </g>
+        </svg>
+        <figcaption>图 3-2｜AMCL 粒子滤波三个阶段（自制示意图）：左=随机撒粒子猜位置；右红点=被激光观测淘汰的猜测，绿点=存活并繁殖的猜测，抱团中心趋近真实位姿（黄圈）。</figcaption>
+      </figure>
+      <figure class="shot">
+        <svg viewBox="0 0 720 260" role="img" aria-label="Nav2 导航栈分层与多点巡检示意图">
+          <g font-size="13" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif">
+            <defs><marker id="a05f32" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#34d399"/></marker></defs>
+            <text x="360" y="30" fill="#6ee7b7" font-weight="bold">Nav2 分层：从「一张路线图」到「每一步落脚」（示意图）</text>
+            <rect x="40" y="52" width="190" height="60" rx="10" fill="#064e3b" stroke="#34d399" stroke-width="2"/>
+            <text x="135" y="78" fill="#d1fae5" font-weight="bold">waypoint_follower</text>
+            <text x="135" y="99" fill="#6ee7b7" font-size="11">巡检点队列：P1→P2→P3…</text>
+            <rect x="265" y="52" width="190" height="60" rx="10" fill="#064e3b" stroke="#34d399" stroke-width="2"/>
+            <text x="360" y="78" fill="#d1fae5" font-weight="bold">Planner（全局规划）</text>
+            <text x="360" y="99" fill="#6ee7b7" font-size="11">地图上画最优路线</text>
+            <rect x="490" y="52" width="190" height="60" rx="10" fill="#064e3b" stroke="#34d399" stroke-width="2"/>
+            <text x="585" y="78" fill="#d1fae5" font-weight="bold">Controller + 避障</text>
+            <text x="585" y="99" fill="#6ee7b7" font-size="11">3Hz 循环：走这步+绕障</text>
+            <line x1="232" y1="82" x2="260" y2="82" stroke="#34d399" stroke-width="2" marker-end="url(#a05f32)"/>
+            <line x1="457" y1="82" x2="485" y2="82" stroke="#34d399" stroke-width="2" marker-end="url(#a05f32)"/>
+            <rect x="40" y="140" width="640" height="100" rx="10" fill="#0b1220" stroke="#334155"/>
+            <rect x="70" y="160" width="240" height="60" fill="none" stroke="#475569" stroke-width="2"/>
+            <path d="M100,205 Q200,215 330,190 T560,175" fill="none" stroke="#fbbf24" stroke-width="2.5" stroke-dasharray="7 5"/>
+            <g font-size="10" fill="#d1fae5"><circle cx="100" cy="205" r="9" fill="#059669"/><text x="100" y="209">桩</text><circle cx="330" cy="190" r="9" fill="#059669"/><text x="330" y="194">1</text><circle cx="450" cy="182" r="9" fill="#059669"/><text x="450" y="186">2</text><circle cx="560" cy="175" r="9" fill="#059669"/><text x="560" y="179">3</text></g>
+            <circle cx="620" cy="196" r="10" fill="#f87171"/>
+            <text x="620" y="200" fill="#fff" font-size="10">障</text>
+            <text x="660" y="234" fill="#6ee7b7" font-size="10.5">绿弧=局部避障绕行</text>
+            <text x="240" y="234" fill="#94a3b8" font-size="10.5">黄虚线=全局路线 · 桩=充电桩（巡检起终点）</text>
+          </g>
+        </svg>
+        <figcaption>图 3-3｜Nav2 三层职责与多点巡检路线（自制示意图）：上层按队列发目标，中层画全局路线，底层 3Hz 循环控步并绕开突发障碍（红点）。</figcaption>
+      </figure>
+    </section>
+    <!-- 03 硬件与材料 -->
+    <section class="blk" id="s3">
+      <h2><span class="no">03</span>硬件与材料<span class="seg">课段 3 · 示证新知 · 15 min</span></h2>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">地图文件</div><div class="kt">EXP-02 产出的 map.yaml + map.pgm 放进导航工作空间；分辨率与 origin 必须完整。</div></div>
+        <div class="kcard"><div class="kd">传感器在线</div><div class="kt">3D 激光 utlidar/cloud 稳定输出（AMCL 的观测源）；里程计/IMU 随运动服务发布。</div></div>
+        <div class="kcard"><div class="kd">定位初值</div><div class="kt">RViz「2D Pose Estimate」手动给初始位姿；充电桩是天然的原点参照。</div></div>
+        <div class="kcard"><div class="kd">场地巡检点</div><div class="kt">3~5 个：表计位、转角、货架端头、门禁点；预先在地图上目测好编号。</div></div>
+      </div>
+      <table>
+        <thead><tr><th>关键参数</th><th>本课示例值（go2_ros2_sdk nav2_params）</th><th>含义</th></tr></thead>
+        <tbody>
+          <tr><td>robot_model_type</td><td>nav2_amcl::OmniMotionModel</td><td>四足可横移，全向模型比差速模型更准</td></tr>
+          <tr><td>max_particles / min_particles</td><td>2000（官方默认量级）</td><td>猜测数量：太少跟不上、太多耗算力</td></tr>
+          <tr><td>laser model</td><td>likelihood_field</td><td>用「离墙面远近」打分，比波束法抗噪声</td></tr>
+          <tr><td>controller_frequency</td><td>3.0 Hz</td><td>控制循环 3 次/秒，匹配四足步态节奏</td></tr>
+        </tbody>
+      </table>
+    </section>
+    <!-- 04 操作步骤 -->
+    <section class="blk" id="s4">
+      <h2><span class="no">04</span>操作步骤<span class="seg">课段 5~6 · 应用新知 · 2×15 min</span></h2>
+      <div class="flow">
+        <div class="step"><b class="n">S1</b>载入地图<br><small>map.yaml 进导航工作空间</small></div>
+        <div class="arr">→</div>
+        <div class="step"><b class="n">S2</b>给初值<br><small>RViz 2D Pose Estimate 对准桩位</small></div>
+        <div class="arr">→</div>
+        <div class="step"><b class="n">S3</b>等收敛<br><small>粒子抱团 + 激光贴合墙体</small></div>
+        <div class="arr">→</div>
+        <div class="step"><b class="n">S4</b>编排巡检点<br><small>Waypoint 工具逐点投放 P1~Pn</small></div>
+        <div class="arr">→</div>
+        <div class="step"><b class="n">S5</b>依序执行<br><small>follow_waypoints + 每点收敛判定</small></div>
+      </div>
+      <ol style="margin:14px 0 6px;padding-left:22px;line-height:1.9">
+        <li><b>载图：</b>把 map.yaml / map.pgm 放到导航参数指定路径，启动 <code>ros2 launch go2_robot_sdk robot.launch.py</code>（内置 slam_toolbox、Nav2、RViz），并<b>停掉建图节点</b>——建图与定位不要同时发 map，静态地图由 map_server 独家供图。</li>
+        <li><b>给初值：</b>RViz 点 <b>2D Pose Estimate</b>，在地图上从充电桩位置拖出方向箭头——箭头起点放狗的真实站位、朝向拖准；AMCL 粒子应从满图散点唰地抱团。</li>
+        <li><b>判定收敛（技巧）：</b>让狗小幅前后挪 0.2m——激光轮廓与地图墙体<b>贴合不重影</b>、粒子团紧致，才算收敛；没收敛就再给一次初值。</li>
+        <li><b>编排路线：</b>用 RViz <b>Waypoint / Nav Through Points</b> 工具在地图上依次落点 P1~Pn；或直接调用 follow_waypoints 服务把姿态数组一次下发。</li>
+        <li><b>依序执行：</b>狗自主逐点到达；每到一点等待定位收敛（粒子不发散、朝向稳定）再执行下一点；途中人为放纸箱，验证局部避障绕行。</li>
+        <li><b>留痕：</b>记录每个点的到达时刻与偏差，任何一点「冲过头/到错位」都回查 AMCL 粒子状态与 /amcl_pose 协方差。</li>
+      </ol>
+      <div class="tip amber"><b>验收闸门：</b>全部巡检点按投放顺序到达且无撞障；抽查任意一点停稳后激光与墙体贴合——顺序错、到点偏、粒子发散三者出现其一即不通过。</div>
+    </section>
+    <!-- 05 关键命令 -->
+    <section class="blk" id="s5">
+      <h2><span class="no">05</span>关键命令<span class="seg">随课段 5 / 6 对照使用</span></h2>
+      <p class="dim">AMCL 参数与 waypoint_follower 来自 Nav2 官方文档；launch 与参数路径沿用 go2_ros2_sdk。</p>
+      <pre><span class="c"># ① 启动（内置 map + AMCL + Nav2 + RViz；建图节点需按步骤停掉）</span>
+export ROBOT_IP=192.168.123.161
+export CONN_TYPE=cyclonedds
+ros2 launch go2_robot_sdk robot.launch.py
+
+<span class="c"># ② RViz 操作（鼠标）：2D Pose Estimate 给初值 → 等粒子抱团</span>
+<span class="c">#    nav2_params.yaml 关键片段（沿 Nav2 官方结构）：</span>
+<span class="c">#    amcl: robot_model_type: "nav2_amcl::OmniMotionModel"  # 四足全向</span>
+<span class="c">#          max_particles: 2000   laser_model_type: "likelihood_field"</span>
+<span class="c">#    controller_server: controller_frequency: 3.0           # 3Hz 控制循环</span>
+
+<span class="c"># ③ 多点巡检：一次下发巡检点队列（nav2_waypoint_follower 服务）</span>
+ros2 service call /follow_waypoints nav2_msgs/srv/FollowWaypoints \
+  "{poses: [{header: {frame_id: map}, pose: {position: {x: 2.1, y: 0.6}, orientation: {w: 1.0}}},
+            {header: {frame_id: map}, pose: {position: {x: 4.0, y: 2.5}, orientation: {w: 1.0}}}]}"
+<span class="c">#    也可以不用命令行：RViz 顶部 Waypoint 工具逐点投放，效果相同</span>
+
+<span class="c"># ④ 监控定位质量（收敛判据看这两个）</span>
+ros2 topic echo /amcl_pose --once      <span class="c"># 协方差椭圆应越缩越小</span>
+ros2 topic echo /particle_cloud --once <span class="c"># 粒子云：抱团=收敛，满图飞=未收敛</span></pre>
+      <div class="tip violet"><span class="lab">观察</span>每到一个巡检点，<code>/amcl_pose</code> 的协方差会先涨（起步扰动）再降；<b>看到协方差回落、粒子抱团再发车</b>，就是「定位收敛后再出发」在数据上的样子。</div>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">规划谁说了算</div><div class="kt">PlannerServer 全局画线；ControllerServer 局部 3Hz 跟线；两层解耦，绕障不推翻全局路线。</div></div>
+        <div class="kcard"><div class="kd">代价地图两层</div><div class="kt">static 层放 EXP-02 地图，obstacle 层实时吃激光——人走过来会被实时标记为膨胀障碍。</div></div>
+        <div class="kcard"><div class="kd">为啥用 Omni 模型</div><div class="kt">四足可原地横移，差速模型会把横向漂移当误差猛纠，Omni 则视为正常运动。</div></div>
+        <div class="kcard"><div class="kd">到点判定</div><div class="kt">goal checker 按位置/朝向容差判定「到达」；容差太紧反复踱步，太松拍照对不准。</div></div>
+      </div>
+    </section>
+    <!-- 06 动画 -->
+    <section class="blk" id="s6">
+      <h2><span class="no">06</span>动画：粒子收敛与多点巡检<span class="seg">课段 4 · 示证新知 · 12 min</span></h2>
+      <div class="anim-box">
+        <svg viewBox="0 0 720 250" width="100%" role="img" aria-label="AMCL 粒子滤波从随机散点收敛到真实位姿的动画">
+          <g font-size="13" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif">
+            <text x="360" y="30" fill="#6ee7b7" font-weight="bold">AMCL 粒子收敛：随机猜测 → 淘汰 → 抱团锁定真实位姿</text>
+            <rect x="60" y="48" width="600" height="170" rx="12" fill="#0b1220" stroke="#334155"/>
+            <rect x="90" y="72" width="540" height="122" fill="none" stroke="#475569" stroke-width="2"/>
+            <g fill="#38bdf8" opacity="0.85">
+              <circle r="4" cx="140" cy="95"><animate attributeName="cx" values="140;400" dur="3.2s" repeatCount="indefinite"/><animate attributeName="cy" values="95;135" dur="3.2s" repeatCount="indefinite"/></circle>
+              <circle r="4" cx="580" cy="90"><animate attributeName="cx" values="580;400" dur="3.2s" repeatCount="indefinite"/><animate attributeName="cy" values="90;135" dur="3.2s" repeatCount="indefinite"/></circle>
+              <circle r="4" cx="130" cy="175"><animate attributeName="cx" values="130;400" dur="3.2s" repeatCount="indefinite"/><animate attributeName="cy" values="175;135" dur="3.2s" repeatCount="indefinite"/></circle>
+              <circle r="4" cx="600" cy="170"><animate attributeName="cx" values="600;400" dur="3.2s" repeatCount="indefinite"/><animate attributeName="cy" values="170;135" dur="3.2s" repeatCount="indefinite"/></circle>
+              <circle r="4" cx="250" cy="85"><animate attributeName="cx" values="250;394" dur="3.2s" repeatCount="indefinite"/><animate attributeName="cy" values="85;130" dur="3.2s" repeatCount="indefinite"/></circle>
+              <circle r="4" cx="520" cy="190"><animate attributeName="cx" values="520;407" dur="3.2s" repeatCount="indefinite"/><animate attributeName="cy" values="190;140" dur="3.2s" repeatCount="indefinite"/></circle>
+              <circle r="4" cx="320" cy="180"><animate attributeName="cx" values="320;392" dur="3.2s" repeatCount="indefinite"/><animate attributeName="cy" values="180;141" dur="3.2s" repeatCount="indefinite"/></circle>
+              <circle r="4" cx="470" cy="82"><animate attributeName="cx" values="470;405" dur="3.2s" repeatCount="indefinite"/><animate attributeName="cy" values="82;128" dur="3.2s" repeatCount="indefinite"/></circle>
+            </g>
+            <g fill="#f87171"><circle cx="180" cy="140" r="4" opacity="0"><animate attributeName="opacity" values="1;1;0;0;1" dur="3.2s" repeatCount="indefinite"/></circle><circle cx="555" cy="130" r="4" opacity="0"><animate attributeName="opacity" values="1;1;0;0;1" dur="3.2s" repeatCount="indefinite"/></circle><circle cx="350" cy="95" r="4" opacity="0"><animate attributeName="opacity" values="1;1;0;0;1" dur="3.2s" repeatCount="indefinite"/></circle><circle cx="240" cy="160" r="4" opacity="0"><animate attributeName="opacity" values="1;1;0;0;1" dur="3.2s" repeatCount="indefinite"/></circle></g>
+            <circle cx="400" cy="135" r="10" fill="none" stroke="#fbbf24" stroke-width="3"/>
+            <path d="M400,135 L425,127" stroke="#fbbf24" stroke-width="3"/>
+            <text x="400" y="165" fill="#fbbf24" font-size="11">真实位姿</text>
+            <text x="185" y="66" fill="#64748b" font-size="10.5" text-anchor="start">t0：给初值前——蓝色粒子满图</text>
+            <text x="540" y="66" fill="#6ee7b7" font-size="10.5" text-anchor="end">t3s：激光观测打分后——蓝聚红灭</text>
+            <text x="360" y="240" fill="#94a3b8" font-size="11.5">蓝=存活猜测（向真值聚拢）　红=观测对不上被秒淘汰　黄=真实位姿（收敛后与粒子团中心重合）</text>
+          </g>
+        </svg>
+        <div class="anim-cap">动画 3-1：给完初始位姿后，蓝粒子从满图各处涌向真值，红粒子在观测比对中闪烁出局——抱团完成即「定位收敛」，此时才允许发车去下一个巡检点。</div>
+      </div>
+      <div class="anim-box">
+        <svg viewBox="0 0 720 260" width="100%" role="img" aria-label="多点巡检依序到达与避障动画">
+          <defs><marker id="a05f33" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#fbbf24"/></marker></defs>
+          <g font-size="13" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif">
+            <text x="360" y="30" fill="#6ee7b7" font-weight="bold">多点巡检：桩 → P1 → P2 → P3 依序到达，遇障绕行</text>
+            <rect x="40" y="48" width="640" height="170" rx="12" fill="#0b1220" stroke="#334155"/>
+            <rect x="70" y="72" width="580" height="122" fill="none" stroke="#475569" stroke-width="2"/>
+            <g font-size="11" fill="#d1fae5"><circle cx="110" cy="165" r="11" fill="#059669"/><text x="110" y="169">桩</text><circle cx="250" cy="95" r="11" fill="#047857"/><text x="250" y="99">P1</text><circle cx="430" cy="170" r="11" fill="#047857"/><text x="430" y="174">P2</text><circle cx="610" cy="100" r="11" fill="#047857"/><text x="610" y="104">P3</text></g>
+            <path d="M110,165 Q160,110 250,95 Q340,80 430,170 Q470,205 500,195 Q545,140 610,100" fill="none" stroke="#fbbf24" stroke-width="2.5" stroke-dasharray="6 5" marker-end="url(#a05f33)"/>
+            <circle cx="500" cy="160" r="13" fill="#f87171"/>
+            <text x="500" y="164" fill="#fff" font-size="10">障</text>
+            <text x="500" y="196" fill="#fca5a5" font-size="10">局部代价地图膨胀 → 绿弧绕行</text>
+            <rect x="-10" y="-8" width="20" height="16" rx="4" fill="#fbbf24" stroke="#78350f">
+              <animateMotion dur="8s" repeatCount="indefinite" keyPoints="0;0.23;0.23;0.55;0.55;1;1" keyTimes="0;0.22;0.34;0.56;0.68;0.94;1" calcMode="linear" path="M110,165 Q160,110 250,95 Q340,80 430,170 Q470,205 500,195 Q545,140 610,100"/>
+            </rect>
+            <g fill="none" stroke="#fbbf24" stroke-width="2.5"><circle cx="250" cy="95" r="11" opacity="0"><animate attributeName="opacity" values="0;1;0;0;0" dur="8s" repeatCount="indefinite"/><animate attributeName="r" values="11;20;11" dur="8s" repeatCount="indefinite"/></circle><circle cx="430" cy="170" r="11" opacity="0"><animate attributeName="opacity" values="0;0;1;0;0" dur="8s" repeatCount="indefinite"/><animate attributeName="r" values="11;20;11" dur="8s" repeatCount="indefinite"/></circle><circle cx="610" cy="100" r="11" opacity="0"><animate attributeName="opacity" values="0;0;0;1;0" dur="8s" repeatCount="indefinite"/><animate attributeName="r" values="11;20;11" dur="8s" repeatCount="indefinite"/></circle></g>
+            <text x="360" y="242" fill="#94a3b8" font-size="11.5">黄虚线=全局规划路线　黄脉冲=到达某点，停稳等定位收敛再出发　绿弧段=controller 局部绕障</text>
+          </g>
+        </svg>
+        <div class="anim-cap">动画 3-2：Go2 从充电桩出发按 P1→P2→P3 顺序执行；到点黄圈脉冲代表「停稳—等粒子收敛」的间歇，途中红障碍被局部规划以绿弧绕开——全局顺序不变，局部灵活应变。</div>
+      </div>
+      <div class="tip violet"><span class="lab">观察</span>动画 3-2 中机器人<b>在每个点都会顿一下</b>——那不是卡顿，是验收技巧「每点需定位收敛后再出发」的具象：停稳让粒子重新抱团，下一段路才不会带着漂移狂奔。</div>
+    </section>
+    <!-- 07 互动 -->
+    <section class="blk" id="s7">
+      <h2><span class="no">07</span>互动：巡检点编排与到达判定<span class="seg">课段 7 · 应用新知 · 10 min</span></h2>
+      <div class="ix-panel">
+        <div class="ix-title">按你想要的顺序投放巡检点，系统计算路线总长并判定编排质量</div>
+        <div class="ctl-row">
+          <button class="btn" onclick="addWp(1)">+ P1 表计位 (2.1, 0.6)</button>
+          <button class="btn" onclick="addWp(2)">+ P2 货架端 (4.0, 2.5)</button>
+          <button class="btn" onclick="addWp(3)">+ P3 转角 (1.2, 3.4)</button>
+          <button class="btn" onclick="addWp(4)">+ P4 门禁 (5.5, 1.2)</button>
+          <button class="btn ghost" onclick="wpReset()">清空重排</button>
+        </div>
+        <div class="io" id="wpIo"></div>
+      </div>
+      <p style="margin-top:10px">试试「P2 → P1」和「P1 → P2」两种顺序：路线总长会明显不同——巡检编排不是随手点，<b>顺序决定里程、里程决定电量与耗时</b>；判定区的黄色警告对应本实验技巧：出发顺序再好，到点不等收敛照样到错位。</p>
+    </section>
+    <!-- 08 常见问题 -->
+    <section class="blk" id="s8">
+      <h2><span class="no">08</span>常见问题<span class="seg">课段 8 · 融会贯通 · 13 min</span></h2>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">Q 初始位姿给了还是飞？</div><div class="kt">箭头方向拖反、或给位姿时狗其实在别处：把箭头起点放在狗真实站位、朝向拖准；仍散则小幅挪动让观测刷新。</div></div>
+        <div class="kcard"><div class="kd">Q 走着走着定位漂了？</div><div class="kt">长直走廊特征少（对称墙迷惑观测）：补桌面/柱子等非对称特征，或在该段降速多留观测帧。</div></div>
+        <div class="kcard"><div class="kd">Q 到点总差半米？</div><div class="kt">goal checker 容差与地图分辨率不匹配：先核对 map.yaml 的 resolution/origin，再微调 xy 容差。</div></div>
+        <div class="kcard"><div class="kd">Q follow_waypoints 报 404？</div><div class="kt">waypoint_follower 节点没起：确认 launch 拉起了 navigation_launch 全套，ros2 node list 里能看到它。</div></div>
+        <div class="kcard"><div class="kd">Q 遇人就停不绕？</div><div class="kt">obstacle 层没吃到激光或膨胀半径过大：检查 pointcloud_to_laserscan 输出与 obstacle 层 topic，膨胀调回合理值。</div></div>
+        <div class="kcard"><div class="kd">Q 电机哼哼/原地踱步？</div><div class="kt">定位抖动导致 controller 反复纠偏：等收敛、减小目标抖动；确认用 Omni 模型而非差速模型。</div></div>
+        <div class="kcard"><div class="kd">Q 建图节点要关吗？</div><div class="kt">要：建图与 AMCL 同时发 map 会互相覆盖，静态地图必须由 map_server 独家供图。</div></div>
+        <div class="kcard"><div class="kd">Q 能中途加点吗？</div><div class="kt">可以向队列继续发 follow_waypoints 请求；但每批点都遵守「到点—收敛—再出发」节奏，别连珠炮。</div></div>
+      </div>
+    </section>
+    <!-- 09 拓展 -->
+    <section class="blk" id="s9">
+      <h2><span class="no">09</span>拓展阅读<span class="seg">课段 8 · 融会贯通</span></h2>
+      <ul class="check">
+        <li><b>nav2_waypoint_follower 官方能力</b>：「依序导航到一组 waypoints」，每点可插回调（拍照等动作）——EXP-04 的「到点拍照」就挂在这里。</li>
+        <li><b>Nav2 AMCL 官方配置</b>：robot_model_type、max_particles、likelihood_field、initialpose 的完整语义——https://docs.nav2.org/configuration/packages/configuring-amcl.html</li>
+        <li><b>nav2_simple_commander（Basic Navigator）</b>：Python API 按「goToPose → wait → followWaypoints」编排流程，比手点 RViz 更适合做全自动巡检脚本。</li>
+        <li><b>粒子云可视化</b>：RViz 订阅 particle_cloud，把「抱团过程」录屏，是理解粒子滤波最直观的一手素材。</li>
+        <li><b>回充对接（预告）</b>：Nav2 Docking Framework（opennav_docking，插件如 opennav_docking::SimpleChargingDock）负责巡检结束自主回桩——EXP-04 展开。</li>
+      </ul>
+    </section>
+    <!-- 10 思考题 -->
+    <section class="blk" id="s10">
+      <h2><span class="no">10</span>思考题 · 自测<span class="seg">课段 8 · 融会贯通</span></h2>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">✅ 完成成果</div><div class="kt">Go2 按投放顺序自主到达全部巡检点，避障绕行一次成功并留痕。</div></div>
+        <div class="kcard"><div class="kd">🧠 原理收获</div><div class="kt">用「一群猜测不断淘汰」「高德导航」讲透 AMCL 与 Nav2 的分工与协作。</div></div>
+        <div class="kcard"><div class="kd">🛠 技能收获</div><div class="kt">独立完成初始位姿标定、收敛判定、多点编排下发与 /amcl_pose 质量监控。</div></div>
+        <div class="kcard"><div class="kd">📐 评分速览</div><div class="kt">依序到达 40% + 避障表现 20% + 原理口述 20% + 动画互动 20%。</div></div>
+      </div>
+      <div class="tip violet"><span class="lab">思考 1</span>为什么「每点需定位收敛后再出发」？用粒子滤波语言解释：未收敛就出发，误差会怎样被 Nav2 的反馈循环放大？</div>
+      <div class="tip violet"><span class="lab">思考 2</span>如果把 robot_model_type 换回差速模型（DiffMotionModel），四足横移时会出什么现象？说明 Omni 与差速模型的假设差异。</div>
+    </section>
+    <nav class="expnav">
+      <a class="prev" href="../exp-02-lidar-slam/index.html">← 上一个：EXP-02 3D 激光建图</a>
+      <a class="next" href="../exp-04-vision-loop/index.html">下一个：EXP-04 视觉巡检闭环 →</a>
+    </nav>
+    <footer>
+      <div>IND-05 · 工业巡检应用场景 · EXP-03 定位与多点导航巡检</div>
+      <div>8 学时 · 实践/理论 · 基于 培训方案"课程5" + go2_ros2_sdk / Nav2 官方 改编</div>
+    </footer>
+  </main>
+</div>
+<script>
+var WPS={1:{n:'P1 表计位',x:2.1,y:0.6},2:{n:'P2 货架端',x:4.0,y:2.5},3:{n:'P3 转角',x:1.2,y:3.4},4:{n:'P4 门禁',x:5.5,y:1.2}};
+var DOCK={x:0,y:0};
+var route=[];
+function addWp(id){
+  if(route.indexOf(id)>=0){wpRender('<span class="bad">该点已在队列里，重复投放会导致原地绕圈</span>');return;}
+  route.push(id);wpRender('');
+}
+function wpReset(){route=[];wpRender('');}
+function dist(a,b){var dx=a.x-b.x,dy=a.y-b.y;return Math.sqrt(dx*dx+dy*dy);}
+function tourLen(order){
+  var pts=[DOCK],i;
+  for(i=0;i<order.length;i++)pts.push(WPS[order[i]]);
+  pts.push(DOCK);
+  var L=0;
+  for(i=0;i<pts.length-1;i++)L+=dist(pts[i],pts[i+1]);
+  return L;
+}
+function wpRender(msg){
+  var io=document.getElementById('wpIo');
+  if(route.length===0){
+    io.innerHTML='队列为空——点击上方按钮按<b>到达顺序</b>投放巡检点（起点/终点固定为充电桩）。\n'
+      + '提示：先试试 P1→P2，再清空改成 P2→P1，对比总里程。';
+    return;
+  }
+  var i,seq=['桩'],backtrack=false,prev={x:0,y:0};
+  for(i=0;i<route.length;i++){
+    var w=WPS[route[i]];
+    seq.push('P'+route[i]);
+    if(dist(prev,w)>2.6)backtrack=true;   // 单段过长视作回头路
+    prev=w;
+  }
+  seq.push('桩');
+  var len=tourLen(route),opt=tourLen([1,2,4,3]),over=(len-opt)/opt,judge;
+  if(route.length<2) judge='<span class="warn">仅 1 个点：先多投几个感受顺序对里程的影响</span>';
+  else if(over>0.35||backtrack) judge='<span class="bad">回头路明显：总里程超出参考序 '+(over*100).toFixed(0)+'%，电量与工时被白白烧掉</span>';
+  else judge='<span class="ok">编排合理：与顺时针参考序偏差 '+(over*100).toFixed(0)+'%，可下发 follow_waypoints</span>';
+  io.innerHTML='到达顺序：<b>'+seq.join(' → ')+'</b>\n'
+    + '路线总长（含往返充电桩）≈ <b>'+len.toFixed(2)+' m</b>　参考最优 ≈ '+opt.toFixed(2)+' m\n'
+    + judge + '\n'
+    + '<span class="warn">不管顺序多完美，每到一点都要等 /amcl_pose 协方差回落、粒子抱团——定位没收敛就出发，到点必偏。</span>'
+    + (msg?'\n'+msg:'');
+}
+wpRender('');
+</script>
+<script src="../shared/tutorial.js" defer></script>
+</body>
+</html>

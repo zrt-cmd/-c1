@@ -1,0 +1,321 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/cases/exp006-smart-factory/exp-08-emergency-stop/index.html
+TITLE: EXP-08 · 危险检测与急停 — 智慧工厂装货分拣码垛综合项目
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+EXP-08 · 危险检测与急停 — 智慧工厂装货分拣码垛综合项目
+🧠 具身智能课程 ·
+教程首页
+综合项目
+/
+智慧工厂装货分拣码垛
+/ EXP-08
+本页目录
+01 问题引入
+02 原理通俗讲解
+03 关联知识点
+04 实验目标
+05 实验环境与准备
+06 动画讲解
+07 互动讲解
+08 实操步骤
+09 重点与易错点
+10 总结与思考
+CASE-01 · 智慧工厂
+EXP-01 需求分析
+EXP-02 五节点架构
+EXP-03 接口设计
+EXP-04 语音交互集成
+EXP-05 视觉自适应装货
+EXP-06 智能分拣
+EXP-07 自主码垛
+EXP-08 危险检测与急停
+EXP-09 全功能快速验证
+EXP-08 · 第 3 章 · 综合性 · 4 学时
+危险检测与急停：60° 扇区 / 20cm / 0.5s 判定
+N3 安全节点订阅激光雷达 /scan，在前方 60° 扇区（±30°，跨 0° 环绕）内检测 <20cm 障碍，
+    持续 0.5s 才判危险（防瞬时误报）→ 同一回调内发布 danger=true 并释放 6 舵机力矩（机械臂变软）；
+    解除后恢复力矩 + go_work 回 work。打断分层：雷达危险 > 语音打断（R9 / R9.1）。
+🚨 扇区危险判定
+persist 0.5s 防误报
+6 舵机力矩释放
+雷达打断 > 语音打断
+TS1~TS5 验收
+01
+问题引入：机器人伸手时，人手也在旁边
+前三章的任务链路都默认"环境是空的"，但真实工位上，操作者的手随时可能伸进机械臂工作区。
+    需求 R9 给出精确红线：
+激光雷达前方 60° 扇区内、障碍距离 <20cm、持续 0.5s
+三个条件同时满足即判危险。为什么需要三个条件而不是一个？——扇区限定"正前方"（只管最可能撞人的方向），
+    距离阈值是"近到会撞"，持续时间是"确实有人站着"而非手掠过。R9.1 进一步规定：
+雷达危险打断 > 语音打断
+，且危险解除后自动恢复回 work、需重新唤醒下发任务。
+02
+原理通俗讲解：保安的手电筒与"松手"哲学
+手电筒
+只照正前方 60°
+保安手电只扫正前方（±30°），不回头看背后——雷达前方 60° 扇区同理。算法遍历每个扫描点：
+        角度归一化到 [0,2π)，判断是否落在 [-30°, +30°] 扇区内（
+含跨 0° 环绕的"或"分支
+），
+        过滤 inf/nan 与 <0.01m 无效点，取扇区内最小距离。
+min_range < 0.20m
+即"有人贴近"。
+        注意检测基于
+雷达自身坐标系 laser_link
+——障碍必须放在雷达正前方，不是机械臂前方。
+三拍延迟
+0.5s 持续才报警
+扫过的手、飞过的纸屑只出现一瞬。
+_scan_cb
+首见障碍记
+_danger_since
+，
+        仅当
+now - _danger_since ≥ persist_time(0.5s)
+才
+_enter_danger()
+；
+        中途消失则清零计时。
+宁可慢半拍，不可狼来了
+——误报会让工人对报警脱敏，比晚报更危险。
+松手不较劲
+力矩释放
+危险时硬刹车保持姿态，机械臂会与推它的人"较劲"。本项目反着来：同一 scan 回调内直接发布
+/car1_base_driver/bus_servo/set_state
+enable_torque=[0]*6
+（ID0-5：5 关节＋1 夹爪，ARM_SERVO_IDS=range(6)，duration=0.2），
+机械臂瞬间变软、可被推离
+。
+        一次 DDS 发布无服务往返：雷达 10Hz 最坏 100ms 检测 + 舵机释放 ~150-220ms。
+复位闭环
+恢复力矩 → go_work
+障碍移开 → 清计时 →
+_exit_danger()
+：发 danger=false、status=recover、
+enable_torque=[1]*6
+恢复力矩，
+再
+异步调
+/arm_controller/go_work
+回 work 安全姿态（顺序不能反：没力矩就动不了）。同时 N-grasp 收 danger 立即 emergency_stop 停抓、
+        N-conveyor 停带停臂、N2 暂停任务——恢复后
+需人工重新触发
+（安全策略）。
+03
+关联知识点
+safety 参数
+yaml L93-98
+front_start_deg=-30 / front_end_deg=30 / danger_dist=0.20 / persist_time=0.5；
+        启动日志
+front=-30°..30° dist=0.20m persist=0.5s
+。
+三个话题
+danger / status / set_state
+/eai_factory/safety/danger（Bool）、/eai_factory/safety/status（safe→danger→recover）、
+        /car1_base_driver/bus_servo/set_state（力矩发布）。
+低内存启动
+start_radar 独立于 start_base
+start_base:=false ... start_radar:=true
+只拉 lidar.launch + safety 节点（launch L85-94），
+        安全模块可独立调试；完整联动时保持 start_base:=true。
+QoS 与依赖
+Best Effort / 两前提
+/scan 用 Best Effort QoS 订阅（sensor_msgs/LaserScan，约 10Hz）；
+        力矩真正生效需 car1_base_driver 在跑，回 work 需 arm_controller 在跑。
+04
+实验目标
+理解扇区检测算法：60° 扇区、跨 0° 环绕判定、20cm 阈值、0.5s 持续计时的防误报原理。
+掌握危险触发时经 /car1_base_driver/bus_servo/set_state 释放 6 舵机力矩的机制（变软可手推）。
+掌握解除恢复流程（恢复力矩 → go_work），理解"雷达打断 > 语音打断"的分层设计。
+完成任务中急停联动验证（grasp/conveyor 订阅 danger 立即停），按 docs/11 验收 TS1~TS5。
+05
+实验环境与准备
+激光雷达 USB 已接（/dev/lidar → ttyUSB1），发布 /scan 约 10Hz；障碍物用书本/纸盒（安全测试用）。
+低内存单测启动（只起雷达 + safety）：
+ros2 launch eai_factory eai_factory.launch.py \
+  start_base:=false start_voice:=false start_vision:=false start_grasp:=false \
+  start_conveyor:=false start_radar:=true
+确认接口：
+ros2 node list
+有 eai_factory_safety；
+ros2 topic hz /scan
+约 10Hz；
+/eai_factory/safety/status
+初始为 safe。
+力矩释放步骤需完整模式（base_driver 在跑）：改
+start_voice:=false start_vision:=false start_grasp:=false start_viz:=false
+完整启动，
+      并
+先确认机械臂在安全位置（work 姿态、远离雷达扇区）
+。
+预备验证命令（TS5 手动路径，与 N3 自动路径同一话题同一消息）。
+06
+动画讲解：扇区触发与三节点联动
+左：雷达前方 60° 扇区（±30°，跨 0° 环绕）
+laser
+-30°
++30°
+0°
+20cm
+障碍在扇区内 <20cm 且停留 ≥0.5s → danger
+扇区外 / >20cm / 抖动后即离 → 不触发（三种过滤）
+右：danger 一发三收（同一回调内直接发布）
+N3 _enter_danger()
+persist ≥0.5s → danger=true + status=danger
+力矩释放
+enable_torque=[0]*6
+N-grasp
+SAFETY DANGER
+N-conveyor
+belt + arm stopped
+N2 调度器
+任务暂停
+障碍移开 → _exit_danger()
+[1,1,1,1,1,1] 恢复力矩 → go_work 回 work → status=recover
+分层：雷达危险打断 ＞ 语音打断 —— 危险时不强行运动，恢复后任务需人工重新触发（R9.1）
+图 8-1　左：扇区几何与三重过滤（扇区内 + <20cm + 持续 0.5s），橙块为在扇区内停留的障碍；右：danger 单点发布、多方响应——力矩立即释放（最快路径）、grasp/conveyor 停、调度暂停，解除后两步恢复闭环。
+07
+互动讲解：急停三参数实验台
+调整判定参数组合，观察"手掠过"与"真人驻留"两种场景下是否触发危险：
+🎛️ 急停判定参数实验台
+标准 60°/20cm/0.5s
+手掠过 0.2s
+扇区开满 360°
+阈值改 10cm
+复位
+选择参数与场景组合，观察 _scan_cb 的判定时间线与触发结果……
+取舍
+把 persist 调到 0 可以"更快"，但纸屑掠过就全臂卸力——生产上一次误停就是一次产线中断；
+阈值与持续时间都是在"漏报风险"和"误报骚扰"之间称重
+。
+08
+实操步骤
+1
+低内存启动雷达安全
+（见 s5 命令），看启动日志
+eai_factory_safety started | front=-30°..30° dist=0.20m persist=0.5s
+。
+2
+监听接口
+ros2 topic echo /eai_factory/safety/status
+# 初始 safe
+ros2 topic echo /eai_factory/safety/danger
+ros2 topic echo /car1_base_driver/bus_servo/set_state
+3
+TS1/TS2 危险触发
+：完整模式下（base_driver 在跑、机械臂在安全位），
+      在
+雷达正前方 10~20cm
+放障碍并保持 ≥0.5s → 观察
+danger: true
+、
+status: danger
+、
+enable_torque: [0,0,0,0,0,0]
+、日志
+DANGER: obstacle 0.20m in front sector
+；轻推关节确认
+可被推动
+。
+4
+TS3 解除恢复
+：缓慢移开障碍 →
+danger: false
+、
+status: recover
+、
+enable_torque: [1,1,1,1,1,1]
+、
+      日志
+SAFE: front sector clear — torque restored, go_work
+；
+      机臂自动回 work 并重新锁死。再触发→解除一次，验证循环可重复。
+5
+TS4 任务中联动
+ros2 launch eai_factory eai_factory.launch.py start_viz:=false
+ros2 service call /eai_factory/start_sort std_srvs/srv/Trigger
+# 机械臂运动中，雷达正前方放障碍 ≥0.5s
+grasp 日志
+SAFETY DANGER — stopping grasp
+；conveyor 日志
+safety danger detected — belt + arm stopped
+；移开后任务
+需重新触发
+（安全策略，
+      非缺陷）。装货/码垛两任务重复一遍。
+6
+TS5 手动验证（不依赖雷达）
+ros2 topic pub -1 /car1_base_driver/bus_servo/set_state car1_base_driver_msgs/msg/SetBusServoState \
+  "{state: [{target_id: [0,1,2,3,4,5], enable_torque: [0,0,0,0,0,0]}], duration: 0.2}"
+# 释放后务必恢复：
+ros2 topic pub -1 /car1_base_driver/bus_servo/set_state car1_base_driver_msgs/msg/SetBusServoState \
+  "{state: [{target_id: [0,1,2,3,4,5], enable_torque: [1,1,1,1,1,1]}], duration: 0.2}"
+7
+分层验证（R9.1）
+：任务中同时制造语音打断与雷达危险，
+      观察 grasp 停止动作（危险优先），而非"回 work 继续等语音指令"。
+09
+重点与易错点
+诊断
+"不触发"三查：是否
+雷达正前方 ±30°
+（不是机械臂前方）、
+    是否在
+10~20cm
+（<10cm 盲区）、是否
+保持 ≥0.5s
+。
+现象
+根因
+处理
+放障碍不触发
+超出 ±30° 扇区 / <10cm 盲区 / 持续 <0.5s
+对准雷达正前方 10-20cm 保持 ≥0.5s
+/scan 无数据、safety 静默
+雷达未接或 start_radar 未开
+查 /dev/lidar（ttyUSB1）；
+ros2 topic hz /scan
+释放后机械臂推不动
+力矩释放命令未生效（驱动 cmd）
+TS5 手动发 enable_torque:[0]*6 验证（释放=0x0B）
+解除后不回 work
+go_work 服务未就绪
+ros2 service list | grep go_work
+，确认 arm_controller 在跑
+危险解除后任务不继续
+安全策略：人工确认后重触发
+重新调 /eai_factory/start_xxx，不是缺陷
+抓取状态卡 busy
+_danger_cb 已置 idle 但残留状态
+/eai_factory/grasp/abort
+复位
+TS5 手动释放后忘了恢复
+机械臂保持软连接
+测完立即发 [1,1,1,1,1,1]；两数组必须同为 6 元素
+评分自测（源讲义 15/30/35/10/10）：原理 15、步骤 30、四步验证 35、TS1~TS5 表 10、思考题 10。
+安全红线：释放力矩前确认机械臂安全位；触发/解除时手离开机械臂，让 go_work 自主回位。
+测完
+bash scripts/stop_eai_factory.sh
+清理，防残留进程占用总线舵机。
+10
+总结与思考
+三条件
+60° · 20cm · 0.5s
+方向、距离、时间三重过滤，缺一不可。
+一发布
+同一回调直发 danger+力矩
+无服务往返，最坏 100ms+150-220ms 内机械臂变软。
+两步恢复
+先力矩后 go_work
+顺序颠倒则无力回位；状态 safe→danger→recover 闭环。
+一分层
+雷达打断 ＞ 语音打断
+危险时不强行运动，恢复后人工重新触发。
+思考 1
+去掉 0.5s 持续计时，系统会遇到哪些误报场景？反过来 persist 调到 2s，
+      又会牺牲什么？（提示：从纸屑掠过与真实碰撞的时间尺度去称。）
+思考 2
+为什么"释放力矩让臂变软"比"急刹车保持姿态"更符合人机协作安全？
+      舵机抓着一个 500g 物品时突然释放，掉落风险又靠什么兜底？
+CASE-01 · 智慧工厂装货分拣码垛 · EXP-08 危险检测与急停
+4 学时 · 综合性 · 基于 llm_practice 实验讲义改编

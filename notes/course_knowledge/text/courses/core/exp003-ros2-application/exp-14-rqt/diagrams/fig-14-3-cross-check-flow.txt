@@ -1,0 +1,34 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp003-ros2-application/exp-14-rqt/diagrams/fig-14-3-cross-check-flow.html
+TITLE: 图 14-3 · 交叉验证：排查流程
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+图 14-3 · 交叉验证：排查流程
+图 14-3 · 交叉验证：先看图再看曲线的排查流程
+本图回答的问题：数据"不对劲"时，按什么顺序用 graph / plot / CLI 定位？
+现象：数值可疑 / 话题没数据
+步①
+话题在发吗？hz 有数吗
+ros2 topic hz / list --verbose
+无
+查发布端
+节点没起 / 没 source
+有
+rqt_graph 里箭头连着吗
+勾 Hide Debug 看主链路
+断
+拓扑断点
+域 / QoS / 名字不匹配
+连着
+rqt_plot 曲线正常吗
+字段级路径 · 注意纵轴刻度
+冻结/异常
+无新消息
+回 hz / node list
+正常
+CLI 定案：echo --once 拿精确值
+数值与曲线右端对齐 → 结论成立
+顺序不能倒：先判"有没有"，再判"对不对"——否则把显示问题误判成数据问题
+✅ 结论：hz 验活 → graph 判连 → plot 判值 → CLI 定案
+⚠️ 风险：跳步直奔 plot，易把"没数据"误判成"没连接"
+🔍 验证：04 节四步交叉印证（echo 值 = 曲线右端）
+EXP-14 · rqt 可视化工具箱

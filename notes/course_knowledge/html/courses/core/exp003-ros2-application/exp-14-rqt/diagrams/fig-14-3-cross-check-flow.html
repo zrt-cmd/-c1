@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>图 14-3 · 交叉验证：排查流程</title>
+<style>
+:root{--bg-page:#ffffff;--bg-card:#fff;--text:#0f172a;--text2:#475569;--muted:#94a3b8;
+  --border:#e2e8f0;--teal:#0891b2;--green:#059669;--purple:#7c3aed;--orange:#ea580c;--red:#e11d48;--gray:#64748b;
+  --teal-bg:rgba(8,145,178,.08);--green-bg:rgba(5,150,105,.08);--purple-bg:rgba(124,58,237,.08);
+  --orange-bg:rgba(234,88,12,.10);--gray-bg:rgba(100,116,139,.08)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg-page);color:var(--text);font-family:system-ui,"PingFang SC","Microsoft YaHei",sans-serif;padding:16px 14px 12px}
+.hd{margin-bottom:6px}
+.hd h1{font-size:15px;margin:0 0 4px}
+.hd .q{font-size:12px;color:var(--text2);margin:0}
+svg{width:100%;height:auto;display:block}
+.t{font:600 12.5px system-ui,sans-serif;fill:var(--text)}
+.s{font:400 10.5px system-ui,sans-serif;fill:var(--text2)}
+.l{font:600 10.5px ui-monospace,Consolas,monospace;fill:var(--text2)}
+.dock{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.dock span{font-size:11.5px;border-radius:999px;padding:3px 10px;line-height:1.6}
+.ok{background:#ecfdf5;color:#047857;border:1px solid #a7f3d0}
+.warn{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca}
+.evid{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}
+.ft{font-size:10.5px;color:var(--muted);margin-top:8px;text-align:right}
+</style>
+</head>
+<body>
+<div class="hd">
+  <h1>图 14-3 · 交叉验证：先看图再看曲线的排查流程</h1>
+  <p class="q">本图回答的问题：数据"不对劲"时，按什么顺序用 graph / plot / CLI 定位？</p>
+</div>
+<svg viewBox="0 0 760 540" role="img" aria-label="graph plot CLI 交叉验证排查流程">
+  <defs>
+    <marker id="a43g" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="var(--green)"/></marker>
+    <marker id="a43r" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="var(--red)"/></marker>
+    <marker id="a43t" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="var(--teal)"/></marker>
+  </defs>
+
+  <!-- 起点 -->
+  <rect x="270" y="14" width="220" height="42" rx="21" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1.5"/>
+  <text class="t" x="380" y="40" text-anchor="middle">现象：数值可疑 / 话题没数据</text>
+
+  <!-- 步1 可绘判定 -->
+  <line x1="380" y1="56" x2="380" y2="84" stroke="var(--teal)" stroke-width="1.5" marker-end="url(#a43t)"/>
+  <text class="l" x="392" y="76">步①</text>
+  <polygon points="380,86 566,132 380,178 194,132" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="1.5"/>
+  <text class="t" x="380" y="126" text-anchor="middle">话题在发吗？hz 有数吗</text>
+  <text class="s" x="380" y="148" text-anchor="middle">ros2 topic hz / list --verbose</text>
+  <text class="l" x="586" y="136">无</text>
+  <line x1="566" y1="132" x2="618" y2="132" stroke="var(--red)" stroke-width="1.5" marker-end="url(#a43r)"/>
+  <rect x="620" y="106" width="128" height="52" rx="6" fill="#fff" stroke="var(--red)" stroke-width="1.5"/>
+  <text class="t" x="684" y="127" text-anchor="middle">查发布端</text>
+  <text class="s" x="684" y="147" text-anchor="middle">节点没起 / 没 source</text>
+
+  <!-- 步2 graph -->
+  <line x1="380" y1="178" x2="380" y2="208" stroke="var(--green)" stroke-width="1.5" marker-end="url(#a43g)"/>
+  <text class="l" x="392" y="198">有</text>
+  <polygon points="380,210 566,256 380,302 194,256" fill="var(--green-bg)" stroke="var(--green)" stroke-width="1.5"/>
+  <text class="t" x="380" y="250" text-anchor="middle">rqt_graph 里箭头连着吗</text>
+  <text class="s" x="380" y="272" text-anchor="middle">勾 Hide Debug 看主链路</text>
+  <text class="l" x="586" y="260">断</text>
+  <line x1="566" y1="256" x2="618" y2="256" stroke="var(--red)" stroke-width="1.5" marker-end="url(#a43r)"/>
+  <rect x="620" y="230" width="128" height="52" rx="6" fill="#fff" stroke="var(--red)" stroke-width="1.5"/>
+  <text class="t" x="684" y="251" text-anchor="middle">拓扑断点</text>
+  <text class="s" x="684" y="271" text-anchor="middle">域 / QoS / 名字不匹配</text>
+
+  <!-- 步3 plot -->
+  <line x1="380" y1="302" x2="380" y2="332" stroke="var(--green)" stroke-width="1.5" marker-end="url(#a43g)"/>
+  <text class="l" x="392" y="322">连着</text>
+  <polygon points="380,334 566,380 380,426 194,380" fill="var(--green-bg)" stroke="var(--green)" stroke-width="1.5"/>
+  <text class="t" x="380" y="374" text-anchor="middle">rqt_plot 曲线正常吗</text>
+  <text class="s" x="380" y="396" text-anchor="middle">字段级路径 · 注意纵轴刻度</text>
+  <text class="l" x="586" y="384">冻结/异常</text>
+  <line x1="566" y1="380" x2="618" y2="380" stroke="var(--red)" stroke-width="1.5" marker-end="url(#a43r)"/>
+  <rect x="620" y="354" width="128" height="52" rx="6" fill="#fff" stroke="var(--red)" stroke-width="1.5"/>
+  <text class="t" x="684" y="375" text-anchor="middle">无新消息</text>
+  <text class="s" x="684" y="395" text-anchor="middle">回 hz / node list</text>
+
+  <!-- 步4 CLI -->
+  <line x1="380" y1="426" x2="380" y2="456" stroke="var(--green)" stroke-width="1.5" marker-end="url(#a43g)"/>
+  <text class="l" x="392" y="446">正常</text>
+  <rect x="222" y="458" width="316" height="52" rx="6" fill="var(--green)" fill-opacity="0.12" stroke="var(--green)" stroke-width="2"/>
+  <text class="t" x="380" y="479" text-anchor="middle">CLI 定案：echo --once 拿精确值</text>
+  <text class="s" x="380" y="499" text-anchor="middle">数值与曲线右端对齐 → 结论成立</text>
+
+  <text class="l" x="380" y="532" text-anchor="middle" fill="#94a3b8">顺序不能倒：先判"有没有"，再判"对不对"——否则把显示问题误判成数据问题</text>
+</svg>
+<div class="dock">
+  <span class="ok">✅ 结论：hz 验活 → graph 判连 → plot 判值 → CLI 定案</span>
+  <span class="warn">⚠️ 风险：跳步直奔 plot，易把"没数据"误判成"没连接"</span>
+  <span class="evid">🔍 验证：04 节四步交叉印证（echo 值 = 曲线右端）</span>
+</div>
+<div class="ft">EXP-14 · rqt 可视化工具箱</div>
+</body>
+</html>

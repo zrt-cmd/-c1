@@ -1,0 +1,33 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp003-ros2-application/exp-11-time/diagrams/fig-11-5-takeover-flow.html
+TITLE: 图 11-5 · 仿真接管流程
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+图 11-5 · 仿真接管流程
+图 11-5 · 仿真接管流程：从"假死"到"复活"
+本图回答的问题：use_sim_time=true 后节点卡在哪一步，/clock 一来为什么立刻复活？
+python3 time_demo_node.py -p use_sim_time:=true
+有人发 /clock 吗？
+Clock 阻塞等首条消息
+否
+永久等待
+进程活着 · 零输出
+（假死）
+是 / 复活
+终端 B · 手动扮演仿真器
+ros2 topic pub /clock … --rate 1
+收到首条 /clock · 时间轴跳到仿真时间
+stamp 从 sec=100 起步并逐条递增
+按 /clock 节拍盖 stamp 发布
+一行业务代码未改
+换 --rate 0.5 ？
+改 pub 参数即可
+是
+0.5× 变速
+真实 1s = 仿真 0.5s
+否
+保持 1×
+仿真秒 ≈ 真实秒
+✅ 结论：卡死点在"等首条 /clock"，业务代码始终未动
+⚠️ 风险：真机误开 true = 节点假死，先查 /clock 再查代码
+🔍 验证：04 节实操 A（假死）/ 实操 B（pub 复活 + 0.5× 变速）
+EXP-11 · 时间 API 与双时钟体系

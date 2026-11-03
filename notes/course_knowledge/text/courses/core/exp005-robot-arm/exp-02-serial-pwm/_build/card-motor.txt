@@ -1,0 +1,16 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp005-robot-arm/exp-02-serial-pwm/_build/card-motor.html
+TITLE: 电机演示：只管转，不知在哪
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+电机演示：只管转，不知在哪
+点刻度设定
+目标角度
+→ 按"转动"，盯着红指针按"
+停止
+"，看能不能停在目标上
+目标 90°
+停
+▶ 转动
+↺ 复位
+还没转。先想好停在哪个角度，再按"转动"。
+只解决转动的问题，但不知道转动到哪里。

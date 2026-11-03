@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>栅格寻路交互演示</title>
+<style>
+  :root{ --accent:#2563eb; --teal:#0d9488; --rose:#e11d48; --border:#e2e8f0; --text:#334155; --muted:#94a3b8; }
+  html,body{margin:0;background:#fff;color:var(--text);
+    font-family:"Noto Sans CJK SC","WenQuanYi Micro Hei","Microsoft YaHei",sans-serif}
+  .panel{max-width:760px;margin:0 auto;padding:16px 18px}
+  .ctrl{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:10px;font-size:13.5px}
+  .ctrl label{display:flex;gap:8px;align-items:center;white-space:nowrap}
+  input[type=range]{width:130px;accent-color:var(--accent)}
+  button{border:1px solid var(--border);background:#f8fafc;color:var(--text);
+    border-radius:8px;padding:6px 14px;font-size:13px;cursor:pointer;
+    transition:.28s cubic-bezier(.4,0,.2,1);font-family:inherit}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  button:hover{border-color:var(--accent);color:var(--accent)}
+  button.primary:hover{color:#fff;box-shadow:0 6px 18px rgba(37,99,235,.25)}
+  .hint{font-size:12.5px;color:var(--muted);margin:0 0 10px}
+  .hint b{color:var(--accent);font-weight:600}
+  canvas{width:100%;border:1px solid var(--border);border-radius:12px;background:#f8fafc;display:block;cursor:crosshair}
+  .legend{display:flex;gap:14px;font-size:12px;color:var(--muted);margin-top:8px;flex-wrap:wrap}
+  .dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+  .stat{font-family:'Cascadia Code',Consolas,monospace;font-size:12.5px;color:var(--muted)}
+  .stat b{color:var(--teal)}
+</style>
+</head>
+<body>
+<div class="panel" id="ix-grid-a-star-root">
+  <div class="hint">① <b>点击/拖动</b> 格子切换障碍 → ② 调权重 → ③ 点<b>运行</b>观察路径变化</div>
+  <div class="ctrl">
+    <label>绕行代价 <input type="range" id="w" min="1" max="8" step="0.5" value="1"><b id="wv">1.0</b></label>
+    <button class="primary" id="run">▶ 运行 A*</button>
+    <button id="reset">重置</button>
+    <span class="stat" id="stat">路径: — | 展开节点: —</span>
+  </div>
+  <canvas id="cv" width="720" height="360"></canvas>
+  <div class="legend">
+    <span><i class="dot" style="background:#2563eb"></i>起点/终点</span>
+    <span><i class="dot" style="background:#94a3b8"></i>障碍</span>
+    <span><i class="dot" style="background:#0d9488"></i>最优路径</span>
+    <span><i class="dot" style="background:#dbeafe"></i>探索节点</span>
+  </div>
+</div>
+<script>
+(function(){
+  var COLS=36, ROWS=18, SZ=20;                 // 720x360
+  var cv=document.getElementById('cv'), ctx=cv.getContext('2d');
+  var wEl=document.getElementById('w'), wv=document.getElementById('wv'),
+      stat=document.getElementById('stat');
+  var start={x:2,y:9}, goal={x:33,y:9}, obstacles={}, path=null, explored=null;
+
+  // 初始障碍（两堵墙，留缺口）
+  function seedObstacles(){
+    obstacles={};
+    for(var y=2;y<16;y++){ if(y!==8&&y!==9&&y!==10) obstacles['14,'+y]=1; }
+    for(var x=14;x<30;x++){ if(x!==22&&x!==23) obstacles[x+',4']=1; }
+  }
+  function key(x,y){return x+','+y;}
+  function cell(cx,cy){return {x:Math.floor(cx/SZ),y:Math.floor(cy/SZ)};}
+
+  function draw(){
+    wv.textContent=(+wEl.value).toFixed(1);
+    ctx.clearRect(0,0,cv.width,cv.height);
+    // 网格
+    ctx.strokeStyle='#e2e8f0'; ctx.lineWidth=1;
+    for(var x=0;x<=COLS;x++){ctx.beginPath();ctx.moveTo(x*SZ+.5,0);ctx.lineTo(x*SZ+.5,ROWS*SZ);ctx.stroke();}
+    for(var y=0;y<=ROWS;y++){ctx.beginPath();ctx.moveTo(0,y*SZ+.5);ctx.lineTo(COLS*SZ,y*SZ+.5);ctx.stroke();}
+    // 探索节点
+    if(explored){ctx.fillStyle='#dbeafe';
+      for(var k in explored){var p=k.split(',');ctx.fillRect(p[0]*SZ+2,p[1]*SZ+2,SZ-4,SZ-4);}}
+    // 障碍
+    ctx.fillStyle='#94a3b8';
+    for(var o in obstacles){var q=o.split(',');ctx.fillRect(q[0]*SZ+1,q[1]*SZ+1,SZ-2,SZ-2);}
+    // 路径
+    if(path&&path.length){
+      ctx.strokeStyle='#0d9488'; ctx.lineWidth=4; ctx.lineJoin='round'; ctx.beginPath();
+      path.forEach(function(n,i){var px=n.x*SZ+SZ/2,py=n.y*SZ+SZ/2;i?ctx.lineTo(px,py):ctx.moveTo(px,py);});
+      ctx.stroke();
+      path.forEach(function(n){ctx.fillStyle='#0d9488';ctx.beginPath();
+        ctx.arc(n.x*SZ+SZ/2,n.y*SZ+SZ/2,3,0,7);ctx.fill();});
+    }
+    // 起点终点
+    [[start,'#2563eb','S'],[goal,'#e11d48','G']].forEach(function(e){
+      ctx.fillStyle=e[1];ctx.fillRect(e[0].x*SZ+2,e[0].y*SZ+2,SZ-4,SZ-4);
+      ctx.fillStyle='#fff';ctx.font='bold 12px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText(e[2],e[0].x*SZ+SZ/2,e[0].y*SZ+SZ/2+1);
+    });
+  }
+
+  function astar(){
+    var W=+wEl.value, open=[{x:start.x,y:start.y,g:0,f:0}], came={}, gs={}, closed={}, steps=0;
+    gs[key(start.x,start.y)]=0;
+    function h(n){var dx=Math.abs(n.x-goal.x),dy=Math.abs(n.y-goal.y);return Math.max(dx,dy)+0.414*Math.min(dx,dy);}
+    while(open.length){
+      open.sort(function(a,b){return a.f-b.f;});
+      var cur=open.shift(), ck=key(cur.x,cur.y);
+      if(closed[ck])continue; closed[ck]=1; steps++;
+      if(cur.x===goal.x&&cur.y===goal.y){
+        path=[]; var k=ck;
+        while(came[k]){var c=k.split(',');path.unshift({x:+c[0],y:+c[1]});k=came[k];}
+        path.unshift(start); explored=closed;
+        stat.innerHTML='路径: <b>'+path.length+'</b> 格 | 展开节点: <b>'+steps+'</b>';
+        return;
+      }
+      for(var dy=-1;dy<=1;dy++)for(var dx=-1;dx<=1;dx++){
+        if(!dx&&!dy)continue;
+        var nx=cur.x+dx, ny=cur.y+dy;
+        if(nx<0||ny<0||nx>=COLS||ny>=ROWS)continue;
+        if(obstacles[key(nx,ny)])continue;
+        if(nx!==start.x&&ny!==start.y&&(nx===start.x||ny===start.y)&&Math.abs(dx)+Math.abs(dy)===2){
+          // 禁止贴墙斜穿其一角（简化：对角若任一正交邻接为障碍则跳过）
+          if(obstacles[key(cur.x+dx,cur.y)]||obstacles[key(cur.x,cur.y+dy)])continue;
+        }
+        var nk=key(nx,ny); if(closed[nk])continue;
+        var ng=cur.g+(dx&&dy?1.414:1)+((nx!==goal.x&&ny!==goal.y)?(W-1)*0.1:0);
+        if(gs[nk]===undefined||ng<gs[nk]){
+          gs[nk]=ng; came[nk]=ck;
+          open.push({x:nx,y:ny,g:ng,f:ng+h({x:nx,y:ny})});
+        }
+      }
+    }
+    path=null; explored=closed;
+    stat.innerHTML='路径: <b style="color:#e11d48">不可达</b> | 展开节点: <b>'+steps+'</b>';
+  }
+
+  // 交互
+  var drawing=false;
+  function toggle(e){
+    var r=cv.getBoundingClientRect();
+    var cx=(e.clientX-r.left)*(cv.width/r.width), cy=(e.clientY-r.top)*(cv.height/r.height);
+    var c=cell(cx,cy);
+    if((c.x===start.x&&c.y===start.y)||(c.x===goal.x&&c.y===goal.y))return;
+    var k=key(c.x,c.y);
+    if(obstacles[k])delete obstacles[k]; else obstacles[k]=1;
+    path=null; explored=null; draw();
+  }
+  cv.addEventListener('pointerdown',function(e){drawing=true;cv.setPointerCapture(e.pointerId);toggle(e);});
+  cv.addEventListener('pointermove',function(e){if(drawing)toggle(e);});
+  cv.addEventListener('pointerup',function(){drawing=false;});
+  wEl.addEventListener('input',draw);
+  document.getElementById('run').onclick=astar;
+  document.getElementById('reset').onclick=function(){
+    seedObstacles(); path=null; explored=null;
+    wEl.value=1; stat.innerHTML='路径: — | 展开节点: —'; draw();
+  };
+  seedObstacles(); draw();
+})();
+</script>
+</body>
+</html>

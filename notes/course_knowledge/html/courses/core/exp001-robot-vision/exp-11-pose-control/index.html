@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-11 · 体感控制（动作 → 小车指令）— 机器人视觉入门课</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<link rel="stylesheet" href="../shared/beginner.css">
+<style>:root{--theme:#ea580c;--theme-deep:#c2410c;--theme-bg:#ffedd5;--theme-bd:#fed7aa}</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit">🧠 具身智能课程 · <i>机器人视觉入门</i></a>
+  <div class="crumb"><a href="../../../index.html#core">核心课程</a> / <a href="../index.html">视觉入门课</a> / EXP-11</div>
+</div>
+
+<div class="wrap">
+
+<aside class="side">
+  <h4>本页步骤</h4>
+  <a href="#s1" class="now">01 这个实验解决什么问题</a>
+  <a href="#s2">02 三分钟讲懂：动作怎么变成车轮转速</a>
+  <a href="#s3">03 先认识 4 个词</a>
+  <a href="#s4">04 它吃什么、吐什么</a>
+  <a href="#s5">05 三步跑起来</a>
+  <a href="#s6">06 你该看到的画面</a>
+  <a href="#s7">07 改一个参数看变化</a>
+  <a href="#s8">08 踩坑速查</a>
+  <a href="#s9">09 进阶（可选）</a>
+  <a href="#s10">10 随堂小测</a>
+  <h4>本课程实验</h4>
+  <a href="../exp-01-color-hsv/index.html">EXP-01 颜色识别</a>
+  <a href="../exp-02-qrcode/index.html">EXP-02 二维码</a>
+  <a href="../exp-03-contour-polygon/index.html">EXP-03 多边形轮廓</a>
+  <a href="../exp-04-industrial-defect/index.html">EXP-04 工业缺陷检测</a>
+  <a href="../exp-05-garbage-classification/index.html">EXP-05 垃圾分类</a>
+  <a href="../exp-06-semantic-segmentation/index.html">EXP-06 语义分割</a>
+  <a href="../exp-07-deepsort-tracking/index.html">EXP-07 多目标跟踪</a>
+  <a href="../exp-08-face-landmarks/index.html">EXP-08 人脸关键点</a>
+  <a href="../exp-09-pose-landmark/index.html">EXP-09 骨骼关键点</a>
+  <a href="../exp-10-depth-3d/index.html">EXP-10 深度 3D</a>
+  <a href="../exp-11-pose-control/index.html" style="color:#0f766e;font-weight:700">EXP-11 体感控制</a>
+  <a href="../exp-12-hand-control/index.html">EXP-12 手势识别</a>
+</aside>
+
+<main class="content">
+
+<div class="exp-head">
+  <span class="code">EXP-11 · 第 5 阶段 · 视觉控制 · 综合性 · 4 学时</span>
+  <h1>体感控制：举左手，小车就左转</h1>
+  <p class="desc">这个实验把前面学的所有东西串起来了：骨骼关键点 → 判断动作 → 发一条控制指令 → 小车动。你会亲手写"举手 / 下蹲 / 双手举"这几条规则，先在 turtlesim 海龟上验证方向对不对，再让真车动起来。</p>
+  <div class="meta">
+    <span class="tag hl">难度 ⭐⭐⭐ · 4 学时</span>
+    <span class="tag">动作分类规则</span><span class="tag">优先级</span>
+    <span class="tag">cmd_vel 发布</span><span class="tag">turtlesim 验证</span>
+    <span class="tag" style="background:#fef3c7;border-color:#fde68a;color:#92400e">B2 / C1 步骤有差异</span>
+  </div>
+</div>
+
+<div class="tip amber" style="margin:14px 0"><span class="lab">🔧 全课唯一需要分平台操作的实验</span>
+  <b>C1 小车</b>：有麦克纳姆轮底盘，改 <code>publish_cmd_vel: true</code> 后可直接驱动真车，车侧会限幅到 ±0.3 m/s / ±1.0 rad/s。<br>
+  <b>B2 实验箱</b>：没有移动底盘，把配置里 <code>control.topic</code> 改成 <code>/turtle1/cmd_vel</code>，用 turtlesim 海龟验证——效果等价，且更安全。<br>
+  其余 11 个实验在两款平台上步骤完全一致（共用 RK3576 + 6TOPS NPU + HP60C 相机）。
+</div>
+
+<div class="pathline">
+  <span>01 颜色</span><span>02 二维码</span><span>03 轮廓</span><span>04 检测</span><span>05 分类</span><span>06 分割</span><span>07 跟踪</span><span>08 人脸</span><span>09 骨骼</span><span>10 3D</span><span class="cur">11 体感</span><span>12 手势</span>
+</div>
+
+<section class="blk" id="s1">
+  <h2><span class="no">01</span>这个实验解决什么问题</h2>
+
+  <div class="idea">
+    <span class="tag1">CORE IDEA · 一句话原理</span>
+    <p class="big">把 33 个关节坐标<b>套进几条 if 规则</b>，判断出你在做哪个动作，然后发一条"前进/左转/停"的消息给车。</p>
+    <p class="analogy"><b>打个比方：</b>这就是一个翻译官 —— <b>一边听"身体说的话"（关节位置），一边说"车能听懂的话"（线速度和角速度）。</b>中间那本字典就是几张 if 表。</p>
+  </div>
+
+  <p>先看完整的链路，你会发现视觉部分只是其中的一段：</p>
+
+  <div class="anim-box">
+    <svg viewBox="0 0 760 230" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="体感控制五段链路：相机取图 关键点 动作分类 指令映射 cmd_vel发布 小车运动">
+      <rect x="6" y="6" width="748" height="218" rx="12" fill="#111827" stroke="#334155"/>
+      <text x="380" y="28" text-anchor="middle" font-size="13" font-weight="700" fill="#fdba74" font-family="sans-serif">从"你抬左手"到"车左转"，中间有五段</text>
+
+      <!-- 段 1 -->
+      <rect x="18" y="48" width="128" height="72" rx="8" fill="#1e293b" stroke="#475569"/>
+      <text x="82" y="70" text-anchor="middle" font-size="11" fill="#fdba74" font-weight="700" font-family="sans-serif">① 取图</text>
+      <text x="82" y="90" text-anchor="middle" font-size="9.5" fill="#94a3b8" font-family="sans-serif">HP60C 相机</text>
+      <text x="82" y="106" text-anchor="middle" font-size="9" fill="#64748b" font-family="monospace">ROS 话题</text>
+
+      <path d="M152 84 L172 84" stroke="#475569" stroke-width="2" marker-end="url(#pa)" fill="none"/>
+      <defs><marker id="pa" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L7,4 L0,8 z" fill="#64748b"/></marker></defs>
+
+      <!-- 段 2 -->
+      <rect x="176" y="48" width="128" height="72" rx="8" fill="#1e293b" stroke="#475569"/>
+      <text x="240" y="70" text-anchor="middle" font-size="11" fill="#fdba74" font-weight="700" font-family="sans-serif">② 33 个点</text>
+      <text x="240" y="90" text-anchor="middle" font-size="9.5" fill="#94a3b8" font-family="sans-serif">BlazePose</text>
+      <text x="240" y="106" text-anchor="middle" font-size="9" fill="#64748b" font-family="monospace">EXP-09</text>
+
+      <path d="M310 84 L330 84" stroke="#475569" stroke-width="2" marker-end="url(#pa)" fill="none"/>
+
+      <!-- 段 3 高亮 -->
+      <rect x="334" y="48" width="128" height="72" rx="8" fill="#431407" stroke="#fb923c" stroke-width="2"/>
+      <text x="398" y="70" text-anchor="middle" font-size="11" fill="#fdba74" font-weight="700" font-family="sans-serif">③ 判断动作</text>
+      <text x="398" y="90" text-anchor="middle" font-size="9.5" fill="#fed7aa" font-family="sans-serif">几条 if 规则</text>
+      <text x="398" y="106" text-anchor="middle" font-size="9" fill="#fb923c" font-family="monospace">← 本实验核心</text>
+
+      <path d="M468 84 L488 84" stroke="#475569" stroke-width="2" marker-end="url(#pa)" fill="none"/>
+
+      <!-- 段 4 -->
+      <rect x="492" y="48" width="128" height="72" rx="8" fill="#1e293b" stroke="#475569"/>
+      <text x="556" y="70" text-anchor="middle" font-size="11" fill="#fdba74" font-weight="700" font-family="sans-serif">④ 指令映射</text>
+      <text x="556" y="90" text-anchor="middle" font-size="9.5" fill="#94a3b8" font-family="sans-serif">动作 → 速度</text>
+      <text x="556" y="106" text-anchor="middle" font-size="9" fill="#64748b" font-family="monospace">linear / angular</text>
+
+      <path d="M626 84 L646 84" stroke="#475569" stroke-width="2" marker-end="url(#pa)" fill="none"/>
+
+      <!-- 段 5 -->
+      <rect x="650" y="48" width="92" height="72" rx="8" fill="#14532d" stroke="#4ade80" stroke-width="1.6"/>
+      <text x="696" y="70" text-anchor="middle" font-size="11" fill="#bbf7d0" font-weight="700" font-family="sans-serif">⑤ 发出去</text>
+      <text x="696" y="90" text-anchor="middle" font-size="9.5" fill="#86efac" font-family="monospace">cmd_vel</text>
+      <text x="696" y="106" text-anchor="middle" font-size="9" fill="#4ade80" font-family="monospace">车动了</text>
+
+      <!-- 底部说明 -->
+      <rect x="18" y="136" width="724" height="72" rx="8" fill="#0b1220" stroke="#1e293b"/>
+      <text x="32" y="156" font-size="10.5" fill="#fdba74" font-family="sans-serif">三个容易搞错的点：</text>
+      <text x="32" y="176" font-size="10" fill="#94a3b8" font-family="sans-serif">· ③ 用的是<b style="fill:#fbbf24">归一化后</b>的坐标（除以身长），否则人站远了判断就失效</text>
+      <text x="32" y="192" font-size="10" fill="#94a3b8" font-family="sans-serif">· ④ 里"左转"对应的是<b style="fill:#fbbf24">正角速度</b>（逆时针），很多人会写反</text>
+      <text x="380" y="176" font-size="10" fill="#94a3b8" font-family="sans-serif">· ⑤ 默认是<b style="fill:#f87171">关闭</b>的（安全设计），要手动打开</text>
+    </svg>
+  </div>
+  <div class="cap">图 11-1｜五段链路。②③ 是视觉，④⑤ 是控制。<b>这个实验是整门课第一次让"视觉"真的驱动"动作"。</b></div>
+
+  <div class="oneline"><span>本实验的目标：<b>你抬左手，屏幕显示 "Turn Left"，海龟（或小车）就左转；双手放下，它停下。</b></span></div>
+</section>
+
+<section class="blk" id="s2">
+  <h2><span class="no">02</span>三分钟讲懂：动作怎么变成车轮转速</h2>
+
+  <p class="lead">两个关键点：① 怎么把"举手"变成数字判断；② 怎么把"动作"变成小车认识的两个数。</p>
+
+  <h3>第一关：怎么判断"举手"</h3>
+  <p>最直觉的想法是"手腕比肩膀高"。但直接比 y 坐标有个大问题：</p>
+
+  <table>
+    <thead><tr><th style="width:26%">情况</th><th style="width:30%">直接比 y 坐标</th><th>用归一化</th></tr></thead>
+    <tbody>
+      <tr><td>人站在 3 米外</td><td>整个人都很小，y 值挤在一起，"举手"和"没举"差不了几个像素</td><td>比值不变，照样判断正确</td></tr>
+      <tr><td>人站在 0.5 米近</td><td>y 值跨度很大，随便动一动就超过阈值 → 误判</td><td>比值不变</td></tr>
+      <tr><td>换成小朋友</td><td>体型不同，阈值全不对</td><td>比值不变</td></tr>
+    </tbody>
+  </table>
+
+  <p><b>解决办法：用身体自身的尺寸做单位。</b>把"髋部中点"当原点，"髋到肩的距离"当 1 —— 所有坐标都换算成这个单位下的值。这就是 <code>_norm()</code> 干的事。</p>
+
+  <pre><span class="c"># 概念示意，不是真实代码</span>
+身长 = |髋中点 − 肩中点|          <span class="c"># 这个距离作为"1 个单位"</span>
+
+<span class="c"># 归一化后的高度（0 = 髋部，1 = 肩膀，1.5 = 头顶以上）</span>
+手腕高度 = (髋中点y − 手腕y) / 身长
+
+<span class="c"># 判断规则就变成了"比值比阈值大"</span>
+if 手腕高度 &gt; 0.72:  举手</pre>
+
+  <p>这个 0.72 就是从经验里试出来的：手举过头顶通常落在 0.8~1.3，正常站着在 -0.5 左右。<b>用比值的好处是：这个 0.72 对谁都适用</b> —— 高个子矮个子、站远站近，都用同一个阈值。</p>
+
+  <h3>第二关：举手怎么变成车能听懂的话</h3>
+  <p>ROS 里控制小车只需要两个数：</p>
+
+  <div class="io2">
+    <div class="cellbox in" style="border-color:#93c5fd;background:#eff6ff">
+      <span class="lb">linear.x</span>
+      <div class="v">往前走多快（米/秒）</div>
+      <p class="d"><b>正数 = 前进</b>，负数 = 后退，0 = 不动。配置默认 0.2 m/s。</p>
+    </div>
+    <div class="arw">+</div>
+    <div class="cellbox in" style="border-color:#fca5a5;background:#fef2f2">
+      <span class="lb">angular.z</span>
+      <div class="v">转多快（弧度/秒）</div>
+      <p class="d"><b>正数 = 左转（逆时针）</b>，负数 = 右转，0 = 不转。默认 0.8 rad/s。</p>
+    </div>
+  </div>
+
+  <table>
+    <thead><tr><th style="width:24%">动作</th><th style="width:22%">linear.x</th><th style="width:22%">angular.z</th><th>结果</th></tr></thead>
+    <tbody>
+      <tr><td>双手放下（停止）</td><td>0</td><td>0</td><td>原地不动</td></tr>
+      <tr><td>双手举过头（前进）</td><td><b>+0.2</b></td><td>0</td><td>直着往前</td></tr>
+      <tr><td>下蹲</td><td><b>−0.2</b></td><td>0</td><td>往后退</td></tr>
+      <tr><td>举左手</td><td>0</td><td><b>+0.8</b></td><td>原地左转</td></tr>
+      <tr><td>举右手</td><td>0</td><td><b>−0.8</b></td><td>原地右转</td></tr>
+    </tbody>
+  </table>
+
+  <div class="tip amber"><span class="lab">⚠️ 最容易搞反的地方</span>"举左手 → 左转"，很多人会写成 <code>angular.z = −0.8</code>。但 ROS 约定是<b>逆时针为正</b>。从上方往下看，车往左拐就是逆时针转 —— 所以左转是正数。<b>这一条记不住就多试两次，试错比背公式快。</b></div>
+
+  <h3>第三关：多个动作同时满足怎么办</h3>
+  <p>现实里经常出现这种情况：你双手举起来，同时手腕也在肩膀上方 —— 算"双手举"还是"举左手"？</p>
+  <p><b>解决办法：给规则定优先级。</b>复杂/明确的动作优先，简单的兜底。</p>
+
+  <div class="tip tealb"><span class="lab">🔍 本实验的优先级顺序</span>
+    <b>1. 下蹲</b>（最特殊，髋部位置变化明显，先判）<br>
+    <b>2. 双手举</b>（要求两只手都高，比单边严格）<br>
+    <b>3. 举左手 / 举右手</b>（单边）<br>
+    <b>4. 停止</b>（兜底，什么都不满足时）
+    <br><br>
+    <b>为什么这么排？</b>因为"下蹲"这个姿态很独特：人蹲下时髋部会大幅下降，同时手腕也可能相对变高。<b>如果先判"举手"，蹲下时就会被误判成举手</b>。所以特殊动作要先判。
+  </div>
+
+  <div class="oneline"><span><b>三句话总结整个实验：</b>① 用身长归一化，让判断不受距离影响；② 用一张 if 规则表，把姿态翻译成两个速度数；③ 用优先级，解决多规则同时命中的冲突。</span></div>
+</section>
+
+<section class="blk" id="s3">
+  <h2><span class="no">03</span>先认识 4 个词</h2>
+  <div class="terms">
+    <div class="term"><div class="w">cmd_vel</div><p class="m">ROS 里控制移动底盘的标准话题名。消息类型是 <code>geometry_msgs/Twist</code>，里面就 <code>linear</code> 和 <code>angular</code> 两组数。</p></div>
+    <div class="term"><div class="w">发布者 / 订阅者</div><p class="m">ROS 的通信方式：一方往话题里写（发布），另一方从话题里读（订阅）。<b>它们互相不认识，只认话题名。</b></p></div>
+    <div class="term"><div class="w">优先级</div><p class="m">多条规则同时命中时，谁说了算。本实验是"特殊动作优先，停止兜底"。</p></div>
+    <div class="term"><div class="w">归一化</div><p class="m">把坐标除以身长，变成"身体的倍数"。这样不同身高、不同距离的人用同一套阈值。</p></div>
+  </div>
+
+  <details class="deep">
+    <summary>为什么板端还要"clamp"（限幅）？<em>选读 30 分钟</em></summary>
+    <div class="deep-body">
+      <p>配置里注释写"车 clamp ±0.3 内"。意思是：<b>不管上层发多大的速度，车端会强制压到 ±0.3 以内</b>。</p>
+      <p>这是一道安全防线。假设程序 bug 发了 <code>linear.x = 5.0</code>（5 米/秒对小车来说是飞出去），车端会自己压成 0.3。<b>上层出错的代价被限制住了。</b></p>
+      <p>这种"最后一层兜底"的设计在机器人里很常见：<b>不要在唯一的控制点上赌正确性，要在能兜底的地方加保护。</b></p>
+    </div>
+  </details>
+</section>
+
+<section class="blk" id="s4">
+  <h2><span class="no">04</span>它吃什么、吐什么</h2>
+
+  <div class="io2">
+    <div class="cellbox in">
+      <span class="lb">INPUT · 喂进去</span>
+      <div class="v">带人体姿态的画面</div>
+      <p class="d">模型和上个实验完全一样（<code>pose_landmark_full.rknn</code>）。<b>新增的是动作判断规则和发布逻辑。</b></p>
+    </div>
+    <div class="arw">→</div>
+    <div class="cellbox out">
+      <span class="lb">OUTPUT · 吐出来</span>
+      <div class="v">屏幕上的动作名 + cmd_vel 消息</div>
+      <p class="d">状态栏显示 <code>Action: Turn Left</code>（英文，因为 OpenCV 画不了中文）；如果打开了发布，还会往 <code>/cmd_vel</code> 写速度。</p>
+    </div>
+  </div>
+
+  <pre><span class="c"># 关键配置（config/pose_control_config.yaml）</span>
+<span class="b">model:</span>
+  pose_model: models/pose_landmark_full.rknn
+  min_detection_confidence: 0.5
+
+<span class="b">server:</span>
+  port: 8083                        <span class="c"># 本实验用 8083</span>
+  stream_name: pose_control.mjpg
+
+<span class="b">control:</span>
+  <span class="y">publish_cmd_vel: false</span>           <span class="c"># ← 默认关闭！要手动改成 true</span>
+  <span class="y">linear: 0.2</span>                      <span class="c"># 前进/后退线速度 m/s（车端 clamp ±0.3）</span>
+  <span class="y">angular: 0.8</span>                     <span class="c"># 转向角速度 rad/s（车端 clamp ±1.0）</span>
+  topic: /cmd_vel
+  print_interval: 2.0               <span class="c"># 终端打印间隔（秒）</span></pre>
+
+  <div class="tip amber"><span class="lab">⚠️ 注意 <code>--config</code> 的默认路径可能指错</span>这个实验有两份同名配置文件（分别在 <code>config/</code> 和 <code>car1_pose_control/config/</code>）。<b>建议显式传参</b>，别靠默认值：<br>
+  <code>--config config/pose_control_config.yaml</code></div>
+</section>
+
+<section class="blk" id="s5">
+  <h2><span class="no">05</span>三步跑起来</h2>
+
+  <ol class="steps3">
+    <li>
+      <span class="st">先不接车，只看动作判断对不对<em>约 5 分钟</em></span>
+      <p>这一步<b>故意不发布指令</b>（<code>publish_cmd_vel: false</code>）。先把"看得准不准"验证了，再谈"动不动"。</p>
+      <pre><span class="g">cd</span> ~/ros2_ws/src/xflz_eai_car1/vision/11_pose_control/car1_pose_control
+<span class="c"># 终端 1：起相机（同前）</span>
+<span class="c"># 终端 2：</span>
+<span class="g">python</span> -m pose_control_core.camera_demo \
+    --config config/pose_control_config.yaml --ros</pre>
+      <div class="expect">FPS: 12  Action: Stop
+FPS: 12  Action: Turn Left     <i>← 你抬起了左手</i>
+FPS: 12  Action: Forward       <i>← 双手举过头</i>
+FPS: 12  Action: Backward      <i>← 下蹲</i></div>
+      <p><b>浏览器：</b><code>http://&lt;板子IP&gt;:8083/pose_control.mjpg</code></p>
+      <p>五个动作各试一次，确认状态栏显示的名字和你做的动作对得上。</p>
+    </li>
+
+    <li>
+      <span class="st">先验证指令链路：海龟或真车，按平台选一个<em>约 5 分钟</em></span>
+      <p><b>这一步是本实验最重要的安全设计。</b>先在一个"撞不坏东西"的对象上验证"指令发得出去、方向对不对"，再上真车。</p>
+      <p><b>B2 实验箱（用海龟）：</b>终端 1 起海龟：</p>
+      <pre><span class="g">source</span> /opt/ros/humble/setup.bash
+<span class="g">ros2</span> run turtlesim turtlesim_node</pre>
+      <p><b>C1 小车（用真车）：</b>不用起海龟，但要先确认底盘节点在跑，然后确认 <code>/cmd_vel</code> 有人订阅：</p>
+      <pre><span class="g">ros2</span> topic info /cmd_vel    <span class="c"># 应该看到至少 1 个订阅者（底盘控制器）</span></pre>
+      <p>终端 2 跑动作识别 + 发布。两平台的差别只在配置里的 <code>topic</code>：</p>
+      <pre><span class="g">nano</span> config/pose_control_config.yaml
+<span class="c"># control.publish_cmd_vel: false → true</span>
+<span class="c"># control.topic:  B2 用 /turtle1/cmd_vel    C1 用 /cmd_vel</span>
+
+<span class="g">python</span> -m pose_control_core.camera_demo \
+    --config config/pose_control_config.yaml --ros</pre>
+      <p>然后做动作，看目标怎么动：</p>
+      <div class="expect">抬左手   → 逆时针左转      <i>方向对吗？</i>
+抬右手   → 顺时针右转
+双手举   → 往前         <i>（海龟爬 / 车前进）</i>
+下蹲     → 往后退
+手放下   → 停住</div>
+      <p><b>如果方向反了</b>（抬左手变成右转），把配置里 <code>angular</code> 改成负数，或者在代码里调换左右分支。这是最快的定位方法。</p>
+      <p style="color:#b45309"><b>C1 上车的第一次测试，务必先把 <code>linear</code> 和 <code>angular</code> 调小</b>（比如 0.1 / 0.4），确认方向对了再放大。车侧虽然有 ±0.3 m/s 的限幅兜底，但方向错了照样会撞。</p>
+    </li>
+
+    <li>
+      <span class="st">改规则，自己加一个动作<em>约 15 分钟</em></span>
+      <p>真正学会的标志是"能改"。打开规则代码找 <code>classify_action</code> 这个函数：</p>
+      <pre><span class="g">grep</span> -rn "classify_action" src/ car1_pose_control/ 2&gt;/dev/null | <span class="g">head</span></pre>
+      <p>你会看到类似这样的结构：</p>
+      <pre><span class="c"># 概念示意</span>
+if 髋部高度 &lt; 阈值:            return BACKWARD   <span class="c"># 下蹲，先判</span>
+if 左手高 and 右手高:          return FORWARD    <span class="c"># 双手举</span>
+if 左手高:                     return TURN_LEFT
+if 右手高:                     return TURN_RIGHT
+return STOP                                   <span class="c"># 兜底</span></pre>
+      <p><b>试着加一个"双手平举 → 前进更快"的规则</b>，插在"双手举"之前。然后重新验证。</p>
+      <div class="expect"><i>改之前：必须先想清楚这条规则和已有规则会不会冲突</i>
+<i>要不要放在"双手举"前面？如果两只手都举过头，两条规则都命中，谁先判？</i></div>
+    </li>
+  </ol>
+
+  <div class="oneline"><span>三步走完的<b>顺序很重要</b>：先看准不准 → 再验指令方向 → 最后改规则。<b>跳过中间那步直接上真车，是实验室里最常见的事故原因。</b></span></div>
+</section>
+
+<section class="blk" id="s6">
+  <h2><span class="no">06</span>你该看到的画面</h2>
+
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">画面 A · 双栏 + 状态栏</div><div class="kt">左原图 右骨架</div><p>状态栏格式：<code>FPS: 12  Action: Turn Left</code>。<b>注意是英文</b> —— OpenCV 画中文会变成问号。</p></div>
+    <div class="kcard"><div class="kd">画面 B · 无人时</div><div class="kt">Action: Stop</div><p>这是安全的兜底设计。<b>只要判断不出动作，就是停止</b> —— 不做猜测，不冒险。</p></div>
+    <div class="kcard"><div class="kd">画面 C · 动作抖动</div><div class="kt">Action 在相邻两个值之间跳</div><p>比如站姿处于"举手的临界点"时，会在 Forward 和 Stop 之间闪。<b>这叫抖动，很常见</b>。解决办法是加"连续 N 帧一致才切换"。</p></div>
+  </div>
+
+  <div class="tip tealb"><span class="lab">🔍 为什么"判断不出来"就停止，而不是保持上一个动作？</span>这是安全设计的两难。保持上一个动作听起来更"平滑"，但如果是因为人走出了画面（不是想停止），车会一直往前开 —— <b>这很危险</b>。所以本实验选了保守方案：<b>不确定 = 停</b>。<br>工业上通常还会加一层：如果连续 3 秒都判不出动作，就主动断开发布。</div>
+</section>
+
+<section class="blk" id="s7">
+  <h2><span class="no">07</span>改一个参数看变化</h2>
+  <p class="lead">三个参数最值得动：举手阈值、速度大小、发布开关。第一个影响"准不准"，后两个影响"安不安全"。</p>
+
+  <div class="lab2">
+    <div class="lh">⚡ 参数实验台 · 举手阈值（归一化高度）</div>
+    <div class="lr">
+      <label>举手阈值</label>
+      <input id="th" type="range" min="40" max="110" step="2" value="72">
+      <output id="th_o">0.72</output>
+    </div>
+    <div class="vis">
+      <svg viewBox="0 0 420 210" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="举手阈值变化时哪些姿势被判定为举手">
+        <rect x="0" y="0" width="420" height="210" rx="8" fill="#0b1220"/>
+        <!-- 归一化坐标轴：0 在髋，向上为正 -->
+        <line x1="40" y1="180" x2="40" y2="24" stroke="#334155"/>
+        <g font-size="8.5" fill="#475569" font-family="monospace">
+          <text x="20" y="184">0</text><text x="14" y="130">0.5</text>
+          <text x="14" y="76">1.0</text><text x="14" y="30">1.3</text>
+          <text x="4" y="18">高度</text>
+        </g>
+        <!-- 阈值线 -->
+        <line id="thline" x1="40" y1="96" x2="390" y2="96" stroke="#fbbf24" stroke-width="2" stroke-dasharray="6 4"/>
+        <text id="thtxt" x="392" y="92" font-size="9" fill="#fbbf24" font-family="monospace" text-anchor="end">0.72</text>
+        <!-- 四个姿势 -->
+        <g id="poses">
+          <g data-h="1.20"><circle cx="82" cy="46" r="12" fill="#34d399"/><text x="82" y="200" text-anchor="middle" font-size="8.5" fill="#94a3b8" font-family="sans-serif">过头顶 1.20</text></g>
+          <g data-h="0.90"><circle cx="164" cy="70" r="12" fill="#34d399"/><text x="164" y="200" text-anchor="middle" font-size="8.5" fill="#94a3b8" font-family="sans-serif">侧平举 0.90</text></g>
+          <g data-h="0.66"><circle cx="246" cy="92" r="12" fill="#fbbf24"/><text x="246" y="200" text-anchor="middle" font-size="8.5" fill="#94a3b8" font-family="sans-serif">与肩平 0.66</text></g>
+          <g data-h="0.05"><circle cx="328" cy="170" r="12" fill="#f87171"/><text x="328" y="200" text-anchor="middle" font-size="8.5" fill="#94a3b8" font-family="sans-serif">放下 0.05</text></g>
+        </g>
+        <text x="210" y="16" text-anchor="middle" font-size="10" fill="#5eead4" font-family="monospace" id="ptxt">阈值 0.72 → 2 个姿势算"举手"</text>
+      </svg>
+    </div>
+    <div class="say" id="say"></div>
+  </div>
+
+  <h3>三个参数的调整指南</h3>
+  <table>
+    <thead><tr><th style="width:24%">参数</th><th style="width:24%">影响</th><th>什么时候改</th></tr></thead>
+    <tbody>
+      <tr><td>举手阈值<br>（代码里，约 0.72）</td><td>调低 → 更容易触发（也更容易误触发）；调高 → 要举更高</td><td>手举到头顶才触发太累，就降到 0.6；站着不动就乱触发，就升到 0.85</td></tr>
+      <tr><td><code>linear</code> / <code>angular</code></td><td>速度大小</td><td>调试阶段先设小（0.1 / 0.4）；熟练后再提高</td></tr>
+      <tr><td><code>publish_cmd_vel</code></td><td>是否真的发指令</td><td><b>调规则时一定要关掉</b>，否则改一行代码车就乱跑</td></tr>
+    </tbody>
+  </table>
+
+  <div class="oneline"><span><b>阈值调参的取舍没有标准答案</b>，取决于你的手举得多高、相机装得多低。<b>唯一的原则：先用小速度调准，再放大速度。</b></span></div>
+</section>
+
+<section class="blk" id="s8">
+  <h2><span class="no">08</span>踩坑速查</h2>
+
+  <table class="pit2">
+    <thead><tr><th>现象</th><th>原因</th><th>怎么办</th></tr></thead>
+    <tbody>
+      <tr><td>车完全不动</td><td><code>publish_cmd_vel</code> 还是 <code>false</code>（默认值）</td><td>改成 <code>true</code>；这是最常见的一条</td></tr>
+      <tr><td>Action 显示对但海龟不动</td><td>话题名不一致，或没 source 车端的 install 空间</td><td>确认 <code>control.topic</code> 是 <code>/cmd_vel</code>；两个终端都 source 了</td></tr>
+      <tr><td>方向反了（举左手右转）</td><td><code>angular</code> 符号搞反</td><td>ROS 里逆时针为正。左转应该是正数</td></tr>
+      <tr><td>动作一直显示 Stop</td><td>人太小/只露上半身，髋部点不可用</td><td><b>必须有髋部</b>（归一化要用它）；退后让全身进画面</td></tr>
+      <tr><td>Action 频繁抖动</td><td>站在阈值临界点上</td><td>加"连续 N 帧一致才切换"的平滑；或把阈值调离你常用的姿势</td></tr>
+      <tr><td>站远了动作判不出来</td><td>归一化没生效 / 髋部点 vis 太低</td><td>确认用了 <code>_norm()</code>；改善光照与距离</td></tr>
+      <tr><td>轮子抖 / 车抽动</td><td>每帧都在发指令，速度突变</td><td>加指令平滑（低通滤波）或降低发布频率</td></tr>
+      <tr><td>配置文件读的是旧的</td><td>两份同名 yaml，默认路径指错</td><td>显式传 <code>--config config/pose_control_config.yaml</code></td></tr>
+    </tbody>
+  </table>
+
+  <div class="tip amber"><span class="lab">💡 排查口诀</span><b>先查开关，再查方向，最后查阈值。</b>不动 → 开关（<code>publish_cmd_vel</code>）；动了但方向错 → 符号；动作判不出来 → 阈值/可见度。<b>按这个顺序查，效率最高。</b></div>
+</section>
+
+<section class="blk" id="s9">
+  <h2><span class="no">09</span>进阶（可选）</h2>
+
+  <details class="deep">
+    <summary>进阶 1 · 加去抖动，让动作稳定<em>约 30 分钟</em></summary>
+    <div class="deep-body">
+      <p>问题：站在阈值附近时，动作会在两个值之间闪。车跟着抽。</p>
+      <p><b>最简单的解法：连续 N 帧都是同一个动作，才真的切换。</b></p>
+      <pre>候选动作 = classify_action(...)
+if 候选动作 == 上一个候选:
+    连续计数 += 1
+else:
+    连续计数 = 1
+    上一个候选 = 候选动作
+
+if 连续计数 &gt;= 3:        # 稳定 3 帧
+    当前动作 = 候选动作</pre>
+      <p>这 6 行代码能显著改善体验。<b>代价是响应变慢了几帧</b> —— 又是一个取舍。</p>
+    </div>
+  </details>
+
+  <details class="deep">
+    <summary>进阶 2 · 用"手的位置"连续控制速度<em>约 40 分钟</em></summary>
+    <div class="deep-body">
+      <p>现在是"离散控制"（要么走得快，要么停）。更自然的是<b>连续控制</b>：手举得越高，车开得越快。</p>
+      <pre>手高度 = 归一化手腕高度
+速度 = clamp((手高度 − 0.4) / (1.2 − 0.4), 0, 1) × 最大速度</pre>
+      <p>这样手在手在胸口时慢慢走，举过头顶时全速。<b>这就是"比例控制"的思想</b>，和 EXP-03 里"偏移量 × 系数 → 角速度"是同一个结构。</p>
+      <p>但要注意：连续控制更难停稳。手一抖速度就变 —— 所以还是需要去抖动。</p>
+    </div>
+  </details>
+
+  <details class="deep">
+    <summary>进阶 3 · 为什么要先上 turtlesim 再上真车<em>选读 1 分钟</em></summary>
+    <div class="deep-body">
+      <p>不是因为海龟"更简单"，而是因为<b>海龟不会撞坏东西</b>。</p>
+      <p>第一次跑体感控制时，几乎所有人都会遇到：方向反了（车往反方向冲）、指令抖动（车来回抽）、或者人走出画面导致车一直往前开。<b>这些错误在小车上是物理伤害，在海龟上只是一个像素在乱跑。</b></p>
+      <p>真实的机器人开发流程就是这样：<b>仿真验证 → 低速真机 → 正常速度</b>。每一步的成本差一个数量级。</p>
+      <p>配置里 <code>publish_cmd_vel: false</code> 这个默认值，也是同一个思路的体现 —— <b>默认不危险，要用的时候才打开</b>。这个设计习惯比任何代码技巧都值得学。</p>
+    </div>
+  </details>
+</section>
+
+<section class="blk" id="s10">
+  <h2><span class="no">10</span>随堂小测</h2>
+
+  <div class="quiz2">
+    <div class="qq"><span class="qn">Q1</span>"举左手 → 小车左转"，<code>angular.z</code> 应该是什么符号？</div>
+    <div class="opt" data-right="0">负数，因为左是负方向</div>
+    <div class="opt" data-right="1">正数，ROS 约定逆时针为正，往左拐就是逆时针</div>
+    <div class="opt" data-right="0">0，转向不用 angular</div>
+    <div class="fb"><b>对。</b>从上方俯视，车往左拐时是逆时针旋转，而 ROS 规定逆时针为正。所以左转 = <b>正</b>角速度。<b>这个符号几乎每个人都会搞反一次</b>，记不住就试一次。</div>
+  </div>
+
+  <div class="quiz2">
+    <div class="qq"><span class="qn">Q2</span>为什么判断动作前要先用"身长"归一化坐标？</div>
+    <div class="opt" data-right="0">为了让计算更快</div>
+    <div class="opt" data-right="1">因为人站远站近、高矮不同，绝对坐标差很多，而比值不变</div>
+    <div class="opt" data-right="0">因为模型输出的就是比值</div>
+    <div class="fb"><b>对。</b>如果直接比 y 坐标，排在 3 米外的人"举手"和"没举手"可能只差 5 个像素，阈值完全失效。除以身长之后，这个比值对任何距离、任何身高都适用同一套阈值。</div>
+  </div>
+
+  <div class="quiz2">
+    <div class="qq"><span class="qn">Q3</span>为什么 <code>publish_cmd_vel</code> 的默认值是 <code>false</code>？</div>
+    <div class="opt" data-right="0">因为默认值写错了</div>
+    <div class="opt" data-right="1">安全设计 —— 调规则、试效果时车不会突然动起来</div>
+    <div class="opt" data-right="0">因为 cmd_vel 话题不存在</div>
+    <div class="fb"><b>对。</b>这是"默认安全"（fail-safe）的原则。<b>危险的默认值是关闭的，要用的时候显式打开。</b>这样即使有人直接跑起程序、改代码改出错，车也不会失控。这个设计思路比代码本身更值得学。</div>
+  </div>
+</section>
+
+<nav class="expnav">
+  <a href="../exp-10-depth-3d/index.html"><span class="lb">← 上一个</span>EXP-10 深度 3D</a>
+  <a class="next" href="../exp-12-hand-control/index.html"><span class="lb">下一个实验 →</span>EXP-12 手势识别</a>
+</nav>
+
+<footer>
+  <span>机器人视觉入门 · EXP-11 体感控制</span>
+  <span>4 学时 · 基于 vision/11_pose_control 源码</span>
+</footer>
+
+</main>
+</div>
+
+<script src="../shared/tutorial.js" defer></script>
+<script src="../shared/beginner.js" defer></script>
+<script>
+(function(){
+  var th=document.getElementById('th'); if(!th) return;
+  var poses=document.querySelectorAll('#poses g');
+  var line=document.getElementById('thline'), thtxt=document.getElementById('thtxt');
+  var ptxt=document.getElementById('ptxt'), say=document.getElementById('say');
+  /* 高度 0~1.3 映射到 y 180~24 */
+  function yOf(h){ return 180 - (h/1.3)*(180-24); }
+  function upd(){
+    var t=parseInt(th.value,10)/100;
+    document.getElementById('th_o').textContent=t.toFixed(2);
+    var y=yOf(t);
+    line.setAttribute('y1',y); line.setAttribute('y2',y);
+    thtxt.setAttribute('y',y-5);
+    thtxt.textContent=t.toFixed(2);
+    var n=0;
+    for(var i=0;i<poses.length;i++){
+      var h=parseFloat(poses[i].getAttribute('data-h'));
+      var on=h>=t;
+      poses[i].setAttribute('opacity', on?1:0.18);
+      if(on) n++;
+    }
+    ptxt.textContent='阈值 '+t.toFixed(2)+' → '+n+' 个姿势算"举手"';
+    var m='';
+    if(t<0.55) m='<b>阈值 '+t.toFixed(2)+'（很低）</b>：连手自然垂在身侧稍抬一点都会被判成举手。<b>会导致持续误触发 —— 车一直动。</b>';
+    else if(t<0.72) m='<b>阈值 '+t.toFixed(2)+'</b>：与肩平也算举手了。好处是省力，坏处是"随便抬一下"就触发。';
+    else if(t<=0.80) m='<b>阈值 '+t.toFixed(2)+'（默认 0.72 附近）</b>：需要明显抬手过头才触发。这是"省力"和"防误触"的平衡点。';
+    else m='<b>阈值 '+t.toFixed(2)+'（很高）</b>：必须举过头顶才认。误触最少，但举久了手会累。<b>如果有用户抱怨"手举起来没反应"，多半是这个值太高。</b>';
+    say.innerHTML=m;
+  }
+  th.addEventListener('input',upd); upd();
+})();
+</script>
+</body>
+</html>

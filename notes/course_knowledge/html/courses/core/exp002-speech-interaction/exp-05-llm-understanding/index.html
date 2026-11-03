@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-05 大模型语义理解 · CORE-03 教程</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+:root{
+  --theme:#7c3aed;
+  --theme-deep:#6d28d9;
+  --theme-bg:#ede9fe;
+  --theme-bd:#ddd6fe;
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <a class="logo" href="../index.html">📘 CORE-03</a>
+  <nav class="crumb">
+    <a href="../../../index.html#core">核心课程</a> / <a href="../index.html">自然语言交互应用</a> / EXP-05
+  </nav>
+</header>
+
+<div class="wrap">
+
+  <aside class="side">
+    <h4>本页目录</h4>
+    <a href="#s1" class="now">01 问题引入：听懂字面 ≠ 听懂你</a>
+    <a href="#s2">02 原理通俗讲解：把话写成工单</a>
+    <a href="#s3">03 关联知识点</a>
+    <a href="#s4">04 实验目标</a>
+    <a href="#s5">05 实验环境与准备</a>
+    <a href="#s6">06 动画讲解：意图→JSON→行动流水线</a>
+    <a href="#s7">07 互动讲解：意图分类与采样实验台</a>
+    <a href="#s8">08 实操步骤</a>
+    <a href="#s9">09 重点与易错点</a>
+    <a href="#s10">10 总结与思考</a>
+
+    <h4>CORE-03 · 自然语言交互</h4>
+    <a href="../exp-01-mic-array-wakeup/index.html">EXP-01 六麦阵列串口唤醒</a>
+    <a href="../exp-02-asr/index.html">EXP-02 声学模型 ASR 语音识别</a>
+    <a href="../exp-03-tts/index.html">EXP-03 TTS 语音合成</a>
+    <a href="../exp-04-voice-dialog/index.html">EXP-04 端到端语音对话</a>
+    <a href="../exp-05-llm-understanding/index.html">EXP-05 大模型语义理解</a>
+    <a href="../exp-06-emotion-perception/index.html">EXP-06 多模态语音情绪感知</a>
+  </aside>
+
+  <main class="content">
+
+    <div class="exp-head">
+      <span class="code">EXP-05 · 第 2 章 · 综合性 · 8 学时</span>
+      <h1>大模型语义理解</h1>
+      <p class="desc">EXP-04 的关键词匹配只能"对暗号"；本实验让大模型正面回答「你想干什么」——意图识别、槽位提取、结构化 JSON 输出，再通过 Function Calling 把语义直接变成可执行的工具调用。</p>
+      <div class="meta">
+        <span class="tag">意图识别 · 槽位提取</span>
+        <span class="tag">Function Calling</span>
+        <span class="tag">OpenAI 兼容 API</span>
+        <span class="tag hl">RKLLM · Qwen3.5-0.8B 本地推理</span>
+      </div>
+    </div>
+
+    <section class="blk" id="s1">
+      <h2><span class="no">01</span>问题引入：听懂字面 ≠ 听懂你</h2>
+      <p>在 EXP-04 的工具模式里，机器人靠"抓→pick、放→place"这类关键词对暗号。这在几条固定指令内很好用，但只要用户换个说法就露馅：</p>
+      <table>
+        <thead><tr><th>你说的话</th><th>关键词方案的下场</th><th>缺的是什么</th></tr></thead>
+        <tbody>
+          <tr><td>"把胳膊抬起来歇会儿"</td><td>没抓没放，匹配失败</td><td>近义意图归一（抬 ≈ 回工作位）</td></tr>
+          <tr><td>"先抓起来，然后放到右边"</td><td>只命中一个词，顺序全丢</td><td>多意图 + 槽位（顺序、位置）</td></tr>
+          <tr><td>"学工专业"（含"工"字）</td><td>误匹配成 work 动了机械臂</td><td>整句语义判断，而非子串匹配</td></tr>
+          <tr><td>"附近有什么好吃的？"</td><td>硬塞给 none，无回答能力</td><td>意图分类：查询 / 控制 / 闲聊</td></tr>
+        </tbody>
+      </table>
+      <p>把一台只会关键词的机器人想象成一个<b>只认门牌号的快递员</b>——6 号门、8 号门他跑得飞快，但你说"送到那个有猫的家"，他就原地宕机。语义理解要做的，就是<b>把千变万化的说法翻译成统一、结构化、可执行的内部表示</b>。</p>
+      <div class="tip amber"><span class="lab">💡 本节要点</span>"语义理解"不是让模型自由发挥地聊天，而是三件事：<b>分类意图</b>（查询/控制/闲聊）、<b>抽取槽位</b>（对象、位置、数量）、<b>约束输出</b>（必须吐合法 JSON 或 tool_call）。可验证、可执行，才叫理解。</div>
+    </section>
+
+    <section class="blk" id="s2">
+      <h2><span class="no">02</span>原理通俗讲解：把话写成工单</h2>
+      <p>把机器人后端想成一家餐厅的<b>前厅写单流程</b>。客人（用户）口头点菜，服务员（大模型）不直接冲进厨房，而是先在点菜单上写清楚：</p>
+      <table>
+        <thead><tr><th>生活比喻</th><th>技术概念</th><th>通俗解释</th></tr></thead>
+        <tbody>
+          <tr><td><b>菜名</b>——点了什么大类</td><td>意图 intent</td><td>"控制机械臂" / "查询信息" / "闲聊" 三选一，先定性。</td></tr>
+          <tr><td><b>口味备注</b>——少辣、大份</td><td>槽位 slot</td><td>"放到<b>右边</b>"里的"右边"、"抓<b>红色</b>方块"里的"红色"。</td></tr>
+          <tr><td><b>工整的点菜单</b></td><td>结构化 JSON</td><td>{"intent":"control","action":"pick","pos":"right"}——机器可读，下一步谁看都懂。</td></tr>
+          <tr><td><b>菜单背面印好的厨具编号</b>，报编号即开工</td><td>Function Call（tools 声明）</td><td>提前告诉模型"你手里有 calculator、move_arm 这几张牌"，它直接报牌名+参数。</td></tr>
+        </tbody>
+      </table>
+      <p><b>再把整条语音管线走一遍（本课程主线第 4 站就是今天的主角）：</b></p>
+      <div class="flow">
+        <div class="step"><span class="n">1</span><div>拾音<br><small>麦克风 16kHz 采集</small></div></div>
+        <div class="arr">→</div>
+        <div class="step"><span class="n">2</span><div>唤醒<br><small>"小飞小飞" 开启会话</small></div></div>
+        <div class="arr">→</div>
+        <div class="step"><span class="n">3</span><div>识别<br><small>ASR 吐出文字</small></div></div>
+        <div class="arr">→</div>
+        <div class="step"><span class="n">4</span><div><b>理解 ★</b><br><small>意图 + 槽位 → JSON / tool_call</small></div></div>
+        <div class="arr">→</div>
+        <div class="step"><span class="n">5</span><div>回复+合成<br><small>LLM 组织答复 → TTS 开口</small></div></div>
+      </div>
+      <p>Function Call 是本站的"临门一脚"，本质是一个<b>三步循环</b>：</p>
+      <table>
+        <thead><tr><th>步</th><th>谁做</th><th>发生了什么</th></tr></thead>
+        <tbody>
+          <tr><td>① 模型决策</td><td>大模型</td><td>响应里 <code>content=None</code>，换成 <code>tool_calls=[{name:"calculator", arguments:"{\"expression\":\"1+1\"}"}]</code></td></tr>
+          <tr><td>② 客户端执行</td><td>你的程序</td><td>查 <code>FUNCTION_MAP</code> 执行函数，拿到 <code>{"result": 2}</code></td></tr>
+          <tr><td>③ 结果回传</td><td>客户端 → 模型</td><td>追加 <code>{"role":"tool", ...}</code> 消息再次请求，模型基于真实结果说人话："1+1 等于 2。"</td></tr>
+        </tbody>
+      </table>
+      <div class="tip tealb"><span class="lab">🎯 核心直觉</span>Prompt 是"嘱咐"，Function Call 是"协议"。嘱咐可能被忘（模型胡说）；协议把自由发挥限制在<b>函数名 + JSON Schema</b> 之内，这是 Agent、RAG、设备控制全部建立其上的地基。</div>
+    </section>
+
+    <section class="blk" id="s3">
+      <h2><span class="no">03</span>关联知识点</h2>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">🔌</div><div class="kt">OpenAI 兼容 API</div><p><code>/v1/chat/completions</code> 请求体 {model, messages, stream, temperature…} 已成事实标准；RKLLM Server 原生实现，客户端零改造可迁移。</p></div>
+        <div class="kcard"><div class="kd">🌊</div><div class="kt">流式 SSE</div><p>服务端逐行推 <code>data: {json}\n\n</code>，末条 <code>data: [DONE]</code>；客户端 <code>iter_lines()</code> 取 <code>delta.content</code> 累积，首字延迟 &lt; 500ms。</p></div>
+        <div class="kcard"><div class="kd">🎲</div><div class="kt">采样参数</div><p>temperature 0.8 / top_p 0.9 / max_tokens 4096 / repeat_penalty 1.1。分类任务要调低温度换确定性，创意任务再调高。</p></div>
+        <div class="kcard"><div class="kd">📜</div><div class="kt">多轮 messages</div><p>服务端无状态，历史由客户端 messages 列表维护；system 角色必须放最前定义人设与输出格式，max_context_len=4096 超限截断。</p></div>
+        <div class="kcard"><div class="kd">🃏</div><div class="kt">Function Call 三件套</div><p><b>tools</b>（JSON Schema 报牌）→ <b>tool_calls</b>（模型出牌）→ <b>role:tool</b>（回传结果），缺任何一件循环不成立。</p></div>
+        <div class="kcard"><div class="kd">⚙️</div><div class="kt">RKLLM 本地推理</div><p>librkllmrt.so 经 ctypes 加载，W4A16 权重 4bit / 激活 16bit，0.8B 模型 NPU 约 30 token/s，全程离线不出板。</p></div>
+      </div>
+    </section>
+
+    <section class="blk" id="s4">
+      <h2><span class="no">04</span>实验目标</h2>
+      <ul class="check">
+        <li>理解 RKLLM 本地推理引擎与 W4A16 量化策略，会用 <code>curl /v1/models</code> 验证服务（原理理解）</li>
+        <li>掌握 <b>意图识别</b>：把用户话术分类为 查询 / 控制 / 闲聊，能处理"多意图含糊指令"（分类实操）</li>
+        <li>掌握 <b>槽位提取（实体抽取）</b>：从句中抽出对象、位置、数量，拼装为<b>结构化 JSON</b> 输出（结构化实操）</li>
+        <li>拆解 LLMClient / 流式 SSE 解析 / CLI 多轮对话三模块，完成 6 轮以上上下文记忆测试（模块拆解）</li>
+        <li>理解 Function Call 原理，能在请求体声明 <b>tools JSON Schema</b> 并解析模型的 tool_call 指令（流程掌握）</li>
+        <li>跑通"模型决策 → 客户端执行 → role:tool 回传"闭环：1+1=? → calculator → "等于 2"（集成实操）</li>
+        <li>会用 system prompt 约束输出风格与 JSON 格式，理解必须 messages[0] 位置的原因（调优实操）</li>
+        <li>能将该 OpenAI 兼容接口迁移到 Agent / MCP 等业务（迁移应用）</li>
+      </ul>
+    </section>
+
+    <section class="blk" id="s5">
+      <h2><span class="no">05</span>实验环境与准备</h2>
+      <table>
+        <thead><tr><th>类别</th><th>配置</th></tr></thead>
+        <tbody>
+          <tr><td>硬件</td><td>具身智能实验箱 B2（RK3576 NPU 6TOPS）</td></tr>
+          <tr><td>系统</td><td>Ubuntu 22.04 + ROS2 Humble，Python 3.10（ros2_venv）</td></tr>
+          <tr><td>核心库</td><td>requests==2.31.0、flask==3.0.0、ctypes（标准库）</td></tr>
+          <tr><td>模型</td><td>Qwen3.5-0.8B_w4a16_g128_rk3576.rkllm（约 0.8GB，max_context_len=4096）</td></tr>
+          <tr><td>运行时</td><td><code>/usr/lib/librkllmrt.so</code>（RKLLM 1.6.x，与 rkllm-toolkit 版本匹配）</td></tr>
+          <tr><td>源码</td><td><code>ros2_ws/src/xflz_eai_car1/interaction/car1_llm/tools/</code>（llm_server.py + llm_test.py）</td></tr>
+        </tbody>
+      </table>
+      <pre><span class="c"># 0) 确认板载运行时存在</span>
+<span class="g">ls -l /usr/lib/librkllmrt.so</span>        <span class="y"># 软链目标，llm_server 首启自动 symlink</span>
+<span class="c"># 1) 启动服务（终端 1）</span>
+<span class="g">cd ros2_ws/src/xflz_eai_car1/interaction/car1_llm/tools/</span>
+<span class="g">python3 llm_server.py</span>               <span class="y"># =========init....=========== rkllm init success!</span>
+<span class="c"># 2) 客户端连通性（终端 2）</span>
+<span class="g">curl http://127.0.0.1:8080/v1/models</span> <span class="y"># {"data":[{"id":"Qwen3.5-0.8B_w4a16_g128_rk3576"...]}</span></pre>
+      <div class="tip"><span class="lab">✅ 准备检查</span>必须<b>先起 llm_server、再起 llm_test</b>——客户端会先调 <code>list_models()</code>，连不上直接报 Cannot connect to server 退出。RKLLM 服务端单线程（threaded=False），并发请求会 503。</div>
+    </section>
+
+    <section class="blk" id="s6">
+      <h2><span class="no">06</span>动画讲解：意图 → JSON → 行动流水线</h2>
+      <p>观察一句话如何被"压"成机器行动：token 流逐段送入模型 → 分类出意图与槽位 → 拼成 JSON → 模型报出 tool_call → 客户端执行并回传 role:tool → 模型终答。4 秒循环，注意下方 Function Call 闭环的回环路径：</p>
+      <div class="anim-box">
+        <svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" font-family="Consolas,monospace" font-size="12">
+          <rect x="0" y="0" width="720" height="300" fill="#111827"/>
+          <!-- 输入句 -->
+          <rect x="16" y="24" width="210" height="40" rx="8" fill="#1f2937" stroke="#4b5563"/>
+          <text x="121" y="49" fill="#e5e7eb" text-anchor="middle">"把机械臂放到右边再抓"</text>
+          <!-- token 流 -->
+          <rect x="236" y="34" width="16" height="10" rx="2" fill="#7c3aed">
+            <animate attributeName="x" values="232;436" dur="1.4s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="0;1;1;0" dur="1.4s" repeatCount="indefinite"/>
+          </rect>
+          <rect x="236" y="52" width="16" height="10" rx="2" fill="#a78bfa">
+            <animate attributeName="x" values="232;436" dur="1.4s" begin="0.35s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="0;1;1;0" dur="1.4s" begin="0.35s" repeatCount="indefinite"/>
+          </rect>
+          <!-- 模型 -->
+          <rect x="440" y="18" width="264" height="60" rx="8" fill="#1f2937" stroke="#7c3aed" stroke-width="2">
+            <animate attributeName="stroke" values="#4b5563;#7c3aed;#4b5563" keyTimes="0;0.2;1" dur="4s" repeatCount="indefinite"/>
+          </rect>
+          <text x="572" y="42" fill="#e5e7eb" text-anchor="middle">Qwen3.5-0.8B @ RKLLM (NPU)</text>
+          <text x="572" y="62" fill="#9ca3af" text-anchor="middle" font-size="10">system: 只输出 JSON，字段 intent/slots</text>
+          <!-- JSON 框 -->
+          <rect x="440" y="98" width="264" height="64" rx="8" fill="#0b1120" stroke="#059669"/>
+          <text x="452" y="120" fill="#34d399">{</text>
+          <text x="464" y="138" fill="#6ee7b7">"intent": <tspan fill="#fbbf24">"control"</tspan>,</text>
+          <text x="464" y="154" fill="#6ee7b7">"slots": {<tspan fill="#fbbf24">"pos":"right"</tspan>}</text>
+          <!-- 意图/槽位标注 -->
+          <rect x="16" y="98" width="210" height="64" rx="8" fill="#1f2937" stroke="#4b5563"/>
+          <text x="121" y="120" fill="#9ca3af" text-anchor="middle" font-size="11">语义三问</text>
+          <text x="129" y="140" fill="#a78bfa" font-size="11">意图 → control（分类）</text>
+          <text x="129" y="156" fill="#a78bfa" font-size="11">槽位 → pos=right（抽取）</text>
+          <path d="M226 130 L438 130" stroke="#4b5563" stroke-width="1.5" stroke-dasharray="5,5">
+            <animate attributeName="stroke-dashoffset" values="10;0" dur="1s" repeatCount="indefinite"/>
+          </path>
+          <!-- tool_call 循环 -->
+          <rect x="40" y="196" width="180 " height="56" rx="8" fill="#1f2937" stroke="#d97706"/>
+          <text x="130" y="218" fill="#fbbf24" text-anchor="middle">tool_calls</text>
+          <text x="130" y="236" fill="#9ca3af" text-anchor="middle" font-size="10">move_arm(pos="right")</text>
+          <rect x="270" y="196" width="180" height="56" rx="8" fill="#1f2937" stroke="#2563eb"/>
+          <text x="360" y="218" fill="#93c5fd" text-anchor="middle">客户端 FUNCTION_MAP 执行</text>
+          <text x="360" y="236" fill="#9ca3af" text-anchor="middle" font-size="10">→ {"ok": true, "pwm": …}</text>
+          <rect x="500" y="196" width="180" height="56" rx="8" fill="#1f2937" stroke="#059669"/>
+          <text x="590" y="218" fill="#6ee7b7" text-anchor="middle">role: "tool" 回传</text>
+          <text x="590" y="236" fill="#9ca3af" text-anchor="middle" font-size="10">→ 模型终答"已放到右边"</text>
+          <!-- 连接箭头 -->
+          <path d="M220 224 L268 224" stroke="#d97706" stroke-width="2" fill="none" stroke-dasharray="6,5">
+            <animate attributeName="stroke-dashoffset" values="11;0" dur="1s" repeatCount="indefinite"/>
+          </path>
+          <path d="M450 224 L498 224" stroke="#2563eb" stroke-width="2" fill="none" stroke-dasharray="6,5">
+            <animate attributeName="stroke-dashoffset" values="11;0" dur="1s" begin="0.5s" repeatCount="indefinite"/>
+          </path>
+          <path d="M590 195 C 590 120, 700 60, 704 48" stroke="#059669" stroke-width="1.5" fill="none" stroke-dasharray="5,4" opacity="0.6">
+            <animate attributeName="stroke-dashoffset" values="9;0" dur="1s" begin="1s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="0.2;1;0.4" keyTimes="0;0.5;1" dur="4s" repeatCount="indefinite"/>
+          </path>
+          <path d="M668 80 L572 96" stroke="#059669" stroke-width="1.5" fill="none" stroke-dasharray="5,4">
+            <animate attributeName="stroke-dashoffset" values="9;0" dur="1s" begin="1s" repeatCount="indefinite"/>
+          </path>
+          <text x="360" y="284" fill="#6b7280" text-anchor="middle" font-size="10">max_iter=3 兜底：模型反复要工具时强制截停，防死循环</text>
+        </svg>
+        <div class="anim-cap">动画 5-1：语义理解与 Function Call 闭环（4 秒循环）——紫色 token 流入模型，绿框吐出结构化 JSON，橘/蓝/绿三站组成「tool_calls → 客户端执行 → role:tool 回传」循环，最后一条绿线回到模型生成终答。理解的产物不是文字，而是<b>可被程序消费的结构</b>。</div>
+      </div>
+    </section>
+
+    <section class="blk" id="s7">
+      <h2><span class="no">07</span>互动讲解：意图分类与采样实验台</h2>
+      <p>选一句话、换一组采样参数，看看同一个 0.8B 模型的"理解"会如何漂移——尤其是温度对结构化输出稳定性的影响，以及多意图指令的拆解方式。</p>
+      <div class="ix-panel">
+        <div class="ix-title">意图分类与采样实验台 · Intent Lab</div>
+        <div class="ctl-row">
+          <button class="btn" onclick="ixClassify('q','stable')">查询句 · temp 0.1</button>
+          <button class="btn" onclick="ixClassify('c','stable')">控制句 · temp 0.1</button>
+          <button class="btn" onclick="ixClassify('c','loose')">同一句 · temp 1.2</button>
+          <button class="btn" onclick="ixClassify('m','stable')">多意图句 · temp 0.1</button>
+          <button class="btn ghost" onclick="ixReset()">↺ 复位</button>
+        </div>
+        <div class="io" id="ixIo">$ system: 你是语义解析器，只输出 JSON：{"intent":…, "slots":{…}}\n$ 点上方按钮发起一次 /v1/chat/completions 请求…</div>
+      </div>
+      <div class="tip violet"><span class="lab">🔍 观察点</span>温度 1.2 的控制句会偶现多余字段甚至裸文本（0.8B 小模型 + 高温 = 结构漂移），这正是"分类任务要低温"的直观证据；多意图句则拆成 <code>intents:[…]</code> 数组并带 order 序号槽位——真实系统里这就是 EXP-04 关键词方案做不到的"先…然后…"。</div>
+    </section>
+
+    <section class="blk" id="s8">
+      <h2><span class="no">08</span>实操步骤</h2>
+      <div class="flow">
+        <div class="step"><span class="n">1</span><div>起服务：llm_server + /v1/models 验证</div></div>
+        <div class="arr">→</div>
+        <div class="step"><span class="n">2</span><div>跑通多轮对话与采样调参</div></div>
+        <div class="arr">→</div>
+        <div class="step"><span class="n">3</span><div>system prompt 约束意图/槽位 JSON 输出</div></div>
+        <div class="arr">→</div>
+        <div class="step"><span class="n">4</span><div>声明 tools，跑通 Function Call 闭环</div></div>
+      </div>
+      <p><b>步骤 1-2：服务与多轮对话</b>（llm_test.py 默认采样 temperature=0.8 / top_p=0.9 / max_tokens=4096 / repeat_penalty=1.1）：</p>
+      <pre><span class="g">python3 llm_test.py</span>
+<span class="y"># You > 我叫小明   → AI > 你好，小明！很高兴认识你。</span>
+<span class="y"># You > 我刚才说我叫什么？ → AI > 你刚才说你叫小明。（messages 历史生效）</span>
+<span class="y"># You > clear 一键清空历史    You > exit 退出</span>
+<span class="c"># 采样对比：事实问题低温，创意任务高温</span>
+<span class="g">python3 llm_test.py --prompt "1+1=?" --temperature 0.1 --no-stream</span>
+<span class="g">python3 llm_test.py --prompt "写一首关于机器人的诗" --temperature 1.5</span></pre>
+      <p><b>步骤 3：意图/槽位 JSON 输出</b>——关键是 system prompt 放 messages[0] 并用白名单约束：</p>
+      <pre><span class="g">messages = [</span>
+<span class="g">  {"role": "system", "content":</span>
+<span class="g">   "你是语义解析器。只输出JSON：{\\"intent\\":查询|控制|闲聊, \\"slots\\":{...}}，禁止解释。"},</span>
+<span class="g">  {"role": "user", "content": "把机械臂放到右边并抓取方块"},</span>
+<span class="g">]</span>
+<span class="c"># 期望: {"intent":"控制","slots":{"动作":["放置","抓取"],"位置":"右边"}}</span>
+<span class="g">resp = client.chat_once(messages, temperature=0.1, max_tokens=200)</span></pre>
+      <p><b>步骤 4：Function Call 闭环</b>——声明 TOOLS → 解析 tool_calls → 执行 → role:tool 回传（<code>max_iter=3</code> 兜底）：</p>
+      <pre><span class="g">python3 llm_test.py --mode tools --prompt "现在几点了？"</span>
+<span class="y"># 可用工具: get_current_time, get_system_info, calculator, get_battery_status</span>
+<span class="y"># model → tool_calls: get_current_time() → FUNCTION_MAP 执行</span>
+<span class="y"># → {"role":"tool","name":...,"content":"{...}"} → 二次请求 → "现在是 14:30"</span>
+<span class="c"># 数学题同理: "1+1等于几?" → calculator(expression="1+1") → {"result": 2}</span>
+<span class="g">python3 llm_test.py --mode tools --prompt "计算 123 * 456"</span></pre>
+      <div class="tip tealb"><span class="lab">⏱ 预期指标</span>首字延迟 &lt; 500ms（流式）；端到端 &lt; 3s；/v1/models 秒回；工具闭环通常 2 轮请求内出终答。</div>
+    </section>
+
+    <section class="blk" id="s9">
+      <h2><span class="no">09</span>重点与易错点</h2>
+      <div class="tip amber"><span class="lab">⚠️ 高频故障</span>本实验的坑集中在<b>协议细节</b>：role 顺序、字段缺失、JSON 容错。0.8B 小模型"理解力有限"，工程上要用约束与容错兜住它，而不是指望它每次都很乖。</div>
+      <table>
+        <thead><tr><th>现象</th><th>原因</th><th>解决</th></tr></thead>
+        <tbody>
+          <tr><td>模型根本不调用工具，正常回文字</td><td>tools 的 description 太模糊 / 问法太开放</td><td>动词开头一行中文（"执行数学计算"）；问题更具体</td></tr>
+          <tr><td>tool_calls JSON 解析失败</td><td>0.8B 偶发非标准 JSON</td><td>try/except 包 json.loads，失败降级正则提取函数名（JSON+DSL 双格式）</td></tr>
+          <tr><td>role:tool 消息被服务端拒收</td><td>缺 <code>name</code> 字段</td><td>确保 {"role":"tool", "name":fn_name, "content":…}</td></tr>
+          <tr><td>工具执行崩了带崩整个流程</td><td>FUNCTION_MAP 无异常保护</td><td>lambda 内 try/except，回传 {"error": str(e)} 让模型自己圆场</td></tr>
+          <tr><td>tool_call 循环停不下来</td><td>模型反复索要工具</td><td>max_iter=3 强制截断，返回 "[max iterations reached]"</td></tr>
+          <tr><td>system prompt 不生效</td><td>放在了 messages 末尾</td><td>必须 messages[0]；clear 历史后要重新 insert</td></tr>
+          <tr><td>多轮越聊越慢/截断</td><td>历史逼近 max_context_len=4096</td><td>只保留最近 N 轮；必要时摘要压缩</td></tr>
+          <tr><td>并发请求 503 / Cannot connect</td><td>RKLLM 单线程；server 未启动</td><td>请求排队；先起 llm_server.py 并等待 init success</td></tr>
+          <tr><td>推理速度忽快忽慢</td><td>NPU/CPU/DDR 未锁频</td><td><code>python3 llm_server.py --fix-freq</code>（需 root，会真实调 sudo）</td></tr>
+        </tbody>
+      </table>
+      <ul class="check">
+        <li>每次实验前先 <code>curl /v1/models</code> 五秒排除连通性问题，再怀疑 prompt。</li>
+        <li>调参遵循"一变量一次"：先锁 temperature=0.1 验证格式，再谈其他。</li>
+        <li>验证 JSON 时打印原始响应原文——别只看解析成功后的漂亮结果。</li>
+        <li>新增工具只改两处：<code>TOOLS</code>（Schema）与 <code>FUNCTION_MAP</code>（实现），保持一一名映射。</li>
+      </ul>
+    </section>
+
+    <section class="blk" id="s10">
+      <h2><span class="no">10</span>总结与思考</h2>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">🏁</div><div class="kt">完成成果</div><p>llm_server + llm_test 多轮对话；意图/槽位结构化 JSON 输出；Function Call 闭环 calculator/get_current_time 实测通过；system prompt 风格约束生效。</p></div>
+        <div class="kcard"><div class="kd">🧠</div><div class="kt">原理收获</div><p>关键词匹配与语义理解的本质差异；tools / tool_calls / role:tool 三件套如何组成"决策—执行—回传"循环；W4A16 量化与流式 SSE 的工程取舍。</p></div>
+        <div class="kcard"><div class="kd">🛠</div><div class="kt">技能收获</div><p>OpenAI 兼容 API 调试、采样参数调优、messages 上下文管理、非标准 JSON 容错解析——这套本事可直接迁移到 Agent 与 MCP 开发。</p></div>
+        <div class="kcard"><div class="kd">➡</div><div class="kt">去向 EXP-06</div><p>理解了"说什么"，还差"怎么说的"——下一站给对话加上情绪维度：文本情感与语音韵律的双模态感知。</p></div>
+      </div>
+      <div class="tip violet"><span class="lab">💭 思考题</span>
+        <p><b>1.</b> Function Call 的"模型决策 → 客户端执行 → 结果回传"循环，相比纯 Prompt Engineering（让模型直接在文本里编答案），在鲁棒性、可解释性、可扩展性上各有什么优势？请用"计算器"与"让模型心算 123×456"对比说明。</p>
+        <p><b>2.</b> 若 0.8B 模型频繁输出非标准 JSON，你会如何设计一个"JSON + DSL 双格式"容错解析器（提示：先 json.loads，失败再正则提取 name/arguments）？它对 Function Call 的落地有什么价值？</p>
+      </div>
+    </section>
+
+    <nav class="expnav">
+      <a href="../exp-04-voice-dialog/index.html">← EXP-04 端到端语音对话</a>
+      <a href="../exp-06-emotion-perception/index.html">EXP-06 多模态语音情绪感知 →</a>
+    </nav>
+
+    <footer>
+      <span>CORE-03 · 机器人自然语言交互应用 · EXP-05 大模型语义理解</span>
+      <span>8 学时 · 综合性 · 基于 speech_practice 实验讲义改编</span>
+    </footer>
+
+  </main>
+</div>
+
+<script>
+(function(){
+  var io = document.getElementById('ixIo');
+  function emit(s, cls){
+    io.innerHTML += '\n<span class="' + (cls||'dim') + '">' + s + '</span>';
+    io.scrollTop = io.scrollHeight;
+  }
+  var utter = {
+    q: { text: '咱们实验室现在温度多少？', json: '{"intent":"查询","slots":{"领域":"环境信息","对象":"温度"}}' },
+    c: { text: '把机械臂放到右边', json: '{"intent":"控制","slots":{"动作":"放置","位置":"右"}}' },
+    m: { text: '先抓起积木，然后放回盒子', json: '{"intents":[{"order":1,"intent":"控制","slots":{"动作":"抓取"}},{"order":2,"intent":"控制","slots":{"动作":"放置","容器":"盒子"}}]}' }
+  };
+  window.ixClassify = function(kind, temp){
+    emit('$ POST /v1/chat/completions  temperature=' + (temp==='loose'?'1.2':'0.1') + '  stream=false', 'dim');
+    emit('You > ' + utter[kind].text, 'dim');
+    if(temp === 'loose' && kind === 'c'){
+      emit('AI  > {"intent":"控制","slots":{"动作":"放置","区域":"右侧","置信度":0.93}} // 多了自造字段', 'warn');
+      emit('   ⚠ 温度 1.2：字段集合漂移，白名单校验会拒收该结果', 'bad');
+    } else if(temp === 'loose' && kind === 'q'){
+      emit('AI  > 查询到实验室当前温度为 26.5 摄氏度。（直接说了人话，没出 JSON！）', 'bad');
+      emit('   ⚠ 结构化约束被高温破坏 → 下游程序无法解析', 'bad');
+    } else if(kind === 'm'){
+      emit('AI  > ' + utter.m.json, 'ok');
+      emit('   ✓ 多意图拆成数组并带 order 槽位 → 可依次下发任务', 'ok');
+    } else {
+      emit('AI  > ' + utter[kind].json, 'ok');
+      emit('   ✓ intent 命中白名单，slots 齐全 → 进入 FUNCTION_MAP 路由', 'ok');
+    }
+  };
+  window.ixReset = function(){
+    io.innerHTML = '$ system: 你是语义解析器，只输出 JSON：{"intent":…, "slots":{…}}\n$ 点上方按钮发起一次 /v1/chat/completions 请求…';
+  };
+})();
+</script>
+<script src="../shared/tutorial.js" defer></script>
+</body>
+</html>

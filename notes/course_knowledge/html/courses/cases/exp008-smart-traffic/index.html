@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CASE-05 机器人小车智慧交通综合案例（小车 C1）· 课程首页</title>
+<style>
+:root{
+  --bg-base:#f8fafc;--bg-card:#fff;--bg-soft:#f1f5f9;--bg-tint:#eef2ff;
+  --border:#e2e8f0;--border-hover:#a5b4fc;
+  --accent-blue:#4f46e5;--accent-cyan:#0891b2;--accent-teal:#0d9488;
+  --accent-amber:#d97706;--accent-rose:#e11d48;--accent-violet:#7c3aed;
+  --theme:#4f46e5;--theme-deep:#4338ca;--theme-bg:#eef2ff;--theme-bd:#c7d2fe;
+  --text-primary:#0f172a;--text-body:#334155;--text-secondary:#64748b;--text-muted:#94a3b8;
+  --shadow-glow:0 8px 24px rgba(79,70,229,.12);
+  --font-mono:'Cascadia Code','JetBrains Mono',Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg-base);color:var(--text-body);
+  font-family:"Noto Sans CJK SC","WenQuanYi Micro Hei","PingFang SC","Microsoft YaHei","Segoe UI",system-ui,sans-serif;
+  background-image:
+    radial-gradient(ellipse 60% 40% at 50% -5%,rgba(79,70,229,.06),transparent),
+    radial-gradient(ellipse 50% 35% at 100% 5%,rgba(8,145,178,.04),transparent);
+}
+/* Topbar */
+.topbar{position:sticky;top:0;z-index:50;height:60px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 40px;background:rgba(255,255,255,.85);backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;color:var(--text-primary);font-size:15px;text-decoration:none}
+.logo .dot{width:9px;height:9px;border-radius:50%;background:var(--theme);animation:pulse 2.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.back{font-size:13px;color:var(--text-muted);text-decoration:none}
+.back:hover{color:var(--theme)}
+.crumb{font-size:13px;color:var(--text-muted)}
+.crumb b{color:var(--text-secondary);font-weight:500}
+/* Hero */
+.hero{max-width:960px;margin:0 auto;padding:56px 40px 8px;text-align:center}
+.hero .eyebrow{display:inline-block;font-size:12.5px;letter-spacing:.14em;color:var(--theme-deep);
+  background:var(--theme-bg);border:1px solid var(--theme-bd);border-radius:100px;padding:5px 14px;font-family:var(--font-mono)}
+.hero h1{margin:18px 0 14px;font-size:40px;line-height:1.2;color:var(--text-primary);font-weight:800}
+.hero h1 .grad{background:linear-gradient(90deg,#4f46e5,#0891b2,#0d9488);
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.hero p{max-width:720px;margin:0 auto;font-size:16px;line-height:1.8;color:var(--text-secondary)}
+.badges{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:22px 0 0}
+.badge{font-size:12.5px;padding:5px 12px;border-radius:100px;background:var(--bg-card);
+  border:1px solid var(--border);color:var(--text-secondary)}
+/* Stats */
+.stats{max-width:960px;margin:34px auto 0;padding:0 40px}
+.stats-inner{display:flex;background:var(--bg-card);border:1px solid var(--border);border-radius:14px;
+  box-shadow:0 1px 3px rgba(0,0,0,.04);overflow:hidden}
+.stat{flex:1;text-align:center;padding:20px 8px}
+.stat+.stat{border-left:1px solid var(--border)}
+.stat .num{font-size:34px;font-weight:800;color:var(--theme)}
+.stat .num.t{color:var(--accent-teal)} .stat .num.c{color:var(--accent-cyan)} .stat .num.a{color:var(--accent-amber)}
+.stat .lbl{font-size:13px;color:var(--text-secondary);margin-top:3px}
+/* Section */
+.section{max-width:1200px;margin:0 auto;padding:52px 40px 10px}
+.section-head{display:flex;align-items:baseline;gap:14px;margin-bottom:22px}
+.section-head h2{margin:0;font-size:22px;color:var(--text-primary)}
+.section-head .sub{font-size:13.5px;color:var(--text-muted)}
+/* Cards */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:20px}
+.card{position:relative;background:var(--bg-card);border:1px solid var(--border);border-radius:14px;
+  padding:24px 24px 20px;cursor:pointer;overflow:hidden;
+  transition:.28s cubic-bezier(.4,0,.2,1)}
+.card::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;transform:scaleX(0);transform-origin:left;
+  background:linear-gradient(90deg,var(--theme),var(--accent-cyan));transition:transform .35s cubic-bezier(.4,0,.2,1)}
+.card:hover{transform:translateY(-4px);box-shadow:var(--shadow-glow);border-color:var(--border-hover)}
+.card:hover::before{transform:scaleX(1)}
+.card .code{font-family:var(--font-mono);font-size:12px;font-weight:600;color:var(--theme-deep);
+  background:var(--theme-bg);border-radius:6px;padding:3px 8px;display:inline-block}
+.card h3{margin:14px 0 8px;font-size:18px;color:var(--text-primary)}
+.card p{margin:0;font-size:13.5px;line-height:1.7;color:var(--text-secondary)}
+.card .meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.tag{font-size:12px;padding:3px 10px;border-radius:100px;background:var(--bg-soft);
+  border:1px solid var(--border);color:var(--text-secondary)}
+.tag.violet{color:var(--accent-violet);border-color:#ede9fe;background:#f5f3ff}
+.tag.teal{color:var(--accent-teal);border-color:#ccfbf1;background:#f0fdfa}
+.tag.indigo{color:var(--theme-deep);border-color:var(--theme-bd);background:var(--theme-bg)}
+.hint{display:flex;justify-content:space-between;align-items:center;margin-top:16px;
+  padding-top:14px;border-top:1px dashed var(--border);font-size:12.5px;color:var(--text-muted)}
+.hint .go{color:var(--theme);font-weight:600}
+/* Exp list */
+.explist{max-height:0;overflow:hidden;transition:max-height .4s cubic-bezier(.4,0,.2,1);margin-top:0}
+.card.expanded .explist{max-height:520px}
+.explist ul{list-style:none;margin:16px 0 0;padding:0}
+.explist li{display:flex;align-items:center;gap:12px;padding:11px 12px;margin-bottom:8px;
+  background:var(--bg-soft);border:1px solid var(--border);border-radius:10px;
+  font-size:13.5px;color:var(--text-body);text-decoration:none;transition:.28s}
+.explist li:hover{border-color:var(--theme);background:var(--theme-bg);transform:translateX(4px)}
+.explist a.explink{color:inherit;text-decoration:none;display:contents}
+.explist .no{font-family:var(--font-mono);font-size:11.5px;font-weight:700;color:#fff;
+  background:var(--theme);border-radius:6px;padding:3px 7px;flex:none}
+.explist .dur{margin-left:auto;font-size:11.5px;color:var(--text-muted);flex:none}
+.stars{color:var(--accent-amber);font-size:12px;letter-spacing:2px}
+/* Tech pills */
+.tech{max-width:1200px;margin:0 auto;padding:48px 40px 8px;text-align:center}
+.tech h2{font-size:20px;color:var(--text-primary);margin:0 0 18px}
+.pills{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.pill{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--text-secondary);
+  background:var(--bg-card);border:1px solid var(--border);border-radius:100px;padding:7px 15px;
+  transition:.28s}
+.pill i{width:6px;height:6px;border-radius:50%;background:var(--theme);flex:none}
+.pill:hover{border-color:var(--theme);color:var(--theme-deep)}
+/* Path */
+.path{max-width:1200px;margin:0 auto;padding:48px 40px 8px}
+.path-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px;margin-top:18px}
+.pcard{background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:18px 18px 16px;position:relative}
+.pcard .stage{position:absolute;top:-11px;left:16px;font-family:var(--font-mono);font-size:11.5px;font-weight:700;
+  color:#fff;background:var(--theme);border-radius:100px;padding:3px 12px;letter-spacing:.06em}
+.pcard h4{margin:6px 0 8px;font-size:15px;color:var(--text-primary)}
+.pcard p{margin:0;font-size:13px;line-height:1.7;color:var(--text-secondary)}
+.note{max-width:1200px;margin:26px auto 0;padding:0 40px;font-size:13px;color:var(--text-muted);line-height:1.8}
+.note b{color:var(--accent-amber)}
+/* Data table & contract */
+.dwrap{overflow-x:auto;border:1px solid var(--border);border-radius:14px;background:var(--bg-card)}
+.dtable{width:100%;border-collapse:collapse;font-size:13.5px}
+.dtable th{background:var(--bg-soft);color:var(--text-primary);font-weight:600;text-align:left;padding:12px 14px;border-bottom:1px solid var(--border);white-space:nowrap}
+.dtable td{padding:12px 14px;border-bottom:1px solid var(--border);color:var(--text-body);vertical-align:top;line-height:1.7}
+.dtable tr:last-child td{border-bottom:none}
+.dtable tr:hover td{background:#f8faff}
+.dtable code{font-family:var(--font-mono);font-size:12px;color:var(--theme-deep);background:var(--theme-bg);border:1px solid var(--theme-bd);border-radius:5px;padding:1px 6px;white-space:nowrap}
+.dtable small{color:var(--text-muted);font-size:11.5px}
+.dtable .wt{color:var(--accent-teal);font-weight:600}
+.contract{background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:20px 18px 14px}
+.contract svg{width:100%;height:auto;display:block}
+/* FAQ */
+.faq details{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:14px 18px;margin-bottom:10px;transition:.25s}
+.faq details[open]{border-color:var(--border-hover);box-shadow:var(--shadow-glow)}
+.faq summary{cursor:pointer;font-weight:600;font-size:14px;color:var(--text-primary);list-style:none}
+.faq summary::before{content:"Q  ";font-family:var(--font-mono);font-size:12px;color:#fff;background:var(--theme);border-radius:6px;padding:2px 7px;margin-right:8px}
+.faq details[open] summary::before{content:"−  "}
+.faq summary::-webkit-details-marker{display:none}
+.faq p{margin:11px 0 2px;font-size:13.5px;line-height:1.85;color:var(--text-secondary)}
+/* Footer */
+footer{max-width:1200px;margin:56px auto 0;padding:24px 40px 40px;border-top:1px solid var(--border);
+  text-align:center;font-size:12.5px;color:var(--text-muted)}
+/* Reveal */
+.reveal{opacity:0;transform:translateY(16px);transition:opacity .5s,transform .5s}
+.reveal.visible{opacity:1;transform:none}
+@media (max-width:760px){
+  .topbar,.hero,.stats,.section,.tech,.path,.note,footer{padding-left:20px;padding-right:20px}
+  .hero h1{font-size:29px}
+  .stats-inner{flex-wrap:wrap}.stat{flex:1 1 50%;border-left:none!important}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="logo" href="../../index.html#case"><span class="dot"></span>具身智能课程 · 科普教程</a>
+  <nav class="crumb"><a class="back" href="../../index.html#case">← 总首页</a>　实验目录 · <b>CASE-05 机器人小车智慧交通综合案例</b></nav>
+</div>
+
+<header class="hero">
+  <span class="eyebrow">CASE-05 · EXPERIMENT 008 · 综合实战</span>
+  <h1>机器人小车智慧交通 <span class="grad">综合案例（小车 C1）</span></h1>
+  <p>把 3.26m × 2.98m 的交通教学沙盘当成一座"微缩城市"：小车 C1 先用激光 SLAM 把路网画进地图，再用深度相机看懂红绿灯与标志牌，用 PID 沿车道线守住路口规则，最后在平行车位完成一次可量化验收的智慧泊车——感知、决策、控制、语音四条链路在沙盘上全闭环。</p>
+  <div class="badges">
+    <span class="badge">📚 4 个实验</span>
+    <span class="badge">⏱️ 32 学时（4 × 8）</span>
+    <span class="badge">🤖 硬件：具身智能机器人小车 C1</span>
+    <span class="badge">🚦 智慧交通教学沙盘</span>
+    <span class="badge">🧵 能力闭环：建图 → 感知 → 控制 → 泊车</span>
+  </div>
+</header>
+
+<section class="stats reveal" id="case">
+  <div class="stats-inner">
+    <div class="stat"><div class="num">4</div><div class="lbl">实验项目</div></div>
+    <div class="stat"><div class="num c">32</div><div class="lbl">总学时</div></div>
+    <div class="stat"><div class="num t">8+</div><div class="lbl">自制 SVG 示意图</div></div>
+    <div class="stat"><div class="num a">1</div><div class="lbl">综合路测验收</div></div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-head">
+    <h2>实验卡片</h2>
+    <span class="sub">点击卡片展开实验列表 · 每实验 8 学时（2 理论 + 6 实践，理论融入实验页原理章）</span>
+  </div>
+  <div class="grid">
+
+    <article class="card reveal" onclick="toggleCard(this)">
+      <span class="code">EXP-01</span>
+      <h3>沙盘环境认知与建图导航</h3>
+      <p>车道线、直角弯、T 形/十字路口、斑马线、车位……沙盘上的每个元素是什么？小车如何遍历全场画出 slam_map，并按 Nav2 规划的路线巡路？</p>
+      <div class="meta"><span class="tag indigo">slam_toolbox</span><span class="tag">Nav2 点到点</span><span class="tag teal">语义标注</span></div>
+      <div class="explist">
+        <ul>
+          <li><a class="explink" href="./exp-01-sandbox-mapping/index.html"><span class="no">01</span>沙盘元素认知 · 激光建图 · Nav2 巡路 · 地图语义标注<span class="stars">★★★</span><span class="dur">8 学时 →</span></a></li>
+        </ul>
+      </div>
+      <div class="hint"><span class="exp-hint">1 个实验 · 含原理动画 + 互动沙盘推演 + 网抓沙盘图</span><span class="go">展开 ▾</span></div>
+    </article>
+
+    <article class="card reveal" onclick="toggleCard(this)">
+      <span class="code">EXP-02</span>
+      <h3>交通标志与红绿灯识别</h3>
+      <p>HP60C 深度相机拍到的画面，如何用 HSV 颜色分割拆出红黄绿三态？四类交通标志怎样交给 NPU 上的 YOLO 检测？输出话题如何标准化？</p>
+      <div class="meta"><span class="tag">HSV 颜色分割</span><span class="tag violet">NPU / YOLOv8</span><span class="tag indigo">/traffic/*</span></div>
+      <div class="explist">
+        <ul>
+          <li><a class="explink" href="./exp-02-traffic-vision/index.html"><span class="no">02</span>红绿灯三态识别 · 标志检测 · 阈值与置信度调优<span class="stars">★★☆</span><span class="dur">8 学时 →</span></a></li>
+        </ul>
+      </div>
+      <div class="hint"><span class="exp-hint">1 个实验 · 含状态机动画 + 识别小测</span><span class="go">展开 ▾</span></div>
+    </article>
+
+    <article class="card reveal" onclick="toggleCard(this)">
+      <span class="code">EXP-03</span>
+      <h3>车道保持与路口信号通行</h3>
+      <p>摄像头里的车道中心线偏差，怎么经 PID 变成 /cmd_vel 的角速度？路口停止线何时刹、绿灯何时走、斑马线前看到行人模型要不要停？</p>
+      <div class="meta"><span class="tag">PID 巡线</span><span class="tag teal">红灯停绿灯行</span><span class="tag violet">优先级状态机</span></div>
+      <div class="explist">
+        <ul>
+          <li><a class="explink" href="./exp-03-lane-signal/index.html"><span class="no">03</span>视觉巡线 · 停止线与三态灯 · 斑马线礼让 · 状态机决策<span class="stars">★★★</span><span class="dur">8 学时 →</span></a></li>
+        </ul>
+      </div>
+      <div class="hint"><span class="exp-hint">1 个实验 · 含 PID 反馈环动画 + 参数滑杆仿真</span><span class="go">展开 ▾</span></div>
+    </article>
+
+    <article class="card reveal" onclick="toggleCard(this)">
+      <span class="code">EXP-04</span>
+      <h3>智慧泊车与综合路测</h3>
+      <p>平行车位与垂直车位的标线如何被检测、车位可用性怎么判定？轨迹泊车与 Nav2 精点导航如何结合？最终"巡游→改道→红灯停等→礼让→泊车→语音播报"全流程验收。</p>
+      <div class="meta"><span class="tag indigo">车位检测</span><span class="tag">几何轨迹泊车</span><span class="tag violet">语音播报成绩</span></div>
+      <div class="explist">
+        <ul>
+          <li><a class="explink" href="./exp-04-smart-parking/index.html"><span class="no">04</span>车位检测 · 可用性判定 · 轨迹入库 · 综合路测评分<span class="stars">★★★</span><span class="dur">8 学时 →</span></a></li>
+        </ul>
+      </div>
+      <div class="hint"><span class="exp-hint">1 个实验 · 含泊车轨迹动画 + 路径拖拽互动</span><span class="go">展开 ▾</span></div>
+    </article>
+
+  </div>
+</section>
+
+<section class="tech reveal">
+  <h2>技术栈 TECH</h2>
+  <div class="pills">
+    <span class="pill"><i></i>ROS 2 Humble</span><span class="pill"><i></i>slam_toolbox（car1_slam / slam_map）</span>
+    <span class="pill"><i></i>Nav2 + AMCL（car1_navigation）</span><span class="pill"><i></i>TF2 view_frames</span>
+    <span class="pill"><i style="background:var(--accent-cyan)"></i>HP60C 深度相机 /ascamera_hp60c/**</span>
+    <span class="pill"><i style="background:var(--accent-teal)"></i>2D 激光雷达</span>
+    <span class="pill"><i style="background:var(--accent-violet)"></i>6 TOPS NPU · YOLOv8 RKNN</span>
+    <span class="pill"><i style="background:var(--accent-amber)"></i>OpenCV HSV 颜色分割</span>
+    <span class="pill"><i></i>PID 巡线控制</span><span class="pill"><i></i>/cmd_vel 速度控制</span>
+    <span class="pill"><i style="background:var(--accent-rose)"></i>优先级状态机 IDLE/CROSSING/WAITING</span>
+    <span class="pill"><i></i>麦克纳姆轮底盘</span><span class="pill"><i style="background:var(--accent-amber)"></i>car1_speech 语音播报</span>
+    <span class="pill"><i></i>RViz2 可视化</span>
+  </div>
+</section>
+
+<section class="path reveal">
+  <div class="section-head">
+    <h2>学习路径 PATH</h2>
+    <span class="sub">四实验即四阶段，前一实验的产出是后一实验的输入</span>
+  </div>
+  <div class="path-grid">
+    <div class="pcard"><span class="stage">STAGE 1 · EXP-01</span><h4>先认路，再画图</h4><p>沙盘元素认知与安全边界先行：遍历建图并保存 slam_map，给路口、灯口、车位做语义标注——没有地图与点位，后面全是空中楼阁。</p></div>
+    <div class="pcard"><span class="stage">STAGE 2 · EXP-02</span><h4>感知先行</h4><p>HSV 三态灯 + NPU 标志检测输出标准话题 /traffic/light、/traffic/sign，光照一变就重新标定——感知的输出决定控制的输入。</p></div>
+    <div class="pcard"><span class="stage">STAGE 3 · EXP-03</span><h4>控制收敛</h4><p>PID 巡线压中心偏差，路口状态机管"停、等、行、让"，低速起步、提前减速两条铁律贯穿始终。</p></div>
+    <div class="pcard"><span class="stage">STAGE 4 · EXP-04</span><h4>综合收口</h4><p>泊车入库 + 全流程路测，每一环都有量化指标与评分表，语音播报成绩作为最终交付。</p></div>
+  </div>
+</section>
+
+<section class="section reveal">
+  <div class="section-head">
+    <h2>数据契约 DATA CONTRACT</h2>
+    <span class="sub">前一实验的产出是后一实验的输入——四段接口决定了 32 学时能串成一个案例</span>
+  </div>
+  <div class="contract">
+    <svg viewBox="0 0 1080 216" role="img" aria-label="四实验数据契约示意图">
+      <defs>
+        <marker id="cAr" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#4f46e5"/></marker>
+      </defs>
+      <g font-family="Noto Sans CJK SC, WenQuanYi Micro Hei, sans-serif" font-size="13" text-anchor="middle">
+        <text x="540" y="24" fill="#4338ca" font-weight="bold">EXP-01 → EXP-04 的数据契约（话题与文件）</text>
+
+        <rect x="8" y="58" width="240 " height="118" rx="14" fill="#eef2ff" stroke="#c7d2fe" stroke-width="2"/>
+        <text x="128" y="86" fill="#4338ca" font-weight="bold">EXP-01 建图导航</text>
+        <text x="128" y="112" fill="#4338ca">slam_map.yaml</text>
+        <text x="128" y="136" fill="#64748b" font-size="12">语义点位 waypoints.yaml</text>
+        <text x="128" y="158" fill="#64748b" font-size="12">（路口 / 灯口 / 车位）</text>
+
+        <rect x="285" y="58" width="240" height="118" rx="14" fill="#eef2ff" stroke="#c7d2fe" stroke-width="2"/>
+        <text x="405" y="86" fill="#4338ca" font-weight="bold">EXP-02 交通视觉</text>
+        <text x="405" y="112" fill="#4338ca">/traffic/light · /traffic/sign</text>
+        <text x="405" y="136" fill="#64748b" font-size="12">HSV 三态 10Hz · 标志 15Hz</text>
+        <text x="405" y="158" fill="#64748b" font-size="12">NPU 端侧推理 6 TOPS</text>
+
+        <rect x="562" y="58" width="240" height="118" rx="14" fill="#eef2ff" stroke="#c7d2fe" stroke-width="2"/>
+        <text x="682" y="86" fill="#4338ca" font-weight="bold">EXP-03 车道与信号</text>
+        <text x="682" y="112" fill="#4338ca">/cmd_vel（PID + 状态机）</text>
+        <text x="682" y="136" fill="#64748b" font-size="12">IDLE / WAITING / CROSSING</text>
+        <text x="682" y="158" fill="#64748b" font-size="12">行人 &gt; 红灯 &gt; 巡线</text>
+
+        <rect x="839" y="58" width="233" height="118" rx="14" fill="#fef3c7" stroke="#f59e0b" stroke-width="2"/>
+        <text x="955" y="86" fill="#92400e" font-weight="bold">EXP-04 泊车 + 路测</text>
+        <text x="955" y="112" fill="#b45309">/score → car1_speech 播报</text>
+        <text x="955" y="136" fill="#92400e" font-size="12">六阶段计分 ≥85 分过关</text>
+        <text x="955" y="158" fill="#92400e" font-size="12">零人工干预 · rosbag 留痕</text>
+
+        <line x1="248" y1="117" x2="277" y2="117" stroke="#4f46e5" stroke-width="2.5" marker-end="url(#cAr)"/>
+        <text x="262" y="48" fill="#4f46e5" font-size="11">地图</text>
+        <line x1="525" y1="117" x2="554" y2="117" stroke="#4f46e5" stroke-width="2.5" marker-end="url(#cAr)"/>
+        <text x="540" y="48" fill="#4f46e5" font-size="11">灯态</text>
+        <line x1="802" y1="117" x2="831" y2="117" stroke="#4f46e5" stroke-width="2.5" marker-end="url(#cAr)"/>
+        <text x="817" y="48" fill="#4f46e5" font-size="11">通行</text>
+
+        <text x="540" y="202" fill="#64748b" font-size="12">四段接口任一断流，后级按 fail-safe 处理——这就是"综合案例"区别于四个孤立实验的地方</text>
+      </g>
+    </svg>
+  </div>
+</section>
+
+<section class="section reveal">
+  <div class="section-head">
+    <h2>学时与验收 SCHEDULE</h2>
+    <span class="sub">32 学时 = 4 实验 × 8（2 理论 + 6 实践），理论融入各实验页"02 核心原理"章</span>
+  </div>
+  <div class="dwrap">
+    <table class="dtable">
+      <thead><tr><th>实验（8 学时 · 2 理论 + 6 实践）</th><th>关键命令（xlsx 风格）</th><th>量化验收</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>EXP-01</b> 沙盘认知与建图导航<br><small>元素认知 → SLAM → Nav2 → 语义标注</small></td>
+          <td><code>ros2 launch car1_slam slam.launch.py</code><br><code>ros2 run nav2_map_server map_saver_cli -f slam_map</code><br><code>ros2 launch car1_navigation navigation.launch.py map:=slam_map</code></td>
+          <td>闭环回路完整无断图；点到点 10/10；语义点位 ≥6 处</td>
+        </tr>
+        <tr>
+          <td><b>EXP-02</b> 交通标志与红绿灯识别<br><small>HSV 三态 → NPU 检测 → 话题标准化</small></td>
+          <td><code>ros2 launch ascamera hp60c.launch.py</code><br><code>python3 src/app.py --model models/*.rknn</code><br><code>ros2 topic echo /traffic/light</code></td>
+          <td>红黄绿三态 ≥95%；四类标志 mAP 达标；话题频率稳（10/15Hz）</td>
+        </tr>
+        <tr>
+          <td><b>EXP-03</b> 车道保持与路口信号通行<br><small>PID 巡线 → 红停绿行 → 礼让 → 状态机</small></td>
+          <td><code>ros2 run car1_control lane_follow_node.py --params-file lane_follow.yaml</code><br><code>ros2 param set /lane_follow_node kp 0.60</code><br><code>ros2 run tf2_tools view_frames</code></td>
+          <td>直道偏差 ≤±2cm；红灯 10/10；礼让 10/10；迁移无振荡</td>
+        </tr>
+        <tr>
+          <td><b>EXP-04</b> 智慧泊车与综合路测<br><small>车位检测 → 轨迹入库 → 全流程计分播报</small></td>
+          <td><code>ros2 action send_goal /navigate_to_pose …</code><br><code>ros2 launch car1_speech speech.launch.py</code><br><code>ros2 bag record -a -o smart_route_bag</code></td>
+          <td>入库 10/10 不压线；全流程 <span class="wt">≥85 分</span>、零干预；TTS 播报一致</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="path reveal">
+  <div class="section-head">
+    <h2>开课准备 PREP</h2>
+    <span class="sub">硬件、软件、交付物、安全四张清单，开课前逐项打勾</span>
+  </div>
+  <div class="path-grid">
+    <div class="pcard">
+      <span class="stage">清单 A · 硬件</span>
+      <h4>沙盘与小车点验</h4>
+      <p>小车 C1 电量与麦克纳姆轮检查；HP60C、2D 雷达紧固；沙盘按现场实际清点车道线、红绿灯、标志牌、车位与行人模型——<b>以现场沙盘实际元素为准</b>。</p>
+    </div>
+    <div class="pcard">
+      <span class="stage">清单 B · 软件</span>
+      <h4>环境一次配好</h4>
+      <p>ROS 2 Humble + slam_toolbox + Nav2/AMCL + ascamera 驱动 + car1_speech；YOLO 权重导出 RKNN（INT8，6 TOPS NPU）；RViz2 配置与 slam_map 初始文件就位。</p>
+    </div>
+    <div class="pcard">
+      <span class="stage">清单 C · 交付物</span>
+      <h4>四实验的作业包</h4>
+      <p>slam_map + 语义点位 yaml → HSV 与置信度标定文件 → 直道偏差曲线、状态机迁移日志 → 泊车评分表 + rosbag；每一项都可复盘、可量化。</p>
+    </div>
+    <div class="pcard">
+      <span class="stage">清单 D · 安全</span>
+      <h4>低速与断流兜底</h4>
+      <p>巡线 ≤0.25m/s、入库 ≤0.10m/s 起步；/traffic/* 断流 ≥1s 按红灯 fail-safe；每次导航前设初始位姿；光照变化先重新标定再动手。</p>
+    </div>
+  </div>
+</section>
+
+<section class="section reveal">
+  <div class="section-head">
+    <h2>常见问答 FAQ</h2>
+    <span class="sub">开课前学生最常问的五个问题</span>
+  </div>
+  <div class="faq">
+    <details open>
+      <summary>没有现场沙盘，页面还能学吗？</summary>
+      <p>能。四个实验页的原理、动画、互动仿真全部自包含，不依赖实拍素材；沙盘元素按同类教学沙盘典型规格（车道约 40cm、直角弯 ×4、平行车位 45×35cm 等）设计，<b>一切以现场沙盘实际元素为准</b>，到现场后对照点验即可。</p>
+    </details>
+    <details>
+      <summary>"2 理论 + 6 实践"的理论讲在哪？</summary>
+      <p>不单独设理论页：每实验页"02 核心原理"就是 2 学时理论（含自制 SVG 示意图），"04~07"合计 6 学时实践；"06 原理动画 / 07 互动实验"可作理论收尾的课堂演示。</p>
+    </details>
+    <details>
+      <summary>/traffic/light、/traffic/sign 是谁发布的？</summary>
+      <p>EXP-02 的识别节点：HSV 颜色分割输出红黄绿三态（约 10Hz），NPU 上的 YOLOv8 输出四类标志（约 15Hz）。EXP-03 状态机与 EXP-04 全流程评分器只订阅这两个标准话题，感知模型换代不影响控制代码。</p>
+    </details>
+    <details>
+      <summary>为什么反复强调"初始位姿必设"？</summary>
+      <p>Nav2 精点导航的目标点定义在 map 坐标系：AMCL 初值歪 5cm，停位就歪 5cm——泊车 ≤3cm 的验收直接失败。每次启动 navigation.launch.py 后，先在 RViz2 用 2D Pose Estimate 对齐，再发 /navigate_to_pose。</p>
+    </details>
+    <details>
+      <summary>光照一变就漏检，怎么根治？</summary>
+      <p>没有一劳永逸的阈值。按实验页给出的流程：换光照 → 重采空位/有车样本 → 重标 HSV 与二值化阈值 → 复测 10 例回归。NPU 侧的标志检测同理，训练集要覆盖沙盘现场的灯光条件。</p>
+    </details>
+    <details>
+      <summary>CASE-05 与已有课程什么关系？卡片编号在哪？</summary>
+      <p>本课程是 cases 目录下第 5 个综合案例（编号 CASE-05，目录名 exp008-smart-traffic），首页总索引的回填由主控统一完成；课程内四实验自成闭环，硬件统一为具身智能机器人小车 C1 + 智慧交通教学沙盘（选型参考：淘宝 id=696594369848「ROS机器人无人驾驶沙盘」，¥899，塔克创新品牌店）。</p>
+    </details>
+  </div>
+</section>
+
+<p class="note"><b>素材与规格说明：</b>本课程按同类教学沙盘典型规格设计（车道宽约 40cm、直角弯 ×4、T 形路口、红绿灯模型、斑马线、平行车位、交通标志牌、高对比识别线等），并抓取了 Hiwonder 同类产品公开页图片作为参照，<b>一切以现场沙盘实际元素为准</b>；教学沙盘选型参考：淘宝 id=696594369848「ROS机器人无人驾驶沙盘」（¥899，塔克创新品牌店）。未标注来源的示意图均为本课程自制示意图；动画与互动组件全部页内自包含、无外部依赖。</p>
+
+<footer>
+  CASE-05 · 机器人小车智慧交通综合案例（小车 C1）· 32 学时 · 输出目录 training/output（样例）
+</footer>
+
+<script>
+function toggleCard(card){
+  var open=card.classList.contains('expanded');
+  document.querySelectorAll('.card.expanded').forEach(function(c){
+    c.classList.remove('expanded');
+    var h=c.querySelector('.exp-hint'); if(h) h.dataset.orig&&(h.textContent=h.dataset.orig);
+    var g=c.querySelector('.go'); if(g) g.textContent='展开 ▾';
+  });
+  if(!open){
+    card.classList.add('expanded');
+    var hint=card.querySelector('.exp-hint');
+    if(hint){ hint.dataset.orig=hint.dataset.orig||hint.textContent; hint.textContent='点击空白处收起'; }
+    var go=card.querySelector('.go'); if(go) go.textContent='收起 ▴';
+  }
+}
+var io=new IntersectionObserver(function(es){
+  es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('visible'); io.unobserve(e.target);} });
+},{threshold:.12});
+document.querySelectorAll('.reveal').forEach(function(el){io.observe(el)});
+</script>
+</body>
+</html>

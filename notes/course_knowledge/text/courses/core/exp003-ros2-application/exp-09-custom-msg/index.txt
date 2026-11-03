@@ -1,0 +1,979 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp003-ros2-application/exp-09-custom-msg/index.html
+TITLE: EXP-09 · 自定义接口消息 · 温湿度传感器 — 机器人 ROS2 应用与开发
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+EXP-09 · 自定义接口消息 · 温湿度传感器 — 机器人 ROS2 应用与开发
+🧠 具身智能课程 ·
+教程首页
+核心课程
+/
+ROS2 应用与开发
+/ EXP-09
+本页目录
+★ 课程目标
+01 跑出现象：DHT11 温湿度节点跑起来
+02 问题引入：一次数据串台事故复盘
+03 核心原理：结构与场景选型
+04 实操 A：通览 6 份真实契约
+05 实操 B：设计一份新接口
+06 注意事项与验收清单
+07 本课总结与思考题
+CH2 · 通信机制
+EXP-05 节点
+EXP-06 话题
+EXP-07 服务
+EXP-08 动作
+EXP-09 自定义接口
+EXP-10 参数
+EXP-09 · 第 2 章 · 设计性 · 2 学时
+自定义接口消息 · 温湿度传感器
+标准 Float32 装不下"温度+湿度+有效位"。本课回看实验 6-8 用过的全部接口，讲清 .msg/.srv/.action 三种文件结构、rosidl 编译链与接口包分离哲学。
+难度 ⭐⭐
+2 学时
+设计性
+关键词 rosidl · 接口包 · 契约
+目标
+本课学完，你应该能做到
+① 说清结构
+三种接口文件
+能阐述
+.msg
+（单段字段）、
+.srv
+（一个
+---
+分隔请求/响应）、
+.action
+（两个
+---
+分隔 Goal/Result/Feedback）的结构差异与适用场景。
+② 掌握链路
+定义 → 编译 → import
+掌握
+ros_sensor_interfaces
+从"写接口定义 → 配
+rosidl_generate_interfaces
+→ 生成 Python/C++ 类 → 节点 import 使用"的完整链路。
+③ 独立完成
+读懂已有契约
+能用
+ros2 interface list/show
+查看定义，并说清
+TemperatureHumidity
+、
+VerifyFingerprint
+、
+RfidScan
+等接口与 EXP-06~08 各节点的对应关系。
+④ 迁移应用
+为新传感器定接口
+能为新传感器建自定义接口包（如光照度、加速度计），并正确配置
+CMakeLists.txt
+的
+rosidl_generate_interfaces
+与
+package.xml
+的依赖。
+本课的重点与难点
+重点
+：接口包必须是
+ament_cmake
+（不能用 ament_python）；改了接口一定要重新编译接口包，再 source。
+难点
+：理解"接口是编译期的契约"——它决定了发布端与订阅端能不能对上话，而不是运行时才协商。
+和前后的关系
+本课是
+EXP-06~08 的收口
+：把散落在三个实验里的自定义接口集中再看一遍。同时为 EXP-17 launch 传参打基础。
+01
+跑出现象：一个真实的温湿度节点跑起来是什么样
+先别急着背接口语法——
+先看一个真跑起来的自定义消息案例
+。DHT11 温湿度传感器正好是"一条消息装两个字段"的典型：温度和湿度
+必须成对出现
+，缺一个就没有意义。跑通它，你就知道自定义接口到底解决了什么问题。
+🌡️
+这个节点你已经有了
+：
+dht11_sensor_node.py
+就在
+ros_sensor
+包里，
+不需要你写一行代码
+。它每 2 秒读一次 DHT11，把温度和湿度打包成一条
+TemperatureHumidity
+消息发到
+/temperature_humidity
+话题上。下面我们把它跑起来，再从三个角度观察它。
+终端 A
+启动温湿度节点
+（保持运行，别关）
+1
+先把接口包和节点包都编译好
+终端 A
+dht11_sensor_node
+要用
+TemperatureHumidity
+这个消息类，所以
+接口包必须一起编
+——只编节点包会因为找不到消息类型而失败。
+# ① 进工作空间，并加载 ROS2 本体
+cd ~/ros2_ws
+source /opt/ros/humble/setup.bash
+# ② 接口包 + 节点包一起编（顺序由 colcon 按依赖自动排）
+colcon build --packages-select ros_sensor_interfaces ros_sensor
+# ③ 注册进当前终端
+source install/setup.bash
+✔ 看到
+Finished <<< ros_sensor_interfaces
+和
+Finished <<< ros_sensor
+两行都出现，才算编全。
+2
+启动节点，看温湿度每 2 秒滚动
+终端 A
+这条命令背后就是那个 65 行的节点：读 DHT11 → 填两个字段 → 发布 → 打日志。
+📦
+关于
+dht11_native
+（读 DHT11 的二进制模块）
+它不是源码，而是
+预编译好的 aarch64 C 扩展
+，已经装在
+~/ros2_ws/install/dht11_native/
+下。
+你不需要编译它
+，但它必须在
+PYTHONPATH
+里才 import 得到——这就是步骤 1 里
+source install/setup.bash
+不能省的原因。
+这也是为什么下面那条启动命令要 source
+三套环境
+：ROS2 本体提供
+ros2
+命令、工作空间提供
+ros_sensor
+与
+dht11_native
+、venv 提供节点实际用的 Python 解释器。
+⚠️
+DHT11 必须用 root 跑（临时方案）
+DHT11 驱动是
+直接读写 GPIO 寄存器
+实现的（走
+/dev/mem
+，走物理地址
+0x27320000
+），不是标准的内核驱动，所以
+必须有 root 权限
+。
+但直接把
+ros2 run
+前面加
+sudo
+会失败——
+sudo
+会清空
+PATH
+、
+PYTHONPATH
+和 venv，导致
+ros2: command not found
+或
+PackageNotFoundError
+。
+所以这里的做法是：用
+sudo
+拉起一个 root 的 bash，在它内部把三套环境重新 source 一遍，再启动节点。
+下面每条
+source
+都标了作用。
+粘贴这一整段（5 行要一起复制，别拆开）
+# 用 sudo 起一个 root 的 bash，在里面依次加载 3 套环境，最后启动节点
+# 行尾的 \ 是续行符：这 5 行在 shell 看来是"一整条命令"，必须整体复制
+# ① source /opt/ros/humble/setup.bash → ROS2 本体环境（提供 ros2 命令与 rclpy）
+# ② source ~/ros2_ws/install/setup.bash → 本工作空间（提供 ros_sensor 包与消息类）
+# ③ source ~/ros2_venv/bin/activate → Python 虚拟环境（节点真正用的解释器）
+sudo -E bash -c 'source /opt/ros/humble/setup.bash; \
+source /home/iflytek/ros2_ws/install/setup.bash; \
+source /home/iflytek/ros2_venv/bin/activate; \
+ros2 run ros_sensor dht11_sensor_node'
+🧪
+为什么这是"临时方案"
+这条命令能用，但它有三个明显的短板，只适合
+课堂实验临时跑一次
+：
+·
+每次都要敲这么长
+，而且路径写死了
+/home/iflytek/
+，换台机器或换个用户就不对了；
+·
+整个节点都在 root 下运行
+——ROS2 网络、日志文件、工作空间缓存都会变成 root 所有，之后普通用户再跑别的节点可能报权限错；
+·
+治不了根
+：真正的解决方式是给 DHT11 换一个不需要
+/dev/mem
+的驱动（比如走 gpiod + 内核定时），或者给这个可执行文件单独配
+setcap
+/udev 规则。这些超出本课范围。
+所以：实验课用这条命令把现象跑出来就行；工程上别这么干。
+$ sudo -E bash -c 'source ... ; ros2 run ros_sensor dht11_sensor_node'
+[INFO]
+[dht11_sensor_node]: DHT11 温湿度节点启动：周期=2.0s
+[INFO]
+[dht11_sensor_node]: 温度=25.3°C 湿度=61.0%
+[INFO]
+[dht11_sensor_node]: 温度=25.4°C 湿度=60.8%
+[INFO]
+[dht11_sensor_node]: 温度=25.3°C 湿度=61.2%
+…每 2 秒一行，持续滚动
+✔ 关键观察：
+温度和湿度永远打印在同一行
+。它们来自同一次采样，是同一条消息里的两个字段——这就是"原子性"。停止请按
+Ctrl+C
+。
+终端 A — dht11_sensor_node
+$ ros2 run ros_sensor dht11_sensor_node
+[INFO] DHT11 温湿度节点启动：周期=2.0s
+[INFO] 温度=25.3°C
+湿度=61.0%
+← 同一条消息的两个字段
+[INFO] 温度=25.4°C
+湿度=60.8%
+[INFO] 温度=25.3°C
+湿度=61.2%
+…每 2 秒一行
+TemperatureHumidity { temperature: 25.3, humidity: 61.0 }  ← 一条消息
+示意｜温湿度
+成对打印
+：每一行都是一次完整采样。
+TemperatureHumidity
+把两个字段装进同一条消息，订阅端收到的一定是同一时刻的配对值——不会出现"温度是这一次、湿度是上一次"的错配。
+终端 B
+换个角度：从话题外部偷看这条消息
+（终端 A 保持运行）
+3
+看话题上到底流着什么结构
+终端 B
+这是理解自定义消息最直观的一步——
+直接看原始消息长什么样
+。
+# 新终端开场：进目录 + source
+cd ~/ros2_ws
+source install/setup.bash
+# 看话题列表（应该能找到 /temperature_humidity）
+ros2 topic list
+# 看这条话题用的什么消息类型
+ros2 topic info /temperature_humidity
+# 直接打印消息内容（Ctrl+C 停止）
+ros2 topic echo /temperature_humidity
+$ ros2 topic info /temperature_humidity
+Type: ros_sensor_interfaces/msg/TemperatureHumidity
+Publisher count:
+1
+Subscription count:
+0
+$ ros2 topic echo /temperature_humidity
+temperature:
+25.3
+humidity:
+61.0
+---
+temperature:
+25.4
+humidity:
+60.8
+---
+✔
+注意
+---
+分隔符
+：上面这两个字段属于
+同一条消息
+，它们之间没有分隔线；分隔线是消息与消息之间的边界。这跟
+.msg
+文件里"零个分隔符"是同一件事。
+4
+看这个消息类是怎么定义出来的
+终端 B
+话题上那个结构不是凭空来的，它来自一个只有两行的文本文件。
+interface show
+打印的就是那个文件的镜像。
+# 查看消息定义（就是 .msg 文件的内容）
+ros2 interface show ros_sensor_interfaces/msg/TemperatureHumidity
+$ ros2 interface show ros_sensor_interfaces/msg/TemperatureHumidity
+# 温湿度传感器数据
+float32 temperature
+# 温度(摄氏度)
+float32 humidity
+# 湿度(%)
+✔ 对照一下：
+两行定义 → 编译成消息类 → 话题上就能 echo 出结构化的两个字段
+。这条链路就是本课的全部主题。
+⚠️
+手上没有 DHT11 模块怎么办？
+终端 A 会跑不起来或报
+读取 DHT11 失败
+（
+dht11_native
+是 aarch64 的 C 扩展，只在实验箱上能用）。
+不影响理解本课
+——真正的核心是"消息结构"，你可以跳过硬件的部分，直接从步骤 3 开始：手动往同一条话题上发一条消息，观察它的结构：
+ros2 topic pub /temperature_humidity ros_sensor_interfaces/msg/TemperatureHumidity "{temperature: 25.3, humidity: 61.0}" -r 1
+终端 B 的
+echo
+与
+interface show
+照常可用。
+🎯
+跑完这一步，你已经看到三件事
+：① 一条消息可以装
+多个字段
+（温度+湿度）；② 这两个字段
+永远配对
+，不会错位；③ 这个结构来自一个
+两行文本文件
+。接下来要回答的就是：为什么不直接用
+Float32
+？那个两行文件怎么变成代码？
+02
+问题引入：一次"数据串台"的误报事故
+在学新东西之前，先把前四章你自己亲手敲过的代码摆到一张桌子上，看它们各自搬运的"
+数据形状
+"是什么。想清楚这一步，你就明白自定义接口为什么非有不可。
+章节
+通信方式
+搬的是什么数据
+当时用的接口
+够不够用
+EXP-05
+节点
+—（只有身份）
+不搬数据，只回答"谁活在计算图里"
+无
+—
+EXP-06
+话题
+广播式持续流
+MQ5 的气体浓度，
+一个 ppm 数值
+标准
+std_msgs/Float32
+只有一个值时刚好够
+EXP-07
+服务
+一问一答
+指纹结果：成功与否 + 用户编号 + 提示语
+自定义
+VerifyFingerprint.srv
+标准库里
+根本没有
+EXP-08
+动作
+长任务 + 进度
+超时目标 + 四字段结果 + 运行状态
+自定义
+RfidScan.action
+标准库里
+根本没有
+发现了吗？
+服务和动作那两章，你早就在用自定义接口了
+——只是当时的注意力全在"通信流程"上，没人停下来讲这两个接口文件本身长什么样、为什么必须自己写。
+真正被卡住的是话题这条线
+：它至今停在单值
+Float32
+上。
+🔥 事故复盘：巡检小车的"温湿度超标报警"，为什么报了一个不存在的状态
+需求很朴素：巡检测到
+温度 > 35℃ 且 湿度 > 80%
+就上报"环境异常"。
+传感器是 DHT11，
+一次采样同时给出温度和湿度两个值
+。既然 EXP-06 用
+Float32
+发 MQ5 浓度没问题，最"自然"的做法就是开两个话题各发各的：
+/dht11/temperature   std_msgs/Float32   → 36.2
+/dht11/humidity      std_msgs/Float32   → 82.0
+代码跑通了，日志在刷，订阅端 print 出来的两条数值也都在——
+看起来一切正常
+。然后现场出现了这样的两次采样：
+采样#1
+36.2 ℃ / 45 %
+—— 热但很干。按需求
+不该报警
+。
+采样#2
+33.1 ℃ / 82 %
+—— 湿但温度不够。按需求
+也不该报警
+。
+现场
+湿度那条话题的第 2 条
+先到
+（t=2.010s），温度那条的第 2 条
+排队晚了
+（t=2.030s）。这 20ms 的网络抖动，在局域网上完全正常。
+结果
+订阅端在两个缓冲里"各取最新"：温度还停在
+36.2
+，湿度已经换成
+82
+→ 判定成立 →
+报警响了
+。
+两条话题各自计时 → 订阅端"各取最新" → 拼出一个从未真实出现过的状态
+① 采样端：DHT11 一次同时给出两个值
+采样#1   t = 1.00s
+36.2 ℃   /   45 %
+采样#2   t = 2.00s
+33.1 ℃   /   82 %
+两次都不满足
+"温度>35 且 湿度>80"
+② 拆成两条独立话题：各自排队、各自到达
+/dht11/temperature
+36.2 @1.002s   33.1 @2.030s ← 晚到
+/dht11/humidity
+45 @1.008s     82 @2.010s ← 先到
+③ 订阅端：两个缓冲各自记"最新值"，谁先到谁先覆盖
+最新温度 = 36.2 ℃
+（33.1 还在路上，没进来）
+最新湿度 = 82 %
+（45 已被覆盖，回不去了）
+④ 判定：36.2 ℃ 且 82 % → 报警 ✗ 这个"又热又湿"的状态现实中从未出现
+图 9-1 · 两条各自为政的话题：订阅端"各取最新"的配对，会拼出一次现实中从未发生的环境状态
+这不是代码 bug —— 变量名、循环、类型全都没错。
+错的是数据结构本身
+：本该原子的一份信息被拆成两条独立消息，等于把"配对的正确性"这个包袱从系统层甩给了每一个订阅者。更糟的是它
+静默出错
+：日志里两条数值都印得漂漂亮亮，你根本看不出它们不是同一刻的。运维跑过去一看现场一切正常，从此再没人信这条报警。
+把这次事故拆开，会看到四层结构性缺陷——它们都不是"写得更仔细"能解决的：
+缺陷 ①
+原子性丢失
+温度和湿度是同一次采样的一体两面。拆成两条消息后，它们之间只剩一个
+没有机制担保的隐含假设
+："差不多同时到的就是一对"。
+缺陷 ②
+时间对齐靠人肉
+要修就得给每条消息加时间戳、在订阅端写配对缓冲。而 6~20ms 抖动在局域网上完全正常——
+错误还会静默发生
+。
+缺陷 ③
+字段一多就组合爆炸
+再补上"有效位""电池电压""传感器编号"，就是 5 个话题、5 路缓冲、5 处配对逻辑。每加一个字段，发布端和订阅端都要全线改一遍。
+缺陷 ④
+标准库改不了
+common_interfaces
+是全球共享的冻结定义，你不可能往里塞一个
+temperature
+字段；而自己在话题上私自约定"第一条是温度、第二条是湿度"，别的节点凭什么认？
+ROS2 给的答案就是
+自定义接口
+：用几行文本把一份数据的结构写清楚，编译成 Python / C++ 双端可用的消息类。下面先把"该打包"和"不该打包"摆在一起看：
+😤 单值消息硬扛：三个话题各发各的
+温度发
+/temperature
+、湿度发
+/humidity
+——
+两次到达、时间对不齐
+订阅方要自己做"配对"：哪条温度配哪条湿度？
+加一个字段 = 全线改发布端和订阅端
+就像
+给你寄三张散装便签
+：一张写重量、一张写收件人，丢了哪张都拼不出完整信息
+😎 自定义接口：一张"标准快递面单"
+一张面单固定印好格子：
+重量、收件人、是否易碎
+——一格不多一格不少
+快递员（发布端）和收件人（订阅端）
+都认这张面单
+，格式永不扯皮
+对应到 ROS2：
+TemperatureHumidity
+一条消息装下温度+湿度，天然原子性
+面单格式（接口）印好后双方共守——
+这就是契约
+✗ 散装便签：两个 Float32 话题
+/temperature 26.3
+/humidity 48.0
+到达时间可能差几毫秒 → 谁配谁？
+第三条消息来了怎么和前两条配？
+t=1.002s 到达的温度 ↔ t=1.008s 的湿度？
+✓ 快递面单：一条 TemperatureHumidity
+TemperatureHumidity
+float32 temperature: 26.3
+float32 humidity:    48.0
+# 同一采样时刻的原子组合
+一条消息 = 一份完整语义，永不拆散
+图 9-2 · 散装便签 vs 标准面单：为什么多字段数据要"打包"成一条自定义消息
+接口 = 契约
+接口定义是收发双方共同遵守的
+数据契约
+：字段名、类型、顺序一旦编译固化，任何一端擅自改动都会破坏兼容——所以它要独立成包、版本化管理。
+03
+核心原理：三种接口文件结构
+.msg · 零个分隔符
+单段字段表
+每行
+类型 字段名 # 注释
+。TemperatureHumidity：float32 temperature / float32 humidity——一对多持续流的数据载体。
+.srv · 一个 ---
+请求 | 响应
+VerifyFingerprint：请求段
+空
+（直接 --- 开头）| 响应 bool success + int32 user_id + string message。可空请求是合法的。
+.action · 两个 ---
+Goal | Result | Feedback
+RfidScan：int32 timeout_sec | success/uid/type/msg | status——三段对应三通道，编译生成三个类。
+生成物
+X.Request / X.Response、X.Goal/Result/Feedback
+编译后固定子类名（不是 .Req！），节点直接 import 实例化使用。
+光看文件结构还不够——
+结构是用来配通信方式的
+。下面这张图会循环高亮三条链路，把"哪种结构 → 走哪条机制 → 用在什么真实场景"一次说清：
+接口结构选型地图：结构 → 通信机制 → 真实用在哪
+高亮每 3 秒切换一行，跟着亮的那行走一遍
+.msg · 零个分隔符
+一整段字段表，直到文件尾
+TemperatureHumidity
+话题 Topic
+广播 · 持续流 · 可多订阅
+EXP-06 已经练过
+多字段传感器数据流
+DHT11 温度 + 湿度（本次事故的解药）
+MAX30102 心率 + 血氧 + 有效位
+电池电压 / 里程计状态广播
+.srv · 一个 ---
+请求段 | 响应段
+VerifyFingerprint
+服务 Service
+一问一答 · 同步 · 谁发谁等
+EXP-07 已经练过
+一次性请求 / 要一个结果
+指纹验证 → 成功 / 编号 / 提示语
+继电器开合、查询当前配置
+"立刻告诉我答案"，绝不等很久
+.action · 两个 ---
+目标 | 结果 | 反馈
+RfidScan
+动作 Action
+长任务 · 有反馈 · 可取消
+EXP-08 已经练过
+耗时任务 + 进度反馈
+RFID 读卡：等待刷卡、可中途取消
+机械臂抓取、导航到目标点
+"慢慢做，边做边告诉我到哪了"
+标准库
+common_interfaces
+已经给了 Float32 / String / Image / Odometry…
+只有当"标准装不下"或"标准库不许你改"时才自定义——一旦要定契约，就从上表挑对应的结构
+图 9-3 · 接口结构选型地图（动画）：三种结构各自绑定一条通信机制，也就各自对应一类真实场景
+.msg · 零个分隔符
+float32 temperature
+float32 humidity
+# 一整段字段表
+# 直到文件尾
+切成 1 段：数据本身
+TemperatureHumidity()
+.srv · 一个 ---
+# 请求（可为空）
+----------------
+bool success
+int32 user_id
+string message
+切成 2 段：请求 | 响应
+VerifyFingerprint.Request / .Response
+.action · 两个 ---
+int32 timeout_sec
+----------
+bool success ...
+----------
+string status
+Goal ↓ 上行 · Result/Feedback ↑ 下行
+切成 3 段：Goal | Result | Feedback
+RfidScan.Goal / .Result / .Feedback
+规律：文件里几个 ---，就切成几段；段数 = 通信方向数 = 编译产出的类数
+图 9-4 · 三种接口文件的切面解剖：分隔符是"剪刀"，剪出请求/响应、目标/结果/反馈
+接口类型
+分隔符
+编译生成的类
+实验对应
+.msg
+无
+消息类本身（如 TemperatureHumidity()）
+EXP-06 气体可继续用 Float32，结构化才自定义
+.srv
+1 个
+---
+VerifyFingerprint.Request / .Response
+EXP-07 指纹验证
+.action
+2 个
+---
+RfidScan.Goal / .Result / .Feedback
+EXP-08 RFID 读卡
+字段类型用定长
+写
+int32
+而不是 C 风格
+int
+——跨语言/跨平台必须宽度确定。另外传感器消息常加
+bool valid
+：MAX30102 未接触皮肤时心率恒为 0，没有有效位的话，0 是"读数"还是"没测"根本无法区分。
+那这行文本是怎么变成可 import 的类的？
+你在 01 节 echo 出来的
+TemperatureHumidity
+结构不是手写的——它由那个两行的
+.msg
+文件经编译自动生成。这条链路走四步：
+msg/srv/action
+.msg / .srv / .action
+（src 内手写契约）
+rosidl_generate
+_interfaces
+CMake 编译入口
+生成代码
+Python 类 + C++ 头
+（install/ 交付）
+节点 import
+from …srv import
+VerifyFingerprint
+忘 source / 忘列进 CMake 列表
+→ ModuleNotFoundError / interface list 缺失
+接口独立成包 ⇒
+多节点/C++/Python 共享
+一套无歧义的数据类型
+契约（文本）→ 编译（rosidl）→ 生成物（双语言类）→ 消费（import）；任何一环断掉都会在最后一格报找不到模块。
+接口包要配什么：CMakeLists 与依赖声明
+上面那步"编译"不是自动发生的——你得在接口包里点名告诉 rosidl 要编哪些文件、基础类型去哪找。这就是
+CMakeLists.txt
+那几行的作用：
+# 接口包（ament_cmake）CMakeLists.txt 核心段
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "srv/VerifyFingerprint.srv"
+  "srv/TriggerRelay.srv"
+  "action/RfidScan.action"
+  "msg/TemperatureHumidity.msg"
+  "msg/HeartRateSpO2.msg"
+  "msg/PhotoState.msg"
+  DEPENDENCIES std_msgs action_msgs builtin_interfaces
+# ← 基础类型从哪来
+)
+ament_package()
+位置
+声明什么
+作用
+CMakeLists DEPENDENCIES
+std_msgs / action_msgs / builtin_interfaces
+编译期：告诉 rosidl 去哪找 float32/int32/GoalStatus 等基础类型
+package.xml（接口包）
+buildtool_depend rosidl_default_generators + exec rosidl_default_runtime + depend std_msgs…
+构建工具与运行时链条
+package.xml（节点包）
+<depend>ros_sensor_interfaces</depend>
+运行期 import 的入场券——EXP-04 依赖标签的实战
+为什么要独立接口包
+接口是契约、节点是实现：分离后 C++ 与 Python 节点共享同一类型；改实现不碰契约；接口版本可单独演进。若写死在节点包里，别的包想用这个类型就不得不
+依赖整个实现包
+——循环依赖的温床。
+动手验证：这段需求该用哪种接口？
+原理讲完了，用下面这个小工具自测一下——选一个需求，看它该配哪种接口结构、为什么。
+Interface Router · 这段需求该用哪种接口
+需求描述
+一次发布温度+湿度两个相关联的值
+请求"验证手指"，返回成功与否+用户号+说明
+下达"读卡"任务：可设超时、过程要报状态、结果含卡号
+发布单个 ppm 浓度值
+请求"3 号继电器吸合 0.5 秒"，回执成败
+// 选择需求，输出接口文件形态与字段草案…
+04
+实操 A：通览全部 6 份契约，逐份读懂
+01 节你只看了一条
+TemperatureHumidity
+，但接口包里一共有
+3 类 6 份定义
+——它们正好对应 EXP-06~08 用过的通信方式。这一节把 6 份陆续读一遍。
+终端 B
+自省四连：确认契约已注册进系统
+（01 节编译好的环境继续用）
+1
+列出全部 6 个自定义接口
+终端 B
+这条命令相当于"查户口"——6 个接口全在，说明编译、注册两环都没掉：
+# 列出本接口包的所有接口，按 msg / srv / action 三类
+ros2 interface list | grep ros_sensor_interfaces
+$ ros2 interface list | grep ros_sensor_interfaces
+msg/HeartRateSpO2
+msg/PhotoState
+msg/TemperatureHumidity
+srv/TriggerRelay
+srv/VerifyFingerprint
+action/RfidScan
+# 3 msg + 2 srv + 1 action = 6 个，一个不少
+3
+检视 .srv：注意"空请求"
+终端 B
+打印出的字段必须与源文件一字不差——这是"编译生效"的最直接证据：
+ros2 interface show ros_sensor_interfaces/srv/VerifyFingerprint
+$ ros2 interface show ros_sensor_interfaces/srv/VerifyFingerprint
+# 请求段为空：触发即验证，无需入参
+---
+bool success
+int32 user_id
+string message
+# --- 上面的"空白"就是完整请求段 —— 空请求是合法的
+4
+检视 .action 与 .msg
+终端 B
+对照上面图 9-4 数分隔符：.action 两个
+---
+三段、.msg 零个一段：
+ros2 interface show ros_sensor_interfaces/action/RfidScan
+ros2 interface show ros_sensor_interfaces/msg/TemperatureHumidity
+$ ros2 interface show …/action/RfidScan
+int32 timeout_sec
+# Goal 段
+---
+bool success
+string card_uid
+string card_type
+string message
+# Result 段
+---
+string status
+# Feedback 段
+$ ros2 interface show …/msg/TemperatureHumidity
+float32 temperature
+float32 humidity
+✔ 自省四连的输出 = 源文件的镜像。
+先 show 再读代码
+，系统层的证据永远比记忆可靠。
+再打开源目录，逐份读原文
+interface show
+打的是编译后的镜像，源文件里还有注释和目录组织。直接进目录读一遍：
+5
+进入接口包，看清目录结构
+终端 B
+接口包的标准形态：
+msg/ srv/ action/
+三个目录 +
+CMakeLists.txt
+。先确认结构再读内容：
+# 进接口包目录，列出三类定义文件
+cd ~/ros2_ws/src/xflz_eai_car1/driver/ros_sensor/ros_sensor_interfaces
+ls -R msg srv action
+$ ls -R msg srv action
+msg:
+HeartRateSpO2.msg  PhotoState.msg  TemperatureHumidity.msg
+
+srv:
+TriggerRelay.srv  VerifyFingerprint.srv
+
+action:
+RfidScan.action
+6
+读 .msg：注意 valid 字段的用意
+终端 B
+逐个打开三份消息定义，对照"字段 ↔ 传感器"的对应关系：
+# 一次读完三份消息定义
+cat msg/TemperatureHumidity.msg
+cat msg/HeartRateSpO2.msg
+cat msg/PhotoState.msg
+$ cat msg/TemperatureHumidity.msg
+float32 temperature
+# 温度(摄氏度)
+float32 humidity
+# 湿度(%)
+$ cat msg/HeartRateSpO2.msg
+float32 heart_rate
+float32 spo2
+bool valid
+# ← MAX30102 未接触皮肤时心率恒 0，
+#   没有它就分不清"读数是 0"还是"没测"
+✔ 想一想：为什么 TemperatureHumidity 不需要 valid，HeartRateSpO2 却必须加？
+3
+读 .srv：数一数分隔符
+终端 B
+验证"一个
+---
+切两段"的规律，并留意请求段允许为空：
+cat srv/VerifyFingerprint.srv
+cat srv/TriggerRelay.srv
+$ cat srv/VerifyFingerprint.srv
+# 请求：触发一次指纹验证（无参数）
+---
+bool success
+int32 user_id
+string message
+$ cat srv/TriggerRelay.srv
+int32 relay_id
+# 这次请求段不为空：继电器编号
+float32 duration
+---
+bool success
+string message
+4
+读 .action：三段各自承载谁
+终端 B
+两个
+---
+切三段，三个方向：Goal 客户端→服务端，Result/Feedback 服务端→客户端：
+cat action/RfidScan.action
+$ cat action/RfidScan.action
+# 目标：执行一次读卡任务
+int32 timeout_sec
+---
+# 结果
+bool success
+string card_uid
+string card_type
+string message
+---
+# 反馈
+string status
+✔ 读完 6 份文件回到本节步骤 2 再跑一遍
+interface show
+——你会发现自己已经能"背出"输出。
+05
+实操 B：设计任务——为新传感器定义接口
+任务背景
+：小车上要新装一个光照传感器，需要上报「照度值 + 读数是否有效 + 采样时刻」。请按真实工程流程走完"定义 → 登记 → 编译 → 验证"四步。
+1
+编写 Illuminance.msg
+终端 B
+用 heredoc 一次写入三字段定义（和 6 份前辈接口住在同一个包里）：
+cd ~/ros2_ws/src/xflz_eai_car1/driver/ros_sensor/ros_sensor_interfaces
+cat > msg/Illuminance.msg << 'EOF'
+# 光照度消息：单段，无分隔符
+float32 lux          # 照度(lx)
+bool valid           # 读数有效位（遮挡/超量程时 false）
+builtin_interfaces/Time stamp   # 最近一次采样时刻
+EOF
+cat msg/Illuminance.msg
+# 回读确认
+2
+把文件登记进编译列表
+编辑器
+打开
+CMakeLists.txt
+，在
+rosidl_generate_interfaces
+列表末尾追加一行（
+builtin_interfaces
+已在 DEPENDENCIES 里，无需再改）：
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "srv/VerifyFingerprint.srv"
+  "srv/TriggerRelay.srv"
+  "action/RfidScan.action"
+  "msg/TemperatureHumidity.msg"
+  "msg/HeartRateSpO2.msg"
+  "msg/PhotoState.msg"
+  "msg/Illuminance.msg"
+# ← 新增这一行
+DEPENDENCIES std_msgs action_msgs builtin_interfaces
+)
+// 忘了登记会怎样？
+$ colcon build 成功，但 ros2 interface list 里永远没有 Illuminance
+// ——每个接口文件都必须显式列入列表才会被编译
+3
+重编 + source + 验证
+终端 B
+编译接口包并重新加载环境，然后用系统层命令做最终验收：
+cd ~/ros2_ws
+colcon build --packages-select ros_sensor_interfaces
+source install/setup.bash
+ros2 interface show ros_sensor_interfaces/msg/Illuminance
+$ ros2 interface show ros_sensor_interfaces/msg/Illuminance
+float32 lux
+bool valid
+builtin_interfaces/Time stamp
+# 三字段完整打印 = 定义→登记→编译全链路打通 ✔
+✔ 此时任何节点包加上
+<depend>ros_sensor_interfaces</depend>
+后即可
+from ros_sensor_interfaces.msg import Illuminance
+——契约已对全系统生效。
+设计题
+如果把 stamp 字段去掉，"采样时刻"就只能靠订阅端收到消息的时间估算——处理排队越久误差越大。这正是 EXP-11
+Header.stamp
+规范的伏笔：
+时间戳要在采集端盖，而不是接收端猜
+。
+#
+证据项
+记录方式
+合格标准
+1
+接口包目录结构
+ls -R msg srv action
+截图
+能看到 Illuminance.msg 已就位
+2
+编译列表登记
+CMakeLists.txt 修改段截图
+列表含 7 个文件（6 + 1）
+3
+编译成功
+colcon build 输出截图
+Finished <<< ros_sensor_interfaces
+4
+系统层验证
+interface show Illuminance
+截图
+三字段完整打印
+5
+消费端可用
+python3 -c "from ros_sensor_interfaces.msg import Illuminance; print('ok')"
+（source 后）
+打印 ok
+06
+注意事项与验收清单
+默画三种接口的分隔符结构：.msg 无、.srv 一个 ---、.action 两个 ---
+6 个既有接口全部 interface show 成功，字段与源文件一致
+说出接口包与节点包为何必须分离（契约 vs 实现）
+解释 DEPENDENCIES 各项分别在支撑哪些字段类型
+独立完成新消息 Illuminance 的定义 → 编译 → import 三步
+知道接口改动后"重编接口包+全部消费方"的连锁规则
+坑
+症状
+解法
+分隔符数量错
+rosidl 编译直接失败
+.srv 数 1 条 ---、.action 数 2 条，缺一即错
+类型写成 int
+字段类型报错
+改
+int32
+/uint8/float32 等定长类型
+文件没进 CMake 列表
+interface list 里没有它
+每个接口都要显式列入 rosidl_generate_interfaces
+没 source / 没重编
+ModuleNotFoundError / 节点读不到新字段
+build + source；接口是契约，改了全链重编
+接口写进节点包
+别的包要用只能连实现一起依赖
+接口必须独立 ament_cmake 包，节点包 just depend
+07
+本课总结与思考题
+结构
+0 / 1 / 2 个分隔符
+msg 单段、srv 请求响应、action 三段——文件结构直接映射通信模型。
+编译
+rosidl_generate_interfaces
+列表 + DEPENDENCIES 双配置，产出 Python/C++ 双端类。
+组织
+接口包 / 节点包分离
+契约独立演进，多语言共享，阻断循环依赖。
+自省
+ros2 interface list/show
+不看源码也能审计系统里全部数据契约。
+思考题
+① TemperatureHumidity 若要补"传感器在线状态"和"最近读数时间戳"，给出扩展后的完整 .msg 与每个字段的选型理由（提示：在线用什么时间戳用什么）。
+② MQ5 将来要发 ppm + 电压 + ADC 原始值三个量——改用标准消息组合还是自定义？对比两种方案的耦合度、可读性与维护成本，并给出与 ros_sensor_interfaces 命名风格一致的方案。
+③ 为什么 HeartRateSpO2 需要 valid 而 TemperatureHumidity 没有？什么条件下"有效位"应该是接口设计的默认字段？
+CORE-01 · 机器人 ROS2 应用与开发 · EXP-09 自定义接口消息
+2 学时 · 设计性 · 基于 ros_practice 实验讲义改编

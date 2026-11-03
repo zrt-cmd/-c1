@@ -1,0 +1,1366 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp003-ros2-application/exp-16-rosbag/index.html
+TITLE: EXP-16 · rosbag2 数据录制与回放 — 机器人 ROS2 应用与开发
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+EXP-16 · rosbag2 数据录制与回放 — 机器人 ROS2 应用与开发
+🧠 具身智能课程 ·
+教程首页
+核心课程
+/
+ROS2 应用与开发
+/ EXP-16
+本页目录
+★ 课程目标
+01 问题引入：只会来一次的现场故障
+02 先看现象：录一次，历史就留住了
+03 原理讲解
+04 实验步骤
+05 注意事项与验收
+06 本课总结与验证题
+CH4 · 工具链
+EXP-14 rqt 工具箱
+EXP-15 rviz2 可视化
+EXP-16 rosbag2 数据录制
+EXP-17 Launch 启动系统
+EXP-18 元功能包集成
+EXP-16 · 第四章 · 验证性 · 2 学时
+rosbag2 数据录制与回放：把现场带回实验室
+最难的 bug 往往只在客户现场出现一次：车到了特定角落才定位漂移，回来怎么调都正常。rosbag2 把整条话题的时间序列原样录进文件，回到实验室"时光倒流"反复重放——本课讲清 SQLite 存储与 CDR 序列化的原理，掌握 record/play 参数族与带时钟的离线回放流。
+难度 ⭐
+2 学时
+验证性
+关键词 rosbag2 · record · play · --clock
+目标
+本课学完，你应该能做到
+① 说清存储
+为什么是 SQLite3
+能阐述 rosbag2 基于 SQLite3 的存储架构——为什么选它而非二进制日志，以及 CDR 序列化、时间戳索引、话题元数据表如何支撑高效检索与随机访问。
+② 掌握命令
+record / info / play
+能正确执行
+ros2 bag record -a
+全量录制、
+record /topic1 /topic2
+选择性录制、
+bag info
+看元数据、
+bag play -r <rate>
+调速回放。
+③ 独立设计
+可追溯的数据集
+能针对特定传感器组合设计采集策略（选择性录制 + 命名规范），建立可追溯的实验数据集。
+④ 迁移应用
+录放当标准流程
+把"录制-回放"当成数据驱动开发的标准工作模式：录真实数据做离线算法开发与回归测试，减少对硬件的依赖。
+本课的重点与难点
+重点
+：必须用
+Ctrl+C
+（SIGINT）停止录制——
+kill -9
+会丢缓存、不写 metadata，包直接废掉。
+难点
+：理解 metadata.yaml 与 .db3 的关系：拆包时少了 yaml，
+bag info
+就找不到它。
+和前后的关系
+本课的
+--clock
+回放，是
+EXP-11 时间 API
+的实战应用：回放要喂
+/clock
+给
+use_sim_time
+节点。
+01
+问题引入：只会来一次的现场故障
+先回忆
+EXP-06 的话题数据流过了就没了、EXP-11 的时间戳与
+use_sim_time
+——本章解决的问题是：
+数据流过就消失，怎么"录下来、倒回去"反复研究
+。现场故障只发生一次，但录好的包可以回放一万次。
+1
+偶发
+仓库小车在 3 号货架角落必现定位跳变，开回调试室就永远复现不了
+2
+代价
+一次现场复查：出差 + 布置笔记本 + 人守着——每次以"小时"计费
+3
+本质
+故障 = 某时刻某组消息的特定内容，现场没录下来就永久丢失
+4
+正解
+ros2 bag record 现场录 5 分钟 → 带回工位 ros2 bag play 想放几遍放几遍
+定义
+rosbag2
+是 ROS2 的数据记录与回放框架：record 把指定话题的每条消息连同时间戳写进文件；play 按原时序（或加速/减速）重新发布出来——订阅节点"感觉不到"这些消息是历史还是现场。
+调试成本从"去现场"变成"回工位"
+，硬件依赖型调试工作量可压缩 80% → 20%。
+本实验的示例数据源：talker / listener
+本课全程用 ROS2 官方演示包
+demo_nodes_cpp
+的
+talker（发布
+/chatter
+）
+与
+listener（订阅
+/chatter
+）
+作为"现场"与"回放验证端"：
+不依赖任何硬件就能走通录→查→放全流程
+，talker 标称
+1Hz
+让"频率对不对得上"一眼可判（实测约 1.03Hz，属正常抖动）。
+理解机制后，再把数据源换成 B2 实验箱的
+/scan
+、
+/odom
+、相机话题——命令完全一样。
+# 两个终端各起一个，保持运行
+ros2 run demo_nodes_cpp talker
+·
+ros2 run demo_nodes_cpp listener
+🔎 是什么
+ROS2 官方的
+数据记录与回放框架
+：一个 bag = 一个目录（
+*.db3
+SQLite 库 +
+metadata.yaml
+清单），里面装着话题消息的
+时间序列 + CDR 原始字节
+。
+❓ 为什么
+因为现场故障
+只发生一次
+，而数据流"流过即消失"。没录下来就永久丢失，只能出差重跑；录下来就能在工位上回放一万次。
+调试成本从"去现场"变成"回工位"
+。
+🛠 怎么用
+三条命令走完全流程：
+ros2 bag record
+录 →
+ros2 bag info
+体检 →
+ros2 bag play
+回放。要跟 TF/定时器联调时再加
+--clock
+与
+use_sim_time:=true
+。
+02
+先看现象：录一次，历史就留住了
+2 分钟 0→1
+先不讲原理——把 talker / listener 起起来、录一段、再回放，你会亲眼看到"已经流走的历史"按原节奏重新发布，订阅端毫无察觉。
+1
+造现场
+开两个终端
+分别
+起发布端与订阅端——listener 每秒打印一条
+world
+，就说明"现场"活着：
+# 终端 A · 发布端
+ros2
+run demo_nodes_cpp talker
+# 终端 B · 订阅端
+ros2
+run demo_nodes_cpp listener
+2
+开录
+第三个终端开录，
+保持运行约 15 秒
+再按
+Ctrl+C
+（SIGINT）优雅停止——这一停决定了 metadata.yaml 会不会被写出来：
+# 终端 C
+ros2
+bag record -a -o exp16_full
+3
+体检
+不用回放，
+info
+毫秒级回答"录了多久、有没有这个话题"：预期
+Duration 约 13.5s
+、
+/chatter Count 约 14 条
+（14 / 13.55 ≈ 1.03Hz，对得上 talker 的 1Hz）：
+ros2
+bag info exp16_full
+4
+断源
+回放前先把
+真源掐掉
+：在终端 A 对
+talker
+按
+Ctrl+C
+（SIGINT）——现场彻底静默、listener 不再收到任何东西，接下来 listener 打印的每一条都必然来自 bag，新旧消息不会混流。
+（这步是按键动作，没有可复制的命令）
+5
+复活
+回到终端 C 回放，历史按原节奏重新发布，listener 会像什么都没发生过一样继续逐条打印：
+ros2
+bag play exp16_full
+6
+变速
+同一份数据二倍速播放——
+只改发布节奏，不改消息内容
+，打印速度翻倍即证明时序被完整记录：
+ros2
+bag play exp16_full -r 2.0
+此刻你已经验证的两件事
+①
+持久化
+：消息以 CDR 字节写进 .db3，断源后依然存在（info 能数出条数与时间跨度）；
+②
+原时序重建
+：play 按时间戳重新发布，-r 改变的是发布节奏而非数据内容——这两点就是后面 03 原理的全部出发点。
+03
+原理讲解
+一个 .db3 文件里到底有什么
+先看外层：目录树
+别急着钻进 .db3——先看它待在哪。
+一个 bag = 一个目录
+，录完
+exp16_full
+后里面就两个文件，谁是本体、谁是清单一眼分清：
+ls
+-l exp16_full/
+# 目录树（先看结构，再看字节数）
+exp16_full/
+# bag 目录本身，这就是"一个 bag"
+├──
+exp16_full_0.db3
+36864 B
+# 本体：SQLite3 数据库（两张表在里面）
+└──
+metadata.yaml
+3297 B
+# 清单：记录时长/条数/指向哪个 _0.db3
+$ ls -l exp16_full/
+total 40
+-rw-r--r-- 1 iflytek iflytek
+36864
+Oct 29 14:10
+exp16_full_0.db3
+-rw-rw-r-- 1 iflytek iflytek
+3297
+Oct 29 14:10
+metadata.yaml
+# ⚠ 注意文件名带 _0 分片号，加了 -d 才会出现 _1 _2 ...；查总数要对着目录，别只查单个 _0.db3
+读树的三个要点
+①
+目录就是 bag
+——拷贝/上传/发给别人，拷的是整个
+exp16_full/
+，只发 .db3 会丢清单；
+②
+两个文件缺一不可
+——yaml 管"找得到"（
+info
+/
+play
+先读它），db3 管"内容在"（消息字节全在这）；
+③
+树只到文件这一层
+——.db3
+里面
+才是本课真正要拆的两张表，接着往下看图 16-1。
+图 16-1 · bag 存储结构：清单与本体分工
+——为什么删掉 metadata.yaml 这个包就"失忆"，而查总数必须对着目录而不是单个 .db3？
+✅ metadata.yaml 管"找得到"、.db3 管"内容在"
+⚠️ 单查一个 _0.db3 漏分片
+🔍 04 节 1.6 cat yaml + info 心算 1.03Hz
+存储结构
+SQLite3 双表 + 元数据
+一个 bag = 目录：
+*.db3
+数据库 +
+metadata.yaml
+清单。库里两张表——
+topics
+（话题ID→名称/类型/QoS）与
+messages
+（时间戳+话题ID+CDR 字节流）。YAML 记录时长/条数/相对路径，删除它 bag 就"失忆"。
+为什么选 SQLite
+四条硬理由
+① 自带索引→任意时间点随机访问；② 事务机制→写到一半断电最多损坏最后一笔；③ SQL 直接聚合分析（频率=Count/Duration）；④ 单文件好搬运好上传。
+序列化
+CDR：和 DDS 同一种字节
+存的就是 DDS 线上传输的 CDR 序列化结果——回放时零转换直接发出，语义 100% 保真。这也是为什么 rosbag2 不需要每种消息写专用适配器：只要类型支持接口定义，就能录能放。
+两个缓冲别混
+max-cache ≠ max-size
+--max-bag-size
+：
+单位是字节
+，单文件写满自动切分新 .db3（控制磁盘文件粒度）；
+--max-cache-size
+：内存写盘缓冲（调小→高频消息排队溢出
+丢数据
+，默认 100MB 够用，4K 相机再加大）。
+决策点
+选择
+理由
+录全部还是选话题
+选话题
+（生产标准）
+1080p 彩色原图（
+image_raw
+，8UC3 未压缩）30Hz 单话题约 178MB/s，
+-a
+全录磁盘秒爆还混入系统噪音
+要不要压缩
+看 CPU 余量
+省盘 30-60%，代价 RK3576 级 SoC 约 +10-20% CPU；必须
+mode + format 双参数
+同写
+哪些话题必录
+感知+定位+控制闭环
+scan/imu/camera + odom/tf + cmd_vel + 关节——修复故障的最小证据链
+QoS
+录时声明，放时匹配
+best_effort 的传感器话题用
+--qos-profile-overrides-path
+传入 YAML 重声明，否则回放对不上（见坑表）
+要点
+bag 的时间戳有
+双来源
+：默认情况下，bag 里的排序时间是 record 节点
+本地接收时刻
+（加
+--use-sim-time
+录包则改用消息收到的
+/clock
+值）；消息内部
+header.stamp
+是
+传感器采集时刻
+。两者在传输延迟大时会差异明显——录包只录"开始之后"，录得太短（< 1~2 秒）可能直接 0 字节，先看 metadata 再走人。
+🔎 是什么
+一个 bag 目录里是
+两张 SQLite 表 + 一份 YAML
+：
+topics
+（id→名称/类型/
+offered_qos_profiles
+）与
+messages
+（时间戳 + topic_id + CDR 字节流）。
+QoS 就存在 topics 表里
+，这正是"元数据一次成形、后续秒查"的底气。
+❓ 为什么
+因为 SQLite 同时给了
+索引随机访问、事务抗断电、SQL 聚合、单文件易搬运
+四样——换任何别的存储格式都要自己重造一遍这些能力。
+🛠 怎么用
+平时不用直接开库——
+ros2 bag info
+读 metadata 就够了；要自己算统计时用
+python3 -c "import sqlite3; ..."
+（
+本机没有 sqlite3 命令行
+）。
+录包保真、回放复活
+图 16-2 · 录放管线与 --clock 时钟双开关
+——从现场消息到 listener 复活经过哪几步？--clock 与 use_sim_time 在管线的哪一段起作用？
+✅ record 原片落盘 · play 按索引再生，节点分不清新旧
+⚠️ kill -9 违规停录 · 双开关漏一个即时间错位
+🔍 04 节 3 回放复活 + 4 Time 面板验钟
+record 与 play 的参数族
+record · 范围
+-a 全量 vs 点名
+-a
+录所有（含系统话题，磁盘杀手）；
+ros2 bag record /t1 /t2
+点名录——生产标准永远是点名 +
+-e
+正则（如
+-e "scan|odom"
+）圈最小证据集。
+record · 范围与切片
+-e 正则 · --max-bag-duration · -o 命名
+-e "chatter|odom"
+正则圈话题；
+-d 3
+是
+--max-bag-duration
+——每 3 秒切一个分片（
+录 12 秒约出 4 片
+_0/_1/_2/_3
+），
+不是
+延迟开录！
+-o exp16_full
+指定输出目录名（默认按时间戳，难找）。
+限时录制无专用参数，用系统
+timeout 15 ros2 bag ...
+。
+record · 保命参数
+--max-bag-size / --max-cache-size
+前者控制单文件切分，
+单位是字节
+——写
+2147483648
+才是 2GB/文件；后者控制内存缓冲（默认 100MB，写不及会丢消息）。
+注意：小数据量下即使写了也不会切分，静默无提示
+（见 06·续 节实测）。
+record · 压缩
+mode + format 必须成对
+--compression-mode message
+（逐条，兼容性最好）/
+file
+（整库，省空间最多），
+必须配
+--compression-format zstd
+。RK3576 级 SoC 约 +10-20% CPU——录摄像头时先跑 top 看余量，CPU 打满丢的是更多数据。
+play · 节奏
+-r 倍速 · --loop · --start-offset
+-r 2.0
+二倍速快进、
+-r 0.5
+慢放细看——
+只改发布节奏，不动消息内时间戳
+；
+--loop
+循环（tf_static 必备）；
+--start-offset 5
+从第 5 秒起播。
+play · 时钟与话题
+--clock · --topics（无 -t）· -q
+--clock
+以
+约 40Hz
+再生 /clock（use_sim_time 节点必开）；选话题必须写全
+--topics /chatter
+（
+play 没有 -t 短选项，只有 record 才有
+）；暂停/单步（空格/→）逐帧审；
+-q
+静默重复警告。
+参数易混对
+第一个
+第二个
+切分 vs 缓冲
+--max-bag-size：
+字节
+单位，文件写满换新 .db3
+--max-cache-size：内存攒批写盘，小了丢消息
+-d vs --start-paused
+-d 3：每 3 秒切一片（分片时长）
+--start-paused：启动后暂停，空格才开始
+调速 vs 改时间
+-r 2.0：消息来得快一倍
+消息内部 stamp 原封不动（仿真时间另走 --clock）
+Ctrl+C vs kill -9
+Ctrl+C（SIGINT）才是优雅停止
+：recorder 捕获后刷完缓存、写 metadata.yaml、关库
+kill -9
+（SIGKILL）
+不可被捕获
+，内核直接杀进程：缓存丢、metadata.yaml 不写、SQLite 可能半写损坏。
+万不得已才用，且事后先
+ros2 bag reindex
+-a vs 点名/-e
+-a：省事，磁盘和噪声都爆
+点名+正则：生产标准，最小证据链
+--compression-mode vs -format
+mode 单独写会被
+静默忽略
+（metadata 里为空串）
+必须同时给
+--compression-format zstd
+🔎 是什么
+两族参数的
+分工
+：
+record
+管"录什么、录多大、压不压"（范围 + 体积 + 编码）；
+play
+管"怎么放"（节奏 + 时间 + 话题选择）。
+❓ 为什么
+因为录制与回放面对的是
+两套不同的约束
+：录制时受磁盘与 CPU 限制（要控制体积），回放时受下游算法与渲染限制（要控制节奏与时间基准）。所以参数族必然分成两队。
+🛠 怎么用
+录：
+timeout N ros2 bag record 点名 -o 名字 --max-bag-size 字节
+。
+放：
+ros2 bag play 名字 -r 倍速 --topics 话题 --clock
+。
+记住三条硬规则
+：限时用 timeout、play 选话题用 --topics、压缩必须双参数。
+04
+实验步骤
+通用结构：① 工程全景（谁在哪台终端做什么）→ ② 每步"为什么 + 命令 + 预期输出" → ③ 坑与对照。全部命令可直接照抄。
+图 16-3 · 实验工程全景：三个终端各管一段
+——录→查→放全流程里每个终端扮演什么角色，回放前为什么要先断源？
+✅ A 造现场 · C 录放 · B 当观众，bag 目录是唯一交接物
+⚠️ 不断源就回放 → 新旧消息混流
+🔍 下文 1.4 录 → 2 体检 → 3 断源回放
+录放命令构建器
+Bag Commander：选场景，生成带参数解释的完整命令
+任务场景
+快速抓包：录全部话题 10 秒
+生产标准：选话题 + 正则 + 2GB 切分
+慢放排障：0.5 倍速 + 循环 + 从 30s 起
+离线仿真：--clock 回放喂给 use_sim_time 节点
+摄像头专项：大缓冲 + 压缩 + 延迟避噪声
+全量录制 → 定量分析 → 回放验证
+1
+全量录制
+1.1~1.6 六小步：建目录 → 起 talker/listener → -a 录 15 秒 → 看文件 → 读 metadata
+2
+体检
+ros2 bag info：确认 Duration、/chatter 的 Count/Duration ≈ 1Hz
+3
+回放
+先停掉原 talker，再 play → listener 照常收到"历史 Hello World"
+4
+调速
+切 -r 2.0 / -r 0.5，观察间隔减半/加倍、stamp 不变
+🔎 是什么
+本实操走一遍
+录 → 查 → 放
+闭环：用 talker/listener 造一个不依赖硬件的"现场"，录成包、查出数据质量、再回放让下游节点复现。
+❓ 为什么
+因为录完不体检等于没录——
+Duration 与 Count 是判断"这包能不能用"的唯一客观依据
+；而回放前必须先断源，否则现场数据与历史数据混在一起，你分不清哪条是真的。
+🛠 怎么用
+严格按 1.1→1.6 顺序敲
+：建目录 → 终端 A 起 talker → 终端 B 起 listener → 终端 C
+ros2 bag record -a -o exp16_full
+（约 15 秒后 Ctrl+C）→
+ls -lh exp16_full/
+→
+cat exp16_full/metadata.yaml
+。之后再做 info 体检与 play 回放。
+终端 A/B/C
+第 1 步 · 全量录制（-a）：1.1 → 1.6 六小步
+三终端 · 按序执行
+1.1
+创建存储目录
+终端 C（任意终端均可）
+先建一个固定目录，避免包散落在
+~
+根目录里日后找不到。
+以后所有录制都在这一个目录里做
+，方便整体备份与清理：
+mkdir
+-p ~/ros2_bags
+cd
+~/ros2_bags
+pwd
+# 确认当前目录：/home/iflytek/ros2_bags
+1.2
+启动数据源节点（终端 A）
+终端 A · 保持运行
+talker 以
+1Hz
+稳定发布
+/chatter
+——"1Hz"这个标称值很关键，后面体检时要拿它当基准判断有没有丢数据：
+# 终端 A：现场数据源（保持运行，不要 Ctrl+C）
+ros2
+run demo_nodes_cpp talker
+# [INFO] [talker]: Publishing: 'Hello World: 1'
+# [INFO] [talker]: Publishing: 'Hello World: 2'   ...每秒一条
+1.3
+启动 listener 增加系统活跃话题（终端 B）
+终端 B · 保持运行
+listener 订阅
+/chatter
+，同时它自身会产生
+/rosout
+等系统话题。
+它的作用是让"全量录制"有多一点话题可录
+——这样你才能直观看到
+-a
+到底把什么收进来了：
+# 终端 B：监听端（保持运行）
+ros2
+run demo_nodes_cpp listener
+# [INFO] [listener]: I heard: [Hello World: 1]   ...每秒一条
+1.4
+启动全量录制（终端 C）
+终端 C · 运行约 15 秒后 Ctrl+C
+-a
+= 录下此刻
+所有
+活跃话题。
+启动即开始录
+，控制台只打印"订阅确认"，不滚动消息内容。
+保持约 15 秒再按 Ctrl+C 停止
+（录太短可能出 0 字节空包）：
+# 终端 C：全量录制
+ros2
+bag record -a -o exp16_full
+# 等待约 15 秒后按 Ctrl+C 停止录制
+$ ros2 bag record -a -o exp16_full
+[INFO] [rosbag2_recorder]: Listening for topics...
+[INFO] [rosbag2_recorder]: Subscribed to topic
+'/chatter'
+[INFO] [rosbag2_recorder]: Subscribed to topic '/parameter_events'
+[INFO] [rosbag2_recorder]: Subscribed to topic '/rosout'
+[INFO] [rosbag2_recorder]: Subscribed to topic '/events/write_split'
+[INFO] [rosbag2_recorder]: Recording...
+# ...等待约 15 秒，然后按 Ctrl+C...
+^C
+[INFO] [rosbag2_recorder]: Recording stopped
+# 干净域里 -a 实际订到 4 个话题（含 /events/write_split）
+# 若当前域里开着 rviz2，还会多出 /initialpose /clicked_point /goal_pose
+# ← 这就是"全量录制会把无关噪音一起录进来"的实测样子
+易踩的坑
+真相 / 正确做法
+敲
+-u 15
+想限时
+Humble 的
+record
+没有 -u 短选项
+，报
+unrecognized arguments
+。限时用系统
+timeout 15 ros2 bag ...
+，或手工 Ctrl+C
+以为
+-d 3
+是"延迟 3 秒"
+-d
+=
+--max-bag-duration
+，
+每 3 秒切一个分片
+（
+_0/_1/_2…
+），不是延迟开录。想单包就别加
+-d
+；想延迟开录用
+--start-paused
+录到一半没看到消息滚动，以为没录上
+正常
+：
+record
+只打印"订阅确认 + 统计"，静默写盘。想看内容另开终端
+ros2 topic echo /chatter
+录了几秒就停，结果 0 字节
+录太短（< 1~2 秒）SQLite 还没写完就退出。至少录 10 秒以上
+本步要记住的一句话
+-a
+会连同
+/rosout
+、
+/parameter_events
+等系统话题一起录进来（干净域实测 4 个话题）——
+这是"全量录制有代价"的第一手证据
+，第 4 步的选择性录制就是对着这个痛点来的。
+1.5
+查看生成的文件结构
+终端 C
+录完立刻看一眼目录——
+一个 bag 就是一个目录，里面至少两个文件
+。
+.db3
+是消息本体，
+metadata.yaml
+是清单：
+ls
+-lh exp16_full/
+$ ls -lh exp16_full/
+-rw-r--r-- 1 iflytek iflytek
+51K
+...
+exp16_full_0.db3
+# SQLite3 数据库（消息本体）
+-rw-r--r-- 1 iflytek iflytek
+4K
+...
+metadata.yaml
+# 元数据清单（时长/条数/话题）
+# ⚠ 注意文件名是 exp16_full_0.db3 —— 带 _0 后缀
+#   这是分片编号，从 0 开始；单包就永远是 _0，加了 -d 才会有 _1 _2 ...
+1.6
+查看 metadata.yaml 内容
+终端 C
+这是整份清单的
+原始出处
+——
+ros2 bag info
+打印的每个数字都能在这里找到。
+human-readable，删了它 bag 就"失忆"
+（
+info
+直接读不出来）：
+cat
+exp16_full/metadata.yaml
+$ cat exp16_full/metadata.yaml
+# 根键：整份清单就这一个顶层块，底下全是缩进的键值/列表
+rosbag2_bagfile_information:
+  version:
+5
+# 清单格式版本，rosbag2 升级会变（跨版本读包先看它）
+storage_identifier:
+sqlite3
+# 存储后端 → 决定你能不能用 SQL/python 直接查库
+relative_file_paths:
+# 消息本体在哪：指向 _0.db3（分片多了这里就多行）
+-
+exp16_full_0.db3
+duration:
+    nanoseconds:
+13554570568
+# 录制时长（纳秒）= 13.55s，注意不是 15s
+starting_time:
+    nanoseconds_since_epoch: 1760000000000000000
+# 起录绝对时刻（Unix 纪元纳秒），多包对齐用
+message_count:
+54
+# 全包总条数，应 = 各话题之和：14+40+0+0
+topics_with_message_count:
+# 每话题一段明细，info 的 Topic 表就是它
+- topic_metadata:
+        name:
+/chatter
+# 话题名（回放时按它重建发布端）
+type:
+std_msgs/msg/String
+# 消息类型（类型不对 play 会拒收）
+serialization_format:
+cdr
+# 序列化格式，与 DDS 线上字节同源
+offered_qos_profiles: "- reliability: 1 ..."
+# 录时声明的 QoS，回放靠它对齐订阅端
+message_count:
+14
+# /chatter 条数 → info 的 Count、心算频率的分子
+- topic_metadata:
+        name: /rosout
+        type: rcl_interfaces/msg/Log
+        serialization_format: cdr
+      message_count: 40
+...
+# 省略 Count=0 的 /parameter_events、/events/write_split
+✔ 这块 YAML 的读法：
+"−" 开头的是列表项
+（每个话题一段），
+缩进 2 格是键值对
+。上半部分回答"这个包整体是什么"（版本/后端/文件/时长/总数），下半部分
+topics_with_message_count
+回答"里面有哪些话题、各多少条"——
+ros2 bag info
+打印的每个数字，都能在这里指出出处
+。
+字段（本例值）
+是什么
+用来干什么 / 不懂会怎样
+version: 5
+清单格式版本号
+新版 rosbag2 读旧包、字段增减时的兼容依据；报"不支持的 bag 格式"先看它
+storage_identifier: sqlite3
+存储后端（不是文件后缀决定的）
+声明是 SQLite → 可用
+python3 -c "import sqlite3; ..."
+直查；换成 mcap 就得换工具
+relative_file_paths
+本体文件的
+相对路径
+（分片多则多行）
+yaml 靠它找到 .db3
+——所以两者必须同目录：只拷 .db3 或移动不同步，
+info/play
+就找不到
+duration.nanoseconds: 13554570568
+真实录制时长 = 13.55s（纳秒）
+是
+info
+的 Duration，也是
+算频率的分母
+；比"按了约 15 秒"短，因为开录/停止有开销
+starting_time.nanoseconds_since_epoch
+起录的绝对时刻（Unix 纪元纳秒）
+多段 bag 拼接、和其他数据源（日志/里程计）对齐时间轴时的基准
+message_count: 54
+全包
+总条数
+应等于各话题之和（14+40+0+0=54）；对不上说明清单与库不同步，先
+ros2 bag reindex
+name / type / serialization_format
+话题名、消息类型、序列化格式
+play
+据此重建发布端；
+类型或格式不匹配的订阅端收不到
+（自定义消息尤其要先
+ros2 interface show
+核对）
+offered_qos_profiles
+录这个话题时声明的 QoS（reliability/durability…）
+QoS 就存在这里
+：best_effort 传感器消息回放时按它对齐，否则"包在、却收不到"（见坑表
+--qos-profile-overrides-path
+）
+message_count: 14
+（每话题）
+该话题条数
+info
+的 Count、
+频率心算的分子
+：14 / 13.55 ≈ 1.03Hz ✓
+三处心算，30 秒自检这个包
+①
+加法
+：总
+54
+= 各话题
+14+40+0+0
+，对得上 → 清单和 .db3 是同步的；
+②
+换算
+：
+13554570568 ns ÷ 10⁹ = 13.55s
+（纳秒 → 秒），和
+info
+的 Duration 一致；
+③
+频率
+：
+14 ÷ 13.55 ≈ 1.03Hz
+，对得上 talker 标称 1Hz → 数据完整没丢帧。
+三处都对，才轮到
+play
+回放；任何一处对不上，先回查录制过程（是否
+Ctrl+C
+、有没有
+kill -9
+）。
+终端 C
+第 2 步 · 定量体检：ros2 bag info
+同终端
+2
+三行数据决定这个包能不能用
+终端 C
+继承别人的 bag、或几周后回头查时，先回答三个问题：录了多久？有这个话题吗？频率对不对？
+info
+毫秒级给出答案，不必回放整个文件：
+ros2 bag info
+exp16_full
+$ ros2 bag info exp16_full
+# ——— 上半 · 包级档案：这个包是什么样 ———
+Files:             exp16_full_0.db3
+# 构成本体的文件（切片多了这里多行）
+Bag size:          50.9 KiB
+# 包体积（1KiB=1024B），话题越多/频率越高越大
+Storage id:        sqlite3
+# 存储后端 → 可用 python sqlite3 直查库
+Duration:          13.5s
+# 真实时长 ← 三问之①；yaml 里精确值 13.55s（此处四舍五入）
+Messages:          54
+# 全包总条数 = 下面各话题 Count 之和
+# ——— 下半 · 逐话题账本：这个包里有什么数据 ———
+Topic information:
+  Topic:
+/chatter
+| Type: std_msgs/msg/String |
+Count: 14
+| Serialization Format: cdr
+#↑业务话题    ↑类型要与订阅端一致        ↑频率分子         ↑与 DDS 线上字节同源
+Topic: /rosout | Type: rcl_interfaces/msg/Log | Count: 40 | Serialization Format: cdr
+# 系统话题，条数偏多属正常——为什么见下方"反直觉现象"表
+Topic: /parameter_events | Type: rcl_interfaces/msg/ParameterEvent | Count: 0 | Serialization Format: cdr
+# 系统话题，0 条属正常——为什么见下方"反直觉现象"表
+Topic: /events/write_split | Type: rosbag2_interfaces/msg/WriteSplitEvent | Count: 0 | Serialization Format: cdr
+# rosbag2 内部"切片通知"话题，只在切出 _1/_2 时才有事件，平时 0 条
+# 频率心算 = Count / Duration：/chatter 14/13.55 ≈ 1.03Hz ✓（与 talker 标称 1Hz 一致）
+# 某话题 Count 异常低 → 录漏了；Duration=0 → 空包，重录
+✔
+输出分两段
+：上半 5 行是
+包级档案
+（哪些文件、多大、什么后端、多久、多少条），下半
+Topic information
+是
+逐话题账本
+。上面三问各看一行——
+"录了多久"
+看
+Duration
+（=0 即废包）；
+"有这个话题吗"
+扫
+Topic
+列并核对
+Type
+；
+"频率对不对"
+算
+Count ÷ Duration
+。十秒钟读完，不必回放。
+输出行（本例值）
+是什么
+怎么用 / 异常长什么样
+Files: exp16_full_0.db3
+构成这个包的本体文件，分片会各占一行
+和 1.5 步
+ls
+对一眼，文件数一致才说明目录没拷漏；
+只发一个 .db3 不等于发了这个包
+（缺 metadata.yaml）
+Bag size: 50.9 KiB
+包占的磁盘空间
+估存储/上传成本；说了只点名录几个话题，它还猛涨 → 混进了大流量话题（如未压缩相机
+image_raw
+）
+Storage id: sqlite3
+存储后端，与 yaml 的
+storage_identifier
+一致
+是 sqlite3 就能
+python3 -c "import sqlite3; ..."
+直查两张表（
+本机没有 sqlite3 命令行
+）
+Duration: 13.5s
+真实
+录制时长（不是你按住命令的秒数），显示值四舍五入到 0.1s
+频率公式的
+分母
+，精确值看 1.6 的
+duration.nanoseconds
+；
+= 0 即废包
+（录晚了/录太短），直接重录
+Messages: 54
+全包总条数
+应 = 14+40+0+0；对不上说明索引与库不同步 →
+ros2 bag reindex
+Topic: /chatter
+话题名——
+继承别人的包，第一眼扫这列
+要的话题不在列表里 = 白录；在，才有下两列可看
+Type: std_msgs/msg/String
+消息类型（含所属包/命名空间）
+回放端与订阅端类型必须一字不差
+；自定义消息先
+ros2 interface show <type>
+核对两端是不是同一份 .msg
+Count: 14
+该话题条数，频率公式的
+分子
+业务话题的 Count÷Duration 与标称频率差一个量级 → 录漏了；系统话题 0/40 条属噪声，不作判据
+Serialization Format: cdr
+序列化格式
+与 DDS 线上传输的字节同源 → 回放
+零转换
+、100% 保真；
+--compression-mode
+只改存储编码，不改这个字段
+三问 → 三行，十秒走完
+① 录了多久？
+→
+Duration: 13.5s
+（精确值 13.55s；
+=0 就别往下走了
+）
+② 有这个话题吗？
+→ 扫
+Topic:
+列找
+/chatter
+，顺手核对
+Type
+和
+Serialization Format
+；
+③ 频率对不对？
+→
+Count ÷ Duration = 14 ÷ 13.55 ≈ 1.03Hz
+✓ 与 talker 标称 1Hz 相符。
+三问都过，才值得
+play
+；有一问不过，先回查录制——是
+Ctrl+C
+停的吗？中途被
+kill -9
+了吗？
+反直觉现象
+真相
+/parameter_events
+常常是 0
+节点启动后不再发参数事件，所以录到 0 条（不是 3 条）——
+正常
+/rosout
+比业务话题还多
+每个节点的每条日志算一条，talker + listener 叠加约
+40
+条——
+正常
+Duration
+不是 15s 而是 13.5s
+timeout 15
+是命令墙钟上限，节点
+启动约花 1.5s
+这段时间还没开录。心算频率要用真实 Duration，别拿 15 去凑（否则得 0.93Hz 会误判掉数据）
+判断数据完整性的唯一标尺
+始终是
+业务话题
+的
+Count / Duration
+对不对得上标称频率——本例
+/chatter 14 / 13.55 ≈ 1.03Hz ✓
+。系统话题的 0 条、40 条都是噪声，不作为判据。
+Duration = 0 或 Count 明显偏少 → 废包，重录。
+一句
+ros2 bag info
+十秒钟，省掉的是明天重跑现场的一整天。
+终端 A/B/C → 新终端
+第 3 步 · 回放验证 + 调速
+断源再放
+3
+停掉现场源 → play 让历史"复活"
+新终端 listener
+关键动作：
+先停掉所有数据源
+（终端 A、B 按 Ctrl+C），确认系统空闲，再起一个干净的 listener 当"观众"，然后回放——listener 会把历史消息当成实时消息照单全收：
+# 终端 A、B 按 Ctrl+C 停掉 talker / listener
+ros2
+node list
+# 预期：空输出，确认系统空闲
+# 新终端：起一个 listener 作为回放"观众"（保持运行）
+ros2
+run demo_nodes_cpp listener
+# 终端 C：以原始速率回放
+ros2
+bag play exp16_full
+# 调速实验：二倍速 / 半速
+ros2
+bag play exp16_full -r
+2.0
+# 间隔变 0.5s（原 1s）
+ros2
+bag play exp16_full -r
+0.5
+# 间隔变 2s
+# 只回放指定话题 —— 注意 play 没有 -t 短选项，必须写全 --topics
+ros2
+bag play exp16_full
+--topics /chatter
+# 忽略 /parameter_events、/rosout
+# 从第 5 秒起播（跳过开头稳定段；注意不能超过包的 Duration）
+ros2
+bag play exp16_full
+--start-offset 5
+$ ros2 bag play exp16_full
+[INFO] [rosbag2_player]: Playback until timestamp: ...
+# 新终端 listener 输出（与录制时完全一致的消息序列）：
+I heard: [Hello World:
+1
+]
+I heard: [Hello World:
+2
+]
+I heard: [Hello World:
+3
+] ...
+# -r 只改发布节奏，消息内部 stamp 原封不动 —— 所以间隔变了、内容不变
+# 误写成 -t /chatter 会报 error: unrecognized arguments: -t /chatter（-t 是 record 的选项）
+两个正常现象，别当故障
+① 回放结束 listener 立刻停止输出
+：预期行为——bag 播完 Publisher 就销毁了。要持续测就用
+--loop
+循环回放。
+② 回放时 listener 收不到
+：先看
+ros2 topic list
+里
+/chatter
+出没出（play 会新建 Publisher）。出了但没反应，查 QoS——
+ros2 bag play
+默认以记录时的 QoS 发布（本机实测
+RELIABLE + VOLATILE
+）。
+观察点
+record 结束后
+先 info 再走人
+：Duration 为 0 或 Count 明显偏少的包是废包（录晚了/缓冲丢了）。
+离线回放 + rviz2 联调数据流
+上节回放"能收到消息"，但只要下游节点用到 TF 或定时器，就必须让
+时间一起回到过去
+——双开关的原理主场在
+03 原理讲解 · 图 16-2
+，这里只做照抄操作与验证。
+图 16-4 · 离线联调数据流：带钟回放四小步
+——play、/clock、rviz2、Time 面板怎么串起来，验钟为什么不能用 /chatter？
+✅ 两开关都开，rviz 才进入"历史时空"
+⚠️ 漏开关 TF LookupException · delay 须带 header
+🔍 下文 4 的 Time 面板 + topic delay /scan
+1
+带钟回放
+ros2 bag play exp16_full --clock --loop：约 40Hz 再生 /clock，时间随回放推进
+2
+视图同步
+rviz2 --ros-args -p use_sim_time:=true，视图进入"历史时空"
+3
+验证对时
+Panels→Add New Panel→Time：显示与回放同步的时间（非系统时间）
+4
+加 Display
+按 bag 内容加 LaserScan / TF / Path / Image 面板，复现原始场景
+终端 A/B
+第 4 步 · 离线回放 + rviz2 联调（带钟工作流）
+带钟回放 + 视图同步
+4
+带钟回放（终端 A）+ rviz 认钟（终端 B）
+两个终端
+# 终端 A：回放数据并持续发布 /clock
+ros2
+bag play exp16_full
+--clock --loop
+# 终端 B：启动 rviz，让视图也认仿真时间
+rviz2
+--ros-args -p
+use_sim_time:=true
+# rviz 界面：菜单 Panels → Add New Panel → "Time"
+#   → Time 面板应显示与 bag 回放同步的时间（而非当前系统时间）
+# 再按包内容添加 Display 面板：
+#   有 LaserScan 数据 → 加 LaserScan Display
+#   有 TF 数据        → 加 TF Display
+#   有 Path 数据      → 加 Path Display
+#   有图像话题        → 加 Image Display（Topic: /camera/color/image_raw）
+# 防御性检查：时间对不对 —— 必须用【带 header 的话题】！
+ros2
+topic delay
+/scan
+# 负值 = 时钟没对齐
+# ⚠ 不能对 /chatter 用 —— 它没有 header 字段，会报：
+#   "msg does not have header" → 换有 header 的传感器话题（如 /scan、/odom）
+$ ros2 bag play exp16_full --clock --loop
+[INFO] [rosbag2_player]: Playback until timestamp: ...
+# /clock 话题以回放进度持续推进（约 40Hz，不是 1Hz）
+$ rviz2 --ros-args -p use_sim_time:=true
+# 任一环节漏开关：STAMP=昨天 vs now=今天 → TF LookupException 满屏
+# 两个开关都开 → Time 面板随回放增长，数据与视图同处"历史时空"
+$ ros2 topic delay /chatter
+[ERROR] [ros2topic]: msg does not have header
+# ← /chatter 无 header，防御检查必须换话题
+$ ros2 topic delay /scan
+average delay:
+0.01
+# 正值且很小 = 时钟对齐良好
+⚠ 验证时钟别用 /chatter——它没有 header
+ros2 topic delay
+依赖消息里的
+header.stamp
+与当前时钟对比。
+std_msgs/msg/String
+（
+/chatter
+）
+没有 header 字段
+，直接跑会报
+msg does not have header
+。
+正确做法
+：换用带 header 的传感器话题验证——
+ros2 topic delay /scan
+、
+/odom
+、
+/imu
+。
+数据不够怎么办
+：本实验
+/chatter
+是 String 类型，rviz 展示效果有限。若 B2 实验箱深度相机可用，录
+ros2 bag record /camera/color/image_raw -o exp16_camera_test
+→
+play --clock
++
+rviz2 --ros-args -p use_sim_time:=true
+→ 加
+Image Display
+（Topic 填
+/camera/color/image_raw
+），即可重现相机画面。
+坑
+症状
+解法
+回放后 listener 收不到
+订阅方全程静默
+QoS 不匹配：play 默认以
+记录时的 QoS
+发布（实测 /chatter = RELIABLE + VOLATILE），用
+--qos-profile-overrides-path
+传 YAML 重声明
+tf_static 只发一次
+节点 late-join 错过静态变换
+play 加
+--loop
+（每圈重播一次 /tf_static），或用
+--qos-profile-overrides-path
+把 durability 改为 transient_local
+/clock 没开或没认
+Time 面板为 0 / 不动、STAMP 错位
+play --clock + 节点/rviz use_sim_time:=true，
+两个开关缺一不可
+topic delay 报 no header
+msg does not have header
+换带 header 的话题验证（/scan、/odom）；
+/chatter
+是 String 类型，没有 header
+回放太快渲染卡顿
+rviz 跟不上、掉帧
+-r 0.5 降速给渲染留时间，或用
+--topics
+只放特定传感器话题
+--clock 时间跳变警告
+TF2 Buffer 报 WARN
+回放结束/跳回开头时 /clock 大幅跳变，属正常；用 --start-offset 从中间起播可避免
+话题名大小写
+--topics 指定了却"没这话题"
+与 list 输出逐字比对，ROS2 话题名大小写敏感（/Chatter ≠ /chatter）
+丢消息
+高频话题 Count 低于预期
+调大 --max-cache-size（默认100MB）、关无关话题、查 CPU 打满
+05
+注意事项与验收
+验收 1：用 talker/listener 造现场，独立完成"录 → info → play"全流程，info 验证时长与频率
+验收 2：会算 Count/Duration 频率并对照标称值（/chatter 应≈1Hz）判断数据完整性；能解释为何 Duration ≈ 13.5s 而非 15s
+验收 3：分别用 -r 2.0 / -r 0.5 / --topics / --start-offset 控制回放，说清"只改流速不改 stamp"
+验收 4：对比选择性录制（点名 /chatter）与全量录制（-a）的 bag 文件大小与话题列表差异
+验收 5：用双参数压缩（--compression-mode message --compression-format zstd）并 grep metadata 验证真压上了
+验收 6：说清 --max-bag-size 单位是字节、小包不切分的原因，并用 -d 3 观察多个 .db3
+验收 7：说清"单查一个 .db3 会丢数据"，并演示正确的查总数方式（查 bag 目录）
+验收 8：--clock + use_sim_time 双开关跑通离线流，rviz Time 面板显示回放时间；用带 header 的话题验证时钟对齐
+验收 9（选做）：用 python3 内置 sqlite3 模块查出各话题消息数（本机无 sqlite3 命令行）
+时间戳去哪了
+bag 唯一保证的是
+相对时序
+：回放把录制时的间隔原样（按 -r 缩放）还原，但绝对时刻可以被 --clock 重映射。因此判断"延迟多少毫秒"要用消息 header.stamp 相减，而不是看 bag 播放墙钟——header 才是传感器时间的原始证据。
+注意
+：也正因为这条原理，验证时钟的
+ros2 topic delay
+只能对带 header 的话题用
+——
+/chatter
+（std_msgs/msg/String）没有 header，会直接报
+msg does not have header
+。
+06
+本课总结与验证题
+结构
+SQLite 双表 + YAML 清单
+topics/messages 两表 + CDR 原始字节，索引支撑随机访问，事务保断电不损。QoS 存在 topics 表的
+offered_qos_profiles
+列。
+录制
+点名 + 正则是生产标准
+-a 磁盘秒爆（还混入 /rosout 等系统话题）；点名圈最小证据集，配双参数压缩、--max-bag-size 分片、--max-cache-size 缓冲。
+停止一律用 Ctrl+C
+（优雅写盘），
+kill -9
+会丢缓存并损坏 SQLite。
+回放
+改节奏不改时间戳
+-r 倍速、--loop 循环、--start-offset 跳段、--topics 选话题（无 -t）；TF 静态必 loop。回放结束 Publisher 销毁属正常。
+离线流
+--clock（约40Hz）+ use_sim_time
+play 带钟、节点与 rviz 认钟、Time 面板验钟——三步跑通"把现场带回工位"。验钟要用带 header 的话题。
+三问一句话收束
+是什么
+：把话题的时间序列 + CDR 字节录进 SQLite 双表，配一份 metadata.yaml 清单。
+为什么
+：现场故障只来一次，数据流过即消失。录下来才能把"去现场"变成"回工位"，把一次性调试变成可重复回归。
+怎么用
+：
+record
+（点名 + timeout + 可选压缩）→
+info
+（用真实 Duration 心算频率验完整性）→
+play
+（-r / --topics / --start-offset / --clock）。
+三条硬规则
+：限时用 timeout 不用 -u；选话题用 --topics 不用 -t；压缩必须 mode + format 双参数。
+✎ 验证题（改动型 · 做完对照得分点）——答案需动手执行后用自己的话归纳，参考答案点击展开。
+验证题
+Q1
+（覆盖目标① 存储）把
+metadata.yaml
+移出 bag 目录另存，分别跑
+ros2 bag info exp16_full
+与
+ros2 bag play exp16_full
+，记录现象；再把 yaml 放回，对比恢复情况。由此说清 yaml 与 .db3 各自承担什么。
+参考答案与得分点
+移走后
+info
+报找不到/读不出（bag"失忆"，因 rosbag2 先读清单才能定位文件），
+play
+同样无法回放；放回后 info/play 全部恢复（.db3 数据本体完好）。得分点：①现象对比如实（2 分）；②说清 yaml=清单/索引入口、db3=消息本体（4 分）；③结论"两者缺一不可"（2 分）。
+注意：
+在副本上做
+，实验后还原，不要在唯一拷贝上试删除。
+Q2
+（覆盖目标② 命令）同一段现场，分别用 ①
+timeout 15 ros2 bag record -a -o bagA
+、②
+ros2 bag record /chatter -o bagB --max-bag-size 2048
+录制，用
+ros2 bag info
+对比两包的话题列表与体积；再解释：为什么②的
+--max-bag-size 2048
+没有产生分片文件？
+参考答案与得分点
+①bagA 含 4 个话题（/chatter /rosout /parameter_events /events/write_split），bagB 只有 /chatter——全量 vs 点名的直接证据；②bagB 体积远小于 bagA。不分片原因：
+--max-bag-size
+单位是字节（2048B），且
+写满才切分
+——/chatter 1Hz 小消息 15 秒远达不到阈值时按需处理，小数据量下即便超过字节阈值也以实际写入为准、静默无提示。得分点：①对比表完整（3 分）；②单位=字节（3 分）；③"写满才切、无提示"（2 分）。
+Q3
+（覆盖目标② 回放）用
+ros2 bag info exp16_full
+读出 Duration=13.5s、/chatter Count=14，心算频率并判断数据是否完整；然后不改包内容，只用参数让回放"每 0.5 秒收到一条"，验证你的参数确实生效且消息内 stamp 没变。
+参考答案与得分点
+频率 = 14/13.55 ≈
+1.03Hz
+，与 talker 标称 1Hz 一致 → 完整（若拿 15s 当分母得 0.93Hz 会误判）。要让间隔从 1s 变 0.5s 用
+ros2 bag play exp16_full -r 2.0
+。验证 stamp 不变：对比前后输出或用
+ros2 bag play --dump
+/echo 观察消息时间字段——-r 只缩放发布节奏。得分点：①心算与分母正确（3 分）；②-r 2.0（3 分）；③"改节奏不改 stamp"（2 分）。
+Q4
+（覆盖目标③ 数据集设计）现场录了 15 个话题共 10 分钟的包，要在 3 版导航算法上做回归测试。请重新设计一份
+最小证据链
+录制命令：圈出必录话题、加上分片与命名，说明每个参数防的是什么风险；并写出"每次改完自动跑一轮"的验证流程骨架（离线回放 → 自动判定 → 结果留存）。
+参考答案与得分点
+示例：
+ros2 bag record /scan /odom /tf /cmd_vel -e "scan|odom" -o nav_reg_001 --max-bag-size 2147483648
+——感知+定位+控制闭环即最小证据链；
+-o
+可读命名防"时间戳考古"；
+--max-bag-size
+字节单位分片防单文件过大。流程骨架：play --clock + 节点 use_sim_time ← 回放；解析输出/比对轨迹 ← 自动判定；bag+日志+版本号归档 ← 留存。得分点：①话题选择理由（3 分）；②三个参数各防一险（3 分）；③三段式流程闭环（2 分）。
+Q5
+（覆盖目标④ 离线联调）按图 16-4 把双开关流程跑通后，故意做一个改动：停掉
+--clock
+（另开一个不带钟的 play）但 rviz2 仍保持
+use_sim_time:=true
+，观察 Time 面板与 TF 现象；再用
+ros2 topic delay /chatter
+与
+ros2 topic delay /scan
+分别验证，解释两条命令输出差异的根源。
+参考答案与得分点
+无 /clock 时：Time 面板停住/为 0（或不推进），节点与 rviz 的
+now()
+拿不到仿真时间，TF 出现 LookupException/数据过期丢弃（now=今天·stamp=昨天）。
+delay /chatter
+报
+msg does not have header
+（String 无 header 字段），
+delay /scan
+返回小正值=对齐良好。得分点：①停钟现象描述（3 分）；②双开关"缺一不可"结论（3 分）；③无 header 根源（2 分）。
+CORE-01 · 机器人 ROS2 应用与开发 · EXP-16 rosbag2 数据录制与回放
+2 学时 · 验证性

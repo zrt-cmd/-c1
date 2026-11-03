@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-02 · 分层系统架构 — 老人跌倒监护综合项目</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+:root{--theme:#059669;--theme-deep:#047857;--theme-bg:#d1fae5;--theme-bd:#a7f3d0}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit" title="返回课程首页">🧠 具身智能课程 · <i>教程首页</i></a>
+  <div class="crumb"><a href="../../../index.html#case">综合项目</a> / <a href="../index.html">老人跌倒监护</a> / EXP-02</div>
+</div>
+
+<div class="wrap">
+
+<aside class="side">
+  <h4>本页目录</h4>
+  <a href="#s1" class="now">01 问题引入：多模块系统靠什么"接口"对接</a>
+  <a href="#s2">02 原理通俗讲解：六层像"医院的科室分工"</a>
+  <a href="#s3">03 关联知识点：monitor.py 三大接口</a>
+  <a href="#s4">04 实验目标</a>
+  <a href="#s5">05 实验环境与准备</a>
+  <a href="#s6">06 动画讲解：分层数据流与双流水线</a>
+  <a href="#s7">07 互动讲解：六层职责与接口连线台</a>
+  <a href="#s8">08 实操步骤：精读关键行与统一通道验证</a>
+  <a href="#s9">09 重点与易错点</a>
+  <a href="#s10">10 总结与思考</a>
+  <h4>CH1 · 需求与配置</h4>
+  <a href="../exp-01-requirements/index.html">EXP-01 需求分析</a>
+  <a href="../exp-02-architecture/index.html">EXP-02 分层架构</a>
+  <a href="../exp-03-config/index.html">EXP-03 配置详解</a>
+  <h4>CH2 · 感知与交互</h4>
+  <a href="../exp-04-voice/index.html">EXP-04 语音交互</a>
+  <a href="../exp-05-pose-detection/index.html">EXP-05 检测与姿态</a>
+  <a href="../exp-06-fall-judgment/index.html">EXP-06 跌倒状态机</a>
+  <h4>CH3 · 告警与验证</h4>
+  <a href="../exp-07-alert-evidence/index.html">EXP-07 告警证据链</a>
+  <a href="../exp-08-llm-vlm/index.html">EXP-08 LLM·VLM</a>
+  <a href="../exp-09-full-verification/index.html">EXP-09 全功能验证</a>
+</aside>
+
+<main class="content">
+
+<div class="exp-head">
+  <span class="code">EXP-02 · 第 1 章 · 设计性 · 4 学时</span>
+  <h1>分层系统架构：六层依赖与双流水线</h1>
+  <p class="desc">摄像头、六麦克风、串口、大模型……十几种能力挤在一个程序里，靠什么不乱？本实验用<b>六层依赖</b>拆解 elderly_companion 工程，精读 <b>fall/monitor.py 三大接口</b>（process_frame / has_ask_session / on_kws）与 <b>voice_loop.py 语音状态机</b>（run / feed_text），看懂<b>视觉流水线与语音流水线</b>如何双线协同，并理解文本通道为什么只是同一台状态机的另一个入口。</p>
+  <div class="meta">
+    <span class="tag hl">难度 ⭐⭐ · 4 学时</span>
+    <span class="tag">六层依赖</span><span class="tag">monitor.py 三接口</span>
+    <span class="tag">voice_loop 状态机</span><span class="tag">双流水线</span>
+  </div>
+</div>
+
+<!-- 01 -->
+<section class="blk" id="s1">
+  <h2><span class="no">01</span>问题引入：多模块系统靠什么"接口"对接</h2>
+  <p>设想没有架构约束的写法：检测代码直接起线程录音、告警代码直接读摄像头帧、LLM 回复直接塞进 TTS —— 每处改动都要全局搜索，牵一发动全身。本工程用<b>分层 + 接口</b>解决：</p>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>相机线程只管把帧送进 <b>monitor.process_frame</b>，它不需要知道后面是要询问还是告警</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>六麦/ASR 链路想判断"现在能不能接收关键词"，只问 <b>monitor.has_ask_session</b>，不伸手去摸状态机内部</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>硬件唤醒事件经 <b>monitor.on_kws</b> 进入，文本输入经 <b>voice_loop.feed_text</b> 进入 —— 多个入口、同一状态机</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span>输出侧统一由 _dispatch 分发：播报、串口告警、证据落盘各安其位</div>
+  </div>
+  <div class="tip amber"><span class="lab">💡 接口的含义</span>接口就是"<b>我承诺给你什么、你别管我怎么做到</b>"。process_frame 承诺"每帧进来、判定推进"；has_ask_session 承诺"告诉你现在是否在询问中"。承诺稳定，层与层才能并行开发、单独测试。</div>
+</section>
+
+<!-- 02 -->
+<section class="blk" id="s2">
+  <h2><span class="no">02</span>原理通俗讲解：六层像"医院的科室分工"</h2>
+  <p>把系统想象成一家医院：挂号信息（配置）统一管理，检验科出报告（模型推理），主治医生下诊断（状态机），护士执行医嘱（TTS/告警），病历室留档（证据），门诊大厅是入口（apps）。六层依赖自下而上：</p>
+  <table>
+    <thead><tr><th>层</th><th>职责（科室）</th><th>工程对应</th></tr></thead>
+    <tbody>
+      <tr><td>① 配置与自检层</td><td>"医院章程"：所有参数一处存放，开机先体检</td><td>config/fall_config.yaml、common/config_schema、common/env_check</td></tr>
+      <tr><td>② 模型算法层</td><td>"检验科"：帧进数字出，不做业务决策</td><td>YOLOv8 RKNN 检测、BlazePose/RTMPose 姿态、sherpa-onnx KWS/ASR、Matcha-TTS、RKLLM</td></tr>
+      <tr><td>③ 视觉监控层</td><td>"影像主治"：把检测+姿态+几何串成每帧流水线</td><td>fall/monitor.py（process_frame 入口）</td></tr>
+      <tr><td>④ 决策与交互状态机层</td><td>"会诊决策"：跌倒六状态机 + 询问/播报窗口</td><td>fall/state_machine.py、voice_loop.py（run / feed_text）</td></tr>
+      <tr><td>⑤ 输出与证据层</td><td>"护士执行 + 病历留档"：串口告警帧、三件套与事件日志</td><td>alert 硬件驱动、evidence FrameRing 落盘</td></tr>
+      <tr><td>⑥ 应用入口层</td><td>"门诊大厅"：面向不同验证场景的启动器</td><td>apps/fall_app.py（--mode camera/image/video）、speech_*.py、fall_video_demo.py 等</td></tr>
+    </tbody>
+  </table>
+  <div class="tip tealb"><span class="lab">🔔 双流水线</span>视觉流水线（帧 → 检测 → 姿态 → 几何 → 状态机）与语音流水线（唤醒 → 录音 → 识别 → 应答）<b>各自独立运转</b>，交汇点只有状态机与三个接口 —— 这就是"双流水线协同"：相机卡顿不会堵死录音，LLM 加载慢也不阻塞判定。</div>
+</section>
+
+<!-- 03 -->
+<section class="blk" id="s3">
+  <h2><span class="no">03</span>关联知识点：monitor.py 三大接口与 voice_loop 双入口</h2>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">接口一 · L247–L252</div><div class="kt">process_frame(frame)</div><p>视觉流水线总入口：检测 → IoU 关联 → 姿态估计 → 几何特征 → 推进每人一台的状态机 → _dispatch 分发结果（L340–L383）。相机线程每帧调用，别的什么都不用知道。</p></div>
+    <div class="kcard"><div class="kd">接口二 · L152–L157</div><div class="kt">has_ask_session()</div><p>只读查询：当前是否有人处于 ASK 询问会话。语音链路用它决定此时收不收 confirm/cancel 关键词，<b>不暴露状态机内部</b>。</p></div>
+    <div class="kcard"><div class="kd">接口三 · L168–L173</div><div class="kt">on_kws()</div><p>硬件唤醒回调：六麦 0xA5 协议唤醒 / 中文 KWS 命中后由语音链路调用，把"进入聆听"事件注入系统。</p></div>
+    <div class="kcard"><div class="kd">状态机宿主 · L224–L271</div><div class="kt">voice_loop.run()</div><p>交互主循环：管理 IDLE/LISTENING/SPEAKING 节拍、播报完成事件、聆听窗口与超时兜底，把 TTS/ASR 两头接起来。</p></div>
+    <div class="kcard"><div class="kd">文本入口 · L154–L181</div><div class="kt">feed_text(text)</div><p>文本通道：把一行字当作 ASR 结果喂进 <b>同一台状态机</b> —— "小飞小飞"=唤醒、"救命"=呼救、"没事"=取消，这就是需求 R12 的落点。</p></div>
+    <div class="kcard"><div class="kd">汇总出口</div><div class="kt">_dispatch（L340–L383）</div><p>状态机迁移后的统一分发：该播报的交给 TTS，该告警的发 0xAA55 帧，该留证的交给 FrameRing —— 决策与执行彻底分离。</p></div>
+  </div>
+</section>
+
+<!-- 04 -->
+<section class="blk" id="s4">
+  <h2><span class="no">04</span>实验目标</h2>
+  <ul class="check">
+    <li>能画出<span class="ok">六层依赖图</span>，说出每层的职责与工程对应模块</li>
+    <li>能复述 monitor.py <span class="ok">三大接口</span>各自的签名职责、所在行号与调用方</li>
+    <li>能说明<span class="ok">视觉流水线与语音流水线</span>的交汇点与隔离点（为什么相机卡顿不堵录音）</li>
+    <li>能解释 feed_text 与音频通道为何必须<span class="ok">共用同一台状态机</span>（R12 的架构意义）</li>
+    <li>完成一次文本通道验证：用 text 驱动状态机走通"唤醒 → 询问 → 应答"最小闭环</li>
+  </ul>
+</section>
+
+<!-- 05 -->
+<section class="blk" id="s5">
+  <h2><span class="no">05</span>实验环境与准备</h2>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>硬件到位：工控主机 + 摄像头 + XFM 六麦（本实验以代码精读为主，音频链路验证可用 <code>--text</code> 替代）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>进入工程：<code>~/ros2_ws/src/xflz_eai_car1/app/elderly_companion</code></div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>环境自检（EXP-03 细讲，这里先跑通）：<code>python3 common/env_check.py --config config/fall_config.yaml</code>，预期 <code>[env] 自检通过</code></div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span>备好两个查看窗口：一个读码（monitor.py / voice_loop.py），一个跑 demo 观察日志</div>
+  </div>
+</section>
+
+<!-- 06 -->
+<section class="blk" id="s6">
+  <h2><span class="no">06</span>动画讲解：分层数据流与双流水线协同</h2>
+  <p class="lead">左半幅：一帧数据自上而下穿过六层（包沿线流动）；右半幅：视觉流水线与语音流水线平行推进，在状态机处交汇：</p>
+  <div class="anim-box">
+    <svg viewBox="0 0 720 330" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="六层数据流与双流水线协同动画">
+      <rect x="8" y="8" width="344" height="314" rx="12" fill="#111827" stroke="#334155"/>
+      <text x="180" y="32" text-anchor="middle" font-size="13.5" font-weight="700" fill="#6ee7b7">六层依赖 · 帧数据下行</text>
+      <g font-size="11.5" font-family="sans-serif" text-anchor="middle">
+        <g>
+          <rect x="40" y="46" width="260" height="34" rx="8" fill="#1e293b" stroke="#059669" stroke-width="1.6"><animate attributeName="stroke-width" values="1.6;3;1.6" dur="4.2s" repeatCount="indefinite"/></rect>
+          <text x="170" y="67" fill="#cbd5e1">⑥ 应用入口 · fall_app --mode</text>
+          <rect x="40" y="90" width="260" height="34" rx="8" fill="#1e293b" stroke="#0891b2" stroke-width="1.6"><animate attributeName="stroke-width" values="1.6;3;1.6" dur="4.2s" begin=".7s" repeatCount="indefinite"/></rect>
+          <text x="170" y="111" fill="#cbd5e1">⑤ 输出与证据 · 串口帧 + 三件套</text>
+          <rect x="40" y="134" width="260" height="34" rx="8" fill="#1e293b" stroke="#7c3aed" stroke-width="1.6"><animate attributeName="stroke-width" values="1.6;3;1.6" dur="4.2s" begin="1.4s" repeatCount="indefinite"/></rect>
+          <text x="170" y="155" fill="#cbd5e1">④ 状态机 · state_machine + voice_loop</text>
+          <rect x="40" y="178" width="260" height="34" rx="8" fill="#1e293b" stroke="#d97706" stroke-width="1.6"><animate attributeName="stroke-width" values="1.6;3;1.6" dur="4.2s" begin="2.1s" repeatCount="indefinite"/></rect>
+          <text x="170" y="199" fill="#cbd5e1">③ 视觉监控 · monitor.process_frame</text>
+          <rect x="40" y="222" width="260" height="34" rx="8" fill="#1e293b" stroke="#e11d48" stroke-width="1.6"><animate attributeName="stroke-width" values="1.6;3;1.6" dur="4.2s" begin="2.8s" repeatCount="indefinite"/></rect>
+          <text x="170" y="243" fill="#cbd5e1">② 模型算法 · YOLO/Pose/KWS/ASR/TTS</text>
+          <rect x="40" y="266" width="260" height="34" rx="8" fill="#1e293b" stroke="#94a3b8" stroke-width="1.6"><animate attributeName="stroke-width" values="1.6;3;1.6" dur="4.2s" begin="3.5s" repeatCount="indefinite"/></rect>
+          <text x="170" y="287" fill="#cbd5e1">① 配置与自检 · fall_config + env_check</text>
+        </g>
+      </g>
+      <g fill="#6ee7b7">
+        <circle r="4.5" cx="170" cy="46"><animate attributeName="cy" values="46;300" dur="4.2s" repeatCount="indefinite"/><animate attributeName="opacity" values="1;1;.2;.2" keyTimes="0;.7;.9;1" dur="4.2s" repeatCount="indefinite"/></circle>
+        <circle r="4.5" cx="300" cy="46"><animate attributeName="cy" values="46;300" dur="4.2s" begin="2.1s" repeatCount="indefinite"/><animate attributeName="opacity" values="1;1;.2;.2" keyTimes="0;.7;.9;1" dur="4.2s" begin="2.1s" repeatCount="indefinite"/></circle>
+      </g>
+
+      <rect x="368" y="8" width="344" height="314" rx="12" fill="#111827" stroke="#334155"/>
+      <text x="540" y="32" text-anchor="middle" font-size="13.5" font-weight="700" fill="#93c5fd">双流水线 · 状态机交汇</text>
+      <g font-size="11" font-family="sans-serif">
+        <text x="392" y="56" fill="#fde68a" font-weight="700">视觉流水线</text>
+        <g fill="#1e293b" stroke="#d97706">
+          <rect x="392" y="66" width="86" height="30" rx="7"/><rect x="486" y="66" width="86" height="30" rx="7"/><rect x="580" y="66" width="106" height="30" rx="7"/>
+        </g>
+        <g text-anchor="middle" fill="#cbd5e1">
+          <text x="435" y="85">帧 → 检测</text><text x="529" y="85">姿态·几何</text><text x="633" y="85">IoU 关联→状态机</text>
+        </g>
+        <line x1="478" y1="81" x2="486" y2="81" stroke="#d97706" stroke-width="2" stroke-dasharray="5 4"><animate attributeName="stroke-dashoffset" values="0;-18" dur="1s" repeatCount="indefinite"/></line>
+        <line x1="572" y1="81" x2="580" y2="81" stroke="#d97706" stroke-width="2" stroke-dasharray="5 4"><animate attributeName="stroke-dashoffset" values="0;-18" dur="1s" begin=".5s" repeatCount="indefinite"/></line>
+
+        <text x="392" y="136" fill="#c4b5fd" font-weight="700">语音流水线</text>
+        <g fill="#1e293b" stroke="#7c3aed">
+          <rect x="392" y="146" width="76" height="30" rx="7"/><rect x="476" y="146" width="76" height="30" rx="7"/><rect x="560" y="146" width="76" height="30" rx="7"/><rect x="644" y="146" width="42" height="30" rx="7"/>
+        </g>
+        <g text-anchor="middle" fill="#cbd5e1">
+          <text x="430" y="165">唤醒</text><text x="514" y="165">录音·ASR</text><text x="598" y="165">关键词判定</text><text x="665" y="165">文本</text>
+        </g>
+        <line x1="468" y1="161" x2="476" y2="161" stroke="#7c3aed" stroke-width="2" stroke-dasharray="5 4"><animate attributeName="stroke-dashoffset" values="0;-18" dur="1s" begin=".3s" repeatCount="indefinite"/></line>
+        <line x1="552" y1="161" x2="560" y2="161" stroke="#7c3aed" stroke-width="2" stroke-dasharray="5 4"><animate attributeName="stroke-dashoffset" values="0;-18" dur="1s" begin=".8s" repeatCount="indefinite"/></line>
+
+        <g stroke="#4ade80" stroke-width="2" stroke-dasharray="6 5" fill="none">
+          <path d="M633 96 L633 120 L470 120 L470 146"><animate attributeName="stroke-dashoffset" values="0;-24" dur="1.2s" repeatCount="indefinite"/></path>
+          <path d="M598 176 L598 200 L470 200"><animate attributeName="stroke-dashoffset" values="0;-24" dur="1.2s" begin=".6s" repeatCount="indefinite"/></path>
+        </g>
+        <rect x="392" y="188" width="78" height="34" rx="8" fill="#052e2b" stroke="#4ade80" stroke-width="2"/>
+        <text x="431" y="203" text-anchor="middle" fill="#86efac" font-size="10.5">六状态机</text>
+        <text x="431" y="216" text-anchor="middle" fill="#6ee7b7" font-size="9.5">每 人 一 台</text>
+
+        <g stroke="#4ade80" stroke-width="2" stroke-dasharray="6 5" fill="none">
+          <path d="M392 205 L360 205 L360 246 L470 246"><animate attributeName="stroke-dashoffset" values="0;-24" dur="1.2s" begin="1.2s" repeatCount="indefinite"/></path>
+        </g>
+        <g fill="#1e293b" stroke="#0891b2">
+          <rect x="470" y="232" width="106" height="28" rx="7"/><rect x="586" y="232" width="100" height="28" rx="7"/>
+        </g>
+        <g text-anchor="middle" fill="#cbd5e1">
+          <text x="523" y="250">TTS 播报询问</text><text x="636" y="250">告警帧+证据</text>
+        </g>
+        <line x1="576" y1="246" x2="586" y2="246" stroke="#0891b2" stroke-width="2" stroke-dasharray="5 4"><animate attributeName="stroke-dashoffset" values="0;-18" dur="1s" begin="1.5s" repeatCount="indefinite"/></line>
+        <text x="540" y="296" text-anchor="middle" font-size="11" fill="#64748b">交汇点只有状态机与三接口 · 层间不越界</text>
+        <text x="540" y="312" text-anchor="middle" font-size="11" fill="#94a3b8">feed_text 与 ASR 结果走同一入口（R12）</text>
+      </g>
+    </svg>
+  </div>
+  <div class="anim-cap">动画 2-1｜左：光点沿六层下行，每层被点亮即承担一段职责；右：双流水线并行推进，虚线在六状态机交汇后流向 TTS 与告警</div>
+</section>
+
+<!-- 07 -->
+<section class="blk" id="s7">
+  <h2><span class="no">07</span>互动讲解：六层职责与接口连线台</h2>
+  <p class="lead">点击按钮，查看每个"接口合约"的承诺、调用方与被隔离的复杂度：</p>
+  <div class="ix-panel">
+    <div class="ix-title">接口连线台 · Wire Bench</div>
+    <div class="ctl-row">
+      <button class="btn" onclick="wirePF()">📹 process_frame</button>
+      <button class="btn ghost" onclick="wireHAS()">❓ has_ask_session</button>
+      <button class="btn ghost" onclick="wireKWS()">🎙 on_kws + feed_text</button>
+      <button class="btn ghost" onclick="wireFlow()">🔀 双流水线协同</button>
+      <button class="btn ghost" onclick="wireReset()">↺ 复位</button>
+    </div>
+    <div class="io" id="wireIo"><span class="dim">// 点击接口按钮，查看"承诺 → 调用方 → 隔离了什么"三段合约</span>
+<span class="ok">架构原则：上层调接口，不摸下层内部；同一入口进状态机，行为才一致。</span></div>
+  </div>
+  <div class="tip violet"><span class="lab">🙋 设计权衡</span>三层接口都是<b>刻意做小</b>的：process_frame 只收一帧，has_ask_session 只答是不是，on_kws 只报"醒了"。接口越小，出错面越小 —— 这正是设计性实验要练的取舍。</div>
+</section>
+
+<!-- 08 -->
+<section class="blk" id="s8">
+  <h2><span class="no">08</span>实操步骤：精读关键行与统一通道验证</h2>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>进入工程目录并跑环境自检，确认七库与模型就绪</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>定位三大接口与状态机主循环，核对行号</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>读 process_frame（L247–L252）→ 往下追 _dispatch（L340–L383），画出"一帧的旅程"</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span>读 voice_loop.run（L224–L271）与 feed_text（L154–L181），确认文本/音频汇入同一状态机</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">5</span>启动文本通道 demo，依次输入"小飞小飞 → （被问）救命/没事"，对照日志验证闭环</div>
+  </div>
+  <pre><span class="c"># ① 进入工程并自检</span>
+<span class="g">cd</span> ~/ros2_ws/src/xflz_eai_car1/app/elderly_companion
+<span class="g">python3</span> common/env_check.py --config config/fall_config.yaml
+<span class="c"># 预期：[env] 自检通过（缺项时逐条 MISSING，EXIT 2）</span>
+
+<span class="c"># ② 定位三大接口（行号应与本课第 03 节一致）</span>
+<span class="g">grep</span> -n "def process_frame\|def has_ask_session\|def on_kws" fall/monitor.py
+<span class="c"># 247: def process_frame(...)      每帧入口</span>
+<span class="c"># 152: def has_ask_session(...)    询问会话只读查询</span>
+<span class="c"># 168: def on_kws(...)             硬件/KWS 唤醒回调</span>
+
+<span class="c"># ③ 定位语音状态机宿主与文本入口</span>
+<span class="g">grep</span> -n "def run\|def feed_text" voice_loop.py
+<span class="c"># 224: def run(...)     交互主循环</span>
+<span class="c"># 154: def feed_text(...)  文本通道 → 同一状态机（R12）</span>
+
+<span class="c"># ④ 文本通道跑最小闭环（无需麦克风/摄像头）</span>
+<span class="g">python3</span> apps/speech_text_demo.py
+<span class="c"># 依次输入：小飞小飞 → （系统询问后）没事 / 救命</span></pre>
+  <div class="tip tealb"><span class="lab">🔍 读码路线</span>不要从头通读。按<b>"一帧的旅程"</b>读：相机线程 → process_frame → _dispatch → TTS/告警/证据；再按<b>"一句话的旅程"</b>读：feed_text → 状态机 → 应答。两条旅程在状态机处打结，其余都是直路。</div>
+</section>
+
+<!-- 09 -->
+<section class="blk" id="s9">
+  <h2><span class="no">09</span>重点与易错点</h2>
+  <ul class="check">
+    <li>三大接口的职责边界：<span class="ok">process_frame 管帧、has_ask_session 管查询、on_kws 管唤醒</span>，不可互相挪用</li>
+    <li>文本与音频是<span class="ok">同一台状态机的两个入口</span>（feed_text L154–L181），不是两套逻辑</li>
+    <li>双流水线的隔离点在状态机：<span class="ok">相机/LLM 的延迟不会阻塞另一条线</span></li>
+    <li>_dispatch 是决策与执行的分界：<span class="ok">状态机只给结论，不直接碰硬件</span></li>
+  </ul>
+  <table>
+    <thead><tr><th>⚠️ 常见坑</th><th>现象 → 解法</th></tr></thead>
+    <tbody>
+      <tr><td>行号对不上</td><td>grep 输出与本课不符 → 以现场 grep 行号为准，行号漂移不影响接口职责理解</td></tr>
+      <tr><td>文本通道"没反应"</td><td>跳过唤醒直接输入"救命" → 先"小飞小飞"进入聆听，语序与 R12 一致</td></tr>
+      <tr><td>把 has_ask_session 当状态机用</td><td>想在语音层直接改状态 → 它是只读查询，迁移必须走状态机自身事件</td></tr>
+      <tr><td>双流水线串成单线</td><td>在 process_frame 里同步等 TTS —— 视觉线被播报堵死 → 交由 voice_loop 异步承担</td></tr>
+      <tr><td>越层调用</td><td>apps 入口直接 import 内部模块改变量 → 经接口与事件，改动只落在服务方</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 10 -->
+<section class="blk" id="s10">
+  <h2><span class="no">10</span>总结与思考</h2>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">✅ 完成成果</div><div class="kt">六层依赖图 + 两段旅程</div><p>手绘六层架构图，以及"一帧的旅程""一句话的旅程"两条调用链。</p></div>
+    <div class="kcard"><div class="kd">🧠 原理收获</div><div class="kt">接口合约与双流水线</div><p>三大接口的承诺边界；交汇点唯一（状态机），其余层间完全隔离。</p></div>
+    <div class="kcard"><div class="kd">🛠 技能收获</div><div class="kt">按旅程读码法</div><p>grep 定位接口 → 顺调用链读，而非逐行通读大文件。</p></div>
+    <div class="kcard"><div class="kd">❓ 排障思路</div><div class="kt">先切层，再定位</span></div><p>行为异常时先问"哪一层的承诺没兑现"，把问题从全局缩小到单层。</p></div>
+  </div>
+  <div class="tip violet"><span class="lab">📝 思考题 1</span>如果把文本通道和音频通道做成<b>两台独立状态机</b>，现场会出现什么竞态？（提示：想象文本输入"没事"的同时，音频侧状态机正准备播报"您还好吗"—— R12 为什么强制"同一状态机"？）</div>
+  <div class="tip violet"><span class="lab">📝 思考题 2</span>monitor.py 的 has_ask_session 只返回"是否在询问中"。若语音层想拿到"询问还剩几秒"，你建议<b>扩接口</b>（返回更多信息）还是<b>保持现状</b>（语音层自行计时）？从接口最小化原则与心跳一致性两方面论证。</div>
+</section>
+
+<nav class="expnav">
+  <a href="../exp-01-requirements/index.html"><span class="lb">← 上一个实验</span>EXP-01 需求分析（R1–R12）</a>
+  <a class="next" href="../exp-03-config/index.html"><span class="lb">下一个实验 →</span>EXP-03 fall_config.yaml 配置详解</a>
+</nav>
+
+<footer>
+  <span>CASE-03 · 老人跌倒监护 · EXP-02 分层系统架构</span>
+  <span>4 学时 · 设计性 · 基于 elderly_companion 实验讲义改编</span>
+</footer>
+
+</main>
+</div>
+
+<script>
+// 接口连线台
+var wBase='<span class="dim">// 点击接口按钮，查看"承诺 → 调用方 → 隔离了什么"三段合约</span>\n'+
+'<span class="ok">架构原则：上层调接口，不摸下层内部；同一入口进状态机，行为才一致。</span>';
+function setW(t){document.getElementById('wireIo').innerHTML=t;}
+function wirePF(){
+  setW('<span class="dim">// fall/monitor.py · process_frame（L247–L252）</span>\n'+
+'<span class="ok">承诺：每帧进入 → 检测 → IoU 关联 → 姿态 → 几何 → 推进状态机 → _dispatch</span>\n'+
+'<span class="ok">调用方：相机线程（每帧一次），不感知询问/告警逻辑</span>\n'+
+'<span class="warn">隔离了什么：换检测模型（YOLO→其他）只改 ②③ 层内部，相机线程零改动</span>');
+}
+function wireHAS(){
+  setW('<span class="dim">// fall/monitor.py · has_ask_session（L152–L157）</span>\n'+
+'<span class="ok">承诺：只读回答"当前有人处于 ASK 询问会话吗"，不外泄状态机内部</span>\n'+
+'<span class="ok">调用方：语音链路 —— 决定此刻收不收 confirm/cancel 关键词</span>\n'+
+'<span class="warn">隔离了什么：状态机字段如何存储、几个人会话如何合并，语音层一律不知</span>');
+}
+function wireKWS(){
+  setW('<span class="dim">// 入口对：on_kws（monitor L168–L173）与 feed_text（voice_loop L154–L181）</span>\n'+
+'<span class="ok">on_kws：硬件 0xA5 唤醒 / 中文 KWS 命中 → 注入"进入聆听"事件</span>\n'+
+'<span class="ok">feed_text：一行文本当作 ASR 结果 —— 小飞小飞=唤醒 / 救命=呼救 / 没事=取消</span>\n'+
+'<span class="bad">两者汇入同一台状态机 → R12 保证文本回归测试与真实音频行为完全一致</span>');
+}
+function wireFlow(){
+  setW('<span class="dim">// 双流水线协同：交汇点 = 状态机 + 三接口</span>\n'+
+'<span class="warn">视觉线：帧 → 检测/姿态/几何 → 状态机（受 falling_window 1.5s / lying_time 3.0s 约束）</span>\n'+
+'<span class="warn">语音线：唤醒 → 录音/ASR → 关键词（受 ask_timeout 12s / 十秒无 partial 兜底约束）</span>\n'+
+'<span class="ok">协同：has_ask_session 联动收词窗口；LLM/TTS 慢不阻塞视觉判定，相机卡不堵录音</span>');
+}
+function wireReset(){setW(wBase);}
+</script>
+<script src="../shared/tutorial.js" defer></script>
+</body>
+</html>

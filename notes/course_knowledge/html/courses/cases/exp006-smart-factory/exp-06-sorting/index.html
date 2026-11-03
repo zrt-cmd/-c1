@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EXP-06 · 智能分拣 — 智慧工厂装货分拣码垛综合项目</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+:root{
+  --theme:#ea580c;
+  --theme-deep:#c2410c;
+  --theme-bg:#ffedd5;
+  --theme-bd:#fed7aa;
+}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit" title="返回课程首页">🧠 具身智能课程 · <i>教程首页</i></a>
+  <div class="crumb"><a href="../../../index.html#case">综合项目</a> / <a href="../index.html">智慧工厂装货分拣码垛</a> / EXP-06</div>
+</div>
+
+<div class="wrap">
+<aside class="side">
+  <h4>本页目录</h4>
+  <a href="#s1" class="now">01 问题引入</a>
+  <a href="#s2">02 原理通俗讲解</a>
+  <a href="#s3">03 关联知识点</a>
+  <a href="#s4">04 实验目标</a>
+  <a href="#s5">05 实验环境与准备</a>
+  <a href="#s6">06 动画讲解</a>
+  <a href="#s7">07 互动讲解</a>
+  <a href="#s8">08 实操步骤</a>
+  <a href="#s9">09 重点与易错点</a>
+  <a href="#s10">10 总结与思考</a>
+  <h4 style="margin-top:22px">CASE-01 · 智慧工厂</h4>
+  <a href="../exp-01-requirements/index.html">EXP-01 需求分析</a>
+  <a href="../exp-02-architecture/index.html">EXP-02 五节点架构</a>
+  <a href="../exp-03-interface-design/index.html">EXP-03 接口设计</a>
+  <a href="../exp-04-voice-integration/index.html">EXP-04 语音交互集成</a>
+  <a href="../exp-05-visual-loading/index.html">EXP-05 视觉自适应装货</a>
+  <a href="../exp-06-sorting/index.html">EXP-06 智能分拣</a>
+  <a href="../exp-07-palletizing/index.html">EXP-07 自主码垛</a>
+  <a href="../exp-08-emergency-stop/index.html">EXP-08 危险检测与急停</a>
+  <a href="../exp-09-full-verification/index.html">EXP-09 全功能快速验证</a>
+</aside>
+
+<main class="content">
+  <div class="exp-head">
+    <span class="code">EXP-06 · 第 2 章 · 综合性 · 4 学时</span>
+    <h1>智能分拣：手动打点 + 固定八步抓放</h1>
+    <p class="desc">分拣任务走与装货不同的技术路线：<code>vision: false</code>，不做 tag 检测与 pick_offset 纠偏，
+    改用"手动打点"示教出 observe_pose / place_pose，靠固定八步 _do_fixed_grasp 完成"抓—移—放—回位"
+    （对应需求 R5）。掌握示教流程、八步时序与动静两套抓放逻辑的差异，是本实验的核心。</p>
+    <div class="meta">
+      <span class="tag hl">📦 固定八步抓放</span>
+      <span class="tag">手动打点示教</span>
+      <span class="tag">vision:false 分支</span>
+      <span class="tag">lift_height / place_lift</span>
+      <span class="tag">TG6 / TG7 用例</span>
+    </div>
+  </div>
+
+  <section class="blk" id="s1">
+    <h2><span class="no">01</span>问题引入：不是所有任务都需要"眼睛"</h2>
+    <p>装货区的箱子会乱放，所以要视觉纠偏；但分拣区的物料是<strong>工位固定</strong>的——取料口、分拣格都在确定位置。
+    源讲义里 <code>grasp.tasks.sort</code> 明确写着 <code>vision: false</code>：既然位置已知，就别为确定的事情付出
+    检测耗时与失败率，直接用示教好的固定位姿执行。</p>
+    <p>于是问题变成：固定路线怎么设计才安全（不撞箱、不拖料）？示教位姿怎么记录进 yaml？
+    中途被人打断怎么停下（TG7）？——这就是 R5 分拣任务要回答的三件事。</p>
+  </section>
+
+  <section class="blk" id="s2">
+    <h2><span class="no">02</span>原理通俗讲解：仓库师傅的"肌肉记忆"</h2>
+    <p>固定八步抓放，就像仓库师傅搬固定货位的箱子——闭着眼也知道套路：</p>
+    <div class="kgrid">
+      <div class="kcard"><div class="kd">先张手</div><div class="kt">第 ① 步：先开夹爪再伸手</div>
+        <p>移动前先张开夹爪并等 <code>gripper_duration + 0.2s</code>（<code>_call_gripper</code> L494-515）。
+        这跟生活直觉一致：<strong>要拿东西先把手张开</strong>，否则张着拳头过去会撞歪箱子。</p></div>
+      <div class="kcard"><div class="kd">再俯身</div><div class="kt">第 ② ③ 步：到位、合拢</div>
+        <p>移动到打点记录的取料位（含示教好的俯仰角 pitch），停稳后合拢夹爪。位姿来自手动打点——
+        人拖着机械臂到位，把关节角写进 yaml，之后每次原样复现。</p></div>
+      <div class="kcard"><div class="kd">先提后移</div><div class="kt">第 ④ ⑤ 步：垂直抬升再横移</div>
+        <p>抓稳后先垂直抬 <code>lift_height=0.03m</code>，再水平移到分拣位。
+        <strong>先抬后移是防刮擦铁律</strong>：不抬就横走，箱子会拖倒料堆。</p></div>
+      <div class="kcard"><div class="kd">放、再抬、回</div><div class="kt">第 ⑥ ⑦ ⑧ 步：松手、脱身、复位</div>
+        <p>放到分拣位后开爪，再抬 <code>place_lift=0.05m</code> 脱离（比抓取抬得更高，因为放货区有围栏/邻箱），
+        最后 go_work 回待命位（R4.1 每步回位）。结束日志
+        <code>=== fixed grasp-place sequence done ===</code>，状态 <code>sort|done</code>。</p></div>
+    </div>
+    <div class="tip tealb" style="margin-top:14px"><span class="lab">对照</span>
+      装货（vision: true）：检测 → TF → pick_offset 动态补；分拣（vision: false）：示教位姿直接用，
+      <strong>自然没有 pick_offset 生效环节</strong>——偏了不能在线纠，只能回打点位重新示教。</div>
+  </section>
+
+  <section class="blk" id="s3">
+    <h2><span class="no">03</span>关联知识点</h2>
+    <div class="kgrid">
+      <div class="kcard"><div class="kd">vision:false 分支</div><div class="kt">L273-278</div>
+        <p>该分支不再调用 pick/place 检测服务，自行组合 set_gripper ＋ target_pose 指令驱动机械臂，路径更短更稳。</p></div>
+      <div class="kcard"><div class="kd">示教位姿</div><div class="kt">yaml grasp.tasks.sort</div>
+        <p>observe [0.0622, -0.1158, 0.1951, 3.0371]；place [0.1434, -0.1296, 0.2075, 2.7283]（约 174°，
+        末端翻转朝向分拣格）。四元数/角度数值来自实际打点，不得凭空改。</p></div>
+      <div class="kcard"><div class="kd">可调参数</div><div class="kt">两个抬升高度</div>
+        <p><code>grasp.lift_height=0.03</code>（抓后抬）、<code>grasp.place_lift=0.05</code>（放后抬），
+        可用 <code>ros2 param set /eai_factory_grasp grasp.lift_height 0.05</code> 在线试，但
+        <strong>二者是全局参数，码垛同样受影响</strong>。</p></div>
+      <div class="kcard"><div class="kd">语音闭环</div><div class="kt">R3 + R7 链路复检</div>
+        <p>"分拣" → "好的，开始分拣" → 八步执行 → done → "分拣完成"（scheduler 固定话术）。
+        热词误听"风景/封建"时靠 hotwords + intent_hints 纠正。</p></div>
+    </div>
+  </section>
+
+  <section class="blk" id="s4">
+    <h2><span class="no">04</span>实验目标</h2>
+    <ul class="check">
+      <li>完成分拣区手动打点，生成 observe_pose / place_pose 并写入 yaml，重启 launch 后位姿可复现。</li>
+      <li>逐条跟踪固定八步 _do_fixed_grasp（L413-485）执行日志，能说出每步对应的关节动作。</li>
+      <li>解释"先开爪再移动"与"抓后抬 place_lift 更高"两个设计的几何原因。</li>
+      <li>区分 vision:true 与 vision:false 两条分支的代码路径差异，说明分拣为何不做 pick_offset。</li>
+      <li>通过 TG6（八步完整性）与 TG7（语音打断复位）测试用例。</li></ul>
+  </section>
+
+  <section class="blk" id="s5">
+    <h2><span class="no">05</span>实验环境与准备</h2>
+    <ul class="check">
+      <li>机械臂手动示教模式可用（断使能拖动到位、记录关节角的工具就绪）。</li>
+      <li>yaml 核对：<code>grasp.tasks.sort: {vision: false, observe: [...], place: [...]}</code>；
+      观察位姿应使夹爪正对取料口、俯仰角适合垂直下抓。</li>
+      <li>分拣区清场：取料口只有一个待抓物料，分拣格空置，四周无晃动遮挡物。</li>
+      <li>启动：<code>ros2 launch eai_factory eai_factory.launch.py</code>（可
+      <code>start_voice:=true</code> 走语音触发；纯调测时 <code>start_vision:=false</code> 减少无关节点）。</li>
+      <li>预演打断命令（TG7 用）：<code>ros2 topic pub -1 /eai_factory/interrupt std_msgs/msg/Bool "{data: true}"</code>。</li>
+    </ul>
+  </section>
+
+  <section class="blk" id="s6">
+    <h2><span class="no">06</span>动画讲解：固定八步时序</h2>
+    <div class="anim-box">
+<svg viewBox="0 0 720 310" xmlns="http://www.w3.org/2000/svg">
+  <text x="20" y="26" font-size="15" fill="#94a3b8">_do_fixed_grasp 固定八步（L413-485）</text>
+  <line x1="45" y1="60" x2="45" y2="285" stroke="#fed7aa" stroke-width="3"/>
+  <g font-size="12">
+    <circle cx="45" cy="60"  r="7" fill="#ea580c"/><text x="62" y="64"  fill="#c2410c">① 张开夹爪（等 gripper_duration+0.2s）</text>
+    <circle cx="45" cy="88"  r="7" fill="#ea580c"/><text x="62" y="92"  fill="#c2410c">② 移到取料位（示教 observe_pose + pitch）</text>
+    <circle cx="45" cy="116" r="7" fill="#ea580c"/><text x="62" y="120" fill="#c2410c">③ 合拢夹爪抓稳</text>
+    <circle cx="45" cy="144" r="7" fill="#ea580c"/><text x="62" y="148" fill="#c2410c">④ 垂直抬 lift_height = 0.03m</text>
+    <circle cx="45" cy="172" r="7" fill="#ea580c"/><text x="62" y="176" fill="#c2410c">⑤ 平移到分拣位（示教 place_pose ≈174°）</text>
+    <circle cx="45" cy="200" r="7" fill="#ea580c"/><text x="62" y="204" fill="#c2410c">⑥ 张爪放件</text>
+    <circle cx="45" cy="228" r="7" fill="#ea580c"/><text x="62" y="232" fill="#c2410c">⑦ 抬 place_lift = 0.05m 脱离</text>
+    <circle cx="45" cy="256" r="7" fill="#ea580c"/><text x="62" y="260" fill="#c2410c">⑧ go_work 回待命位 → done 播报"分拣完成"</text>
+  </g>
+  <circle r="9" fill="#fdba74" stroke="#ea580c" stroke-width="2">
+    <animate attributeName="cy" values="60;88;116;144;172;200;228;256;60" dur="8s" repeatCount="indefinite"/>
+    <animate attributeName="cx" values="45;45;45;45;45;45;45;45;45" dur="8s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="1;1;1;1;1;1;1;1;0" dur="8s" repeatCount="indefinite"/>
+  </circle>
+  <rect x="430" y="45" width="265" height="115" rx="8" fill="#ffedd5" stroke="#fed7aa"/>
+  <text x="445" y="66" font-size="12" fill="#9a3412">侧视：为什么"先抬再移"</text>
+  <rect x="450" y="132" width="80" height="10" fill="#cbd5e1"/>
+  <rect x="580" y="132" width="80" height="10" fill="#cbd5e1"/>
+  <rect x="470" y="118" width="40" height="14" fill="#fb923c"/>
+  <rect x="492" y="72" width="34" height="26" rx="4" fill="#0f172a"/>
+  <path d="M 490 100 h 38 v 14 h -38 z" fill="#fb923c" stroke="#ea580c"/>
+  <path d="M 509 114 C 540 70, 560 70, 596 104" fill="none" stroke="#ea580c" stroke-width="2.5" stroke-dasharray="6 4"/>
+  <line x1="470" y1="112" x2="540" y2="112" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="3 3"/>
+  <text x="545" y="110" font-size="10" fill="#dc2626">不抬会刮倒邻箱</text>
+  <text x="445" y="152" font-size="11" fill="#9a3412">抬升高度：抓后 0.03 ｜ 放后 0.05</text>
+  <rect x="430" y="175" width="265" height="95" rx="8" fill="#0f172a"/>
+  <text x="445" y="196" font-size="12" fill="#fdba74">分支对照</text>
+  <text x="445" y="216" font-size="11" fill="#94a3b8">装货 vision: true → tag 检测 + TF + pick_offset</text>
+  <text x="445" y="236" font-size="11" fill="#94a3b8">分拣 vision: false → 示教位姿直驱（L273-278）</text>
+  <text x="445" y="256" font-size="11" fill="#fdba74">打断(TG7) → interrupt → 停抓放 + 回位 + 状态清零</text>
+</svg>
+    </div>
+    <div class="anim-cap">图 6-1　左：八步时序纵轴，光点循环走一遍即一次完整分拣；右上：抓取高度几何——先抬 0.03 再横移防刮擦，放后抬 0.05 脱离围栏；右下：两条抓放分支的取舍与打断复位。</div>
+  </section>
+
+  <section class="blk" id="s7">
+    <h2><span class="no">07</span>互动讲解：流程单步播放器</h2>
+    <p>逐击"下一步"，按真实日志推进固定八步，或"到底"一次播完；也可模拟 TG7 打断：</p>
+    <div class="ix-panel">
+      <div class="ix-title">🎛️ 分拣八步单步播放器</div>
+      <div class="ctl-row">
+        <button class="btn" onclick="stepSort()">下一步 ▸</button>
+        <button class="btn" onclick="runSort()">跑到底 ⏩</button>
+        <button class="btn" onclick="abortSort()">TG7 打断 ⛔</button>
+        <button class="btn" onclick="resetSort()">复位</button>
+      </div>
+      <div class="io" id="sortIo">共 8 步。点击"下一步"开始，观察 gripper / target_pose 指令与状态迁移……</div>
+    </div>
+    <div class="tip amber" style="margin-top:14px"><span class="lab">观察点</span>
+      第 ① 步输出的是 set_gripper（开）而不是 move——<strong>这正是 vision:false 分支自组指令的证据</strong>；
+      若第一步是检测服务调用，说明跑错了分支。</div>
+  </section>
+
+  <section class="blk" id="s8">
+    <h2><span class="no">08</span>实操步骤</h2>
+    <div class="flow">
+      <div class="step"><div class="n">1</div><div><strong>手动打点</strong>：进示教模式，把机械臂拖到取料口正上方（含合适俯仰角）记录为 observe_pose；
+      再拖到分拣格上方记录 place_pose，写入 <code>grasp.tasks.sort</code>。</div></div>
+      <div class="step"><div class="n">2</div><div><strong>核对 yaml</strong>
+<pre>grep -A4 "sort:" config/eai_factory.yaml
+<span class="y">sort: { vision: false, observe: [0.0622, -0.1158, 0.1951, 3.0371],
+             place: [0.1434, -0.1296, 0.2075, 2.7283] }</span></pre></div></div>
+      <div class="step"><div class="n">3</div><div><strong>启动并触发</strong>
+<pre>ros2 launch eai_factory eai_factory.launch.py
+<span class="c"># 语音喊"执行分拣"，或直接：</span>
+ros2 service call /eai_factory/start_sort std_srvs/srv/Trigger</pre></div></div>
+      <div class="step"><div class="n">4</div><div><strong>对照日志走八步</strong>：从"开爪"到
+      <code>=== fixed grasp-place sequence done ===</code>，核对每步与 s6 动画一致；观察总耗时含三处等待
+      （gripper_duration+0.2、move_delay、指令间隔）。</div></div>
+      <div class="step"><div class="n">5</div><div><strong>TG6 完整性用例</strong>：连续跑 3 次全流程，记录成功次数与失败步号，
+      失败在第几步就查第几步的位姿/等待时间。</div></div>
+      <div class="step"><div class="n">6</div><div><strong>在线调抬升高度</strong>
+<pre>ros2 param set /eai_factory_grasp grasp.lift_height 0.05
+<span class="c"># 注意：码垛也用该参数，调完要做回归：再跑一次 start_palletize</span></pre></div></div>
+      <div class="step"><div class="n">7</div><div><strong>TG7 打断用例</strong>：在第 ⑤ 步平移中发打断，终端应出现
+<code>VOICE INTERRUPT — stopping grasp, going work</code>，机械臂停止当前动作并回 work 位，
+重触发须等或先经 abort 复位。</div></div>
+      <div class="step"><div class="n">8</div><div><strong>语音闭环复检</strong>：走语音链路确认
+      "分拣"→"好的，开始分拣"→八步→"分拣完成"四段齐全（R3/R7）。</div></div>
+    </div>
+  </section>
+
+  <section class="blk" id="s9">
+    <h2><span class="no">09</span>重点与易错点</h2>
+    <div class="tip amber"><span class="lab">诊断</span>固定流程"错一步、步步歪"：<strong>失败步号</strong>是第一线索——
+    第 ①② 步错查开爪与取料位，第 ③ 步空抓查 pitch 与下探，第 ④⑤ 步挂碰查抬升高度，第 ⑥⑦ 步压件查 place_pose。</div>
+    <table>
+      <tr><th>现象</th><th>根因</th><th>处理</th></tr>
+      <tr><td>去抓时撞倒物料</td><td>第 ① 步没先开爪，或 gripper_duration 太短未等到位</td><td>核对 _call_gripper L494-515 的 0.2s 追加等待</td></tr>
+      <tr><td>抓空</td><td>observe 打点偏移或 pitch 不对</td><td>重新示教；视线确认夹爪正对物料中心</td></tr>
+      <tr><td>横移刮倒邻箱</td><td>lift_height=0.03 不够</td><td>param set 抬到 0.05，回归测试码垛</td></tr>
+      <tr><td>放入时压围栏</td><td>place_lift 或 place 打点高度不对</td><td>重打 place 点，验证 ⑦ 步脱离间隙</td></tr>
+      <tr><td>调了 offset 没效果</td><td>vision:false 分支不走 pick_offset</td><td>改打点位姿，勿在装货参数上白调</td></tr>
+      <tr><td>打断后无法重触发</td><td>状态未复位，串行保护拒绝</td><td>等 done/回位或调 abort 复位后再触发</td></tr>
+    </table>
+    <ul class="check">
+      <li>评分自测（源讲义 25/30/20/15/10）：八步流程 25、打点复现 30、分支理解 20、打断复位 15、记录规范 10。</li>
+      <li>报告附八步日志全文（含 done 行）与 3 次 TG6 成功/失败统计。</li>
+      <li>lift_height / place_lift 是全局参数——任何一课改动都要回归码垛任务。</li>
+    </ul>
+  </section>
+
+  <section class="blk" id="s10">
+    <h2><span class="no">10</span>总结与思考</h2>
+    <div class="kgrid">
+      <div class="kcard"><div class="kd">取舍</div><div class="kt">vision:false</div><p>位置确定就不上视觉——省时间也省失败率，代价是不能在线纠偏。</p></div>
+      <div class="kcard"><div class="kd">示教</div><div class="kt">手动打点入 yaml</div><p>observe 定"看/取的位置"，place 定"放的位置"，改场景重打点。</p></div>
+      <div class="kcard"><div class="kd">八步</div><div class="kt">开—移—抓—抬—移—放—抬—回</div><p>先张手、先抬后移、放后高抬，三个顺序都不能颠倒。</p></div>
+      <div class="kcard"><div class="kd">全局</div><div class="kt">lift_height / place_lift</div><p>分拣改参数，码垛受影响，改完必回归。</p></div>
+    </div>
+    <div class="tip violet" style="margin-top:14px"><span class="lab">思考 1</span>
+      固定八步与装货的视觉八步差异在哪？为什么"第 ① 步先开夹爪"必须发生在移动之前、而不是到位后再开？
+      （提示：到位再开会夹到什么？）</div>
+    <div class="tip violet"><span class="lab">思考 2</span>
+      lift_height 管抓后、place_lift 管放后，为什么放后要抬得更高（0.05 &gt; 0.03）？
+      若码摞堆叠场景改反了会出什么事故？</div>
+  </section>
+
+  <nav class="expnav">
+    <a href="../exp-05-visual-loading/index.html" class="prev">← EXP-05 视觉自适应装货</a>
+    <a href="../exp-07-palletizing/index.html" class="next">EXP-07 自主码垛 →</a>
+  </nav>
+
+  <footer>
+    <span>CASE-01 · 智慧工厂装货分拣码垛 · EXP-06 智能分拣</span>
+    <span>4 学时 · 综合性 · 基于 llm_practice 实验讲义改编</span>
+  </footer>
+</main>
+</div>
+
+<script>
+var SORT_STEPS = [
+  '<span class="dim">[step 1/8] _call_gripper → set_gripper(OPEN)，等待 gripper_duration+0.2s</span>',
+  '<span class="dim">[step 2/8] target_pose ← observe_pose [0.0622, -0.1158, 0.1951, 3.0371]（L273-278 自组指令）</span>',
+  '<span class="ok">[step 3/8] 合拢夹爪抓稳 —— 接触确认通过</span>',
+  '<span class="ok">[step 4/8] 垂直抬升 lift_height = 0.03m</span>',
+  '<span class="dim">[step 5/8] target_pose ← place_pose [0.1434, -0.1296, 0.2075, 2.7283] ≈174°，平移中……</span>',
+  '<span class="ok">[step 6/8] 张爪放件</span>',
+  '<span class="ok">[step 7/8] 抬 place_lift = 0.05m 脱离分拣格</span>',
+  '<span class="b">[step 8/8] go_work 回待命位 → 日志 === fixed grasp-place sequence done === → status: sort|done → 播报"分拣完成"</span>'
+];
+var sortStep = 0;
+function stepSort(){
+  var io = document.getElementById('sortIo');
+  if(sortStep >= SORT_STEPS.length){ resetSort(); }
+  sortStep++;
+  var show = SORT_STEPS.slice(0, sortStep).join('\n');
+  io.innerHTML = show + (sortStep < SORT_STEPS.length ? '\n<span class="warn">…… 还剩 ' + (8 - sortStep) + ' 步</span>' : '\n<span class="ok">八步完整，TG6 通过判据即本段日志无缺行</span>');
+}
+function runSort(){
+  sortStep = SORT_STEPS.length;
+  document.getElementById('sortIo').innerHTML = SORT_STEPS.join('\n') + '\n<span class="ok">八步完整，TG6 通过判据即本段日志无缺行</span>';
+}
+function abortSort(){
+  document.getElementById('sortIo').innerHTML =
+    '<span class="bad">[TG7] ros2 topic pub -1 /eai_factory/interrupt std_msgs/msg/Bool "{data: true}"</span>\n' +
+    '<span class="warn">_interrupt_cb → VOICE INTERRUPT — stopping grasp, going work</span>\n' +
+    '<span class="warn">在第 ' + Math.max(sortStep, 1) + ' 步切断：停止后续步、夹爪保位、机械臂回 work</span>\n' +
+    '<span class="dim">重触发前等回位完成或调 abort 复位（串行保护）</span>';
+}
+function resetSort(){
+  sortStep = 0;
+  document.getElementById('sortIo').innerHTML = '共 8 步。点击"下一步"开始，观察 gripper / target_pose 指令与状态迁移……';
+}
+</script>
+<script src="../shared/tutorial.js" defer></script>
+</body>
+</html>

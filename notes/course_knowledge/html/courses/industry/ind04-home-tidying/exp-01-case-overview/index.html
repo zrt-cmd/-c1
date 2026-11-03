@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-01 · 案例总览与成果演示 | IND-04 家庭整理应用场景</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+  :root{
+    --theme:#0284c7;
+    --theme-deep:#0369a1;
+    --theme-bg:#f0f9ff;
+    --theme-bd:#bae6fd;
+  }
+  figure.shot{margin:18px 0;border:1px solid var(--theme-bd);border-radius:12px;overflow:hidden;background:#fff}
+  figure.shot img{display:block;width:100%;height:auto}
+  figure.shot figcaption{padding:10px 14px;font-size:13px;color:#075985;background:var(--theme-bg);border-top:1px solid var(--theme-bd)}
+  video.demo{display:block;width:100%;max-width:520px;margin:14px auto 4px;border:1px solid var(--theme-bd);border-radius:14px;background:#000;aspect-ratio:9/16;object-fit:contain}
+  .vid-note{text-align:center;font-size:12.5px;color:#0369a1;margin-bottom:6px}
+  .tag.hl{background:var(--theme-bg);border-color:var(--theme-bd);color:var(--theme-deep)}
+  /* ── 五星学习法 · 课程分段 ── */
+  .fivestar-note{font-size:13px;color:#5b6b78;margin-top:12px}
+  .fs-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:14px}
+  .fs-cell{border:1px solid var(--theme-bd);border-radius:12px;padding:10px 8px;text-align:center;background:var(--theme-bg)}
+  .fs-cell .st{font-size:12.5px;font-weight:800;color:var(--theme-deep)}
+  .fs-cell .tm{font-family:var(--font-mono,monospace);font-size:11px;color:#0f766e;margin-top:3px;font-weight:700}
+  .fs-cell .ds{font-size:11.5px;color:#5b6b78;margin-top:4px;line-height:1.5}
+  .seg{display:inline-block;font-size:11px;font-weight:700;font-family:var(--font-mono,monospace);background:var(--theme-bg);color:var(--theme-deep);border:1px solid var(--theme-bd);border-radius:99px;padding:2px 10px;margin-left:8px;vertical-align:middle;white-space:nowrap}
+  .tl{width:100%;border-collapse:collapse;font-size:13px;margin-top:14px;background:#fff}
+  .tl th,.tl td{border:1px solid #e2ece9;padding:7px 10px;text-align:left;vertical-align:top}
+  .tl th{background:var(--theme-bg);color:var(--theme-deep);font-size:12.5px;white-space:nowrap}
+  .tl .m{font-family:var(--font-mono,monospace);color:var(--theme-deep);font-weight:700;white-space:nowrap}
+  @media(max-width:900px){.fs-grid{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="bar-in">
+    <a class="logo" href="../../../index.html"><b>课程</b>家庭</a>
+    <nav class="crumb"><a href="../../../index.html#ind">总首页</a> / <a href="../index.html">IND-04 家庭整理</a> / EXP-01</nav>
+  </div>
+</header>
+
+<div class="wrap">
+  <aside class="side">
+    <h4>本页目录 · 五星学习法</h4>
+    <a href="#s0">00 课程节奏 · 8 段微课</a>
+    <a href="#s1" class="now">01 学习目标 ①聚焦问题</a>
+    <a href="#s2">02 原理 ①聚焦 ②激活</a>
+    <a href="#s3">03 硬件与材料 ③示证新知</a>
+    <a href="#s4">04 操作步骤 ④应用新知</a>
+    <a href="#s5">05 关键命令 ④应用新知</a>
+    <a href="#s6">06 动画 ③示证新知</a>
+    <a href="#s7">07 互动 ④应用新知</a>
+    <a href="#s8">08 常见问题 ⑤融会贯通</a>
+    <a href="#s9">09 拓展 ⑤融会贯通</a>
+    <a href="#s10">10 思考题 ⑤融会贯通</a>
+    <h4>兄弟实验</h4>
+    <a href="../exp-02-teleop-collection/index.html">EXP-02 遥操作采集</a>
+    <a href="../exp-03-data-training/index.html">EXP-03 转换与训练</a>
+    <a href="../exp-04-real-robot/index.html">EXP-04 真机与鲁棒性</a>
+  </aside>
+
+  <main class="content">
+    <div class="exp-head">
+      <div class="code">EXP-01 · 8 学时</div>
+      <h1>案例总览与成果演示</h1>
+      <p class="desc">先看《家庭收纳场景》成果演示视频，再拆解「感知—决策—执行」与「开盖—取物—入罐—盖盖」闭环，最后沿四段流水线分步进入后续实验。</p>
+      <div class="meta"><span class="tag hl">演示驱动</span><span class="tag">LDT01-STD</span><span class="tag">ACT 行为克隆</span></div>
+    </div>
+
+    <!-- 00 -->
+    <section class="blk" id="s0">
+      <h2><span class="no">00</span>课程节奏：五星学习法 · 8 段微课（每段 ≤ 15 min）</h2>
+      <p>本实验按<b>五星学习法</b>组织：先看成果演示视频<b>聚焦问题</b>，再用「教孩子收玩具」<b>激活旧知</b>，接着<b>示证新知</b>（硬件三大件 + 感知决策执行闭环动画），然后动手<b>应用新知</b>梳理四段流水线与节拍估算，最后借常见问题与拓展<b>融会贯通</b>。全程切成 <b>8 段微课、每段不超过 15 分钟</b>，段间停顿 1~2 分钟消化；纯讲授合计约 100 分钟，其余课时用于动手实操与个别辅导。</p>
+      <div class="fs-grid">
+        <div class="fs-cell"><div class="st">① 聚焦问题</div><div class="tm">课段 1 · 12 min</div><div class="ds">看演示视频提出"机器人怎么自主收纳"</div></div>
+        <div class="fs-cell"><div class="st">② 激活旧知</div><div class="tm">课段 2 · 8 min</div><div class="ds">教孩子收玩具 · 感知决策执行三角色</div></div>
+        <div class="fs-cell"><div class="st">③ 示证新知</div><div class="tm">课段 3~4 · 27 min</div><div class="ds">硬件三大件 + 闭环与时序动画</div></div>
+        <div class="fs-cell"><div class="st">④ 应用新知</div><div class="tm">课段 5~7 · 40 min</div><div class="ds">四段流水线 + 命令预览 + 节拍估算</div></div>
+        <div class="fs-cell"><div class="st">⑤ 融会贯通</div><div class="tm">课段 8 · 13 min</div><div class="ds">常见问题 · 拓展阅读 · 思考题</div></div>
+      </div>
+      <table class="tl">
+        <tr><th>课段</th><th>五星阶段</th><th>时长</th><th>对应章节</th><th>本段任务</th></tr>
+        <tr><td class="m">课段 1</td><td>聚焦问题</td><td class="m">12 min</td><td>§01 + §02 前半</td><td>看演示视频，提出"机器人怎么自主开盖入罐"的核心问题</td></tr>
+        <tr><td class="m">课段 2</td><td>激活旧知</td><td class="m">8 min</td><td>§02 后半</td><td>用"教孩子收玩具"旧知衔接感知-决策-执行闭环</td></tr>
+        <tr><td class="m">课段 3</td><td>示证新知</td><td class="m">15 min</td><td>§03</td><td>认识 LDT01 一体机、主从双臂、三路相机与场景物料</td></tr>
+        <tr><td class="m">课段 4</td><td>示证新知</td><td class="m">12 min</td><td>§06</td><td>看感知-决策-执行闭环与开盖取物时序动画</td></tr>
+        <tr><td class="m">课段 5</td><td>应用新知</td><td class="m">15 min</td><td>§04 + §05 前半</td><td>梳理四段流水线操作步骤与三条关键命令预览</td></tr>
+        <tr><td class="m">课段 6</td><td>应用新知</td><td class="m">15 min</td><td>§05 后半</td><td>对照转换/训练/推理命令理解各段输入输出</td></tr>
+        <tr><td class="m">课段 7</td><td>应用新知</td><td class="m">10 min</td><td>§07</td><td>用收纳节拍估算器算采集时长，理解有效轮次</td></tr>
+        <tr><td class="m">课段 8</td><td>融会贯通</td><td class="m">13 min</td><td>§08~§10</td><td>常见问题收口，拓展阅读与思考题拔高迁移</td></tr>
+      </table>
+      <p class="fivestar-note">讲课提示：课段 1/2 以讲授 + 提问为主；课段 3~4 用实物 + 动画；课段 5~6 边看视频边动手；课段 7 学员独立完成；课段 8 答疑拔高。段间停顿 1~2 分钟。</p>
+    </section>
+
+    <!-- 01 学习目标（含成果演示视频） -->
+    <section class="blk" id="s1">
+      <h2><span class="no">01</span>学习目标 · 先看成果<span class="seg">课段 1 · 聚焦问题 · 12 min</span></h2>
+      <ul class="check">
+        <li>理解家庭收纳任务：左手打开不锈钢罐盖 → 右手拿芒果放入罐中 → 左手盖回盖子的三步闭环。</li>
+        <li>记住四段流水线：数据采集 → 数据转换 → 模型训练 → 真机推理，各段输入输出清晰。</li>
+        <li>能用「感知—决策—执行」讲清机器人为何能自主完成收纳动作。</li>
+        <li>明确教学动线：本页先看演示，后续三个实验把这段视频「拆开再拼回去」。</li>
+      </ul>
+      <figure class="shot">
+        <video class="demo" controls preload="metadata" playsinline poster="../../../../media/industry/ind04-home-tidying/exp-01-case-overview/videos/home-tidying-demo-poster.jpg">
+          <source src="../../../../media/industry/ind04-home-tidying/exp-01-case-overview/videos/home-tidying-demo.mp4" type="video/mp4">
+          您的浏览器不支持视频播放。
+        </video>
+        <figcaption>视频 1-1｜成果演示：训练完成的双臂机器人在家庭桌面自主完成收纳——左手开盖、右手将芒果放入不锈钢罐、左手盖回盖子（聆动课程案例视频《家庭收纳场景.mp4》）。</figcaption>
+      </figure>
+      <p class="vid-note">建议先完整看一遍演示：接下来三个实验，就是把这段视频「拆开再拼回去」。</p>
+    </section>
+
+    <!-- 02 原理 -->
+    <section class="blk" id="s2">
+      <h2><span class="no">02</span>原理：任务定义与感知—决策—执行<span class="seg">课段 1 收尾 + 课段 2 · 激活旧知 · 8 min</span></h2>
+      <div class="tip amber"><span class="lab">❓ 聚焦问题（课段 1）</span>机器人看完视频能自主开盖入罐，但它没学过力学——它是怎么"看一眼就知道下一步怎么动"的？带着这个问题听完原理，到课段 4 你会看懂感知-决策-执行闭环。</div>
+      <p>收纳任务像教孩子收玩具：<b>「先开盖，再把水果放进去，最后盖好盖子」</b>。机器人并不懂「芒果」是什么，它只是把「三路相机看到的画面 + 当前关节状态」翻译成「下一步关节动作」。这中间有三个角色：<b>感知</b>（相机看现场）、<b>决策</b>(ACT 策略选出动作)、<b>执行</b>(双臂与夹爪动起来)，三者首尾相接形成闭环，跑完一轮就是一次收纳。</p>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">任务准则</div><div class="kt">开 - 拿 - 放 - 盖：左手管罐盖、右手管水果，时序固定不乱套。</div></div>
+        <div class="kcard"><div class="kd">示范来源</div><div class="kt">操作者穿戴 LDT-01 遥操作端，主臂领动、从臂跟随，三路相机同步录像。</div></div>
+        <div class="kcard"><div class="kd">学习目标</div><div class="kt">ACT 策略学会「画面 + 关节状态 → 下一段动作」，部署回真机复现闭环。</div></div>
+        <div class="kcard"><div class="kd">成败关键</div><div class="kt">芒果/罐子按默认布局摆放、桌面环境与采集时一致，坏示范当场剔除。</div></div>
+      </div>
+      <div class="tip teal"><span class="lab">↺ 激活旧知（课段 2）</span>回忆教孩子收玩具的三步：先开盖、再放进去、最后盖好——你示范时孩子同时看着你的手和玩具。机器人学的也是"画面+动作"配对，这就是行为克隆的本质。</div>
+      <div class="tip amber"><b>场景三大安全要求：</b>① 抓取范围内不站人（双臂 5kg 负载，夹手指尖能捏断笔）；② 保护桌面，金属罐/芒果落下可能砸坏；③ 遥操作时保持急停按钮在手边。</div>
+      <div class="tip amber"><b>家庭收纳任务拆解：</b><b>开 → 拿 → 放 → 盖</b> 四步闭环——左手管罐盖（开/盖）、右手管水果（拿/放），时序固定不乱套。默认布局：不锈钢罐居中、芒果放在罐右侧，采集/复现都按此摆放。</div>
+      <div class="tip amber"><b>生活化类比：</b>行为克隆像「跟着大厨学颠勺」——你只看他的手怎么动、锅在哪，不背力学公式；他示范里若混入翻锅失误，你也会学失误——所以<b>坏数据必须剔除，数据质量 &gt; 数据数量</b>。</div>
+    </section>
+
+    <!-- 03 硬件与材料 -->
+    <section class="blk" id="s3">
+      <h2><span class="no">03</span>硬件与材料<span class="seg">课段 3 · 示证新知 · 15 min</span></h2>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">LDT01-STD 一体机</div><div class="kt">i5-13400F / RTX 4060 Ti 16GB / 64GB RAM / 2TB SSD，Ubuntu 22.04 + ROS2，采训推一体。</div></div>
+        <div class="kcard"><div class="kd">主从同构双臂</div><div class="kt">从动臂（跟随）7 轴谐波关节 DC48V、负载 5kg；主动臂（遥操作端）7 轴总线舵机；二指夹爪 0–90mm。</div></div>
+        <div class="kcard"><div class="kd">视觉相机</div><div class="kt">3 路在用 RGB 相机：头部、左腕、右腕，同时观测盖沿、罐口与果实近景。</div></div>
+        <div class="kcard"><div class="kd">场景物料</div><div class="kt">不锈钢罐 + 罐盖、芒果（或同类水果）、平整桌面；按默认布局拍照留底以便复原。</div></div>
+      </div>
+      <table>
+        <thead><tr><th>部件</th><th>关键参数（摘自 00-硬件参数）</th><th>在本课中的角色</th></tr></thead>
+        <tbody>
+          <tr><td>三路相机</td><td>头部 + 左腕 + 右腕 RGB，全局快门</td><td>提供第三视角 + 双手腕视角，构成策略输入图像</td></tr>
+          <tr><td>从动臂 ×2</td><td>7 轴谐波关节，DC48V，通信 500Hz，负载 5kg</td><td>执行开盖与取物的「真机双手」</td></tr>
+          <tr><td>主动臂 ×2</td><td>7 轴总线舵机，DC12V，100Hz，运动半径 554mm</td><td>遥操作端，人类示范的「输入手」</td></tr>
+          <tr><td>二指夹爪</td><td>开口 0–90mm，夹持 2.5kg，50Hz</td><td>抓取芒果、捏住罐盖的执行末端</td></tr>
+          <tr><td>工控机</td><td>i5-13400F + RTX 4060 Ti 16GB + 64GB RAM + 2TB SSD</td><td>采集录制、数据转换、本地训练与推理全在这台跑</td></tr>
+        </tbody>
+      </table>
+      <p>场景测量提醒（案例原文）：桌面到机械臂的距离保持一致、方位粗略测量即可；采集量够大时可容忍小的位置变动——但<b>默认布局不乱动，复现最稳</b>。</p>
+    </section>
+
+    <!-- 04 操作步骤 -->
+    <section class="blk" id="s4">
+      <h2><span class="no">04</span>操作步骤：从开机到四段流水线<span class="seg">课段 5~6 · 应用新知 · 2×15 min</span></h2>
+      <div class="flow">
+        <div class="step"><b class="n">S1</b>数据采集<br><small>开机布景 → 新建任务 → 遥操作示范，三路视频 + 关节角同步入库</small></div>
+        <div class="arr">→</div>
+        <div class="step"><b class="n">S2</b>数据转换<br><small>CSV + 视频 → LeRobot v3.0 Parquet + 三路 mp4</small></div>
+        <div class="arr">→</div>
+        <div class="step"><b class="n">S3</b>模型训练<br><small>lerobot-train 驱动 ACT 学习示范</small></div>
+        <div class="arr">→</div>
+        <div class="step"><b class="n">S4</b>真机推理<br><small>ROS2 节点 50Hz 推理，双臂自主开盖入罐</small></div>
+      </div>
+      <ol style="margin:14px 0 6px;padding-left:22px;line-height:1.9">
+        <li><b>部署与开机</b>：按默认布局摆好罐与芒果 → 测量桌面到基座距离 → 依次开侧面电源与主机电源，开机后夹爪张开再收回。</li>
+        <li><b>进入上位机</b>：登录 Ubuntu（默认密码 1），浏览器访问 <code>localhost:8699/#/robotManage</code>。</li>
+        <li><b>建任务与采集</b>：新建任务（名称/描述建议英文）→ 预览轨迹 → 点开始后 3 秒内握持操作端完成示范 → 停止当前组，循环往复。</li>
+        <li><b>标记坏数据</b>：失误的组点「本次采集失败」，该组不计入训练。</li>
+        <li><b>转换 → 训练 → 推理</b>：convert 脚本切段转换 → lerobot-train 训练 ACT → 加载 checkpoint 用 /model_ifrun 服务开关复现闭环。</li>
+      </ol>
+      <div class="tip amber"><b>开机 4 步：</b>① 卷尺测量桌面到机械臂基座距离（<b>采集和复现必须一致</b>）→ ② 依次开侧面总电源 → 主机电源 → ③ 开机后夹爪张开再收回（确认伺服正常）→ ④ 登录 Ubuntu（默认密码 1），浏览器访问 <code>localhost:8699/#/robotManage</code>。</div>
+      <div class="tip amber"><b>任务采集入口：</b>任务管理列表标注「1 开始」进入采集、「2 预览」先看轨迹；点开始数据采集后<b>3 秒内</b>握持操作端（主动臂），页面出现三路摄像头画面（头部 + 左腕 + 右腕）。</div>
+      <div class="tip amber"><b>完成一组采集：</b>按流程完成「左手打开不锈钢盖 → 右手拿芒果放入 → 左手盖回盖」后点「停止当前组数据采集」，画面显示三摄像头画面、采集用时与左右实时关节节拍——<b>坏组立即点「本次采集失败」剔除</b>。</div>
+    </section>
+
+    <!-- 05 关键命令 -->
+    <section class="blk" id="s5">
+      <h2><span class="no">05</span>关键命令（预览，后续实验展开）<span class="seg">随课段 5 / 6 对照使用</span></h2>
+      <p class="dim">以下命令摘自《聆动机器人案例-家庭场景》与 LeRobot 0.4.1 入口，本实验先混个脸熟：</p>
+      <pre><span class="c"># ① 数据转换：save_data 编号目录 → LeRobot v3.0 数据集</span>
+python convert_lerobot_v3_fixed_simple.py \
+  --input  /home/lindenbot/save_data/<span class="b">&lt;组目录&gt;</span> \
+  --output /home/lindenbot/converted_data \
+  --start 180 --end 209
+
+<span class="c"># ② 训练 ACT 策略（家庭任务，本地示例，完整参数见 EXP-03）</span>
+lerobot-train --policy.type=act \
+  --dataset.repo_id=<span class="g">lindenbot/put_fruit_in_box</span> \
+  --dataset.root=/home/lindenbot/converted_data \
+  --batch_size=12 --steps=50000 --save_freq=4000
+
+<span class="c"># ③ 真机推理：启动推理节点后，用服务开关控制自主收纳</span>
+ros2 service call /model_ifrun std_srvs/srv/SetBool <span class="g">"{data: true}"</span>   <span class="c"># 开始</span>
+ros2 service call /model_ifrun std_srvs/srv/SetBool <span class="y">"{data: false}"</span>  <span class="c"># 停止</span></pre>
+      <div class="tip tealb"><b>编号提醒：</b>save_data 下的采集编号不从 0 开始，家庭案例从 <b>180</b> 号段起步、取「当前最大编号 = 最新一集」；切段时用 <code>--start/--end</code> 或 <code>--skip</code> 排除坏集。</div>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">转换在干什么</div><div class="kt">把散装采集记录（CSV 关节角 + 视频帧）按 episode 切齐，重排成训练框架统一的数据格式。</div></div>
+        <div class="kcard"><div class="kd">训练在干什么</div><div class="kt">让 ACT 网络反复看「当前画面 → 人的下一个动作」，把示范内化成权重/checkpoint。</div></div>
+        <div class="kcard"><div class="kd">推理在干什么</div><div class="kt">真机上加载 checkpoint，把每帧观测实时翻译成关节指令，服务开关随时接管/交还控制权。</div></div>
+        <div class="kcard"><div class="kd">一条主线</div><div class="kt">三条命令共享同一套数据：converted_data 既是训练的读取根目录，也是排查问题的唯一事实来源。</div></div>
+      </div>
+    </section>
+
+    <!-- 06 动画 -->
+    <section class="blk" id="s6">
+      <h2><span class="no">06</span>动画：感知—决策—执行闭环与开盖取物时序<span class="seg">课段 4 · 示证新知 · 12 min</span></h2>
+      <div class="anim-box">
+        <svg viewBox="0 0 720 260" width="100%" role="img" aria-label="感知决策执行闭环与开盖取物时序动画">
+          <defs>
+            <marker id="a04" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#38bdf8"/></marker>
+          </defs>
+          <g font-size="14" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif">
+            <!-- 感知-决策-执行 闭环 -->
+            <rect x="40" y="24" width="150" height="60" rx="10" fill="#0c4a6e" stroke="#38bdf8" stroke-width="2"/>
+            <text x="115" y="48" fill="#e0f2fe" font-weight="bold">感知</text>
+            <text x="115" y="70" fill="#7dd3fc" font-size="11">三路相机 + 关节状态</text>
+            <rect x="285" y="24" width="150" height="60" rx="10" fill="#0c4a6e" stroke="#38bdf8" stroke-width="2"/>
+            <text x="360" y="48" fill="#e0f2fe" font-weight="bold">决策</text>
+            <text x="360" y="70" fill="#7dd3fc" font-size="11">ACT 策略选动作</text>
+            <rect x="530" y="24" width="150" height="60" rx="10" fill="#0c4a6e" stroke="#38bdf8" stroke-width="2"/>
+            <text x="605" y="48" fill="#e0f2fe" font-weight="bold">执行</text>
+            <text x="605" y="70" fill="#7dd3fc" font-size="11">双臂 + 夹爪动作</text>
+            <line x1="195" y1="54" x2="278" y2="54" stroke="#38bdf8" stroke-width="2" marker-end="url(#a04)"/>
+            <line x1="440" y1="54" x2="523" y2="54" stroke="#38bdf8" stroke-width="2" marker-end="url(#a04)"/>
+            <!-- 反馈闭环路径 -->
+            <path id="loop04" d="M605,84 L605,112 C605,124 595,130 580,130 L140,130 C120,130 115,124 115,112 L115,90"
+                  fill="none" stroke="#38bdf8" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#a04)" opacity="0.85"/>
+            <circle r="7" fill="#fbbf24">
+              <animateMotion dur="4s" repeatCount="indefinite" path="M605,84 L605,112 C605,124 595,130 580,130 L140,130 C120,130 115,124 115,112 L115,90"/>
+            </circle>
+            <text x="360" y="152" fill="#94a3b8" font-size="11">环境变化回传感知 · 每帧（50Hz）转一圈</text>
+            <!-- 开盖-取物-入罐-盖盖 时序 -->
+            <text x="60" y="188" fill="#7dd3fc" font-size="12" text-anchor="start">一轮动作时序：</text>
+            <rect x="40" y="200" width="150" height="44" rx="9" fill="#0f2a3d" stroke="#334155" stroke-width="1.5"/>
+            <text x="115" y="227" fill="#e2e8f0" font-size="13">① 左手开盖</text>
+            <rect x="205" y="200" width="150" height="44" rx="9" fill="#0f2a3d" stroke="#334155" stroke-width="1.5"/>
+            <text x="280" y="227" fill="#e2e8f0" font-size="13">② 右手取芒果</text>
+            <rect x="370" y="200" width="150" height="44" rx="9" fill="#0f2a3d" stroke="#334155" stroke-width="1.5"/>
+            <text x="445" y="227" fill="#e2e8f0" font-size="13">③ 放入罐中</text>
+            <rect x="535" y="200" width="145" height="44" rx="9" fill="#0f2a3d" stroke="#334155" stroke-width="1.5"/>
+            <text x="607" y="227" fill="#e2e8f0" font-size="13">④ 左手盖盖</text>
+            <rect x="40" y="200" width="150" height="44" rx="9" fill="none" stroke="#38bdf8" stroke-width="3" opacity="0.9">
+              <animate attributeName="x" values="40;205;370;535;40" dur="6s" repeatCount="indefinite"/>
+              <animate attributeName="stroke" values="#38bdf8;#38bdf8;#38bdf8;#fbbf24;#38bdf8" dur="6s" repeatCount="indefinite"/>
+            </rect>
+          </g>
+        </svg>
+        <div class="anim-cap">动画：黄点沿反馈回路流动表示「感知→决策→执行→再感知」的闭环；下方高亮框按顺序扫过四步动作时序，第 4 步盖盖后回到第 1 步，即一轮收纳。</div>
+      </div>
+      <div class="tip violet"><span class="lab">观察</span>为什么闭环里还要「再感知」？——盖子开没开、芒果在不在手里，都是动作之后才确定的新事实；每帧都重看一眼，下一步才不会闭眼瞎抓。<b>开盖-取物-入罐-盖盖</b>四步靠这个回路串成一个可循环的任务。</div>
+    </section>
+
+    <!-- 07 互动 -->
+    <section class="blk" id="s7">
+      <h2><span class="no">07</span>互动：收纳节拍估算器<span class="seg">课段 7 · 应用新知 · 10 min</span></h2>
+      <div class="ix-panel">
+        <div class="ix-title">拖动滑杆估算一轮「开盖-取物-入罐-盖盖」耗时与总采集时长</div>
+        <div class="ctl-row">
+          <label>单轮示范耗时 <b id="bpmV">8</b> 秒
+            <input type="range" id="cycleS" min="4" max="20" value="8" step="1" style="width:220px;vertical-align:middle">
+          </label>
+          <label>目标轮数
+            <select id="rounds" style="padding:6px 10px;border:1px solid var(--theme-bd);border-radius:8px;background:#fff">
+              <option value="50">50 轮（试采）</option>
+              <option value="200" selected>200 轮（案例复现口径）</option>
+              <option value="300">300 轮（冲量）</option>
+            </select>
+          </label>
+          <button class="btn" onclick="calcBpm()">计算节拍</button>
+          <button class="btn" onclick="resetBpm()">重置</button>
+        </div>
+        <div class="io" id="bpmIo"><span class="dim">等待计算……</span></div>
+      </div>
+      <p style="margin-top:10px">案例复盘口径：采集数据 <b>200 次左右</b>、训练步数 <b>500000 步以上</b>，桌面环境与默认布局保持一致，收纳闭环复现才稳。轮数不是越多越好——含失误的轮次会被剔除，<b>有效轮次才是硬指标</b>。</p>
+    </section>
+
+    <!-- 08 常见问题 -->
+    <section class="blk" id="s8">
+      <h2><span class="no">08</span>常见问题<span class="seg">课段 8 · 融会贯通 · 13 min</span></h2>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">Q 演示视频能正常播放吗？</div><div class="kt">源片为竖版 720×1280 mp4，Chrome/Edge（Win）自带解码一般可直接播；若黑屏请换 Edge 或本地播放器打开同目录 mp4。</div></div>
+        <div class="kcard"><div class="kd">Q 上位机打不开？</div><div class="kt">先确认一体机开机自检完成（夹爪张开收回）、进度条 100%，浏览器访问 localhost:8699；默认密码 1。</div></div>
+        <div class="kcard"><div class="kd">Q 左右手会「串」吗？</div><div class="kt">采集时就固定分工：左手开/盖盖、右手取/放水果，时序固定；训练数据才有一致的映射规律。</div></div>
+        <div class="kcard"><div class="kd">Q 四段顺序能跳吗？</div><div class="kt">不能。没有合格的采集就没有可转换的数据，没有 v3.0 数据集训练会直接报错，推理也无 checkpoint 可加载。</div></div>
+      </div>
+    </section>
+
+    <!-- 09 拓展 -->
+    <section class="blk" id="s9">
+      <h2><span class="no">09</span>拓展阅读<span class="seg">课段 8 · 融会贯通</span></h2>
+      <ul class="check">
+        <li>《聆动机器人案例-家庭场景》：安全要求、场景测量建议、复现效果评估与成功判据原文。</li>
+        <li>《00-聆动机器人硬件参数介绍》：相机/主从臂/夹爪完整参数表（EXP-01 第 03 章已摘核心行）。</li>
+        <li>LeRobot 官方 ACT 论文：Action Chunking with Transformers——一次输出动作块，动作更平滑。</li>
+        <li>对照 IND-03 物料分拣案例：同一条四段流水线，换任务、换物料即迁移——<b>场景变、框架不变</b>。</li>
+        <li>《遥操作设备 LDT-01 软件使用流程（开发者版）》：双人安全制与拖拽模式，EXP-02 详解。</li>
+      </ul>
+    </section>
+
+    <!-- 10 思考题 -->
+    <section class="blk" id="s10">
+      <h2><span class="no">10</span>思考题 · 自测<span class="seg">课段 8 · 融会贯通</span></h2>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">✅ 完成成果</div><div class="kt">看完演示视频，能默画出四段流水线并说出每段的输入/输出产物。</div></div>
+        <div class="kcard"><div class="kd">🧠 原理收获</div><div class="kt">用「感知—决策—执行」复述开盖入罐闭环，并解释为什么每帧都要重新感知。</div></div>
+        <div class="kcard"><div class="kd">🛠 技能收获</div><div class="kt">认识 localhost:8699 上位机、任务创建/预览/采集/停止的完整入口与视频演示对照。</div></div>
+        <div class="kcard"><div class="kd">📐 评分速览</div><div class="kt">动画观察 30% + 互动计算 30% + 思考题作答 40%。</div></div>
+      </div>
+      <div class="tip violet"><span class="lab">思考 1</span>若每次采集时芒果摆放位置都不同，训练出的模型可能学会什么「歪本事」？这说明示范数据的哪类变量必须受控？（提示：EXP-04 会用摆放偏移专门检验这一点。）</div>
+      <div class="tip violet"><span class="lab">思考 2</span>行为克隆只模仿动作，不懂物理。请举一个本场景中「照猫画虎但会翻车」的风险点（提示：罐盖滑脱、芒果碰沿），并说明可用什么手段缓解。</div>
+    </section>
+
+    <nav class="expnav">
+      <a class="prev" href="../index.html">← 返回课程目录</a>
+      <a class="next" href="../exp-02-teleop-collection/index.html">下一个：EXP-02 遥操作数据采集 →</a>
+    </nav>
+    <footer>
+      <div>IND-04 · 家庭整理应用场景 · EXP-01 案例总览与成果演示</div>
+      <div>8 学时 · 演示认知实验 · 基于 聆动课程指导文档《聆动机器人案例-家庭场景》《00-聆动机器人硬件参数介绍》改编</div>
+    </footer>
+  </main>
+</div>
+
+<script>
+function calcBpm(){
+  var s = parseInt(document.getElementById('cycleS').value,10);
+  var n = parseInt(document.getElementById('rounds').value,10);
+  var total = s * n;
+  var h = Math.floor(total/3600), m = Math.round((total%3600)/60);
+  var io = document.getElementById('bpmIo');
+  var grade = n>=200 ? '<span class="ok">达到案例复现口径（200 次左右）</span>' : '<span class="warn">低于案例复现口径，复现稳定性可能不足</span>';
+  io.innerHTML = '<span class="ok">单轮 ' + s + ' 秒 × ' + n + ' 轮 ≈ ' + h + ' 小时 ' + m + ' 分纯示范时长</span>'
+    + '　|　' + grade
+    + '　<span class="dim">（未计组间停止/复原罐盖的间隙，实际按 1.3 倍估）</span>';
+}
+function resetBpm(){
+  document.getElementById('cycleS').value = 8;
+  document.getElementById('rounds').value = 200;
+  document.getElementById('bpmV').textContent = 8;
+  document.getElementById('bpmIo').innerHTML = '<span class="dim">等待计算……</span>';
+}
+document.getElementById('cycleS').addEventListener('input',function(){
+  document.getElementById('bpmV').textContent = this.value;
+});
+</script>
+<script src="../shared/tutorial.js" defer></script>
+</body>
+</html>

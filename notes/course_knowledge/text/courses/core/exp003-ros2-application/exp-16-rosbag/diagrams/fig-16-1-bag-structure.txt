@@ -1,0 +1,35 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp003-ros2-application/exp-16-rosbag/diagrams/fig-16-1-bag-structure.html
+TITLE: 图 16-1 · bag 存储结构
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+图 16-1 · bag 存储结构
+图 16-1 · 一个 bag 目录里到底装了什么
+本图回答的问题：为什么删掉 metadata.yaml 这个包就"失忆"，而 .db3 才是消息本体？
+目录层
+exp16_full/ （一个 bag = 一个目录）
+metadata.yaml · 清单
+duration: 13.55s（算频率的分母）
+storage_identifier: sqlite3
+relative_file_paths → *.db3
+topics_with_message_count：条数/QoS
+exp16_full_0.db3 · SQLite3 消息本体
+表1 · topics（话题元数据）
+id → name / type / serialization_format
+offered_qos_profiles：录时声明的 QoS
+→ info 秒查、play 回放按它重建发布端
+表2 · messages（时间序列）
+timestamp + topic_id + CDR 字节流
+索引 → 任意时间点随机访问（跳转按钮）
+事务 → 断电最多损坏最后一笔
+CDR = DDS 线上原样字节 · 回放零转换 100% 保真
+指向
+删了它 → info 读不出
+Count 来自 topics
+频率心算尺
+14 / 13.55s ≈ 1.03 Hz ✓
+单查一个 _0.db3 会漏分片
+查总数必须 ros2 bag info 目录
+✅ 结论：metadata.yaml 管"找得到"、.db3 管"内容在"，两者缺一不可
+⚠️ 风险：单查一个 .db3 漏分片 · 删 yaml 后 info 失忆
+🔍 验证：04 节 1.6 cat metadata.yaml + 2 info 心算 1.03Hz
+EXP-16 · rosbag2 数据录制与回放

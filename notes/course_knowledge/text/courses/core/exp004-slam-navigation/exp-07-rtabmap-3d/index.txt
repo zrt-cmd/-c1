@@ -1,0 +1,311 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp004-slam-navigation/exp-07-rtabmap-3d/index.html
+TITLE: EXP-07 · RTAB-Map 3D SLAM — 机器人 SLAM 与自主导航
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+EXP-07 · RTAB-Map 3D SLAM — 机器人 SLAM 与自主导航
+🧠 具身智能课程 ·
+教程首页
+核心课程
+/
+SLAM 与自主导航
+/ EXP-07
+本页目录
+01 问题引入
+02 原理通俗讲解
+03 关联知识点
+04 实验目标
+05 实验环境与准备
+06 动画讲解
+07 互动讲解
+08 实操步骤
+09 重点与易错点
+10 总结与思考
+CH1 · 建模与建图
+EXP-01 原理与 URDF
+EXP-02 SLAM Toolbox 建图
+CH2 · 定位与导航
+EXP-03 Nav2 导航
+EXP-04 AMCL 定位
+EXP-05 DWA/TEB 避障
+CH3 · 任务调度与三维进阶
+EXP-06 多点导航
+EXP-07 RTAB-Map 3D
+EXP-07 · 第 3 章 · 综合性 · 8 学时
+RTAB-Map 3D SLAM
+一句话读懂：前 6 个实验，小车眼里世界是"一张平面图"（俯视图，像户型图）。这节课让小车"长出一双立体眼睛"——用 RGB-D 深度相机 + RTAB-Map，构建三维点云/八叉树地图，让机器人理解高度、层次、悬空障碍，为"分楼层导航、抓取定位"打基础。
+难度 ⭐⭐⭐ · 8 学时
+综合性（进阶）
+📌 无配套源码资源
+前置：EXP-03
+01
+问题引入：平面图看不见"头顶的横梁"
+情境
+二维栅格地图是俯视图：一根离地 1.2 m 的横梁、一张悬空的桌面下沿，在俯视图里
+要么被并进"障碍"、要么根本看不见
+。仓库取货机器人要"知道第二层货架上有东西"，机械臂抓取要知道"杯子在桌面上 30 cm 处"——这些都需要高度这一维。给小车装上 RGB-D 深度相机（本课程硬件 HP60C），用 RTAB-Map 构建
+三维点云 / 八叉树地图
+，世界就从"户型图"升级成了"3D 模型"。
+02
+原理通俗讲解：从"照片"到"立体"的两步跳
+白话比喻
+普通相机只记"那里有个东西"，深度相机还记"那个东西离我多远"——有了
+方向（像素 u,v）+ 距离（深度 d）
+，就能拼出立体世界。点云地图是"一堆沙子"（每个颗粒一个三维点，直观但冗余），OctoMap 是"乐高积木"（规则小方块体素，能数得清哪块占据哪块空——可压缩、可增量更新，导航避障常用）。
+认路方式
+词袋回环（Bag of Words）
+RTAB-Map 用图像特征（ORB）聚类成"词汇"，一帧图 = 一组词汇集合；检索"和当前帧最像的历史帧"，相似度过阈值即回环 → g2o 图优化消漂移。就像凭"照片里出现吧台+红椅+吊灯"判断"我回到了这家咖啡馆"，而不是逐像素比照片。
+反投影
+像素 → 三维点
+有内参 (fx, fy, cx, cy) 就能把 (u,v,d) 换算成空间点：X=(u−cx)·d/fx，Y=(v−cy)·d/fy，Z=d。像素放图像中心 (cx,cy) 时应得 X≈0、Y≈0——这是自检口诀。
+与前作对比
+同是图优化，传感器不同
+slam_toolbox：激光雷达 + 扫描匹配回环 + 二维栅格；RTAB-Map：RGB-D 相机 + 图像词袋回环 + 三维点云/OctoMap。两者都是图优化 SLAM，只是"用什么看世界"不同。
+三维导航
+OctoMap 进代价地图
+三维地图替代二维栅格作 costmap 输入，悬空障碍可被正确区分（低矮可跨、横梁必躲）。但 ROS2 里需要投影/转换环节，地面小车通常二维就够——三维更多服务感知/抓取/展示。
+选型口诀
+：二维 = 平面图（便宜够用），三维 = 3D 模型（信息全但贵）。核心判据就一条——
+任务需不需要"高度"这一维
+：出现悬空障碍 / 高度分层 / 抓取定位需求时，才该上三维。
+03
+关联知识点
+知识点 1
+RTAB-Map 框架
+Real-Time Appearance-Based Mapping：前端图像特征里程计 → 局部地图 → 词袋回环 → g2o/GTSAM 位姿图优化。
+知识点 2
+RGB-D 二合一
+HP60C 同时输出彩色图（640×480）与深度图（每像素距离 d，单位毫米，25 fps）；反光、超距、强光处深度返回 0（图上全黑）。
+知识点 3
+点云 vs OctoMap
+海量 3D 点直观但冗余不可编辑；体素八叉树可压缩、增量更新、支持占据查询——导航/避障更常用后者。
+知识点 4
+回环那一"咔"
+回环触发时地图会整体抖一下——那是图优化一次性校正所有历史帧的瞬间，属正常现象，不是 bug。
+知识点 5
+相机内参来源
+/camera_info 里带 fx/fy/cx/cy；
+ros2 topic echo /ascamera_hp60c/camera_publisher/depth0/camera_info
+可查。反投影公式必须配内参才成立。
+知识点 6
+算力现实
+RK3576 跑实时三维 SLAM 压力大；三维比二维更怕运动畸变——遥控角速度 ≤0.5 rad/s，转角处多停留。
+04
+实验目标
+理解视觉 SLAM 与 RTAB-Map 基本原理（ORB 特征、词袋回环、图优化） ——
+原理理解
+理解 RGB-D 相机工作原理与反投影公式、点云/八叉树两种地图表示 ——
+原理理解
+掌握三维建图与三维导航的通用流程（相机 → RTAB-Map → 操控 → 保存） ——
+流程掌握
+能够完成 RGB-D 数据链路验证（话题频率 / 深度图查看 / 手算反投影） ——
+流程掌握
+能对比二维与三维 SLAM 的六维差异并做场景选型分析 ——
+迁移应用
+05
+实验环境与准备
+资源声明
+源讲义明确标注：本实验 spec 的 source_code_path 指向 source-codes/exp07/，notes = 无资源（仓库暂缺 RTAB-Map 专用源码）。因此本实验为
+原理 + 通用流程型
+：以概念讲解、通用命令、数据链路验证与选型分析为主，
+不强行要求跑通三维导航、不编造项目专属 launch
+；若后续补充源码，将按源码更新操作步骤。
+类别
+配置
+硬件
+小车 C1 +
+HP60C RGB-D 深度相机
+（驱动在
+examples/camera/HP60C/src/ascamera/
+）
+系统
+Ubuntu 22.04 + ROS 2 Humble
+核心库
+rtabmap_ros（ROS2 版）、depth_image_proc、octomap_server、rviz2
+依赖
+HP60C 驱动（ascamera）能发布 RGB + Depth 话题；Nav2 可用（EXP-03）
+主入口
+通用流程
+ros2 run rtabmap_slam rtabmap
++ 相机驱动
+ros2 launch ascamera hp60c.launch.py
+；本项目为原理演示型
+⚠️ 话题名必须记准
+HP60C 驱动
+刻意不允许 remap
+（驱动靠话题名里的 "rgb0/depth0" 子串决定推哪路流），所以真实话题名是
+/ascamera_hp60c/camera_publisher/rgb0/image
+、
+.../depth0/image_raw
+、
+.../depth0/camera_info
+、
+.../depth0/points
+——
+不是
+教科书里常见的
+/camera/rgb/image_raw
+。第 08 节的命令都按真实名写。
+两条路线
+有 HP60C 相机
+：按 08 节通用流程跑数据链路验证与三维建图演示；
+无相机 / 无资源
+：完成反投影手算 + 对比表 + 选型判断题（报告写全即可），可观看课程演示视频/截图。深度相机注意有效距离与避开强光直射。
+06
+动画讲解：RGB-D 反投影生成三维点云
+深度图 (u,v,d)
+近 = 红，远 = 蓝
+HP60C
+三维点云 (X,Y,Z)
+X
+Y
+Z
+X=(u−cx)·d/fx
+Y=(v−cy)·d/fy, Z=d
+d 先由毫米换成米；中心行 v=cy 时 Y≈0
+图 7-1：深度图每个像素 (u,v,d) 携带"方向+距离"，乘相机内参反投影成空间点 (X,Y,Z)；逐帧累积并用相机自身运动拼接，就长出了带颜色的三维点云——再体素化（乐高化）即得 OctoMap。动画中彩色点与左侧深度图像素块一一对应。
+注意
+：上式是"相机光学坐标系"约定，Z 朝前、X 朝右、Y 朝下，所以 v 小于 cy（图像偏上）时 Y 为负——这也是深度图坐标系与 RViz 世界系不一致的根源。
+07
+互动讲解：2D 栅格 vs 3D 点云选型台
+🎛 给任务选地图形态：二维够吗？该上三维吗？
+A · 家庭扫地机器人
+B · 仓库货架多层取货
+C · 无人机绕楼巡检
+D · 走廊送餐小车
+↑ 点击四个场景：先自己选二维/三维并说明理由，再对照讲义的六维选型表推演。
+维度
+二维 SLAM（slam_toolbox）
+三维 SLAM（RTAB-Map）
+传感器
+激光雷达
+RGB-D 深度相机
+地图
+栅格（俯视）
+点云 / OctoMap（立体）
+算力
+低（RK3576 轻松）
+高（实时需更强算力）
+精度
+水平精度高
+含高度信息，垂直精度依赖深度质量
+导航
+Nav2 直接消费 /map
+需投影/转换后才能消费
+适用
+地面巡检 / 送货
+分层避障 / 抓取定位 / 展示
+08
+实操步骤：RGB-D 数据链路验证与通用流程
+1
+启动 HP60C 相机驱动，确认四话题（rgb0/image、depth0/image_raw、depth0/camera_info、depth0/points）都有数据
+2
+rqt_image_view 查看深度图（近红远蓝、反光处发黑）；echo camera_info 抄下 fx/fy/cx/cy
+3
+用 numpy 手算一次反投影：把一个像素 (u,v,d) 转成 (X,Y,Z)，并用中心像素自检 X≈0、Y≈0（注意 d 先换算成米）
+4
+启动 RTAB-Map（显式指定话题名）+ RViz PointCloud2 显示，遥控小车
+低速走闭环
+，转角停留 1-2 s，观察点云成形与回环对齐
+5
+保存与导出：rtabmap 数据库（.db）+ octomap_server 导出八叉树；无相机条件则按此流程写报告 + 看演示
+# ① 启动相机（命名空间 ascamera_hp60c），核对四话题
+ros2 launch ascamera hp60c.launch.py
+ros2 topic list |
+grep
+ascamera_hp60c
+#   /ascamera_hp60c/camera_publisher/rgb0/image
+#   /ascamera_hp60c/camera_publisher/depth0/image_raw
+#   /ascamera_hp60c/camera_publisher/depth0/camera_info
+ros2 topic hz /ascamera_hp60c/camera_publisher/depth0/image_raw
+ros2 topic echo /ascamera_hp60c/camera_publisher/depth0/camera_info
+# 抄 fx fy cx cy
+# ② 查看深度图（近红远蓝，反光/超距处发黑）
+ros2 run rqt_image_view rqt_image_view /ascamera_hp60c/camera_publisher/depth0/image_raw
+# ③ 启动 RTAB-Map（通用命令：话题名不匹配就显式指定）
+ros2 run rtabmap_slam rtabmap --ros-args -p subscribe_rgbd:=true \
+  -p rgb_topic:=/ascamera_hp60c/camera_publisher/rgb0/image \
+  -p depth_topic:=/ascamera_hp60c/camera_publisher/depth0/image_raw \
+  -p approx_sync:=true
+# ④ 遥控低速走闭环（角速度 ≤ 0.5 rad/s，转角停留 1-2s）观察 RViz 点云
+ros2 run teleop_twist_keyboard teleop_twist_keyboard
+# ⑤ 保存数据库 / 导出八叉树
+ros2 service call /rtabmap/save std_srvs/srv/Empty
+ros2 launch octomap_server octomap_mapping.launch.xml
+# 通用
+# 反投影手验算（numpy）：中心像素应得到 X≈0, Y≈0, Z=d
+import numpy as np
+fx, fy, cx, cy = 380.0, 380.0, 320.0, 240.0
+# ← 以实测 camera_info 为准
+u, v, d = 320.0, 240.0, 1.500
+# 深度换算成「米」再算
+X = (u - cx) * d / fx
+Y = (v - cy) * d / fy
+Z = d
+print(X, Y, Z)
+# 期望 ≈ 0, 0, 1.5
+单位陷阱
+HP60C 的 depth 图默认是
+millimeter
+编码（16UC1，单位毫米），而 RTAB-Map 与 Nav2 都用「米」。手算时先把 d 除以 1000，否则算出来的 Z 会大三个数量级——这是本实验最容易错的一步。
+无资源时的验收标准
+仓库暂缺 RTAB-Map 专用 launch/源码——有相机跑通 ①-⑤ 并记录回环现象；无相机则交付：反投影验算截图 + 二维/三维对比表 + 四场景选型结论 + 完整通用流程文字描述（等同本页 08 节）。
+09
+重点与易错点
+重点
+① 词袋回环 vs 扫描匹配回环的本质区别；② RGB-D 反投影公式、内参与
+毫米→米
+的单位；③ 点云与 OctoMap 的取舍（沙子 vs 乐高）；④ 六维选型表——"什么信号提示你该上三维了"。
+坑
+现象
+解决
+深度图全黑
+无深度数据
+超出有效距离或反光/强光直射；调整距离与环境
+话题名照抄教科书
+RTAB-Map 收不到数据
+真实名是 /ascamera_hp60c/camera_publisher/rgb0/image 与 depth0/image_raw；用 -p rgb_topic:=… / -p depth_topic:=… 显式指定
+给相机做 remap
+话题改名后相机不再出流
+驱动靠话题名里的 "rgb0/depth0" 子串判断推哪路流，remap 会丢掉这个线索——
+不要 remap
+深度单位当米用
+点云/点算出来大 1000 倍
+depth 图是 16UC1 毫米编码，计算前先 /1000
+反投影公式记反
+点云左右/上下镜像
+中心像素自检：(cx,cy) → X≈0、Y≈0、Z=d
+三维地图"花"
+点云散乱重影
+走太快导致运动畸变；更慢速（≤0.5 rad/s），转角停留 1-2 s
+回环时地图乱一下
+点云整体抖动
+正常！
+图优化一次性校正所有帧，记录即可
+算力不足卡顿
+RViz 卡、掉帧
+降分辨率/关闭额外显示；实时性优先场景改用二维
+以为三维导航直接替换
+Nav2 吃不到 OctoMap
+需投影/转换成 Nav2 costmap 可消费的格式，工程有额外环节
+以为词袋 = 深度学习
+概念混淆
+词袋是经典特征聚类（ORB + KMeans），不是神经网络
+跟风上三维
+成本失控
+三维算力与工程成本翻倍；地面任务优先二维，确有高度需求再上
+本实验为原理+演示型，
+不强行要求跑通三维导航
+，重点在理解与选型分析
+RGB-D 强光/远距/反光处失效——户外或大场景优先激光雷达
+三维地图文件大，保存后检查磁盘空间
+记住"话题名 + 毫米单位"这两个本机特有的坑，比背公式更容易拿分
+10
+总结与思考：什么时候该上三维
+本课收获
+打通了"深度图像素 → 反投影 → 三维点云 → 体素 OctoMap"的表示链；理解了 RTAB-Map 以词袋回环替代扫描匹配的图优化路线；掌握 RGB-D 数据链路验证与三维建图通用流程；并能用六维对比表回答选型问题。也如实认识了工程边界：仓库暂无 RTAB-Map 专用源码，本课为原理+流程型。
+思考 1
+RTAB-Map 用"图像词袋"做回环检测，slam_toolbox 用"扫描匹配"——两者本质区别是什么？各在什么传感器配置下更可靠（提示：走廊重复纹理 vs 空旷大厅）？
+思考 2
+写出 RGB-D 反投影公式并解释每个符号；点云与 OctoMap 各自优缺点是什么、导航为何更常用 OctoMap？请给出至少两条"该上三维了"的信号，并解释把三维导航落到 Nav2 上的工程难点。
+CORE-04 · 机器人 SLAM 与自主导航 · EXP-07 RTAB-Map 3D SLAM
+8 学时 · 综合性 · 基于 slam_practice 实验讲义改编

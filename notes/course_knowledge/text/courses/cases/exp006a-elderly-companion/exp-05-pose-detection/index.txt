@@ -1,0 +1,290 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/cases/exp006a-elderly-companion/exp-05-pose-detection/index.html
+TITLE: EXP-05 · 人体检测与姿态估计 — 老人跌倒监护综合项目
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+EXP-05 · 人体检测与姿态估计 — 老人跌倒监护综合项目
+🧠 具身智能课程 ·
+教程首页
+综合项目
+/
+老人跌倒监护
+/ EXP-05
+本页目录
+01 问题引入：检测框总会"缩水"的真相
+02 原理通俗讲解：letterbox 像"拍证件照垫纸"
+03 关联知识点：检测链路与双姿态引擎
+04 实验目标
+05 实验环境与准备
+06 动画讲解：letterbox→RKNN→NMS→逆映射
+07 互动讲解：置信度阈值实验台
+08 实操步骤：单图 → 双后端 → 视频集成
+09 重点与易错点
+10 总结与思考
+CH1 · 需求与配置
+EXP-01 需求分析
+EXP-02 分层架构
+EXP-03 配置详解
+CH2 · 感知与交互
+EXP-04 语音交互
+EXP-05 检测与姿态
+EXP-06 跌倒状态机
+CH3 · 告警与验证
+EXP-07 告警证据链
+EXP-08 LLM·VLM
+EXP-09 全功能验证
+EXP-05 · 第 2 章 · 综合性 · 8 学时
+人体检测与姿态估计：让系统"看见"老人
+视觉是跌倒监护的第一入口：
+YOLOv8（RKNN，640×640，仅 person 类）
+先框出人，
+BlazePose 33 点（整图 256×256）
+或
+RTMPose 17 点（top-down 192×256，工厂按 pose_type 切换）
+再摆好骨架，后面的躯干角、宽高比判定才有依据。本实验走通
+letterbox → RGB 4D → NPU 推理 → DFL 解码 → classwise NMS → unletterbox 逆映射
+全链路，理解补边/缩放对坐标的影响，按"逐层单跑 → 集成联调 → 参数调优"完成 T8-1~T8-6。
+难度 ⭐⭐⭐ · 8 学时
+YOLOv8 RKNN
+BlazePose 33pt
+RTMPose SimCC
+MJPEG :8088
+01
+问题引入：检测框总会"缩水"的真相
+第一次跑 detect_demo 的同学常惊呼："框明明画在人的身上，怎么总往左上偏一点、像没对准？" 真相是：
+模型看到的图不是你拍的那张图
+—— 送进 NPU 前原图被等比缩放并居中补了黑边（letterbox）。解码出的框在"补边后的空间"里，必须用 scale 和 pad 两个参数把坐标搬回原图，少一个都会整体偏移。
+1
+原图 → letterbox：等比缩放至 640×640 + 居中补黑边（scale、pad 两个产物）
+2
+NPU 推理后得到 DFL logits → softmax 加权解码出框 → NMS 去重
+3
+unletterbox：x_orig = (x − pad) / scale —— 少减 pad，框就整体偏一个固定量
+4
+姿态同理：BlazePose/RTMPose 的关键点也要 scale+pad 逆映射回原图才算数
+💡 一个类比
+letterbox 像
+拍证件照时把人缩放后垫在一张固定尺寸的纸中央
+：你在"纸面坐标"里指出的鼻子位置，想换算回"真人身高坐标"，就得先扣掉四周垫纸的宽度（pad），再除以缩小倍数（scale）。顺序错了，人就像平移了。
+02
+原理通俗讲解：检测与姿态的"两步舞"
+检测 · YOLOv8n
+一眼圈出"哪里有人"
+anchor-free 单阶段：网格直接预测，每条边回归 16-bin 分布（DFL）softmax 加权成亚像素偏移；NMS（IoU 0.45）去重后只留 person（class_id=0）。nano 版约 320 万参数，INT8 量化后 30–50ms/帧，正好塞进 6TOPS NPU。
+NMS 去重
+像"合影只点一次名"
+同一人可能被多个网格同时报框：按分数从高到低保留，凡与保留框 IoU > 0.45 的全部压掉。阈值太高（0.9）同人多框、ID 乱跳；太低（0.2）挨得近的两个人被误删一个 —— 漏检比误检更危险。
+姿态 · BlazePose 33pt
+"整图直出全骨架"
+256×256 整图一次推理，33 点含面部/手部细节；vis < 0.5 的点不画。优势是不依赖检测框，输输出 195=39×5 交错布局。
+姿态 · RTMPose 17pt
+"先框人再精扫"（top-down）
+单人裁剪 192×256 竖版输入，SimCC 双头输出 simcc_x(1,17,384) + simcc_y(1,17,512)，argmax ÷ 2 得像素坐标；vis = 双头峰值均值（FP32 实测有人 0.75~1.2）。躺姿裁剪稳定，是默认后端。
+🔒 隐私底线
+视觉层全程端侧处理：
+帧只在内存流转
+，除非主动 --save / --mjpeg，不落盘、不上传。testdata 为教学素材，真实部署时摄像头画面涉及老人起居隐私 —— 默认不开推流、开也要限定局域网，这是给家属的"看得见的承诺"。
+03
+关联知识点：六个知识块对号入座
+编号
+知识点
+关键机制 / 位置
+4.1.1
+YOLOv8 行人检测（COCO person）
+640×640 RGB；3 层 × 3 张量输出；vision/yolo/detector.py L13-L41
+4.1.2
+letterbox 预处理与 NMS 解码
+scale=min(640/h,640/w)、pad=0 黑边；DFL 16-bin；classwise_nms IoU 0.45；preprocess.py L18-L53
+4.1.3
+RKNN NPU 推理与 core_mask
+rknnlite2.3.2；core_mask 0=AUTO（None 会报不支持）；双模型共 NPU 排队；backend.py L34-L65
+4.2.1
+BlazePose 33 关键点
+整图 256×256；195=39×5 交错；VIS_THRESHOLD=0.5；vision/pose/pose.py L42-L80
+4.2.2
+RTMPose 17 点 SimCC 双头
+384=192×2、512=256×2、SPLIT_RATIO=2.0；vis=双头峰值均值；vision/pose_rtm/simcc.py L17-L63
+4.2.3
+双后端切换与 MJPEG 推流
+model.pose_type；工厂 build_pose_engine（fall/monitor.py L41-L61）；MjpegServer :8088/fall.mjpg
+04
+实验目标
+理解
+检测六段链路 letterbox → RGB 4D → RKNN → DFL → NMS → unletterbox，能说出每段的
+数据形状变化
+掌握
+BlazePose 与 RTMPose 的四维差异（整图 vs top-down、33pt vs 17pt、vis 计算、耗时），能独立切后端对比
+理解
+letterbox 补边对关键点逆映射的影响（scale+pad 双参数）与 NMS IoU 阈值的漏检/误检权衡
+独立完成
+detect_demo / pose_demo / fall_video_demo 三层验证，能定位漏检、姿态不跟帧、推流卡顿
+掌握
+MJPEG 推流与 --text 文本叠加观察，理解"视觉层可独立于语音层验证"的设计意图
+迁移
+把"逐层单跑→集成联调→参数调优"方法论用到其他检测场景
+05
+实验环境与准备
+1
+硬件：实验箱 B2 / 小车 C1（RK3576，6TOPS NPU）；Ubuntu 22.04 + Python 3.10
+2
+核心库：rknnlite2.3.2、opencv-python、numpy；MJPEG 可选 pip install mjpeg_streamer
+3
+模型就位：yolov8n.rknn、blazepose pose_landmark_full.rknn、rtmpose_s_256x192_int8.rknn（已打包 models/rtmpose/）
+4
+素材齐备（离线可用）：testdata/stand_up.jpg、testdata/fall_1.png、testdata/fall_slow_x264.mp4
+5
+基线体检：
+python3 common/env_check.py --config config/fall_config.yaml
+确认 EXIT 0
+06
+动画讲解：letterbox → NPU → NMS → 逆映射
+左侧一张竖图被缩放补边送进模型、再"拆框去重"搬回原图；右侧 SimCC 双头解码的 argmax 扫描：
+YOLOv8 检测链路 · 六段
+原图
+竖图 384×640
+letterbox
+640² + pad 黑边
+RKNN NPU
+int8 30–50ms
+box+cls 3×3 张量
+DFL 16-bin logits
+NMS + 反算
+IoU 0.45 去重
+(xyxy−pad)/scale
+三个易错坐标环节：
+① 补边要减
+x−pad 再 ÷scale
+漏 pad → 整体偏移
+宽高只除 scale
+② NMS 时机
+score_thr 先筛候选
+iou_thr 再去重
+两个阈值作用不同段
+③ NPU 排队
+YOLO + 姿态共 NPU
+帧率掉 → 关 LLM
+core_mask 默认 0 AUTO
+SimCC 双头解码
+simcc_x (1,17,384)：34 根柱
+simcc_y (1,17,512)：竖向 argmax
+公式：
+x = (argmax/2 − pad_w)/scale
+y = (argmax/2 − pad_h)/scale
+vis = 双头峰值均值
+FP32: 有人 0.75~1.2
+阈值默认 0.3（INT8 漂移再调）
+动画 5-1｜左：原图 → letterbox 补边 → NPU 柱状激活 → NMS 双框眨闪去重 + 反算，下方三个坐标易错环节；右：SimCC 双头扫描线游走 + argmax 公式与 vis 说明
+07
+互动讲解：置信度阈值实验台
+拖动等价于 CLI 的 --score-thr / yaml 的 iou_thr 预设，观察检出数与风险的跷跷板：
+阈值实验台 · Threshold Bench
+宽松 --score-thr 0.3
+默认 0.5 / IoU 0.45
+保守 --score-thr 0.7
+IoU 0.9 同人多框
+IoU 0.2 误删邻人
+↺ 复位
+// 跌倒监护是召回优先场景：漏检（人倒了没看见）代价远高于误检
+当前：score_thr=0.5、iou_thr=0.45 → 实测建议区间内，检出 1 框 score≈0.837
+🙋 为什么宁可"多看一眼"
+误报多画一个框，顶多让姿态引擎白算一次；漏检却是
+真正摔倒的老人被判定"没人"
+，后面状态机、告警全部无从谈起。所以 score_thr 宜偏宽容（0.4~0.6），代价（噪声框）用 person 类过滤和 IoU 去重来兜住 —— 这是守护生命场景的取舍逻辑。
+08
+实操步骤：单图 → 双后端 → 视频集成 → 调参
+1
+单图检测（90min）：detect_demo 跑 stand_up.jpg，记录框/score/耗时
+2
+单图姿态（90min）：pose_demo 跑 fall_1.png，默认 rtmpose 出 17 点
+3
+双后端对比（60min）：sed 切 blazepose → 33 点对比 →
+务必恢复 rtmpose
+4
+视频集成（90min）：fall_video_demo --text [--mjpeg] 逐帧看 person_id/骨架/状态流转
+5
+T8-1~T8-6（60min）：单图/连续性/切换/状态迁移/判据调节/输入源等价
+6
+score_thr 调参（60min）：0.3 / 0.5 / 0.7 各记录检出·漏检·误检数并总结
+# ① 单图行人检测（预期: 76ms / 13.1fps / score 0.837）
+cd
+~/ros2_ws/src/xflz_eai_car1/app/elderly_companion
+python3
+apps/detect_demo.py --input testdata/stand_up.jpg --save
+# OK: 1 detections in 76 ms → cls=0(person) box=(31.2,7.8,183.2,393.5)
+# 标注图存 runs/out/detect_image.jpg；无人图返回 0 框不崩溃
+# ② 单图姿态（默认 model.pose_type: rtmpose → 17 keypoints）
+python3
+apps/pose_demo.py --input testdata/fall_1.png --save
+grep
+-A2 "pose_type" config/fall_config.yaml
+# 确认当前后端
+# ③ 切 blazepose 对比 33 点，完成后必须改回 rtmpose
+sed
+-i 's/pose_type: rtmpose/pose_type: blazepose/' config/fall_config.yaml
+python3
+apps/pose_demo.py --input testdata/fall_1.png --save
+sed
+-i 's/pose_type: blazepose/pose_type: rtmpose/' config/fall_config.yaml
+# ④ 视频集成 + 文本叠加 + 可选 MJPEG 预览（浏览器 :8088/fall.mjpg）
+python3
+apps/fall_video_demo.py --video testdata/fall_slow_x264.mp4 --text --mjpeg
+# 逐帧: [frame N] person_id=1 box=... pose: 17 keypoints → IDLE→FALLING→LYING
+# ⑤ 阈值调参（CLI 覆盖不落盘，记录三档检出数）
+python3
+apps/detect_demo.py --input testdata/stand_up.jpg --save --score-thr 0.3
+python3
+apps/detect_demo.py --input testdata/stand_up.jpg --save --score-thr 0.7
+# 图片模式等价性: python3 apps/fall_app.py --mode image --input testdata/fall_1.png --save
+09
+重点与易错点
+六段链路每段的
+形状与坐标空间
+：原图 → 640² letterbox → 张量 → letterbox 空间框 → 原图框
+双后端切换是
+纯配置行为
+：工厂 build_pose_engine 按 pose_type 创建，接口同为 process() → PoseResult
+NPU 是
+共享资源
+：YOLO+姿态共 2 核，双模型串行排队是帧率下降主因
+验证方法论：
+单点 → 集成 → 调参
+；单点挂是模块问题，单点过集成挂是接口/参数问题
+⚠️ 常见坑
+现象 → 解法
+RKNN 加载失败
+load_rknn failed → 核对 detect.model_path；跑 env_check 校验模型文件
+need 4dims input
+板端 static_shape 要求 4D NHWC → 确认 to_rgb 已补批维
+检测框整体偏移
+unletterbox 漏传 pad → 检查 letterbox 返回的 (r,(dw,dh)) 链路
+报"未检测到人体关键点"
+遮挡/模糊/vis 阈值过高 → 换图或调低 model.rtmpose.vis_threshold（默认 0.3）
+RTMPose score 异常漂移
+INT8 量级漂移属已知现象 → 调 vis_threshold，别急着怀疑解码
+切完 blazepose 忘恢复
+污染 EXP-06 判定基线 → 实验结束固定改回 rtmpose
+MJPEG 404
+8088 被占 → lsof -i :8088 找占用进程；start 前有端口预检
+帧率低/推理堆积
+双模型抢 NPU → pkill llm_server 等释放资源，关非必要服务
+core None 报错
+"The core mode None is not supported" → core_mask 用 0（AUTO），不是 None
+10
+总结与思考
+✅ 完成成果
+四份记录 + 测试报告
+检测结果、姿态结果、双后端对比表、--text 运行日志、T8 用例与调参记录。
+🧠 原理收获
+坐标空间的一致性
+scale+pad 贯穿预处理与后处理；任何一步空间不一致，画面上就是"整体偏移"。
+🛠 技能收获
+三层验证与调参
+detect/pose/fall_video 逐层单跑，再用 CLI 临时覆盖扫阈值区间。
+❓ 排障思路
+先看形状再看数值
+报错先确认 tensor 维度（4D？195？384/512？），形状对了再查坐标与阈值。
+📝 思考题 1
+unletterbox 逆映射 px=(lm−pad)/scale 中 scale 与 pad 各管什么？如果只除 scale 忘了减 pad，关键点会朝哪个方向偏、偏多少像素？用一张具体尺寸的图（如宽明显小于 640）推演一遍。
+📝 思考题 2
+从输入方式、关键点数、躺姿稳定性、推理耗时四个维度对比 BlazePose 与 RTMPose，并解释：跌倒监护场景为什么默认选 top-down 的 RTMPose？（提示：与 crop_margin 1.5、双模型 NPU 排队一起想。）
+CASE-03 · 老人跌倒监护 · EXP-05 人体检测与姿态估计
+8 学时 · 综合性 · 基于 elderly_companion 实验讲义改编

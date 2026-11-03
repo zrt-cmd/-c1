@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-02 · 3D 激光建图 | IND-05 工业巡检应用场景</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+  :root{
+    --theme:#059669;
+    --theme-deep:#047857;
+    --theme-bg:#ecfdf5;
+    --theme-bd:#a7f3d0;
+  }
+  figure.shot{margin:18px 0;border:1px solid var(--theme-bd);border-radius:12px;overflow:hidden;background:#fff}
+  figure.shot img{display:block;width:100%;height:auto}
+  figure.shot figcaption{padding:10px 14px;font-size:13px;color:#065f46;background:var(--theme-bg);border-top:1px solid var(--theme-bd)}
+  .tag.hl{background:var(--theme-bg);border-color:var(--theme-bd);color:var(--theme-deep)}
+/* ── 五星学习法 · 课程分段 ── */
+.fivestar-note{font-size:13px;color:#5b6b78;margin-top:12px}
+.fs-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:14px}
+.fs-cell{border:1px solid var(--theme-bd);border-radius:12px;padding:10px 8px;text-align:center;background:var(--theme-bg)}
+.fs-cell .st{font-size:12.5px;font-weight:800;color:var(--theme-deep)}
+.fs-cell .tm{font-family:var(--font-mono,monospace);font-size:11px;color:#0f766e;margin-top:3px;font-weight:700}
+.fs-cell .ds{font-size:11.5px;color:#5b6b78;margin-top:4px;line-height:1.5}
+.seg{display:inline-block;font-size:11px;font-weight:700;font-family:var(--font-mono,monospace);background:var(--theme-bg);color:var(--theme-deep);border:1px solid var(--theme-bd);border-radius:99px;padding:2px 10px;margin-left:8px;vertical-align:middle;white-space:nowrap}
+.tl{width:100%;border-collapse:collapse;font-size:13px;margin-top:14px;background:#fff}
+.tl th,.tl td{border:1px solid #e2ece9;padding:7px 10px;text-align:left;vertical-align:top}
+.tl th{background:var(--theme-bg);color:var(--theme-deep);font-size:12.5px;white-space:nowrap}
+.tl .m{font-family:var(--font-mono,monospace);color:var(--theme-deep);font-weight:700;white-space:nowrap}
+@media(max-width:900px){.fs-grid{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="bar-in">
+    <a class="logo" href="../../../index.html"><b>课程</b>巡检</a>
+    <nav class="crumb"><a href="../../../index.html#ind">总首页</a> / <a href="../index.html">IND-05 工业巡检</a> / EXP-02</nav>
+  </div>
+</header>
+
+<div class="wrap">
+  <aside class="side">
+    <h4>本页目录 · 五星学习法</h4>
+    <a href="#s0">00 课程节奏 · 8 段微课</a>
+    <a href="#s1" class="now">01 学习目标 ①聚焦问题</a>
+    <a href="#s2">02 原理 ①聚焦 ②激活</a>
+    <a href="#s3">03 硬件与材料 ③示证新知</a>
+    <a href="#s4">04 操作步骤 ④应用新知</a>
+    <a href="#s5">05 关键命令 ④应用新知</a>
+    <a href="#s6">06 动画 ③示证新知</a>
+    <a href="#s7">07 互动 ④应用新知</a>
+    <a href="#s8">08 常见问题 ⑤融会贯通</a>
+    <a href="#s9">09 拓展 ⑤融会贯通</a>
+    <a href="#s10">10 思考题 ⑤融会贯通</a>
+    <h4>兄弟实验</h4>
+    <a href="../exp-01-sdk-motion/index.html">EXP-01 控制与巡检准备</a>
+    <a href="../exp-03-amcl-nav2/index.html">EXP-03 定位与多点导航</a>
+    <a href="../exp-04-vision-loop/index.html">EXP-04 视觉巡检闭环</a>
+  </aside>
+
+  <main class="content">
+    <div class="exp-head">
+      <div class="code">EXP-02 · 8 学时</div>
+      <h1>3D 激光建图</h1>
+      <p class="desc">启动 Go2 的 3D 激光与建图节点，遥控遍历场地，实时拼出 3D 点云与栅格地图（Mid-360 / XT16 等多线激光）。验收标准：生成可供 EXP-03 使用的巡检地图（map.yaml / .pgm + 序列化地图）；关键技巧：闭合回路提升建图质量。</p>
+      <div class="meta"><span class="tag hl">实践</span><span class="tag">go2_ros2_sdk</span><span class="tag">slam_toolbox</span><span class="tag">点云→栅格</span></div>
+    </div>
+
+    <!-- 00 -->
+    <section class="blk" id="s0">
+      <h2><span class="no">00</span>课程节奏：五星学习法 · 8 段微课（每段 ≤ 15 min）</h2>
+      <p>本实验按<b>五星学习法</b>组织：先用一个真实故障<b>聚焦问题</b>，再<b>激活旧知</b>（坐标系 + 激光测距 + 累积误差），接着<b>示证新知</b>（三级流水线 + 回环动画），然后动手<b>应用新知</b>完成一键启动到绕场存图，最后借排障与拓展<b>融会贯通</b>。全程切成 <b>8 段微课、每段不超过 15 分钟</b>，段间停顿 1~2 分钟消化；纯讲授合计约 100 分钟，其余课时用于动手实操与个别辅导。</p>
+      <div class="fs-grid">
+        <div class="fs-cell"><div class="st">① 聚焦问题</div><div class="tm">课段 1 · 12 min</div><div class="ds">"建图回来墙重影"故障现场，带着问题开课</div></div>
+        <div class="fs-cell"><div class="st">② 激活旧知</div><div class="tm">课段 2 · 8 min</div><div class="ds">坐标系/TF · 激光测距 · 累积误差直觉</div></div>
+        <div class="fs-cell"><div class="st">③ 示证新知</div><div class="tm">课段 3~4 · 27 min</div><div class="ds">三级流水线 + 点云逐帧/回环动画</div></div>
+        <div class="fs-cell"><div class="st">④ 应用新知</div><div class="tm">课段 5~7 · 40 min</div><div class="ds">一键启动→绕场闭合回路→存图双产物</div></div>
+        <div class="fs-cell"><div class="st">⑤ 融会贯通</div><div class="tm">课段 8 · 13 min</div><div class="ds">排障口诀 · 拓展阅读 · 思考题</div></div>
+      </div>
+      <table class="tl">
+        <tr><th>课段</th><th>五星阶段</th><th>时长</th><th>对应章节</th><th>本段任务</th></tr>
+        <tr><td class="m">课段 1</td><td>聚焦问题</td><td class="m">12 min</td><td>§01 + §02 前半</td><td>抛出现场故障"建图回来墙重影"，明确本课要解决的目标</td></tr>
+        <tr><td class="m">课段 2</td><td>激活旧知</td><td class="m">8 min</td><td>§02 后半</td><td>用坐标系/TF、激光测距、累积误差三条旧知解释故障成因</td></tr>
+        <tr><td class="m">课段 3</td><td>示证新知</td><td class="m">15 min</td><td>§03</td><td>认识 3D 激光雷达/机载算力/DDS 链路与建图场地要求</td></tr>
+        <tr><td class="m">课段 4</td><td>示证新知</td><td class="m">12 min</td><td>§06</td><td>看懂点云逐帧累积与回环校正动画</td></tr>
+        <tr><td class="m">课段 5</td><td>应用新知</td><td class="m">15 min</td><td>§04 S1~S3 + §05 ①②</td><td>粒子检查 + 一键启动 robot.launch.py（边讲边演）</td></tr>
+        <tr><td class="m">课段 6</td><td>应用新知</td><td class="m">15 min</td><td>§04 S4~S5 + §05 ③④⑤</td><td>遥控绕场闭合回路 + Save/Serialize 存图——课段 1 的故障就此根除</td></tr>
+        <tr><td class="m">课段 7</td><td>应用新知</td><td class="m">10 min</td><td>§07</td><td>建图质量沙盘自测，全通方可进入下一实验</td></tr>
+        <tr><td class="m">课段 8</td><td>融会贯通</td><td class="m">13 min</td><td>§08~§10</td><td>排障口诀收口，挑战题与思考题拔高迁移</td></tr>
+      </table>
+      <p class="fivestar-note">讲课提示：课段 1/2 以讲授 + 提问为主；课段 3~6 边讲边演（实物 / 动画 / 命令行）；课段 7 学员独立完成；课段 8 答疑拔高。段与段之间停顿 1~2 分钟，确认学员跟上再进下一段。</p>
+    </section>
+
+    <!-- 01 学习目标 -->
+    <section class="blk" id="s1">
+      <h2><span class="no">01</span>学习目标<span class="seg">课段 1 · 聚焦问题 · 12 min</span></h2>
+      <ul class="check">
+        <li>用自己的话讲清 SLAM：机器人一边「看」一边「画地图」，同时记住自己走到哪。</li>
+        <li>说清 3D 点云到 2D 栅格地图的降维链路：utlidar/cloud → pointcloud_to_laserscan → slam_toolbox。</li>
+        <li>用 go2_ros2_sdk 一键拉起雷达、建图、RViz，并用键盘/遥控探索整个场地。</li>
+        <li>掌握 Start At Dock → 遥控探索 → Save Map → Serialize Map 建图工作流。</li>
+        <li>理解「回环」为什么能纠正累积漂移，掌握绕场一周闭合回路的实操技巧。</li>
+      </ul>
+      <div class="tip amber"><b>素材说明：</b>本课无视频素材——动态演示采用官方仓库 README 的演示动图（GIF）与自制 SVG 原理动画，不虚构实拍录像。</div>
+    </section>
+
+    <!-- 02 原理 -->
+    <section class="blk" id="s2">
+      <h2><span class="no">02</span>原理：3D 点云建图（SLAM）讲透<span class="seg">课段 1 收尾 + 课段 2 · 激活旧知 · 8 min</span></h2>
+      <div class="tip amber"><span class="lab">❓ 聚焦问题（课段 1）</span>学员现场最常遇到的怪事：<b>绕场一圈存了图，重载发现同一面墙画出两条线</b>，起点和终点错开半米——这就是"漂移"。问题出在哪？带着这个故障听完全课——到课段 6 你会亲手用回环把它拉直。</div>
+      <p><b>把建图想象成「蒙眼画房间」：</b>你被蒙着眼在房间里走，手里的一根激光笔每毫秒向四周量一次距离——右手边 2.3 米有面墙、正前方 4.1 米是柜子……把这些「距离点」按你的走位反投影到空间里，点越攒越多，房间的轮廓就浮现了。这就是 <b>3D 点云建图</b>。难点有两个：一是<b>你不知道自己走到哪</b>（得边走边定位，即 SLAM = Simultaneous Localization And Mapping，同步定位与建图）；二是<b>每一步的定位误差会累加</b>，走一圈回来发现「起点和终点对不上」——这就是漂移。</p>
+      <h3>Go2 上的三级流水线</h3>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">① 传感器出点云</div><div class="kt">3D 激光雷达（Mid-360 / XT16 级多线激光）旋转扫描，发布 utlidar/cloud（sensor_msgs/PointCloud2，frame_id=utlidar_lidar）。</div></div>
+        <div class="kcard"><div class="kd">② 3D 压成 2D</div><div class="kt">pointcloud_to_laserscan 把点云裁剪压平成一束「虚拟单线激光」——因为巡检地图按楼层平面画就够用，算力省一个量级。</div></div>
+        <div class="kcard"><div class="kd">③ SLAM 拼图</div><div class="kt">slam_toolbox online_async 拿激光束做scan匹配：找最优位姿把新扫描「贴」进地图，同时输出自己在哪。</div></div>
+        <div class="kcard"><div class="kd">④ 出两种图</div><div class="kt">Save Map 出 map.yaml + map.pgm（给 Nav2/AMCL 用的 2D 栅格）；Serialize Map 出序列化点云图（供 slam_toolbox 二次精修）。</div></div>
+      </div>
+      <h3>回环：让地图「拉链对齿」的唯一办法</h3>
+      <p>scan 匹配每一步都有一点点误差，走 100 米可能错出半米——地图里的墙会「重影」。但若你<b>绕场一圈回到起点</b>，建图算法会认出「这面墙我见过！」（回环检测），把首尾强行对齐并把误差摊销到整条轨迹上，墙立刻变直。这就是培训方案强调的技巧：<b>闭合回路提升建图质量</b>。</p>
+      <div class="tip tealb"><b>生活化类比：</b>slam_toolbox 像「接力描图纸」：每次扫描是一张半透明硫酸纸，按最佳角度叠上去；回环就是把第一张和最后一张用夹子对齐——中间所有纸的错位一起被修正。</div>
+      <div class="tip teal"><span class="lab">↺ 激活旧知（课段 2）</span>回忆三条旧知：① <b>坐标系与 TF</b>（EXP-01 已通链路，雷达有 frame_id）；② <b>激光测距原理</b>（每束激光返回一个距离值，攒成点云）；③ <b>累积误差</b>（每步小错累加成大错）。三条合起来，正好解释课段 1 那个故障。</div>
+      <figure class="shot">
+        <img src="./images/fig-go2sdk-pointcloud.gif" alt="go2_ros2_sdk 实时 3D 点云建图演示" loading="lazy">
+        <figcaption>图 2-1｜Go2 实时 3D 点云建图效果（来自 abizovnuralem/go2_ros2_sdk 仓库 README 演示动图）：随着机器人移动，房间点云被逐帧拼接成完整轮廓——本实验要复现的正是这个过程。</figcaption>
+      </figure>
+    </section>
+
+    <!-- 03 硬件与材料 -->
+    <section class="blk" id="s3">
+      <h2><span class="no">03</span>硬件与材料<span class="seg">课段 3 · 示证新知 · 15 min</span></h2>
+      <table>
+        <thead><tr><th>项</th><th>规格 / 要求</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td>3D 激光雷达</td><td>多线激光（Mid-360 / XT16 级别）</td><td>建图主传感器，话题 utlidar/cloud，先 echo --no-arr 查 frame_id</td></tr>
+          <tr><td>机载/实训机</td><td>Jetson Orin 40 TOPS + Ubuntu 22.04 / ROS2 Humble</td><td>go2_ros2_sdk 在 ROS2 Humble 下编译运行</td></tr>
+          <tr><td>DDS 链路</td><td>网卡 192.168.123.x + rmw_cyclonedds_cpp</td><td>沿用 EXP-01 配网成果</td></tr>
+          <tr><td>遥控手段</td><td>teleop_twist_keyboard / 遥控器 / joy</td><td>探索走位用，低速慢走防止点云拉花</td></tr>
+          <tr><td>建图场地</td><td>3×5m 以上、特征丰富（墙、柱、货架）</td><td>空旷无特征的走廊最难匹配，多留参照物</td></tr>
+        </tbody>
+      </table>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">开始前检查</div><div class="kt">ros2 topic hz /utlidar/cloud 有稳定频率；rviz 能看到点云滚动。</div></div>
+        <div class="kcard"><div class="kd">场地动线规划</div><div class="kt">先沿墙绕一圈（回环），再补中间盲区；不要上来就冲刺式乱走。</div></div>
+        <div class="kcard"><div class="kd">速度控制</div><div class="kt">建图时保持慢速：走太快激光帧间重叠不足，匹配会「跳变」。</div></div>
+        <div class="kcard"><div class="kd">产物清单</div><div class="kt">map.yaml + map.pgm + serialize 序列化文件 + 一张全景点云截图。</div></div>
+      </div>
+      <figure class="shot">
+        <img src="./images/fig-ros2-rviz-cloud.png" alt="RViz 查看 Go2 雷达点云" loading="lazy">
+        <figcaption>图 2-2｜RViz 中查看 utlidar/cloud 点云（来自 unitreerobotics/unitree_ros2 仓库 README）：Fixed Frame 设为雷达 frame 后，点云应在机器人四周实时刷新——建图前的第一道体检。</figcaption>
+      </figure>
+    </section>
+
+    <!-- 04 操作步骤 -->
+    <section class="blk" id="s4">
+      <h2><span class="no">04</span>操作步骤<span class="seg">课段 5~6 · 应用新知 · 2×15 min</span></h2>
+      <div class="flow">
+        <div class="step"><b class="n">S1</b>粒子检查<br><small>点云频率 + frame_id 正常</small></div>
+        <div class="arr">→</div>
+        <div class="step"><b class="n">S2</b>一键启动<br><small>robot.launch.py 拉起雷达/建图/RViz</small></div>
+        <div class="arr">→</div>
+        <div class="step"><b class="n">S3</b>Start At Dock<br><small>SlamToolboxPlugin 设定建图原点</small></div>
+        <div class="arr">→</div>
+        <div class="step"><b class="n">S4</b>遥控探索<br><small>沿墙绕圈闭合回路 → 补盲区</small></div>
+        <div class="arr">→</div>
+        <div class="step"><b class="n">S5</b>保存地图<br><small>Save Map + Serialize Map 双产物</small></div>
+      </div>
+      <ol style="margin:14px 0 6px;padding-left:22px;line-height:1.9">
+        <li><b>粒子检查：</b><code>ros2 topic echo --no-arr /utlidar/cloud</code> 确认 frame_id=utlidar_lidar，<code>ros2 topic hz /utlidar/cloud</code> 看频率稳定。</li>
+        <li><b>一键启动：</b>设置 ROBOT_IP 与 CONN_TYPE 后 <code>ros2 launch go2_robot_sdk robot.launch.py</code>——该 launch 内置 pointcloud_to_laserscan、slam_toolbox online_async、Nav2、RViz、Foxglove 全套。</li>
+        <li><b>切到建图视角：</b>RViz 左侧 SlamToolbox（SlamToolboxPlugin）面板，点击 <b>Start At Dock</b> 开始建图，把起始位姿定在充电桩（Dock）处——与 EXP-04 的回充闭环呼应。</li>
+        <li><b>遥控探索：</b>键盘或遥控器低速起步，<b>先沿场地外围绕一整圈回到起点触发回环</b>，再走中间区域补盲；途中观察点云是否与墙体贴合、有无重影。</li>
+        <li><b>保存地图：</b>面板 <b>Save Map</b> 输出 map.yaml / map.pgm，再点 <b>Serialize Map</b> 序列化工匠文件——两种都交作业。</li>
+        <li><b>质量自检：</b>重新加载地图，墙线笔直无重影、门口/柱子轮廓闭合、起终点一致即达标。</li>
+      </ol>
+      <figure class="shot">
+        <img src="./images/fig-ros2-rviz-cloud2.png" alt="RViz 点云俯视视角" loading="lazy">
+        <figcaption>图 2-3｜俯视视角下点云勾勒出场地边界（来自 unitreerobotics/unitree_ros2 仓库 README）：理想状态是墙面呈细线状；若墙变「雾团」，说明走太快或匹配漂移，需减速重走。</figcaption>
+      </figure>
+    </section>
+
+    <!-- 05 关键命令 -->
+    <section class="blk" id="s5">
+      <h2><span class="no">05</span>关键命令<span class="seg">随课段 5 / 6 对照使用</span></h2>
+      <p class="dim">命令来自 go2_ros2_sdk 与 unitree_ros2 官方 README；IP 按实机替换。</p>
+      <pre><span class="c"># ① 预检：点云话题与坐标系（EXP-01 已通链路）</span>
+ros2 topic hz /utlidar/cloud
+ros2 topic echo --no-arr /utlidar/cloud      <span class="c"># frame_id 应为 utlidar_lidar</span>
+
+<span class="c"># ② 一键启动（内置 pointcloud_to_laserscan + slam_toolbox + Nav2 + RViz + Foxglove）</span>
+export ROBOT_IP=192.168.123.161
+export CONN_TYPE=cyclonedds                   <span class="c"># 网线直连；webrtc 可走 WiFi</span>
+ros2 launch go2_robot_sdk robot.launch.py
+
+<span class="c"># ③ 键盘遥控探索（若 launch 未带遥控，可另开终端）</span>
+ros2 run teleop_twist_keyboard teleop_twist_keyboard
+
+<span class="c"># ④ RViz 操作（SlamToolboxPlugin 面板，鼠标点击，无命令行）</span>
+<span class="c">#    Start At Dock → 慢速绕场一圈闭合回路 → Save Map → Serialize Map</span>
+
+<span class="c"># ⑤ 也可用 slam_toolbox 官方 CLI 存图（标准功能）</span>
+ros2 run slam_toolbox save_map -f ~/maps/patrol_site</pre>
+      <div class="tip amber"><b>验收闸门：</b>map.yaml / map.pgm 存在且 RViz 重载无重影；序列化文件同目录保留。没走出回环就保存的地图一律返工——这是本实验唯一「技巧型」硬指标。</div>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">为啥压成 2D</div><div class="kt">巡检按平面路网走位，2D 栅格足够 AMCL/Nav2 用，内存与算力都降一个量级。</div></div>
+        <div class="kcard"><div class="kd">为啥是 online_async</div><div class="kt">建图放后台线程跑，前台遥控不卡顿——实时性与质量的折中。</div></div>
+        <div class="kcard"><div class="kd">地图存哪</div><div class="kt">Save Map 产 map.yaml(metdata+分辨率)+map.pgm(灰度像素)；Serialize 存 slam_toolbox 内部结构供再编辑。</div></div>
+        <div class="kcard"><div class="kd">下次实验怎么用</div><div class="kt">EXP-03 的 AMCL 直接吃 map.yaml；序列化图留给想修改地图结构的同学。</div></div>
+      </div>
+    </section>
+
+    <!-- 06 动画 -->
+    <section class="blk" id="s6">
+      <h2><span class="no">06</span>动画：点云逐帧建图与回环<span class="seg">课段 4 · 示证新知 · 12 min</span></h2>
+      <div class="anim-box">
+        <svg viewBox="0 0 720 270" width="100%" role="img" aria-label="点云逐帧累积建图与回环闭合动画">
+          <defs>
+            <marker id="a05e21" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#fbbf24"/></marker>
+          </defs>
+          <g font-size="13" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif">
+            <rect x="20" y="40" width="330" height="210" rx="12" fill="#0b1220" stroke="#1e293b"/>
+            <text x="185" y="66" fill="#6ee7b7" font-weight="bold" font-size="13" text-anchor="middle">逐帧累积：点越攒越多</text>
+            <!-- 场地轮廓 -->
+            <rect x="55" y="85" width="260" height="140" fill="none" stroke="#334155" stroke-width="2" stroke-dasharray="4 4"/>
+            <!-- 已建点（逐步显形） -->
+            <g fill="#34d399">
+              <circle cx="70" cy="100" r="3" opacity="0"><animate attributeName="opacity" values="0;1" dur="0.3s" begin="0.2s" fill="freeze"/></circle>
+              <circle cx="110" cy="92" r="3" opacity="0"><animate attributeName="opacity" values="0;1" dur="0.3s" begin="0.6s" fill="freeze"/></circle>
+              <circle cx="160" cy="88" r="3" opacity="0"><animate attributeName="opacity" values="0;1" dur="0.3s" begin="1.0s" fill="freeze"/></circle>
+              <circle cx="215" cy="90" r="3" opacity="0"><animate attributeName="opacity" values="0;1" dur="0.3s" begin="1.4s" fill="freeze"/></circle>
+              <circle cx="265" cy="96" r="3" opacity="0"><animate attributeName="opacity" values="0;1" dur="0.3s" begin="1.8s" fill="freeze"/></circle>
+              <circle cx="300" cy="120" r="3" opacity="0"><animate attributeName="opacity" values="0;1" dur="0.3s" begin="2.2s" fill="freeze"/></circle>
+              <circle cx="303" cy="165" r="3" opacity="0"><animate attributeName="opacity" values="0;1" dur="0.3s" begin="2.6s" fill="freeze"/></circle>
+              <circle cx="290" cy="210" r="3" opacity="0"><animate attributeName="opacity" values="0;1" dur="0.3s" begin="3.0s" fill="freeze"/></circle>
+              <circle cx="240" cy="222" r="3" opacity="0"><animate attributeName="opacity" values="0;1" dur="0.3s" begin="3.4s" fill="freeze"/></circle>
+              <circle cx="180" cy="224" r="3" opacity="0"><animate attributeName="opacity" values="0;1" dur="0.3s" begin="3.8s" fill="freeze"/></circle>
+              <circle cx="120" cy="220" r="3" opacity="0"><animate attributeName="opacity" values="0;1" dur="0.3s" begin="4.2s" fill="freeze"/></circle>
+              <circle cx="70" cy="195" r="3" opacity="0"><animate attributeName="opacity" values="0;1" dur="0.3s" begin="4.6s" fill="freeze"/></circle>
+              <circle cx="62" cy="150" r="3" opacity="0"><animate attributeName="opacity" values="0;1" dur="0.3s" begin="5.0s" fill="freeze"/></circle>
+              <circle cx="70" cy="100" r="4" fill="#fbbf24"/>
+            </g>
+            <!-- 机器人沿路径移动 -->
+            <rect x="-9" y="-9" width="18" height="18" rx="4" fill="#fbbf24" stroke="#78350f">
+              <animateMotion dur="6s" repeatCount="indefinite" path="M70,100 L160,88 L265,96 L303,165 L240,222 L120,220 L70,150 L70,100"/>
+            </rect>
+            <path d="M70,100 L160,88 L265,96 L303,165 L240,222 L120,220 L70,150 L70,100" fill="none" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="3 5" opacity="0.7"/>
+            <text x="185" y="243" fill="#94a3b8" font-size="11" text-anchor="middle">黄块=Go2　绿点=逐帧写入的点云　虚线=探索轨迹（绕场一周）</text>
+            <!-- 右侧：回环前后 -->
+            <rect x="370" y="40" width="330" height="96" rx="12" fill="#0b1220" stroke="#1e293b"/>
+            <text x="535" y="64" fill="#f87171" font-weight="bold" font-size="13" text-anchor="middle">无回环：累积漂移 → 首尾错开（墙体重影）</text>
+            <path d="M400,115 L470,110 L540,112" stroke="#f87171" stroke-width="4" fill="none" stroke-linecap="round"/>
+            <path d="M545,118 L620,116 L685,110" stroke="#f87171" stroke-width="4" fill="none" stroke-linecap="round" opacity="0.55"/>
+            <line x1="542" y1="95" x2="542" y2="130" stroke="#ef4444" stroke-width="2" stroke-dasharray="4 3"/>
+            <text x="535" y="132" fill="#fca5a5" font-size="11" text-anchor="middle">起点 ≠ 终点，错位 ≈ 每步误差 × 步数</text>
+            <rect x="370" y="150" width="330" height="100" rx="12" fill="#0b1220" stroke="#1e293b"/>
+            <text x="535" y="174" fill="#6ee7b7" font-weight="bold" font-size="13" text-anchor="middle">有回环：检测到旧景 → 对齐首尾、摊销误差</text>
+            <path d="M400,222 L470,218 L540,220 Q580,221 610,219 L685,221" stroke="#34d399" stroke-width="4" fill="none" stroke-linecap="round">
+              <animate attributeName="stroke" values="#34d399;#fbbf24;#34d399" dur="2s" repeatCount="indefinite"/>
+            </path>
+            <circle cx="400" cy="222" r="7" fill="none" stroke="#fbbf24" stroke-width="2">
+              <animate attributeName="r" values="5;13;5" dur="2s" repeatCount="indefinite"/>
+              <animate attributeName="opacity" values="1;0;1" dur="2s" repeatCount="indefinite"/>
+            </circle>
+            <text x="535" y="243" fill="#a7f3d0" font-size="11" text-anchor="middle">黄圈=回环检测命中「这面墙我见过」→ 整条轨迹拉直</text>
+          </g>
+        </svg>
+        <div class="anim-cap">动画 2-1：左图机器人绕场一周，绿点逐帧累积出房间轮廓；右上是「不回头」的代价——首尾错开的红墙；右下是回环校正后首尾咬合的绿线（黄圈脉冲=回环命中瞬间）。</div>
+      </div>
+      <div class="anim-box">
+        <svg viewBox="0 0 720 210" width="100%" role="img" aria-label="建图工作流五步动画">
+          <defs>
+            <marker id="a05e22" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#34d399"/></marker>
+          </defs>
+          <g font-size="12.5" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif">
+            <text x="360" y="30" fill="#6ee7b7" font-weight="bold" font-size="13">go2_ros2_sdk 建图工作流（RViz SlamToolboxPlugin）</text>
+            <g>
+              <rect x="30" y="60" width="120" height="66" rx="10" fill="#064e3b" stroke="#34d399" stroke-width="2"/>
+              <text x="90" y="88" fill="#d1fae5" font-weight="bold">Start At Dock</text>
+              <text x="90" y="110" fill="#6ee7b7" font-size="10.5">建图原点=充电桩</text>
+              <rect x="185" y="60" width="120" height="66" rx="10" fill="#064e3b" stroke="#34d399" stroke-width="2"/>
+              <text x="245" y="88" fill="#d1fae5" font-weight="bold">遥控探索</text>
+              <text x="245" y="110" fill="#6ee7b7" font-size="10.5">沿墙绕圈闭合回路</text>
+              <rect x="340" y="60" width="120" height="66" rx="10" fill="#064e3b" stroke="#34d399" stroke-width="2"/>
+              <text x="400" y="88" fill="#d1fae5" font-weight="bold">Save Map</text>
+              <text x="400" y="110" fill="#6ee7b7" font-size="10.5">map.yaml + map.pgm</text>
+              <rect x="495" y="60" width="90" height="66" rx="10" fill="#064e3b" stroke="#34d399" stroke-width="2"/>
+              <text x="540" y="88" fill="#d1fae5" font-weight="bold">Serialize</text>
+              <text x="540" y="110" fill="#6ee7b7" font-size="10.5">序列化存档</text>
+              <rect x="620" y="60" width="80" height="66" rx="10" fill="#78350f" stroke="#fbbf24" stroke-width="2"/>
+              <text x="660" y="88" fill="#fde68a" font-weight="bold">交给 EXP-03</text>
+              <text x="660" y="110" fill="#fbbf24" font-size="10.5">AMCL 载入</text>
+            </g>
+            <line x1="152" y1="93" x2="179" y2="93" stroke="#34d399" stroke-width="2" marker-end="url(#a05e22)"/>
+            <line x1="307" y1="93" x2="334" y2="93" stroke="#34d399" stroke-width="2" marker-end="url(#a05e22)"/>
+            <line x1="462" y1="93" x2="489" y2="93" stroke="#34d399" stroke-width="2" marker-end="url(#a05e22)"/>
+            <line x1="587" y1="93" x2="614" y2="93" stroke="#34d399" stroke-width="2" marker-end="url(#a05e22)"/>
+            <circle r="7" fill="#fbbf24">
+              <animateMotion dur="5s" repeatCount="indefinite" path="M90,150 L245,150 L400,150 L540,150 L660,150"/>
+            </circle>
+            <path d="M90,145 L90,132 M245,145 L245,126 M400,145 L400,126 M540,145 L540,126 M660,145 L660,132" stroke="#334155" stroke-width="1.5" stroke-dasharray="3 3"/>
+            <text x="360" y="176" fill="#94a3b8" font-size="11">黄点巡游 = 课堂实操顺序；每一步的产物都存档，缺一项验收不通过</text>
+            <text x="360" y="198" fill="#64748b" font-size="11">技巧：不绕回起点就开始存图 = 白做（回环没闭合，误差没收敛）</text>
+          </g>
+        </svg>
+        <div class="anim-cap">动画 2-2：五步工作流泳道——从定原点、探索、双格式存图到交付 EXP-03；黄点按课堂实际点击顺序巡游，任何一步产物缺失都无法进入下一步。</div>
+      </div>
+      <div class="tip violet"><span class="lab">观察</span>动画 2-1 中绿点不是均匀铺满的：机器人<b>走过近处点密、远处点稀</b>——所以盲区补扫时要「贴着走」；而回环黄圈出现的瞬间整条绿线会抖一下并拉直，那就是误差摊销。</div>
+    </section>
+
+    <!-- 07 互动 -->
+    <section class="blk" id="s7">
+      <h2><span class="no">07</span>互动：建图质量沙盘<span class="seg">课段 7 · 应用新知 · 10 min</span></h2>
+      <div class="ix-panel">
+        <div class="ix-title">设定探索覆盖率与步数，开关回环，预测地图质量等级</div>
+        <div class="ctl-row">
+          <label class="ctl">场地覆盖率
+            <input type="range" id="cov" min="20" max="100" value="70" step="5" oninput="mapSim()">
+          </label>
+          <label class="ctl">累计走位步数
+            <input type="range" id="steps" min="10" max="400" value="120" step="10" oninput="mapSim()">
+          </label>
+          <label class="ctl">
+            <input type="checkbox" id="loop" checked onchange="mapSim()"> 绕场闭合回路（回环）
+          </label>
+          <button class="btn ghost" onclick="mapReset()">重置</button>
+        </div>
+        <div class="io" id="mapIo"></div>
+      </div>
+      <p style="margin-top:10px">把滑杆推到「高步数 + 不回环」，误差会冲破红线——这正是<b>「闭合回路提升建图质量」</b>的定量直觉：漂移 ≈ 单步误差 × 步数，只有回环能把这笔账一笔勾销。</p>
+    </section>
+
+    <!-- 08 常见问题 -->
+    <section class="blk" id="s8">
+      <h2><span class="no">08</span>常见问题<span class="seg">课段 8 · 融会贯通 · 13 min</span></h2>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">Q RViz 里没有点云？</div><div class="kt">先 echo --no-arr /utlidar/cloud 查 frame_id，再把 Fixed Frame 改成该 frame；话题没数据则回 EXP-01 查 DDS 链路。</div></div>
+        <div class="kcard"><div class="kd">Q 点云「拉花」重影？</div><div class="kt">走太快或机身晃动过大：降低速度、保持匀速直线；地面打滑时等步态稳定再走。</div></div>
+        <div class="kcard"><div class="kd">Q 启动 launch 报找不到包？</div><div class="kt">没 source go2_ros2_sdk 工作空间：source install/setup.bash 后重开；确认 CONN_TYPE 与网线/WiFi 匹配（cyclonedds | webrtc）。</div></div>
+        <div class="kcard"><div class="kd">Q 地图墙体错位重影？</div><div class="kt">回环没闭合或闭合时匹配失败：沿特征丰富的墙体重走一圈，起点终点重叠 2~3 米再存图。</div></div>
+        <div class="kcard"><div class="kd">Q Save / Serialize 都要吗？</div><div class="kt">Save 产 2D 栅格（AMCL 必需）；Serialize 产可再编辑的序列化工件——验收两个都要交。</div></div>
+        <div class="kcard"><div class="kd">Q 空旷走廊建不了图？</div><div class="kt">特征太少 scan 匹配无从下手：临时摆放纸箱/锥桶造特征，或沿有货架、柱子的一侧行走。</div></div>
+        <div class="kcard"><div class="kd">Q launch 太重卡顿？</div><div class="kt">该 launch 默认连 Nav2/RViz/Foxglove 全开：先只留建图调通，再逐步打开其余节点。</div></div>
+        <div class="kcard"><div class="kd">Q 地图坐标和充电桩对不上？</div><div class="kt">务必用 Start At Dock 定原点；后期随手重启建图会让位姿原点漂移，EXP-04 回充就找不到桩。</div></div>
+      </div>
+    </section>
+
+    <!-- 09 拓展 -->
+    <section class="blk" id="s9">
+      <h2><span class="no">09</span>拓展阅读<span class="seg">课段 8 · 融会贯通</span></h2>
+      <ul class="check">
+        <li><b>宇树机载 unitree_slam / mid360_driver</b>：官方建图服务，App 里点一点即可出图，效果好但<b>闭源、不可随课分发</b>——与本课 slam_toolbox 开源链路对照理解「能演示 ≠ 能二次开发」。</li>
+        <li><b>FAST-LIO</b>（HKU-Mars）：高性能 LIO 框架，工程界常用其替代方案——<b>拓展阅读：https://github.com/hku-mars/FAST-LIO （命令与兼容性请自行核验后再用）</b>。</li>
+        <li><b>slam_toolbox 调参</b>：loop_search_minimum_linear_distance（回环搜索距离）、ceres 线性求解器参数——地图重影时的第二把钥匙。</li>
+        <li><b>点云进阶玩法</b>：go2_ros2_sdk 同时发布点云与 TF，配合 Foxglove 可回放建图全程，交作业时附回放比截图更有说服力。</li>
+        <li><b>3D→2D 的取舍</b>：多层建筑需要分层建图；本课场景（单层厂区）以栅格为主，3D 点云留存作碰撞与货架核查的底档。</li>
+      </ul>
+    </section>
+
+    <!-- 10 思考题 -->
+    <section class="blk" id="s10">
+      <h2><span class="no">10</span>思考题 · 自测<span class="seg">课段 8 · 融会贯通</span></h2>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">✅ 完成成果</div><div class="kt">产出 map.yaml + map.pgm + 序列化地图，RViz 重载墙体笔直无重影，起终点闭合。</div></div>
+        <div class="kcard"><div class="kd">🧠 原理收获</div><div class="kt">用「蒙眼画房间」讲清点云累积、scan 匹配与回环摊销误差三件事。</div></div>
+        <div class="kcard"><div class="kd">🛠 技能收获</div><div class="kt">独立跑通 robot.launch.py + SlamToolboxPlugin 五步工作流并完成质量自检。</div></div>
+        <div class="kcard"><div class="kd">📐 评分速览</div><div class="kt">地图质量 40% + 回环证据 30% + 动画互动 30%。</div></div>
+      </div>
+      <div class="tip violet"><span class="lab">思考 1</span>为什么把 3D 点云压成 2D 栅格是「划算」的？举一个 2D 栅格<b>不够用</b>的巡检场景（提示：想想立体障碍物），并说明补救思路。</div>
+      <div class="tip violet"><span class="lab">思考 2</span>如果建图中途狗被人抱起来换了位置，地图会发生什么？你会在回放里看到什么现象？该如何处置（提示：与「回环」的区别）？</div>
+    </section>
+
+    <nav class="expnav">
+      <a class="prev" href="../exp-01-sdk-motion/index.html">← 上一个：EXP-01 控制与巡检准备</a>
+      <a class="next" href="../exp-03-amcl-nav2/index.html">下一个：EXP-03 定位与多点导航 →</a>
+    </nav>
+    <footer>
+      <div>IND-05 · 工业巡检应用场景 · EXP-02 3D 激光建图</div>
+      <div>8 学时 · 实践 · 基于 培训方案"课程5" + go2_ros2_sdk 改编</div>
+    </footer>
+  </main>
+</div>
+
+<script>
+function mapSim(){
+  var cov=parseInt(document.getElementById('cov').value,10);
+  var st=parseInt(document.getElementById('steps').value,10);
+  var loop=document.getElementById('loop').checked;
+  var drift=st*0.012*(loop?0.15:1);          // 累积漂移（米）：回环摊销到 15%
+  var depth=cov/100, charge='';
+  if(cov<60) charge='<span class="bad">覆盖率不足：场地大片盲区，AMCL 激光场会误匹配</span>';
+  else if(!loop&&drift>3) charge='<span class="bad">漂移 '+drift.toFixed(1)+'m &gt; 3m：墙体必重影，返工绕圈</span>';
+  else if(!loop) charge='<span class="warn">漂移 '+drift.toFixed(1)+'m（临界）：小场地勉强能用，正式验收风险高</span>';
+  else charge='<span class="ok">回环已闭合：漂移摊销至 '+drift.toFixed(2)+'m，可拿去存图</span>';
+  var grade=(!loop&&drift>3)?'D · 不合格':(!loop?'C · 勉强':(cov>=85?'A · 优秀':'B · 合格'));
+  document.getElementById('mapIo').innerHTML=
+    '场地覆盖率 <b>'+cov+'%</b>　累计步数 <b>'+st+'</b>　回环：<b>'+(loop?'已闭合 ✕→◯':'未闭合')+'</b>\n'
+    + '估算累积漂移 <b>'+drift.toFixed(2)+' m</b> → 评级 <b>'+grade+'</b>\n' + charge + '\n'
+    + '经验式：漂移 ≈ 单步误差(1.2cm) × 步数 × 回环系数(闭合取 0.15)——绕一圈，账就清了。';
+}
+function mapReset(){
+  document.getElementById('cov').value=70;
+  document.getElementById('steps').value=120;
+  document.getElementById('loop').checked=true;
+  mapSim();
+}
+mapSim();
+</script>
+<script src="../shared/tutorial.js" defer></script>
+</body>
+</html>

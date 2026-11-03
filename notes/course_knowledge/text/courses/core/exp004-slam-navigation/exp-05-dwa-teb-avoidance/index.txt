@@ -1,0 +1,243 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp004-slam-navigation/exp-05-dwa-teb-avoidance/index.html
+TITLE: EXP-05 · DWA/TEB 局部避障 — 机器人 SLAM 与自主导航
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+EXP-05 · DWA/TEB 局部避障 — 机器人 SLAM 与自主导航
+🧠 具身智能课程 ·
+教程首页
+核心课程
+/
+SLAM 与自主导航
+/ EXP-05
+本页目录
+01 问题引入
+02 原理通俗讲解
+03 关联知识点
+04 实验目标
+05 实验环境与准备
+06 动画讲解
+07 互动讲解
+08 实操步骤
+09 重点与易错点
+10 总结与思考
+CH1 · 建模与建图
+EXP-01 原理与 URDF
+EXP-02 SLAM Toolbox 建图
+CH2 · 定位与导航
+EXP-03 Nav2 导航
+EXP-04 AMCL 定位
+EXP-05 DWA/TEB 避障
+CH3 · 任务调度与三维进阶
+EXP-06 多点导航
+EXP-07 RTAB-Map 3D
+EXP-05 · 第 2 章 · 综合性 · 8 学时
+DWA/TEB 局部避障
+一句话读懂：实验 3 里小车会"看地图走大路"，但路上突然滚来一个球、放下一只箱子怎么办？这节课专门练"开车时的随机应变"——用 DWB 局部规划器，让小车在行驶中实时躲开动态障碍，绕不过去还会自己转圈、后退重新想办法。
+难度 ⭐⭐⭐ · 8 学时
+综合性
+DWA / DWB / TEB
+前置：EXP-03 + EXP-04
+01
+问题引入：静态地图挡不住滚动的球
+情境
+你在手机导航里看到一条"完美路线"，开到半路发现前面临时放了个水马——导航没让你重查地图，你也不会停下来重新规划整条路线，而是
+打一把方向绕过去，再并回原路
+。机器人也一样：EXP-03 的全局规划管"走哪条大路"，但大路上突然出现的纸箱、滚动的泡沫球，需要一套"边开边躲"的本地反应机制——这就是
+局部路径规划
+。
+本项目的全局路径（ThetaStar）给出的是一条"战略路线"，真正把轮子转起来的是局部规划器（controller_server 里的 DWB）。它每 50 ms（控制器 20 Hz）就重新采样"接下来 1.5 秒怎么走"，一旦发现当前轨迹前有障碍，就地换一条——所以障碍物根本不需要出现在静态地图里。
+02
+原理通俗讲解：先想"刹得住"，再打分挑最优
+白话比喻
+开车时你不会考虑"200 km/h 冲过去"——先看
+能不能刹住
+（动态窗口），再从敢踩的速度里挑一条最好的路线。DWA（Dynamic Window Approach）就是这个思路：只在"当前速度出发、靠最大加减速在下一拍能够到"的速度集合里采样，每对 (vx, ω) 推演出一条短轨迹，再让一排"教练"给每条轨迹打分，总分最高者执行。
+两道闸门
+动态窗口怎么来
+① 速度必须在 acc_lim（acc_lim_x 1.0 m/s²、acc_lim_theta 1.5 rad/s²）约束下"下一拍可达"；② 以它刹车必须能在撞上障碍前停住。过了两道闸门的 (vx, ω) 才进入采样范围——这就是"刹得住"的数学表达。
+采样规模
+20 × 40 = 最多 800 条
+vx_samples: 20 个线速度 × vtheta_samples: 40 个角速度 = 上限 800 条候选轨迹（vy_samples 为 0，麦轮横移未启用）；每条用 sim_time: 1.5 推演未来 1.5 秒，在局部代价地图上逐点查代价。
+评委团
+7 个 critics 加权打分
+DWB 把 DWA 模块化成可插拔 critics，本项目启用了 7 个：RotateToGoal / Oscillation / BaseObstacle / GoalAlign / PathAlign / PathDist / GoalDist——每项先归一化再乘 scale，总分最高的轨迹被执行。
+邻居方案
+TEB 弹性带
+TEB 把路径看成一根弹性带，用图优化同时调整轨迹点位置和到达时间（贴路径+避障+时间最短+平滑四目标）。DWA 快而糙只看眼前 1.5 秒；TEB 平滑可加时间约束但算力高。
+本项目默认 DWB，TEB 未安装
+，属知识扩展。
+避障全链路：
+雷达 → voxel_layer 标记障碍 → 局部代价地图 5 Hz 更新 → controller（20 Hz）发现当前轨迹撞了 → 重采样绕行轨迹 → 绕过后按 PathDist 重新贴回全局路径
+。全程无需重新规划全局路径——就像高速上遇事故，现场变道绕过再并回原车道。
+03
+关联知识点
+知识点 1
+DWA 速度窗口
+只考虑当前刹得住的速度组合——这是它"安全"的根本；acc_lim 直接决定窗口大小。
+知识点 2
+DWB 评价函数
+PathDist / GoalDist / BaseObstacle / RotateToGoal 等 critics 加权打分，plugin 为 dwb_core::DWBLocalPlanner。
+知识点 3
+局部代价地图
+3 m×3 m 滚动窗口 + voxel 层（z_voxels 16）+ inflation 层（0.18 m），5 Hz 更新，动态避障全靠它。
+知识点 4
+代价数值含义
+0=空闲；1-252=离障碍越近代价越高（按 cost_scaling_factor 4.0 衰减）；254=障碍本体；255=致命不可入。
+知识点 5
+全局 vs 局部
+全局路径是"目标线路"（长，行为树 1 Hz 触发重规划）；局部轨迹是"接下来 1.5 秒怎么走"（短，20 Hz 重算）——别混。
+知识点 6
+行为树兜底
+障碍堵死通道时，controller 一直报失败，行为树转入恢复：清代价地图 → Spin 1.57 rad → Wait 5 s，重试 6 次仍不行则 ABORTED。（本车麦轮可横移，未配 backup）
+04
+实验目标
+理解 DWA/DWB 速度窗口思想与评价函数（critics）加权机制 ——
+原理理解
+理解 TEB 时间弹性带原理及其与 DWA 的差异 ——
+原理理解
+掌握 local_costmap（滚动窗口 / voxel / inflation）配置与 RViz 可视化 ——
+流程掌握
+独立完成"正前方放纸箱"动态避障三重复试验 ——
+独立完成
+通过单变量调参改善避障表现并记录"参数→现象"对照表 ——
+独立完成
+05
+实验环境与准备
+类别
+配置
+硬件
+具身智能实验箱 B2 / 小车 C1 + COIN-D6 雷达；
+地图（EXP-02）+ 定位（EXP-04）可用
+系统
+Ubuntu 22.04 + ROS 2 Humble
+核心库
+Nav2 dwb_controller、nav2_costmap_2d
+障碍物
+纸箱 / 泡沫块（低矮安全，便于测试）
+主入口
+navigation/car1_navigation/config/nav2_params.yaml
+（controller_server / local_costmap / behavior_server 段）
+准备清单
+① 确认 EXP-03 导航 launch 正常、EXP-04 定位已收敛；② 记住车体外廓 footprint = 0.36 m（长）× 0.27 m（宽），通道测试要用；③ 障碍物只用低矮纸箱/泡沫，禁用易碎沉重物；④ 调参前备份 nav2_params.yaml。
+06
+动画讲解：采样轨迹打分与代价地图膨胀
+cost 254
+小车 (执行中)
+✔ 绿：绕行+对齐 → 总分最高
+✘ 红：穿过膨胀区 → BaseObstacle 否决
+最多 800 条候选 / 1.5s 推演
+图 5-1：蓝虚线是全局路径；灰色小车按 sim_time 1.5 推演出多条候选轨迹，穿过膨胀圈（inflation 0.18）的轨迹被 BaseObstacle 打上天文数字代价直接淘汰，"绕行且与原路对齐"的绿轨迹总分最高被选中——绕过后 PathDist 又把它拉回全局路径。障碍本体 cost 254（黑块），周围灰蓝渐变是膨胀出的 1-252 代价区。
+07
+互动讲解：膨胀半径 × 代价权重调参台
+🎛 选一组参数，预测小车过纸箱的表现
+A · BaseObstacle 0.02（默认）
+B · BaseObstacle 0.1
+C · max_vel_x 0.3→0.2
+D · inflation 0.18→0.35
+↑ 点击 A/B/C/D：对照源讲义"调优方向表"预测现象，再动手实测验证（每改必重启 navigation.launch！）。
+critic
+作用
+本项目 scale
+PathDist
+离全局路径的横向偏差
+32.0
+PathAlign
+轨迹方向与全局路径对齐程度
+32.0
+GoalDist
+离目标点的距离
+24.0
+GoalAlign
+轨迹方向与目标朝向对齐
+24.0
+BaseObstacle
+轨迹是否撞障碍（查代价地图原始 cost）
+0.02
+RotateToGoal
+到目标时转正的效率
+32.0
+Oscillation
+惩罚来回震荡（防抖动）
+未单独设 scale，靠默认参数生效
+上表 7 项与本项目 nav2_params.yaml 的
+critics
+列表一一对应；顺序即打分顺序，顺序本身不影响总分但影响短路的判定时机。
+为什么 0.02 拦得住撞墙
+权重是
+相对关系
+：撞墙轨迹的 BaseObstacle 项取的是代价地图原始 cost（可达 254），乘 0.02 之后依然远大于其他项的正常取值——权重只需区分"远/近"，否决撞墙靠的是 cost 本身的量级。PathDist 给到 32，是因为"贴不贴路径"需要精细排序。
+08
+实操步骤：纸箱前方 1 m 动态避障三重复试验
+1
+启动导航并用 "2D Pose Estimate" 定位，下发一个
+穿过房间中部
+的长距离目标
+2
+小车行驶途中，把纸箱放到它
+正前方约 1 m
+处保持不动，记录：减速时机、绕行最大横向距离、是否回到原路径
+3
+重复 3 次记录避障成功率与"最小安全距离"；移开箱子再测一次，观察恢复直线
+4
+挑战测试：两箱摆 50 cm 窄通道（车宽 0.27 m，两侧各留 11.5 cm）；直线行驶中 0.5 m 处突然放箱观察急刹
+5
+调优 A：BaseObstacle.scale 0.02→0.1 重启复测；调优 B：max_vel_x 0.3→0.2 对比成功率与耗时
+# ① 启动导航（含定位），map 指向 EXP-02 保存的地图名
+ros2 launch car1_navigation navigation.launch.py map:=map_01
+# ② 命令行下发穿过房间的目标（也可用 RViz 工具栏 Nav2 Goal）
+ros2 action send_goal /navigate_to_pose nav2_msgs/action/NavigateToPose \
+  "{pose: {header: {frame_id: 'map'}, pose: {position: {x: 2.0, y: 1.0}, orientation: {w: 1.0}}}}"
+# ③ 实时观察速度变化（减速→绕行→回升；平滑后的名字是 controller/cmd_vel）
+ros2 topic echo /controller/cmd_vel
+# ④ RViz 添加 Display → By topic → /local_costmap/costmap（Color 显示）
+#    放纸箱后应看到障碍处黑圈（254）与周围 1-252 渐变
+# ⑤ 调参：改 nav2_params.yaml 的 controller_server / local_costmap 段后必须整栈重启
+ros2 launch car1_navigation navigation.launch.py map:=map_01
+预期现象
+避障时速度先降后升（voxel 层感知 → controller 减速）；绕行轨迹平滑无急转弯，绕过后重新贴合全局路径；若障碍堵死通道，小车会清代价地图、原地转 1.57 rad 找路、再等 5 秒重试，始终不行才 ABORTED——不会硬闯。
+09
+重点与易错点
+重点
+① 动态窗口 = "刹得住"的速度集合；② critics 权重的相对关系；③ 局部代价地图数值语义（0/1-252/254/255）；④ "现象→参数"调优方向判断。
+坑
+现象
+解决
+以为 DWA 考虑所有速度
+误解安全来源
+只考虑刹得住的（acc_lim 决定窗口），这是安全根本
+避障时撞上箱子
+擦到纸箱
+箱子离机器人太近（进局部窗口才被发现）或速度太快刹不住；放远一点 / 降 max_vel_x
+绕过后"迷路"乱转
+回不到原路径
+PathDist 权重不足；调大 PathDist.scale / PathAlign.scale
+行驶抖动左右摆
+原地哆嗦
+调大 Oscillation 惩罚；降低 sim_time；降速
+贴障碍太近
+擦边走
+调大 inflation_radius（默认 0.18 已比半宽 0.135 多留 4.5 cm，再大窄道会判不可行）
+改参没重启
+调了没效果
+controller_server 参数启动时读取，改后必须重启 navigation.launch
+一次改多个参数
+无法归因
+单变量对比，每轮记录"当前参数→当前现象"
+窄通道过不去
+50 cm 通不过
+车宽 0.27 m + 两侧各 0.18 m 膨胀 ≈ 需要 0.63 m 净宽——属正常不可行，换宽通道或改小 inflation_radius
+全程人站开阔侧、手远离小车路径，随时准备按急停
+0.5 m 突现测试留够刹车距离：acc_lim_x 1.0 决定减速能力，小车不是无限刹车性能
+每次调参前记录"参数→现象"，便于对比与回退
+10
+总结与思考：DWA 与 TEB 的取舍
+本课收获
+掌握了 DWA 动态窗口思想、DWB 七大 critics 打分机制、local_costmap 滚动窗口配置，以及"正前方/窄通道/突然出现"三类避障试验与单变量调参法。本项目 nav2_params.yaml 的 controller_plugins 为 FollowPath → DWB；
+TEB 未启用，属知识扩展
+（DWA 快而糙只看眼前 1.5 秒；TEB 优化整条局部路径、平滑可加时间约束，代价是算力）。
+思考 1
+为什么 BaseObstacle 权重只有 0.02 却仍能阻止撞墙轨迹？如果把 PathDist 也调成 0.02，小车行为会怎么变？（提示：cost 量级 × 权重的乘积关系）
+思考 2
+项目默认选 DWB 而非 TEB 的理由是什么？请列出至少两组你的"现象→参数"对照记录，并说明若小车要在密集人群中穿行，你会倾向哪种局部规划器、为什么。
+CORE-04 · 机器人 SLAM 与自主导航 · EXP-05 DWA/TEB 局部避障
+8 学时 · 综合性 · 基于 slam_practice 实验讲义改编

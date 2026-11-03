@@ -1,0 +1,435 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/cases/exp006-smart-factory/exp-03-interface-design/index.html
+TITLE: EXP-03 · 接口设计 — 智慧工厂装货分拣码垛综合项目
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+EXP-03 · 接口设计 — 智慧工厂装货分拣码垛综合项目
+🧠 具身智能课程 ·
+教程首页
+综合项目
+/
+智慧工厂装货分拣码垛
+/ EXP-03
+本页目录
+01 问题引入：接口对不上，联调全报废
+02 原理通俗讲解：传菜条的写法
+03 关联知识点：A/C/D/E/F 五系列
+04 实验目标
+05 实验环境与准备
+06 动画讲解：意图到播报的闭环链
+07 互动讲解：接口契约选择台
+08 实操步骤：核对实现与验证
+09 重点与易错点
+10 总结与思考
+CASE-01 · 智慧工厂
+EXP-01 需求分析
+EXP-02 五节点系统架构
+EXP-03 接口设计
+EXP-04 语音交互集成
+EXP-05 视觉自适应装货
+EXP-06 智能分拣
+EXP-07 自主码垛
+EXP-08 危险检测与急停
+EXP-09 全功能快速验证
+EXP-03 · 第 1 章 · 设计性 · 4 学时
+接口设计：五个节点之间的"契约"怎么签
+架构画好了，节点之间拿什么说话？本实验掌握
+A/C/D/E/F 五大系列接口
+的名称、类型、方向与消息类型，画出
+"意图→任务→执行→完成播报"
+的完整闭环调用链，解读
+config/eai_factory.yaml
+的参数化与
+意图映射
+（改 yaml 不改代码），并学会用 ros2 命令核对"文档 ↔ 代码"的一致性。
+难度 ⭐⭐ · 4 学时
+A/C/D/E/F 系列
+触发 vs 完成语义
+yaml 参数化
+意图映射
+01
+问题引入：接口对不上，联调全报废
+两个小组并行开发：A 组写语音、B 组写调度。联调那天——
+1
+A 组往
+/eai_factory/intent
+发了
+"开始装货"
+（中文句子），B 组在等
+"load"
+（英文枚举）→
+对不上暗号
+2
+A 组用话题发任务、B 组做成服务等调用 →
+通信范式不一致
+，谁也叫不醒谁
+3
+B 组任务做完了发了"完成"，A 组却在轮询另一个名字的话题 →
+播报永远不响
+4
+解法：
+先签契约再写代码
+——五系列接口清单（名称/类型/方向/消息/语义）就是全项目的技术合同
+💡 接口 = 契约
+接口定义回答三件事：
+谁发布、谁订阅（方向）
+，
+说什么语言（消息类型）
+，
+说完了算不算数（触发 vs 完成语义）
+。三者都写进清单表，双方各自开发也不会跑偏——这就是"接口先行"的工程纪律。
+02
+原理通俗讲解：传菜条的写法与后厨暗号
+餐厅的传菜条（接口）怎么写才不出错？三条生活经验直接对应三条设计规律：
+✏️ 规律一：格式看内容
+什么信息用什么格式
+状态类（跑没跑、安不安全）用
+String 枚举
+（idle/running/sensor_blocked、safe/danger/recover）；布尔信号用
+Bool
+（interrupt/danger）；办手续用
+Trigger
+（回执 success+message）；坐标位姿用
+PoseStamped
+。看到新接口先猜类型，八九不离十。
+📎 规律二：喊话 vs 立字据
+话题异步、服务同步
+"装货开始了"这种
+叫一声人人听见
+的用话题（intent/speak/status/danger）；"把这批货抓了并等你回话"这种
+必须等回执
+的用服务（start_load、grasp/start）。喊话不保证听到，立字据保证有回执。
+🏷 规律三：触发 ≠ 完成
+两段式确认
+服务返回 success 只代表"
+任务已受理
+"（'load task triggered'），机械臂还在动；真正完成要等 status/state 话题通知。
+预约餐厅拿到排队号（触发）≠ 菜已上桌（完成）
+。
+🧾 规律四：改单不改菜谱
+yaml 表驱动映射
+"装货"这个词对应哪个服务？写在 yaml 的 intents 段（load→/eai_factory/start_load）。
+加个新意图 = 加三行配置
+，一行代码不用动——后厨加菜只改菜单不改流程。
+🧲 规律五：借来的工具贴标签
+D 系列复用接口
+pick/place/go_work/set_motor 这些是
+复用包既有接口
+（D 系列）——eai_factory 只调用不重写。清单表里标注"复用"，避免误以为是自家定义。
+🔔 规律六：播报走固定文案
+A2 speak 是唯一出口
+所有对外播报（"装货完成"）都经 N2 发 A2 speak、由 N1 的 TTS 念出——
+出口收敛到一个接口
+，文案才管得住（R7）。
+03
+关联知识点：五大系列接口清单
+#
+接口
+类型
+方向
+消息
+语义 / 说明
+A1
+/eai_factory/intent
+话题
+N1→N2
+std_msgs/String
+意图："load"/"sort"/"palletize" 英文枚举
+A2
+/eai_factory/speak
+话题
+N2→N1
+std_msgs/String
+固定文案播报出口
+A3
+/eai_factory/interrupt
+话题
+N1→N2
+std_msgs/Bool
+语音打断（R8 四步复位入口）
+C1
+/eai_factory/safety/danger
+话题
+N3→N2,N-grasp,N-conveyor
+std_msgs/Bool
+true=危险（释放力矩），false=解除（恢复+回work）
+C2
+/eai_factory/safety/status
+话题
+N3→观察者
+std_msgs/String
+safe / danger / recover 状态枚举
+C3
+/car1_base_driver/bus_servo/set_state
+话题
+N3→底盘驱动
+SetBusServoState
+力矩释放/恢复（enable_torque 6 舵机）
+C4
+/arm_controller/go_work
+服务
+N3→复用包
+std_srvs/Trigger
+回 work 姿态（解除危险后调用）
+D1-D7
+复用系列
+服务/话题
+N2→复用节点
+Trigger / PoseStamped 等
+arm pick/place/set_gripper、set_motor、set_pick_target 等（
+复用不改
+）
+E1-E3
+/eai_factory/start_load|sort|palletize
+服务
+→N2
+std_srvs/Trigger
+任务触发（触发语义，如 'load task triggered'）
+F1-F9
+流水线系列
+服务/话题
+→N-conveyor
+Trigger / String / Bool
+含
+F3 run_until_sensor（异步：运转至光电遮挡→定点停，完成走 state 话题）
+、F4 emergency_stop（同步立即生效）
+F10
+danger 联锁
+话题
+N3→N-conveyor
+std_msgs/Bool
+危险即急停：流水线停 + 调 /arm_controller/emergency_stop（"双停"）
+yaml 参数化
+（
+config/eai_factory.yaml
+，
+/**: ros__parameters:
+顶层下发）关键段落：
+mode
+: production
+# L7：debug/production 双模式
+vision: { tag_id: 3, tag_size: 0.025, tag_family:
+tag36h11
+}
+# L56-L63
+grasp.tasks:
+# L65-L90 每任务 [x,y,z,pitch] 四元组 + vision 标志
+load:      { vision:
+true
+,  observe_pose: [0.16,0.0,0.27,2.5307], place_pose: [0.05675,-0.13166,0.20386,2.93322] }
+  sort:      { vision:
+false
+, observe_pose: [0.0622,-0.1158,0.1951,3.0371], place_pose: [0.1434,-0.1296,0.2075,2.7283] }
+  palletize: { vision:
+false
+, observe_pose: [0.145,0.0027,0.1850,3.1381], place_pose: [0.0608,0.1345,0.2051,2.6461] }
+safety:  { front_start_deg: -30, front_end_deg: 30, danger_dist: 0.20, persist_time: 0.5 }
+# L92-L98
+intents:
+# L110-L117 意图 ↔ 服务名 表驱动映射
+load:      { action:
+"/eai_factory/start_load"
+}
+  sort:      { action:
+"/eai_factory/start_sort"
+}
+  palletize: { action:
+"/eai_factory/start_palletize"
+}
+🔍 双模式开关
+grasp.tasks.*.vision
+标志决定抓取模式：
+load 为 true 走视觉抓取
+（AprilTag 定位）、sort/palletize 为 false 走固定点位。同一个 grasp/start 服务，两种用法——这就是"双模式"在接口层的落点。
+04
+实验目标
+掌握
+A/C/D/E/F 五系列接口的定义位置、消息类型与方向（谁发布、谁订阅、谁调用）
+理解
+"意图 → 任务 → 执行"调用链：intent 话题 → start_load 服务 → grasp/start 服务 → grasp/status 话题 → speak 话题，能画完整闭环
+掌握
+config/eai_factory.yaml
+参数配置（mode / grasp.tasks / safety / conveyor / intents），会解释意图映射"改 yaml 不改代码"的原理
+独立完成
+一份接口清单表（编号/名称/类型/方向/消息/实现位置/行号/一致性），可用 ros2 命令验证（可选）
+迁移
+：对任意 ROS2 项目快速产出"接口清单 + 消息类型 + 实现位置"对照表
+05
+实验环境与准备
+类别
+内容
+硬件
+B2 底盘 + C1 机械臂（
+可纯文档阅读
+，也可在已启动系统中验证）；传感器：激光雷达、RGB-D 相机、光电传感器、AprilTag（tag_id=3）
+OS / ROS
+Ubuntu 22.04 + ROS 2 Humble
+Python
+3.10（voice/vision/grasp/conveyor 运行时用 /home/iflytek/ros2_venv/bin/python3）
+核心库
+rclpy、std_msgs、std_srvs、geometry_msgs、sensor_msgs、car1_base_driver_msgs（SetBusServoState / MotorsState）、tf2_ros
+阅读对象
+docs/02_架构设计.md
+接口定义 v1 章节（L26-L81）、
+config/eai_factory.yaml
+、五节点的 node.py 源码
+⚠️ 准备提示
+验证步骤（步骤 4）
+可选
+：无法起环境时直接跳过，不影响实验成果。实机验证前必须确认
+机械臂活动范围内无人无遮挡
+，且建议 yaml 设
+mode: debug
+（视觉抓取会停在 await confirm 等人工确认）。改 yaml 坐标需重启对应节点生效，切勿在机械臂运动中改。
+06
+动画讲解：从意图到播报的闭环链
+跟着光点走一遍完整闭环：
+虚线 = 话题（异步）
+，
+实线 = 服务（同步必回执）
+。注意链路上两处"触发→完成"的两段式：start_load/grasp/start 都是受理即返回，真正完成靠 status 话题回传，最后才经 A2 speak 收口播报。
+执行正向链 · 语音 → 任务 → 抓取（触发语义即返回）
+N1 语音
+LLM 意图分类
+N2 调度器
+_run_task 路由
+N-grasp
+双模式执行
+机械臂/流水线
+复用 D 系列
+A1 intent
+grasp/start(服务)
+D 系列
+完成语义：grasp/status = "load|done"（话题回传）
+A2 speak
+TTS 念固定文案「装货完成」（R7）
+E1 start_load 同样受理即返 success
+安全旁路 · C1 danger 话题一发，三方同时断
+N3 safety
+60°/20cm/0.5s 判定
+发 danger=true
+C1 话题
+释放 6 舵机力矩
+C3 set_state
+流水线双停
+F10
+动画 3-1｜上：执行正向链（服务实线、话题虚线、status 回环、speak 收口）；下：C1 danger 一发三断的安全旁路，与业务链并行不排队
+07
+互动讲解：接口契约选择台
+给一条业务需求，你选哪种接口契约？点击选择查看评审结论：
+接口契约选择台 · Contract Picker
+🎙 "开始装货"意图如何送达 N2？
+🏭 流水线转到光电遮挡就停？
+🚨 危险信号如何送达三方？
+↺ 复位
+// 选择一个场景，评估 话题 / 服务 / 两段式 的取舍
+评审原则：要回执用服务，要广播用话题，长任务用"触发+完成"两段式
+💡 换个角度想
+选接口本质是在三个约束里权衡：
+要不要回执、要不要多方同时听到、会不会阻塞调用方
+。F3 与 F4 同是 Trigger 服务，一个异步（长运转不能阻塞单线程 executor）、一个同步立即生效——
+同类型 ≠ 同语义
+，语义由"做了多久"决定。
+08
+实操步骤：阅读、核联、验证三板斧
+1
+通读 docs/02 接口定义 v1（L26-L81），抄录五系列清单并加"语义"列（60min）
+2
+通读 config/eai_factory.yaml（117 行），按段记录参数与作用，对比 D9 配置示例找差异（50min）
+3
+源码联查五节点 node.py，核对 create_* 实现与消息类型，标注一致性结论（50min）
+4
+（可选）ros2 四件套验证：node/topic/service/interface（30min）
+5
+汇总接口清单表 + 补画"意图→任务→执行→播报"调用链图（20min）
+# ① 五节点的订阅/发布/服务/客户端实现位置（一把抓）
+grep
+-n "create_publisher\|create_subscription\|create_service\|create_client" eai_factory/*.py
+# voice_node.py L250-L253: A1 intent / A3 interrupt / A2 speak
+# safety_node.py L56-L63:   C1/C2/C3 发布 + C4 客户端
+# conveyor_node.py L109-L111: F3 Trigger 服务端
+# scheduler_node.py L62-L67:  E1-E3 服务端注册
+# ② 运行时验证（可选，需系统已启动）
+ros2
+node list | grep eai_factory
+# 应看到 5 个节点
+ros2
+topic list | grep eai_factory
+# intent/speak/interrupt/danger/...
+ros2
+service list | grep eai_factory
+# start_load/start_sort/start_palletize/grasp/start/...
+ros2
+interface show std_srvs/srv/Trigger
+# bool success  +  string message
+ros2
+interface show geometry_msgs/msg/PoseStamped
+# ③ 手动触发装货（须安全环境！Trigger 请求体为空 {}）
+ros2
+service call /eai_factory/start_load std_srvs/srv/Trigger "{}"
+# response: success: True / message: 'load task triggered'
+🔍 真实的文档-代码差异（必须记下）
+文档 D1 写的是
+/visual_grasp/start
+，但当前实现是 N-grasp
+自提供
+/eai_factory/grasp/start
+（grasp_node.py L140-L142），调度器也调用后者（scheduler_node.py L55-L56）——版本演进留下的差异，清单表应标注"以代码为准：当前实现自包含，未使用 visual_grasp 原节点"。
+09
+重点与易错点
+⚠️ 三大经典易错
+消息类型记混（记住"语义定类型"：状态 String、布尔 Bool、触发 Trigger、位姿 PoseStamped）；混淆触发与完成语义（start 即返 ≠ 任务做完，完成看 grasp/status 与 conveyor/state）；照抄文档不核代码（D1 差异就是教训，以代码为准）。
+⚠️ 常见坑
+现象 → 解法
+service call 报 not available
+对应节点未启动或服务名拼错 → 先
+ros2 service list
+查存在性；E1-E3 由调度器提供、F1-F5 由 conveyor 提供、grasp/start 由 grasp 提供
+改了 yaml 坐标不生效
+参数在节点启动时读取一次 → 修改后重启对应节点；运行中可
+ros2 param get /eai_factory_grasp grasp.tasks.load.observe_pose
+检查当前值
+以为 mode 只影响抓取
+mode（yaml L7）由 grasp 节点读取：debug 模式检测到目标后
+等 /eai_factory/grasp/confirm
+人工确认（grasp_node.py L295-L301），production 直接 pick；改 mode 需重启
+清单漏掉完成语义接口
+grasp/status、conveyor/state 漏记 → 漏掉它们就解释不了"装货完成"播报从哪来（闭环最后一环是 grasp/status → speak）
+D 系列当自家接口
+docs L58 注明"D 系列为复用现有接口" → 实现在 car1_arm_controller / car1_base_driver 等复用包，eai_factory 只调用不改
+sort.place_pose 数值对不上
+文档 D9 示例与 yaml 现值有差异（如 [0.1334,-0.1396,...] → [0.1434,-0.1296,0.2075,2.7283]）→ 正是"配置驱动、改配置不动代码"的活例，以 yaml 实际值为准
+接口清单表覆盖
+A1-A3 / C1-C4 / D1-D7 / E1-E3 / F1-F10
+，每条含类型/方向/消息/语义/实现行号
+能默画
+语音→intent→start_load→grasp/start→grasp/status→speak
+闭环
+能指出 yaml 五段（
+mode/grasp.tasks/safety/conveyor/intents
+）的位置与作用
+能解释意图映射两种消费方式：
+voice 读 intent_hints 做提示词（L228）
+、调度器路由服务（L62-L67）
+（可选）验证记录含
+success: True / 'load task triggered'
+返回截图或抄录
+10
+实验总结与思考
+✅ 完成成果
+接口清单表 + 闭环调用链
+覆盖五系列的清单表（含消息/语义/实现行号/一致性）；"意图→任务→执行→播报"调用链图；yaml 五段解读；（可选）ros2 验证记录。
+🧠 原理收获
+语义定类型 + 两段式确认
+状态 String/布尔 Bool/触发 Trigger/位姿 PoseStamped 的选型规律；触发 vs 完成的两段式；表驱动意图映射。
+🛠 技能收获
+文档-代码核对法
+grep create_* 抓实现位置、interface show 看结构、service call 手动触发；以代码为准标注差异。
+📐 评分速览
+40 / 30 / 20 / 10
+清单表 40、调用链与实现核对 30、yaml 解读 20、验证记录与规范 10，合计 100。
+📝 思考题 1
+对比 A1（intent 话题）与 E1（start_load 服务）：为什么意图用话题广播、而任务触发同时提供服务？两种方式各自的适用场景是什么？
+📝 思考题 2
+F3（run_until_sensor）与 F4（emergency_stop）同为 Trigger 服务，为什么一个"异步完成走 state 话题"、一个"同步立即生效"？请结合单线程 executor 的阻塞风险分析。
+CASE-01 · 智慧工厂装货分拣码垛 · EXP-03 接口设计
+4 学时 · 设计性 · 基于 llm_practice 实验讲义改编

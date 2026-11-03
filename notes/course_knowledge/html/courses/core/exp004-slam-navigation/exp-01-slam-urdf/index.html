@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-01 · SLAM 原理与 URDF 模型 — 机器人 SLAM 与自主导航</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+:root{--theme:#2563eb;--theme-deep:#1d4ed8;--theme-bg:#dbeafe;--theme-bd:#bfdbfe}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit" title="返回课程首页">🧠 具身智能课程 · <i>教程首页</i></a>
+  <div class="crumb"><a href="../../../index.html#core">核心课程</a> / <a href="../index.html">SLAM 与自主导航</a> / EXP-01</div>
+</div>
+
+<div class="wrap">
+
+<aside class="side">
+  <h4>本页目录</h4>
+  <a href="#s1" class="now">01 问题引入：没地图的"鸡生蛋"困局</a>
+  <a href="#s2">02 原理通俗讲解：SLAM 与 URDF 是什么</a>
+  <a href="#s3">03 关联知识点</a>
+  <a href="#s4">04 实验目标</a>
+  <a href="#s5">05 实验环境与准备</a>
+  <a href="#s6">06 动画讲解：激光扫描与栅格地图</a>
+  <a href="#s7">07 互动讲解：joint 类型 × TF 树拼装台</a>
+  <a href="#s8">08 实操步骤：display 三件套看模型</a>
+  <a href="#s9">09 重点与易错点</a>
+  <a href="#s10">10 总结与思考</a>
+  <h4>CH1 · 建模与建图</h4>
+  <a href="../exp-01-slam-urdf/index.html">EXP-01 原理与 URDF</a>
+  <a href="../exp-02-slam-toolbox/index.html">EXP-02 SLAM Toolbox 建图</a>
+  <h4>CH2 · 定位与导航</h4>
+  <a href="../exp-03-nav2-navigation/index.html">EXP-03 Nav2 导航</a>
+  <a href="../exp-04-amcl-localization/index.html">EXP-04 AMCL 定位</a>
+  <a href="../exp-05-dwa-teb-avoidance/index.html">EXP-05 DWA/TEB 避障</a>
+  <h4>CH3 · 进阶</h4>
+  <a href="../exp-06-radar-multiwaypoint/index.html">EXP-06 多点导航</a>
+  <a href="../exp-07-rtabmap-3d/index.html">EXP-07 RTAB-Map 3D</a>
+</aside>
+
+<main class="content">
+
+<div class="exp-head">
+  <span class="code">EXP-01 · 第 1 章 · 验证性 · 4 学时</span>
+  <h1>SLAM 原理与 URDF 模型</h1>
+  <p class="desc">这节课不写一行复杂代码，目标就两件事——① 用"蒙眼逛新家"的比喻听懂 SLAM 到底在干什么；② 用 URDF + RViz 把 car1 机器人"搬"到电脑屏幕上，看看它长什么样、坐标怎么连。</p>
+  <div class="meta">
+    <span class="tag hl">难度 ⭐ · 4 学时</span>
+    <span class="tag">SLAM 概念</span><span class="tag">URDF / Xacro</span>
+    <span class="tag">TF 树</span><span class="tag">rviz2</span>
+  </div>
+</div>
+
+<!-- 01 -->
+<section class="blk" id="s1">
+  <h2><span class="no">01</span>问题引入：没地图的"鸡生蛋"困局</h2>
+  <p>你要让扫地机器人打扫房间，它得先知道自己"在房间哪一格"；可要判断自己在哪，它又得先有一张地图。<b>定位需要地图，建图又需要知道自己的位置</b>——这就是 SLAM 面对的经典鸡生蛋问题。再看另一个现实：</p>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>雷达每秒扫 10 圈，每次只看到"眼前这一环"墙壁</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>车轮里程计会打滑（麦轮原地转时航向漂移可达 45%），走着走着就"记错"自己挪了多远</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>没有地图 → 无法修正漂移；不修正漂移 → 地图拼歪（墙变双影、直角变钝角）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span>SLAM 把两件事绑在一起同时解：边走边画图，边画图边锁定自己的位置</div>
+  </div>
+  <div class="tip amber"><span class="lab">💡 一句话读懂</span>这一课只做两件事：① 用"蒙眼逛新家"的比喻听懂 SLAM 在算什么；② 用 URDF + RViz 把 car1 机器人"搬"到屏幕上，看清它的连杆、关节与坐标树怎么连。</div>
+</section>
+
+<!-- 02 -->
+<section class="blk" id="s2">
+  <h2><span class="no">02</span>原理通俗讲解：SLAM 与 URDF 是什么</h2>
+  <div class="tip tealb"><span class="lab">🏠 蒙眼逛新家</span>把你蒙上眼睛送进一套新房：你伸手摸到"左边 2 米有墙"，就<b>边走边在脑子里画户型图</b>；同时因为你记得"刚才向右转了 90°、走了 3 步"，也能在图上<b>标出自己此刻站哪</b>——画图与定位互相喂料，这就是 SLAM（Simultaneous Localization And Mapping，同时定位与建图）。雷达 = 你的手，里程计 = 你的步感，脑子 = SLAM 算法。</div>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">感知</div><div class="kt">激光雷达 /scan</div><p>COIN-D6 每秒 10 圈、量程 0.05~12 m，把周围墙壁变成一圈"距离点"，相当于蒙眼人的手。</p></div>
+    <div class="kcard"><div class="kd">定位</div><div class="kt">里程计 + 扫描匹配</div><p>轮速与 IMU 经 EKF 融合推算走了多远（仍会漂），再拿新一圈扫描与上一圈对齐修正——相当于步感 + 摸墙校正。</p></div>
+    <div class="kcard"><div class="kd">构图</div><div class="kt">占据栅格地图</div><p>世界切成 0.05 m 的小格子：100 = 占据、0 = 空闲、-1 = 没扫到的未知区。手电筒照到哪，哪格就"亮"。</p></div>
+  </div>
+  <p><b>URDF（Unified Robot Description Format，统一机器人描述格式）</b>则是机器人的"身份证 + 骨架说明书"：用 XML 写清每个连杆（link）的外观尺寸与惯性、每个关节（joint）怎么连、能怎么动。TF 坐标树再把 base_link、雷达、机械臂这些坐标系串成一棵树——<b>没有这棵树，雷达数据不知道该画在车体哪一侧，后面建图全是乱的。</b></p>
+  <table>
+    <thead><tr><th>概念</th><th>生活比喻</th><th>本课程对应</th></tr></thead>
+    <tbody>
+      <tr><td>SLAM</td><td>蒙眼逛新家：边摸边画图，边画图边记自己站哪</td><td>EXP-02 用 SLAM Toolbox 真正跑起来</td></tr>
+      <tr><td>占据栅格</td><td>户型图的方格纸：每格标"墙 / 空 / 未勘探"</td><td>话题里是 100/0/-1，存成 .pgm 后变成 0/254/205 灰度</td></tr>
+      <tr><td>URDF</td><td>机器人的乐高拼装说明书</td><td>car1.urdf：底盘 + arm_link1~6 + 夹爪</td></tr>
+      <tr><td>joint</td><td>骨头之间的关节：有的焊死、有的能转</td><td>fixed / continuous / revolute 三类</td></tr>
+      <tr><td>TF 树</td><td>全家福站位图：谁站在谁旁边、朝向哪</td><td>根是 base_footprint，树断一则全乱</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 03 -->
+<section class="blk" id="s3">
+  <h2><span class="no">03</span>关联知识点</h2>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">知识点 1</div><div class="kt">SLAM 鸡生蛋</div><p>定位要地图、建图要定位，SLAM 把两者联合求解，是移动机器人自主性的起点。</p></div>
+    <div class="kcard"><div class="kd">知识点 2</div><div class="kt">建图三要素</div><p>感知（雷达）→ 定位（里程计+匹配）→ 构图（栅格），缺一则地图不可用。</p></div>
+    <div class="kcard"><div class="kd">知识点 3</div><div class="kt">link 三重属性</div><p>visual 看的、collision 撞的、inertial 算动力学的——三者可以引用不同精度的几何模型。</p></div>
+    <div class="kcard"><div class="kd">知识点 4</div><div class="kt">joint 三类型</div><p>fixed 焊死（底盘→雷达）、continuous 无界旋转（4 个麦轮）、revolute 有界旋转（臂与夹爪，必须带 limit）。</p></div>
+    <div class="kcard"><div class="kd">知识点 5</div><div class="kt">TF 树根节点</div><p>根是 base_footprint（车体在地面的投影点），base_joint 以 fixed 抬升 0.029 m 接 base_link，保证 2D 导航的"地面基准"。</p></div>
+    <div class="kcard"><div class="kd">知识点 6</div><div class="kt">mimic 联动关节</div><p>夹爪 5 个指节里只有 r_joint 是主动的，其余用 <code>&lt;mimic&gt;</code> 跟随它——滑条只拖一根，五根指节一起动。</p></div>
+  </div>
+</section>
+
+<!-- 04 -->
+<section class="blk" id="s4">
+  <h2><span class="no">04</span>实验目标</h2>
+  <ul class="check">
+    <li>能用一句生活比喻向他人讲清 <span class="ok">SLAM = 边走边画地图 + 同时定位</span></li>
+    <li>能指认 car1 URDF 中 <span class="ok">底盘 / 机械臂 / 夹爪</span> 三部分及各自 joint 类型</li>
+    <li>跑通 <span class="ok">display.launch.py</span> 可视化三件套，在 rviz2 中看到模型并拖动关节滑条</li>
+    <li>用 <span class="ok">view_frames</span> 导出 TF 树，说清 base_footprint → base_link → laser_link 链路</li>
+    <li>解释栅格地图三值 <span class="ok">-1 / 0 / 100</span> 与分辨率 0.05 m 的含义</li>
+  </ul>
+</section>
+
+<!-- 05 -->
+<section class="blk" id="s5">
+  <h2><span class="no">05</span>实验环境与准备</h2>
+  <p>本实验<b>纯软件即可完成</b>（有实物更佳）：只需 Ubuntu 22.04 + ROS2 Humble 与已编译的 car1_description 功能包。</p>
+  <table>
+    <thead><tr><th>项目</th><th>要求</th></tr></thead>
+    <tbody>
+      <tr><td>系统</td><td>Ubuntu 22.04 + ROS2 Humble，source 工作空间并编译通过</td></tr>
+      <tr><td>软件包</td><td>car1_description（含 urdf/car1.urdf、launch/display.launch.py、rviz/car1.rviz）、joint_state_publisher_gui、robot_state_publisher、rviz2</td></tr>
+      <tr><td>源码位置</td><td><code>ros2_ws/src/xflz_eai_car1/simulations/car1_description/</code></td></tr>
+      <tr><td>可选硬件</td><td>小车 C1：COIN-D6 雷达（设备节点 /dev/lidar、话题 /scan、10 Hz、Best Effort QoS）</td></tr>
+      <tr><td>验证命令</td><td><code>ros2 topic hz /scan</code> 约 10 Hz（接实物时）</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 06 -->
+<section class="blk" id="s6">
+  <h2><span class="no">06</span>动画讲解：激光扫描与栅格地图</h2>
+  <p class="lead">左：雷达扇形束一圈圈扫过，量出到墙面的距离；右：扫到的格子被逐格"点亮"——100（墙）、0（空闲）、-1（灰色未知）。<b>小车走到哪，亮的格子就铺到哪</b>，这就是建图的最小过程。</p>
+  <div class="anim-box">
+    <svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="激光扇形扫描与栅格地图逐步填充动画">
+      <rect x="8" y="8" width="344" height="284" rx="12" fill="#111827" stroke="#334155"/>
+      <rect x="368" y="8" width="344" height="284" rx="12" fill="#111827" stroke="#334155"/>
+      <text x="180" y="34" text-anchor="middle" font-size="14" font-weight="700" fill="#93c5fd">激光雷达 · 扇形扫描一圈圈量距离</text>
+      <text x="540" y="34" text-anchor="middle" font-size="14" font-weight="700" fill="#4ade80">占据栅格 · 格子逐格填充</text>
+
+      <!-- 左：房间与扫描 -->
+      <rect x="52" y="58" width="248" height="196" rx="6" fill="none" stroke="#64748b" stroke-width="3"/>
+      <g stroke="#38bdf8" stroke-width="2" opacity="0.9">
+        <g>
+          <line x1="176" y1="156" x2="52" y2="86"><animate attributeName="opacity" values="1;0.15;1" dur="1.4s" repeatCount="indefinite"/></line>
+          <line x1="176" y1="156" x2="76" y2="58"><animate attributeName="opacity" values="1;0.15;1" dur="1.4s" begin=".15s" repeatCount="indefinite"/></line>
+          <line x1="176" y1="156" x2="160" y2="58"><animate attributeName="opacity" values="1;0.15;1" dur="1.4s" begin=".3s" repeatCount="indefinite"/></line>
+          <line x1="176" y1="156" x2="300" y2="96"><animate attributeName="opacity" values="1;0.15;1" dur="1.4s" begin=".45s" repeatCount="indefinite"/></line>
+          <line x1="176" y1="156" x2="300" y2="200"><animate attributeName="opacity" values="1;0.15;1" dur="1.4s" begin=".6s" repeatCount="indefinite"/></line>
+          <line x1="176" y1="156" x2="180" y2="254"><animate attributeName="opacity" values="1;0.15;1" dur="1.4s" begin=".75s" repeatCount="indefinite"/></line>
+          <line x1="176" y1="156" x2="70" y2="230"><animate attributeName="opacity" values="1;0.15;1" dur="1.4s" begin=".9s" repeatCount="indefinite"/></line>
+          <line x1="176" y1="156" x2="52" y2="160"><animate attributeName="opacity" values="1;0.15;1" dur="1.4s" begin="1.05s" repeatCount="indefinite"/></line>
+        </g>
+      </g>
+      <circle cx="176" cy="156" r="14" fill="#1e293b" stroke="#60a5fa" stroke-width="2.5"/>
+      <circle cx="176" cy="156" r="4" fill="#38bdf8"/>
+      <text x="176" y="188" text-anchor="middle" font-size="11.5" fill="#93c5fd">car1 · /scan 10Hz</text>
+      <text x="180" y="282" text-anchor="middle" font-size="11" fill="#64748b">每一根射线 = 一个距离读数，一圈覆盖 360°</text>
+
+      <!-- 右：栅格逐步填充 -->
+      <g id="gridcells">
+        <g fill="#1e293b">
+          <rect x="404" y="58" width="272" height="184" rx="4"/>
+        </g>
+        <g fill="#f8fafc" opacity="0.95">
+          <rect x="410" y="64" width="260" height="8" rx="2"/>
+          <rect x="410" y="64" width="8" height="172" rx="2"><animate attributeName="height" values="0;172" dur="2s" repeatCount="indefinite"/></rect>
+          <rect x="410" y="228" width="260" height="8" rx="2"><animate attributeName="width" values="0;260" dur="2s" begin=".4s" repeatCount="indefinite"/></rect>
+        </g>
+        <g fill="#4ade80" opacity="0.85">
+          <rect x="426" y="80" width="40" height="26" rx="2"><animate attributeName="opacity" values="0;0;.85;.85" keyTimes="0;.3;.45;1" dur="3s" repeatCount="indefinite"/></rect>
+          <rect x="474" y="80" width="52" height="40" rx="2"><animate attributeName="opacity" values="0;0;.85;.85" keyTimes="0;.4;.55;1" dur="3s" repeatCount="indefinite"/></rect>
+          <rect x="534" y="96" width="46" height="52" rx="2"><animate attributeName="opacity" values="0;0;.85;.85" keyTimes="0;.5;.65;1" dur="3s" repeatCount="indefinite"/></rect>
+          <rect x="588" y="132" width="56" height="42" rx="2"><animate attributeName="opacity" values="0;0;.85;.85" keyTimes="0;.6;.75;1" dur="3s" repeatCount="indefinite"/></rect>
+          <rect x="470" y="140" width="60" height="44" rx="2"><animate attributeName="opacity" values="0;0;.85;.85" keyTimes="0;.7;.85;1" dur="3s" repeatCount="indefinite"/></rect>
+        </g>
+        <rect x="546" y="150" width="46" height="30" rx="4" fill="#60a5fa" stroke="#93c5fd" stroke-width="2">
+          <animate attributeName="x" values="436;600;436" dur="6s" repeatCount="indefinite"/>
+        </rect>
+        <text x="540" y="264" text-anchor="middle" font-size="11.5" fill="#86efac">0 空闲（绿） · 100 墙（白线） · -1 未知（深灰）</text>
+        <text x="540" y="282" text-anchor="middle" font-size="11" fill="#64748b">分辨率 0.05 m：一格 = 5 厘米见方</text>
+      </g>
+    </svg>
+  </div>
+  <div class="anim-cap">动画 1-1｜左：雷达扇形逐束测距（1.4 秒循环）；右：小车驶过，空闲格逐格点亮成"户型图"（3 秒填充 + 6 秒往返）</div>
+</section>
+
+<!-- 07 -->
+<section class="blk" id="s7">
+  <h2><span class="no">07</span>互动讲解：joint 类型 × TF 树拼装台</h2>
+  <p class="lead">点击按钮给两个 link 选一种 joint，看 TF 父子关系与车体行为如何变化：</p>
+  <div class="ix-panel">
+    <div class="ix-title">TF 树拼装台 · Joint Lab</div>
+    <div class="ctl-row">
+      <button class="btn" onclick="setJoint('fixed')">固定 joint（base→雷达）</button>
+      <button class="btn ghost" onclick="setJoint('continuous')">连续 joint（轮子）</button>
+      <button class="btn ghost" onclick="setJoint('revolute')">旋转 joint（机械臂）</button>
+    </div>
+    <div class="io" id="jointIo"><span class="dim">// 点击上方按钮，观察 joint 类型如何决定 TF 行为</span>
+<span class="ok">car1 默认结构：base_footprint →(fixed)→ base_link →(fixed)→ laser_link</span></div>
+  </div>
+  <div class="tip"><span class="lab">💡 判断口诀</span>焊死不动选 fixed；转起来没完没了（轮子）选 continuous；有最大最小角度限制、必须带 <code>&lt;limit&gt;</code>（机械臂与夹爪）选 revolute。<b>类型选错，rviz 里要么拖不动、要么转飞了。</b></div>
+</section>
+
+<!-- 08 -->
+<section class="blk" id="s8">
+  <h2><span class="no">08</span>实操步骤：display 三件套看模型</h2>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>source 环境后启动可视化：joint_state_publisher_gui（关节滑条）+ robot_state_publisher（算 TF）+ rviz2（显示），rviz 已自带 car1.rviz 配置</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>确认 Fixed Frame 为 base_footprint、RobotModel 已加载；拖动滑条观察机械臂与夹爪联动</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>导出 TF 树核对父子关系，并数一数 URDF 里到底有多少 link 与 joint</div>
+  </div>
+  <pre><span class="c"># ① 启动模型可视化（本实验核心命令，一条命令拉起三个节点）</span>
+<span class="g">ros2</span> launch car1_description display.launch.py
+
+<span class="c"># ② 导出 TF 坐标树：生成 frames_&lt;时间戳&gt;.pdf 与 frames.gv（在命令执行的当前目录）</span>
+<span class="g">ros2</span> run tf2_tools view_frames
+
+<span class="c"># ③ 数一数 URDF 里有多少连杆与关节（真实值：17 link / 21 joint）</span>
+<span class="g">grep</span> -c "&lt;link name=" car1.urdf
+<span class="g">grep</span> -c "&lt;joint name=" car1.urdf
+
+<span class="c"># ④（接实物）确认雷达数据在发</span>
+<span class="g">ros2</span> topic hz /scan
+<span class="c"># 约 10.0 Hz</span>
+
+<span class="c"># car1.urdf 关键片段：根节点贴地，fixed 抬升 0.029 m 接车体</span>
+&lt;link name="base_footprint" /&gt;
+&lt;joint name="base_joint" type="fixed"&gt;
+  &lt;origin xyz="0 0 0.029" rpy="0 0 0" /&gt;
+  &lt;parent link="base_footprint" /&gt;
+  &lt;child link="base_link" /&gt;
+&lt;/joint&gt;</pre>
+  <table>
+    <thead><tr><th>car1 三部分</th><th>构成</th><th>joint 类型</th></tr></thead>
+    <tbody>
+      <tr><td>底盘主体</td><td>base_link + 4 个麦轮（wheel_lf/rf/lb/rb）+ 雷达 / IMU 支架</td><td>base_joint、laser_joint、imu_joint 全为 <b>fixed</b>；4 个轮子为 <b>continuous</b></td></tr>
+      <tr><td>机械臂</td><td>arm_base_link + arm_link1~6（臂体 6 段，其中 arm_link6 用 fixed 与 link5 固定）</td><td>arm_joint1~5 为 <b>revolute</b>（各带 ±3.14 rad limit）→ <b>5 自由度</b></td></tr>
+      <tr><td>夹爪</td><td>r_link / l_link / r_in_link / r_out_link / l_in_link / l_out_link 共 6 段指节</td><td>全部 <b>revolute</b>；仅 r_joint 主动，其余 5 个用 <code>&lt;mimic&gt;</code> 跟随开合</td></tr>
+    </tbody>
+  </table>
+  <div class="tip tealb"><span class="lab">🔍 为什么要"数一遍"</span>URDF 里 <code>&lt;link&gt;</code> 数 = 17、<code>&lt;joint&gt;</code> 数 = 21，而<b>自由度只有 4（轮子）+ 5（臂）+ 1（夹爪）= 10</b>：因为 fixed 关节、mimic 从动关节都不贡献自由度。分清"节点数"与"自由度"，后面算正逆运动学才不会乱。</div>
+</section>
+
+<!-- 09 -->
+<section class="blk" id="s9">
+  <h2><span class="no">09</span>重点与易错点</h2>
+  <div class="tip amber"><span class="lab">⚠️ 重点</span>看懂 TF 树 = 拿到全课程的"导航地图坐标基准"。只要是"数据该画在哪"的问题，一律先查 TF：根是不是 base_footprint、链路有没有断、雷达是不是挂在 base_link 下。</div>
+  <table>
+    <thead><tr><th>⚠️ 常见坑</th><th>现象 → 解法</th></tr></thead>
+    <tbody>
+      <tr><td>rviz 里没有模型</td><td>画面空白 → 检查左侧 Displays 里 RobotModel 是否 Enabled、Description Topic 是否为 /robot_description</td></tr>
+      <tr><td>joint 滑条拖不动</td><td>该关节是 fixed / mimic 从动关节（本来就拖不动）→ 改拖 arm_joint1~5 或 r_joint</td></tr>
+      <tr><td>找不到功能包</td><td><code>Package 'car1_description' not found</code> → 忘了 source 工作空间的 install/setup.bash，或未编译该包</td></tr>
+      <tr><td>模型扭曲/位置错</td><td>origin 的 xyz/rpy 写错单位（米/弧度）→ 对照实物量一遍</td></tr>
+      <tr><td>TF 树断裂</td><td>view_frames 里缺 laser_link → robot_state_publisher 没起，或 URDF parent/child 写反</td></tr>
+    </tbody>
+  </table>
+  <ul class="check">
+    <li>display.launch.py 一键拉起 <span class="ok">三件套</span>，rviz2 能看到完整车体与机械臂</li>
+    <li>frames.pdf 中 <span class="ok">root = base_footprint</span>，laser_link 与 imu_link 挂在 base_link 之下</li>
+    <li>能说出 <span class="ok">-1 / 0 / 100</span> 与 0.05 m 分辨率的含义</li>
+    <li>能指出 car1 三部分及 <span class="ok">fixed / continuous / revolute</span> 各用在哪里，并说出自由度为何是 10</li>
+  </ul>
+</section>
+
+<!-- 10 -->
+<section class="blk" id="s10">
+  <h2><span class="no">10</span>总结与思考</h2>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">✅ 完成成果</div><div class="kt">模型上屏 + TF 树落盘</div><p>display 三件套跑通，rviz2 见车、view_frames 见树、grep 数出 17 link / 21 joint。</p></div>
+    <div class="kcard"><div class="kd">🧠 原理收获</div><div class="kt">SLAM 鸡生蛋与三要素</div><p>感知 → 定位 → 构图闭环；蒙眼逛新家比喻讲清同时定位与建图。</p></div>
+    <div class="kcard"><div class="kd">🛠 技能收获</div><div class="kt">URDF 读写与可视化</div><p>link/joint/origin 三件套语法，三种 joint 类型辨识，mimic 联动关系。</p></div>
+    <div class="kcard"><div class="kd">❓ 排障思路</div><div class="kt">无模型四问</div><p>source 了吗 → RobotModel 加了吗 → Fixed Frame 对吗 → parent/child 反了吗。</p></div>
+  </div>
+  <div class="tip violet"><span class="lab">📝 思考题 1</span>SLAM 的"鸡生蛋"是怎么被打破的？提示从"猜测也是一组可能答案"出发——如果把"我可能在这 100 个位置"全部同时拿去和雷达扫描比对，会引出什么方法？（预告：EXP-04 粒子滤波）</div>
+  <div class="tip violet"><span class="lab">📝 思考题 2</span>栅格地图为什么用 -1 / 0 / 100 三个值而不是布尔值？-1（未知区）在导航时应该被当成"可以走"还是"不能走"？为什么没扫过的区域保留成"未知"，反而比直接刷成"空闲"更安全？</div>
+</section>
+
+<nav class="expnav">
+  <a href="../index.html"><span class="lb">← 返回</span>课程目录 · SLAM 与自主导航</a>
+  <a class="next" href="../exp-02-slam-toolbox/index.html"><span class="lb">下一个实验 →</span>EXP-02 SLAM Toolbox 建图</a>
+</nav>
+
+<footer>
+  <span>CORE-04 · 机器人 SLAM 与自主导航 · EXP-01 SLAM 原理与 URDF 模型</span>
+  <span>4 学时 · 验证性 · 基于 slam_practice 实验讲义改编</span>
+</footer>
+
+</main>
+</div>
+
+<script>
+// joint 类型 × TF 拼装台
+function setJoint(t){
+  var io=document.getElementById('jointIo'),h='';
+  if(t==='fixed'){
+    h='<span class="dim">// type="fixed"：两 link 焊死，相对位姿永久固定</span>\n'+
+      '<span class="ok">base_footprint →(fixed, z+0.029m)→ base_link →(fixed)→ laser_link</span>\n'+
+      '<span class="ok">TF 中只发一次（/tf_static），车怎么动雷达都跟着车体走</span>\n'+
+      '<span class="warn">⚠ 想拖动它？拖不动是对的——fixed 本来就不该动</span>\n'+
+      '<span class="dim">// car1 中 8 个 fixed：base / laser / imu / arm_base / arm6 / camera×2 / tcp</span>';
+  }else if(t==='continuous'){
+    h='<span class="dim">// type="continuous"：绕轴无界旋转，不需要 limit 标签</span>\n'+
+      '<span class="ok">base_link →(continuous)→ wheel_lf / rf / lb / rb 四个麦轮</span>\n'+
+      '<span class="ok">编码器持续累加转角，配合麦轮模型解算出 vx / vy / ω</span>\n'+
+      '<span class="warn">⚠ 麦轮原地转时轮速反推的航向漂移可达 45%</span>\n'+
+      '<span class="dim">// 因此本车 ω 由 IMU 提供，EKF 只取轮速的 vx（见 ekf.yaml）</span>';
+  }else{
+    h='<span class="dim">// type="revolute"：有界旋转，必须写 &lt;limit lower upper effort velocity&gt;</span>\n'+
+      '<span class="ok">arm_joint1~5：5 个 revolute 关节 = 5 自由度机械臂</span>\n'+
+      '<span class="ok">夹爪 6 段指节里只有 r_joint 主动，其余 5 个用 mimic 跟随</span>\n'+
+      '<span class="ok">滑条范围由 limit（±3.14 rad）决定，越界会被截断</span>\n'+
+      '<span class="bad">✘ 缺 limit 或 effort/velocity → check_urdf 报错，rviz 加载失败</span>';
+  }
+  io.innerHTML=h;
+}
+</script>
+<script src="../shared/tutorial.js" defer></script>
+</body>
+</html>

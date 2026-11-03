@@ -1,0 +1,22 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/cases/exp007-intelligent-factory/exp-02-vision-grasp/index.html
+TITLE: EXP-02 视觉识别与抓取 · 建设中 · EXP007
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+EXP-02 视觉识别与抓取 · 建设中 · EXP007
+具身智能课程 · 科普教程
+EXP007
+/
+实验 02 视觉识别与抓取
+EXPERIMENT · EXP-02
+🤖
+视觉识别与抓取
+⏳ 本实验正在建设中
+规划建设内容
+HSV 颜色分割原理：为什么能"认出"目标
+目标检测 → 抓取位姿计算（TF 坐标变换）
+识别结果驱动机械臂准确抓取的实操演示
+内容就绪度
+50%
+先看：实验 01 建图与导航 →
+返回课程首页
+EXP007 · 实验 02 视觉识别与抓取 · 输出于 training/output

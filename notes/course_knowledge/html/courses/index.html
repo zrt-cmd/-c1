@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>具身智能课程 · 教程首页</title>
+<style>
+:root{
+  --bg-base:#f8fafc;--bg-card:#fff;--bg-soft:#f1f5f9;--bg-tint:#eef4ff;
+  --border:#e2e8f0;--border-hover:#94a3b8;
+  --accent-blue:#2563eb;--accent-cyan:#0891b2;--accent-teal:#0d9488;
+  --accent-indigo:#4f46e5;--accent-amber:#d97706;--accent-rose:#e11d48;--accent-violet:#7c3aed;
+  --text-primary:#0f172a;--text-body:#334155;--text-secondary:#64748b;--text-muted:#94a3b8;
+  --shadow-glow:0 8px 24px rgba(37,99,235,.10);
+  --font-mono:'Cascadia Code','JetBrains Mono',Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg-base);color:var(--text-body);
+  font-family:"Noto Sans CJK SC","PingFang SC","Microsoft YaHei","Segoe UI",system-ui,sans-serif;
+  background-image:
+    radial-gradient(ellipse 60% 40% at 50% -5%,rgba(37,99,235,.05),transparent),
+    radial-gradient(ellipse 50% 35% at 100% 5%,rgba(13,148,136,.04),transparent);}
+/* Topbar */
+.topbar{position:sticky;top:0;z-index:50;height:60px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 40px;background:rgba(255,255,255,.85);backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;color:var(--text-primary);font-size:15px}
+.logo .dot{width:9px;height:9px;border-radius:50%;background:var(--accent-blue);animation:pulse 2.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.nav a{font-size:13.5px;color:var(--text-secondary);text-decoration:none;margin-left:22px;transition:.28s}
+.nav a:hover{color:var(--accent-blue)}
+/* 产品介绍下拉 */
+.nav .dropdown{position:relative;display:inline-block}
+.nav .dropdown>.dd-toggle{font-size:13.5px;color:var(--text-secondary);text-decoration:none;cursor:pointer;
+  display:inline-flex;align-items:center;gap:4px;transition:.28s;border:none;background:none;font-family:inherit;padding:0}
+.nav .dropdown>.dd-toggle:hover{color:var(--accent-blue)}
+.nav .dropdown>.dd-toggle .arr{font-size:10px;transition:.25s}
+.nav .dropdown:hover>.dd-toggle .arr{transform:rotate(180deg)}
+.dd-menu{position:absolute;top:calc(100% + 14px);left:50%;transform:translateX(-50%) translateY(6px);
+  min-width:250px;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;
+  box-shadow:0 14px 36px rgba(15,23,42,.14);padding:6px;opacity:0;visibility:hidden;transition:.22s;z-index:60}
+.nav .dropdown:hover .dd-menu{opacity:1;visibility:visible;transform:translateX(-50%) translateY(0)}
+.dd-menu a{display:flex;flex-direction:column;gap:2px;padding:10px 13px;border-radius:8px;
+  font-size:13px;color:var(--text-body);text-decoration:none;transition:.2s;margin-left:0!important}
+.dd-menu a:hover{background:var(--bg-tint);color:var(--accent-blue)}
+.dd-menu a small{font-size:11.5px;color:var(--text-muted);font-weight:400}
+.dd-menu a+a,.dd-menu a+.soon,.dd-menu .soon+.soon{border-top:1px solid var(--border)}
+.dd-menu .soon{display:flex;flex-direction:column;gap:2px;padding:10px 13px;border-radius:8px;
+  font-size:13px;color:var(--text-muted);cursor:default}
+.dd-menu .soon small{font-size:11.5px;color:var(--text-muted);font-weight:400;opacity:.85}
+/* Hero */
+.hero{max-width:960px;margin:0 auto;padding:56px 40px 8px;text-align:center}
+.hero .eyebrow{display:inline-block;font-size:12.5px;letter-spacing:.14em;color:var(--accent-blue);
+  background:var(--bg-tint);border:1px solid #dbeafe;border-radius:100px;padding:5px 14px;font-family:var(--font-mono)}
+.hero h1{margin:18px 0 14px;font-size:40px;line-height:1.2;color:var(--text-primary);font-weight:800}
+.hero h1 .grad{background:linear-gradient(90deg,var(--accent-blue),var(--accent-cyan),var(--accent-teal));
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.hero p{max-width:740px;margin:0 auto;font-size:16px;line-height:1.8;color:var(--text-secondary)}
+.badges{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:22px 0 0}
+.badge{font-size:12.5px;padding:5px 12px;border-radius:100px;background:var(--bg-card);
+  border:1px solid var(--border);color:var(--text-secondary)}
+/* Stats */
+.stats{max-width:960px;margin:34px auto 0;padding:0 40px}
+.stats-inner{display:flex;background:var(--bg-card);border:1px solid var(--border);border-radius:14px;
+  box-shadow:0 1px 3px rgba(0,0,0,.04);overflow:hidden}
+.stat{flex:1;text-align:center;padding:20px 8px}
+.stat+.stat{border-left:1px solid var(--border)}
+.stat .num{font-size:34px;font-weight:800;color:var(--accent-blue)}
+.stat .num.c{color:var(--accent-cyan)}.stat .num.t{color:var(--accent-teal)}.stat .num.a{color:var(--accent-amber)}
+.stat .lbl{font-size:13px;color:var(--text-secondary);margin-top:3px}
+/* Section */
+.section{max-width:1200px;margin:0 auto;padding:54px 40px 6px;scroll-margin-top:72px}
+.section-head{display:flex;align-items:baseline;gap:14px;margin-bottom:6px;flex-wrap:wrap}
+.section-head h2{margin:0;font-size:22px;color:var(--text-primary);display:flex;align-items:center;gap:10px}
+.section-head h2 .idx{font-family:var(--font-mono);font-size:12px;font-weight:700;color:#fff;
+  background:linear-gradient(90deg,var(--accent-blue),var(--accent-cyan));border-radius:7px;padding:3px 9px}
+.section-head .sub{font-size:13.5px;color:var(--text-muted)}
+
+.section .desc{font-size:14px;color:var(--text-secondary);line-height:1.8;margin:8px 0 20px;max-width:860px}
+/* Cards */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:20px}
+.card{position:relative;background:var(--bg-card);border:1px solid var(--border);border-radius:14px;
+  padding:22px 24px 18px;display:flex;flex-direction:column;overflow:hidden;
+  transition:.28s cubic-bezier(.4,0,.2,1)}
+.card::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;transform:scaleX(0);transform-origin:left;
+  background:linear-gradient(90deg,var(--accent-blue),var(--accent-cyan));transition:transform .35s cubic-bezier(.4,0,.2,1)}
+.card:hover{transform:translateY(-4px);box-shadow:var(--shadow-glow);border-color:var(--border-hover)}
+.card:hover::before{transform:scaleX(1)}
+.card .top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.card .code{font-family:var(--font-mono);font-size:12px;font-weight:600;color:var(--accent-blue);
+  background:var(--bg-tint);border-radius:6px;padding:3px 8px}
+.card h3{margin:14px 0 8px;font-size:17.5px;color:var(--text-primary);line-height:1.4}
+.card p{margin:0;font-size:13.5px;line-height:1.7;color:var(--text-secondary);flex:1}
+.card .meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.tag{font-size:12px;padding:3px 10px;border-radius:100px;background:var(--bg-soft);
+  border:1px solid var(--border);color:var(--text-secondary)}
+.tag.violet{color:var(--accent-violet);border-color:#ede9fe;background:#f5f3ff}
+.tag.teal{color:var(--accent-teal);border-color:#ccfbf1;background:#f0fdfa}
+.tag.amber{color:var(--accent-amber);border-color:#fef3c7;background:#fffbeb}
+.card .foot{margin-top:13px;display:flex;justify-content:space-between;align-items:center;font-size:12.5px;color:var(--text-muted)}
+.card .foot .go{font-weight:600}
+.card a.enter{color:var(--accent-blue);text-decoration:none;font-weight:600}
+.card.disabled{opacity:.96}
+.card .soon{color:var(--text-muted);font-weight:500}
+/* Technology */
+.tech{max-width:1200px;margin:0 auto;padding:52px 40px 8px}
+.tech h2{font-size:22px;color:var(--text-primary);margin:0 0 6px;display:flex;align-items:center;gap:10px}
+.tech h2 .idx{font-family:var(--font-mono);font-size:12px;font-weight:700;color:#fff;
+  background:linear-gradient(90deg,var(--accent-blue),var(--accent-cyan));border-radius:7px;padding:3px 9px}
+.tech .tech-sub{font-size:13.5px;color:var(--text-muted);margin:0 0 26px}
+.layer{display:grid;grid-template-columns:132px 1fr;gap:20px;align-items:start;
+  padding:18px 0;border-top:1px solid var(--border)}
+.layer:first-of-type{border-top:none}
+.layer-name{display:flex;flex-direction:column;gap:3px;padding-top:6px}
+.layer-name b{font-size:14px;color:var(--text-primary);font-weight:700}
+.layer-name span{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.1em;color:var(--text-muted)}
+.layer-name em{font-style:normal;font-size:11.5px;color:var(--text-muted);line-height:1.5;margin-top:3px}
+.pills{display:flex;flex-wrap:wrap;gap:8px}
+.pill{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--text-secondary);
+  background:var(--bg-card);border:1px solid var(--border);border-radius:100px;padding:7px 15px;transition:.28s}
+.pill i{width:6px;height:6px;border-radius:50%;background:var(--accent-cyan);flex:none}
+.pill:hover{border-color:var(--accent-blue);color:var(--accent-blue);transform:translateY(-2px)}
+.pill.blue i{background:var(--accent-blue)}
+.pill.teal i{background:var(--accent-teal)}
+.pill.amber i{background:var(--accent-amber)}
+.pill.violet i{background:var(--accent-violet)}
+.pill.rose i{background:var(--accent-rose)}
+.pill.indigo i{background:#4f46e5}
+/* 产品线小条 */
+.lineup{max-width:1200px;margin:26px auto 0;padding:0 40px}
+.lineup-inner{background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:18px 22px;
+  display:flex;flex-wrap:wrap;gap:10px 26px;align-items:center;justify-content:center}
+.lineup-inner .lb{font-size:12.5px;color:var(--text-muted);font-family:var(--font-mono);letter-spacing:.06em}
+.lineup-inner a{font-size:13px;color:var(--text-secondary);text-decoration:none;transition:.24s;
+  display:inline-flex;align-items:center;gap:6px}
+.lineup-inner a:hover{color:var(--accent-blue)}
+.lineup-inner .dot{width:5px;height:5px;border-radius:50%;background:var(--accent-cyan);flex:none}
+footer{max-width:1200px;margin:56px auto 0;padding:24px 40px 40px;border-top:1px solid var(--border);
+  text-align:center;font-size:12.5px;color:var(--text-muted)}
+.reveal{opacity:0;transform:translateY(16px);transition:opacity .5s,transform .5s}
+.reveal.visible{opacity:1;transform:none}
+@media (max-width:900px){
+  .layer{grid-template-columns:1fr;gap:10px}
+  .layer-name{flex-direction:row;align-items:baseline;gap:9px;padding-top:0;flex-wrap:wrap}
+  .layer-name em{flex-basis:100%;margin-top:0}
+}
+@media (max-width:760px){
+  .topbar,.hero,.stats,.section,.tech,.lineup,footer{padding-left:20px;padding-right:20px}
+  .nav{display:none}.hero h1{font-size:29px}
+  .stats-inner{flex-wrap:wrap}.stat{flex:1 1 50%;border-left:none!important}
+  .tech h2{font-size:19px}
+  .lineup-inner{padding:14px 16px;gap:8px 18px}
+}
+@media (prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="logo" href="index.html" style="text-decoration:none;color:inherit" title="返回课程首页"><span class="dot"></span>具身智能课程</a>
+  <nav class="nav">
+    <div class="dropdown">
+      <a class="dd-toggle" href="javascript:void(0)">人培方案 <span class="arr">▼</span></a>
+      <div class="dd-menu">
+        <a href="renpei/index.html#b">📘 具身智能本科人培方案<small>本科 · 星辰版 · 2026 版 V4.1 · 四年制 8 学期</small></a>
+        <a href="renpei/index.html#g">📗 具身智能高职人培方案<small>高职 · 星辰版 · 2026 版 V1.1 · 三年制 6 学期</small></a>
+      </div>
+    </div>
+    <div class="dropdown">
+      <a class="dd-toggle" href="javascript:void(0)">产品介绍 <span class="arr">▼</span></a>
+      <div class="dd-menu">
+        <a href="../products/b2-box/index.html">📦 具身智能实验箱B2旗舰版<small>6 TOPS · 双核架构 · 6 门课 / 65 实验</small></a>
+        <a href="../products/c1-car/index.html">🚗 具身智能机器人小车 C1<small>移动导航 · 机械臂作业 · 7 门课 / 59 实验</small></a>
+        <a href="../products/xlerobot/index.html">🤖 LZ-XL01 开源双臂移动机器人<small>LeRobot 生态 · 双臂协同 · 3D 打印件</small></a>
+        <a href="../products/ldt-01/index.html">🦾 具身智能实验平台 LDT-01<small>同构双臂遥操作 · 采训推一体 · 数据采集</small></a>
+        <a href="../products/unitree-g1/index.html">🧍 人形导览机器人<small>宇树 G1 · 讯飞语音背包 · 导览讲解</small></a>
+        <a href="../products/unitree-go2/index.html">🐕 四足巡检机器狗<small>宇树 Go2 Edu · MID-360 · D435i</small></a>
+      </div>
+    </div>
+    <div class="dropdown">
+      <a class="dd-toggle" href="javascript:void(0)">快速上手 <span class="arr">▼</span></a>
+      <div class="dd-menu">
+        <a href="../products/b2-box/quickstart/index.html">📦 实验箱 B2 快速上手<small>供电 → 取出机械臂 → 登录 → 智慧工厂四功能演示</small></a>
+        <a href="../products/c1-car/quickstart/index.html">🚗 小车 C1 快速上手<small>开箱清点 → 上电开机 → 串口联网 → SSH 登录 → 遥控器试车</small></a>
+      </div>
+    </div>
+    <a href="#core">核心课程</a>
+    <a href="#case">综合案例</a>
+    <a href="#ind">行业应用</a>
+    <a href="#tech">技术栈</a>
+    <a href="device/workspace.html" target="_blank" rel="noopener">设备开发</a>
+  </nav>
+</div>
+
+<header class="hero">
+  <span class="eyebrow">EMBODIED AI · TRAINING PROGRAM</span>
+  <h1>具身智能课程 <span class="grad">教程首页</span></h1>
+  <p>一站渐进式学习方案，从核心课程到综合项目再到行业应用，15 门课程的渐进式学习地图，<br>设备适配（实验箱 B2 / 小车 C1 / 聆动 LDT-01 / LZ-XL01 / 人形导览 G1 / 巡检机器狗 Go2）。</p>
+  <div class="badges">
+    <span class="badge">🧭 3 大方案分类</span>
+    <span class="badge">📚 15 门课程</span>
+    <span class="badge">⏱️ 556 学时</span>
+    </div>
+</header>
+
+<section class="stats reveal">
+  <div class="stats-inner">
+    <div class="stat"><div class="num">15</div><div class="lbl">门课程</div></div>
+    <div class="stat"><div class="num c">556</div><div class="lbl">总学时</div></div>
+    <div class="stat"><div class="num t">107</div><div class="lbl">个实验</div></div>
+    <div class="stat"><div class="num a">6</div><div class="lbl">类实训设备</div></div>
+  </div>
+</section>
+
+<!-- ============ 分类一：具身智能核心课程（方案1 · 5门） ============ -->
+<section class="section" id="core">
+  <div class="section-head">
+    <h2><span class="idx">CAT 1</span>具身智能核心课程</h2>
+    <span class="sub">方案 1 · 实验箱 B2 + 小车 C1 · 5 门 / 208 学时</span>
+  </div>
+  <p class="desc">打牢地基的五门主干课：ROS2 通信 → 视觉感知 → 语音与大模型 → SLAM 导航 → 机械臂控制。除「SLAM 与自主导航」仅适配小车 C1 外，其余四门同时适配实验箱 B2 与小车 C1。</p>
+  <div class="grid">
+
+    <article class="card reveal">
+      <div class="top"><span class="code">CORE-01</span></div>
+      <h3>机器人 ROS2 应用与开发</h3>
+      <p>解决机器人"信息传递"的问题。从话题/服务、坐标系到传感器实验（MQ5/指纹/RFID），打牢各处信息互通与分布式计算的地基。</p>
+      <div class="meta"><span class="tag">ROS2</span><span class="tag">话题/服务</span><span class="tag">实验箱 B2 · 小车 C1</span></div>
+      <div class="foot"><span>48 学时 · 20 实验</span><a class="go" href="core/exp003-ros2-application/index.html" style="color:var(--accent-teal);font-weight:700;text-decoration:none">进入课程 →</a></div>
+    </article>
+
+    <article class="card reveal">
+      <div class="top"><span class="code">CORE-02</span></div>
+      <h3>机器人视觉应用与开发</h3>
+      <p>解决机器人"看得懂"的问题。从 OpenCV 颜色识别到 YOLOv8 缺陷检测、DeepSORT 跟踪和深度测距等，让相机输出能直接驱动决策。</p>
+      <div class="meta"><span class="tag">OpenCV</span><span class="tag">YOLOv8</span><span class="tag amber">NPU 部署</span><span class="tag">实验箱 B2 · 小车 C1</span></div>
+      <div class="foot"><span>48 学时 · 12 实验</span><a class="go" href="core/exp001-robot-vision/index.html" style="color:var(--accent-teal);font-weight:700;text-decoration:none">进入课程 →</a></div>
+    </article>
+
+    <article class="card reveal">
+      <div class="top"><span class="code">CORE-03</span></div>
+      <h3>机器人自然语言交互应用</h3>
+      <p>解决机器人"听得懂人话"的问题。从六麦阵列唤醒、ASR 语音识别、TTS 合成，到端到端对话与 LLM/VLM 意图解析，让语音指令变成可执行动作。</p>
+      <div class="meta"><span class="tag violet">LLM/VLM</span><span class="tag">离线语音</span><span class="tag">意图解析</span><span class="tag">实验箱 B2 · 小车 C1</span></div>
+      <div class="foot"><span>32 学时 · 6 实验</span><a class="go" href="core/exp002-speech-interaction/index.html" style="color:var(--accent-teal);font-weight:700;text-decoration:none">进入课程 →</a></div>
+    </article>
+
+    <article class="card reveal">
+      <div class="top"><span class="code">CORE-04</span></div>
+      <h3>机器人 SLAM 与自主导航</h3>
+      <p>解决机器人"知道我在哪、走到哪"的问题。从 SLAM 激光建图、AMCL 粒子滤波定位到 Nav2 路径规划，独立完成 A 点到 B 点的自主导航与动态避障。</p>
+      <div class="meta"><span class="tag teal">SLAM</span><span class="tag">Nav2</span><span class="tag">AMCL</span><span class="tag amber">仅小车 C1</span></div>
+      <div class="foot"><span>48 学时 · 7 实验</span><a class="go" href="core/exp004-slam-navigation/index.html" style="color:var(--accent-teal);font-weight:700;text-decoration:none">进入课程 →</a></div>
+    </article>
+
+    <article class="card reveal">
+      <div class="top"><span class="code">CORE-05</span></div>
+      <h3>机器人机械臂应用与开发</h3>
+      <p>解决机器人"怎么把东西抓住"的问题。从 URDF 仿真与 MoveIt2、1Mbps 串口底层协议到 FK/IK 运动学，完成零位校准、实机 IK 解算与视觉动态抓取。</p>
+      <div class="meta"><span class="tag">MoveIt2</span><span class="tag">IK 解算</span><span class="tag">串口协议</span><span class="tag">实验箱 B2 · 小车 C1</span></div>
+      <div class="foot"><span>32 学时 · 7 实验</span><a class="go" href="core/exp005-robot-arm/index.html" style="color:var(--accent-teal);font-weight:700;text-decoration:none">进入课程 →</a></div>
+    </article>
+
+  </div>
+</section>
+
+<!-- ============ 分类二：具身智能综合案例（方案2 · 5门） ============ -->
+<section class="section" id="case">
+  <div class="section-head">
+    <h2><span class="idx">CAT 2</span>具身智能综合案例</h2>
+    <span class="sub">方案 2 · 智慧工厂 / 智慧交通 / 监护 / 追踪场景 · 5 门 / 208 学时</span>
+  </div>
+  <p class="desc">五个大型综合案例：智慧工厂装货分拣码垛综合项目（实验箱 B2）、机器人小车智能工厂与机器人小车智慧交通综合案例（小车 C1）、老人跌倒监护（实验箱 B2 + 小车 C1）与通用目标追踪（B2 + C1）。卡片标注各自适配的设备。</p>
+  
+  <div class="grid">
+
+    <article class="card reveal">
+      <div class="top"><span class="code">CASE-01</span></div>
+      <h3>智慧工厂装货分拣码垛综合项目</h3>
+      <p>eai_factory 语音 + 大模型驱动智慧工厂：装货 / 分拣 / 码垛闭环，联动雷达急停与安全联锁（原「机器人大模型综合应用」）。</p>
+      <div class="meta"><span class="tag violet">大模型</span><span class="tag amber">安全联锁</span><span class="tag amber">实验箱 B2</span></div>
+      <div class="foot"><span>48 学时 · 9 实验</span><a class="go" href="cases/exp006-smart-factory/index.html" style="color:var(--accent-teal);font-weight:700;text-decoration:none">进入课程 →</a></div>
+    </article>
+
+    <article class="card reveal">
+      <div class="top"><span class="code">CASE-02</span></div>
+      <h3>机器人小车智能工厂综合项目</h3>
+      <p>以小车 C1 为载体的智能工厂全程实训主线（EXP007）：建图导航、视觉抓取、离线语音大模型到四链路全闭环。</p>
+      <div class="meta"><span class="tag">综合主线</span><span class="tag teal">四链路</span><span class="tag amber">仅小车 C1</span></div>
+      <div class="foot"><span>32 学时 · 4 实验</span><a class="go" href="cases/exp007-intelligent-factory/index.html" style="color:var(--accent-teal);font-weight:700;text-decoration:none">进入课程 →</a></div>
+    </article>
+
+    <article class="card reveal">
+      <div class="top"><span class="code">CASE-03</span></div>
+      <h3>老人跌倒监护综合项目</h3>
+      <p>YOLOv8 人体检测 + BlazePose 关键点 + 六状态机判别跌倒，联动 Qwen3.5 RKLLM 端侧告警，覆盖 9 个完整实验（EXP006a）。</p>
+      <div class="meta"><span class="tag amber">跌倒检测</span><span class="tag violet">RKLLM 告警</span><span class="tag">实验箱 B2 · 小车 C1</span></div>
+      <div class="foot"><span>48 学时 · 9 实验</span><a class="go" href="cases/exp006a-elderly-companion/index.html" style="color:var(--accent-teal);font-weight:700;text-decoration:none">进入课程 →</a></div>
+    </article>
+
+    <article class="card reveal">
+      <div class="top"><span class="code">CASE-04</span></div>
+      <h3>通用目标追踪综合项目</h3>
+      <p>LLF 轻量特征 + VLM 语义选靶的通用目标追踪全链路，覆盖相机标定到自主跟拍的 9 个完整实验（EXP006b）。</p>
+      <div class="meta"><span class="tag teal">目标追踪</span><span class="tag violet">VLM 选靶</span><span class="tag">实验箱 B2 · 小车 C1</span></div>
+      <div class="foot"><span>48 学时 · 9 实验</span><a class="go" href="cases/exp006b-object-tracking/index.html" style="color:var(--accent-teal);font-weight:700;text-decoration:none">进入课程 →</a></div>
+    </article>
+
+    <article class="card reveal">
+      <div class="top"><span class="code">CASE-05</span></div>
+      <h3>机器人小车智慧交通综合项目</h3>
+      <p>小车 C1 在智慧交通沙盘上的自主通行主线（EXP008）：沙盘建图与语义标注、路口交通视觉感知、红绿灯口自主通行与智能泊车四实验贯通 32 学时。</p>
+      <div class="meta"><span class="tag teal">交通感知</span><span class="tag violet">自主通行</span><span class="tag amber">仅小车 C1</span></div>
+      <div class="foot"><span>32 学时 · 4 实验</span><a class="go" href="cases/exp008-smart-traffic/index.html" style="color:var(--accent-teal);font-weight:700;text-decoration:none">进入课程 →</a></div>
+    </article>
+
+  </div>
+</section>
+
+<!-- ============ 分类三：具身智能行业应用（方案3 · 5门） ============ -->
+<section class="section" id="ind">
+  <div class="section-head">
+    <h2><span class="idx">CAT 3</span>具身智能行业应用</h2>
+    <span class="sub">方案 3 · 端到端双臂 + 四足巡检 · 5 门 / 160 学时</span>
+  </div>
+  <p class="desc">面向真实行业的端到端落地方向：双臂平台基础与"采集 → 训练 → 推理"全流程，工厂分拣与家庭整理两大场景案例，以及宇树 Go2 Edu 四足工业巡检。</p>
+  
+  <div class="grid">
+
+    <article class="card reveal">
+      <div class="top"><span class="code">IND-01</span></div>
+      <h3>具身智能端到端平台与基础</h3>
+      <p>主机环境搭建、平台一键启停自检、主从臂校准与遥操作自检——进入端到端世界的第一门课（LZ-XL01）。</p>
+      <div class="meta"><span class="tag teal">主从双臂</span><span class="tag">遥操作</span><span class="tag">LZ-XL01</span></div>
+      <div class="foot"><span>32 学时 · 4 实验</span><a class="go" href="industry/ind01-endtoend-platform/index.html" style="color:var(--accent-teal);font-weight:700;text-decoration:none">进入课程 →</a></div>
+    </article>
+
+    <article class="card reveal">
+      <div class="top"><span class="code">IND-02</span></div>
+      <h3>双臂采训推全流程（ACT / VLA）</h3>
+      <p>独立完成遥操作采集 → LeRobot v3 转换 → ACT/VLA 训练 → 真机推理复现闭环，理解两大主流策略差异。</p>
+      <div class="meta"><span class="tag violet">ACT</span><span class="tag violet">VLA</span><span class="tag amber">显存管理</span></div>
+      <div class="foot"><span>32 学时 · 4 实验</span><a class="go" href="industry/ind02-act-vla-pipeline/index.html" style="color:var(--accent-teal);font-weight:700;text-decoration:none">进入课程 →</a></div>
+    </article>
+
+    <article class="card reveal">
+      <div class="top"><span class="code">IND-03</span></div>
+      <h3>物料分拣应用场景</h3>
+      <p>聆动工厂场景：双臂分工采集（左黑件入左格 / 右银件入右格），训练后真机自主分拣复现。</p>
+      <div class="meta"><span class="tag teal">双臂协同</span><span class="tag">工厂分拣</span><span class="tag">LDT-01</span></div>
+      <div class="foot"><span>32 学时 · 4 实验</span><a class="go" href="industry/ind03-material-sorting/index.html" style="color:var(--accent-teal);font-weight:700;text-decoration:none">进入课程 →</a></div>
+    </article>
+
+    <article class="card reveal">
+      <div class="top"><span class="code">IND-04</span></div>
+      <h3>家庭整理应用场景</h3>
+      <p>聆动家庭场景：左手开盖 → 右手取物入罐 → 左手盖盖，完整收纳闭环 + 摆放偏移鲁棒性评估。</p>
+      <div class="meta"><span class="tag teal">任务闭环</span><span class="tag">鲁棒性</span><span class="tag">LDT-01</span></div>
+      <div class="foot"><span>32 学时 · 4 实验</span><a class="go" href="industry/ind04-home-tidying/index.html" style="color:var(--accent-teal);font-weight:700;text-decoration:none">进入课程 →</a></div>
+    </article>
+
+    <article class="card reveal">
+      <div class="top"><span class="code">IND-05</span></div>
+      <h3>工业巡检应用场景（宇树 Go2 Edu）</h3>
+      <p>3D 激光建图 → AMCL/Nav2 多点巡检 → YOLOv8 表计识别 → 自主回充与巡检报告的完整四足闭环。</p>
+      <div class="meta"><span class="tag amber">四足巡检</span><span class="tag">YOLOv8</span><span class="tag teal">多点导航</span></div>
+      <div class="foot"><span>32 学时 · 4 实验</span><a class="go" href="industry/ind05-industrial-inspection/index.html" style="color:var(--accent-teal);font-weight:700;text-decoration:none">进入课程 →</a></div>
+    </article>
+
+  </div>
+</section>
+
+<!-- 技术栈 -->
+<section class="tech" id="tech">
+  <h2><span class="idx">TECH</span>技术栈总览</h2>
+  <p class="tech-sub">按「从底到上」六层梳理，15 门课程用到的技术都能在某一层里找到位置。</p>
+
+  <div class="layer reveal">
+    <div class="layer-name">
+      <b>硬件平台</b><span>HARDWARE</span>
+      <em>课程跑在哪些设备上</em>
+    </div>
+    <div class="pills">
+      <span class="pill blue"><i></i>RK3576 + 6TOPS NPU</span>
+      <span class="pill blue"><i></i>实验箱 B2</span>
+      <span class="pill blue"><i></i>小车 C1</span>
+      <span class="pill blue"><i></i>LDT-01 双臂平台</span>
+      <span class="pill blue"><i></i>LZ-XL01 主从臂</span>
+      <span class="pill blue"><i></i>LZ-XL01 开源双臂</span>
+      <span class="pill blue"><i></i>宇树 G1 人形</span>
+      <span class="pill blue"><i></i>宇树 Go2 四足</span>
+      <span class="pill blue"><i></i>讯飞智能语音背包</span>
+      <span class="pill blue"><i></i>讯飞六麦阵列</span>
+      <span class="pill blue"><i></i>COIN-D6 激光雷达</span>
+      <span class="pill blue"><i></i>HP60C RGB-D 相机</span>
+      <span class="pill blue"><i></i>MQ5 · 指纹 · RFID</span>
+      <span class="pill blue"><i></i>Livox MID-360</span>
+      <span class="pill blue"><i></i>RealSense D435i</span>
+    </div>
+  </div>
+
+  <div class="layer reveal">
+    <div class="layer-name">
+      <b>系统底座</b><span>FOUNDATION</span>
+      <em>整套课程的统一底座</em>
+    </div>
+    <div class="pills">
+      <span class="pill teal"><i></i>ROS 2 Humble</span>
+      <span class="pill teal"><i></i>DDS 通信</span>
+      <span class="pill teal"><i></i>话题 / 服务 / 动作</span>
+      <span class="pill teal"><i></i>TF2 坐标变换</span>
+      <span class="pill teal"><i></i>URDF / Xacro</span>
+      <span class="pill teal"><i></i>Gazebo / RViz2</span>
+      <span class="pill teal"><i></i>Linux / SSH 部署</span>
+    </div>
+  </div>
+
+  <div class="layer reveal">
+    <div class="layer-name">
+      <b>感知与定位</b><span>PERCEPTION</span>
+      <em>让机器人看得见、知道自己在哪</em>
+    </div>
+    <div class="pills">
+      <span class="pill amber"><i></i>OpenCV</span>
+      <span class="pill amber"><i></i>HSV 色彩空间</span>
+      <span class="pill amber"><i></i>轮廓拟合</span>
+      <span class="pill amber"><i></i>YOLOv8 检测 / 分割</span>
+      <span class="pill amber"><i></i>DeepSORT 跟踪</span>
+      <span class="pill amber"><i></i>Kalman / EKF 状态估计</span>
+      <span class="pill amber"><i></i>MediaPipe</span>
+      <span class="pill amber"><i></i>SLAM Toolbox</span>
+      <span class="pill amber"><i></i>AMCL 粒子滤波</span>
+      <span class="pill amber"><i></i>LIO-SAM / FAST-LIO</span>
+      <span class="pill amber"><i></i>深度测距与点云</span>
+    </div>
+  </div>
+
+  <div class="layer reveal">
+    <div class="layer-name">
+      <b>决策与规划</b><span>DECISION</span>
+      <em>知道要做什么、怎么走过去</em>
+    </div>
+    <div class="pills">
+      <span class="pill rose"><i></i>Nav2 路径规划</span>
+      <span class="pill rose"><i></i>多点导航</span>
+      <span class="pill rose"><i></i>动态避障</span>
+      <span class="pill rose"><i></i>MoveIt2</span>
+      <span class="pill rose"><i></i>FK / IK 运动学</span>
+      <span class="pill rose"><i></i>抓取位姿规划</span>
+      <span class="pill rose"><i></i>安全联锁</span>
+      <span class="pill rose"><i></i>状态机与任务编排</span>
+    </div>
+  </div>
+
+  <div class="layer reveal">
+    <div class="layer-name">
+      <b>模型与算法</b><span>MODELS</span>
+      <em>AI 能力从哪来</em>
+    </div>
+    <div class="pills">
+      <span class="pill violet"><i></i>RKNN / NPU 部署</span>
+      <span class="pill violet"><i></i>YOLOv5 / v8 量化</span>
+      <span class="pill violet"><i></i>LLM 意图解析</span>
+      <span class="pill violet"><i></i>VLM 视觉问答</span>
+      <span class="pill violet"><i></i>RKLLM 本地推理</span>
+      <span class="pill violet"><i></i>离线语音 KWS / ASR / TTS</span>
+      <span class="pill violet"><i></i>ACT 模仿学习</span>
+      <span class="pill violet"><i></i>VLA 视觉语言动作</span>
+      <span class="pill violet"><i></i>Learning To Drive 一体策略</span>
+    </div>
+  </div>
+
+  <div class="layer reveal">
+    <div class="layer-name">
+      <b>训练与仿真</b><span>TRAINING</span>
+      <em>策略怎么练出来、怎么落到实机</em>
+    </div>
+    <div class="pills">
+      <span class="pill indigo"><i></i>LeRobot v3</span>
+      <span class="pill indigo"><i></i>数据采集与回放</span>
+      <span class="pill indigo"><i></i>ACT / Diffusion Policy</span>
+      <span class="pill indigo"><i></i>显存管理与批训练</span>
+      <span class="pill indigo"><i></i>AMASS 动作数据集</span>
+      <span class="pill indigo"><i></i>GMR 动作重定向</span>
+      <span class="pill indigo"><i></i>BeyondMimic</span>
+      <span class="pill indigo"><i></i>Isaac Sim / Isaac Lab</span>
+      <span class="pill indigo"><i></i>MuJoCo Sim2Real</span>
+      <span class="pill indigo"><i></i>Unitree SDK</span>
+    </div>
+  </div>
+</section>
+
+<div class="lineup">
+  <div class="lineup-inner reveal">
+    <span class="lb">课程对应设备</span>
+    <a href="../products/b2-box/index.html"><span class="dot"></span>实验箱 B2</a>
+    <a href="../products/c1-car/index.html"><span class="dot"></span>小车 C1</a>
+    <a href="../products/ldt-01/index.html"><span class="dot"></span>LDT-01</a>
+    <a href="../products/xlerobot/index.html"><span class="dot"></span>LZ-XL01</a>
+    <a href="../products/unitree-g1/index.html"><span class="dot"></span>人形导览 G1</a>
+    <a href="../products/unitree-go2/index.html"><span class="dot"></span>巡检机器狗 Go2</a>
+  </div>
+</div>
+
+<footer>
+  具身智能课程 · 3 大类 / 15 门课程 · 数据源：培训计划.xlsx + sheet1 课程资源包 · 输出于 training/output
+</footer>
+
+<script>
+/* 滚动显现 */
+var io=new IntersectionObserver(function(es){
+  es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('visible'); io.unobserve(e.target);} });
+},{threshold:.12});
+document.querySelectorAll('.reveal').forEach(function(el){io.observe(el)});
+</script>
+<script src="device/entryflow.js?v=20260926b"></script>
+<script>
+/* 点击「设备开发」入口：统一入口流 control（device/entryflow.js）。
+   1) 本机已成功拉起过（eai_helper_ready=1）→ 手势内发 eai-helper://，由操作系统按平台
+      翻译到对应的已注册脚本静默拉起助手（Windows 注册表 / Linux xdg / Mac LaunchServices）；
+   2) 全新环境（未注册）→ 绝不发协议（避免系统弹「选择应用」框），直接进工作台，
+      由 workspace 弹「一次性初始化」分步引导（含脚本完整路径与成功判据）；
+   助手已在运行时新进程检测到端口占用自行退出，重复触发幂等安全。
+   target=_blank 的链接保持浏览器默认新开（仍在手势内，不被弹窗拦截）。 */
+document.querySelectorAll('a[href*="workspace.html"]').forEach(function (a) {
+  a.addEventListener('click', function (e) {
+    if (e.defaultPrevented) return;                 // 同标签：接管导航
+    var href = a.href;
+    var newTab = (a.getAttribute('target') === '_blank');
+    if (newTab) { EAI.entry(href, true); return; }  // 新标签：先发协议，其余交给浏览器默认行为
+    e.preventDefault();
+    EAI.entry(href, false);                         // 同标签：发协议 + 延迟跳转由 EAI 统一调度
+  });
+});
+</script>
+</body>
+</html>

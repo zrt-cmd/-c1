@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>具身智能实验箱B2 · 快速上手</title>
+<style>
+:root{
+  --bg-base:#f8fafc;--bg-card:#fff;--bg-soft:#f1f5f9;--bg-tint:#eef4ff;
+  --border:#e2e8f0;--border-hover:#94a3b8;
+  --accent-blue:#2563eb;--accent-cyan:#0891b2;--accent-teal:#0d9488;
+  --accent-amber:#d97706;--accent-violet:#7c3aed;--accent-rose:#e11d48;
+  --text-primary:#0f172a;--text-body:#334155;--text-secondary:#64748b;--text-muted:#94a3b8;
+  --shadow-glow:0 8px 24px rgba(37,99,235,.10);
+  --font-mono:'Cascadia Code','JetBrains Mono',Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg-base);color:var(--text-body);
+  font-family:"Noto Sans CJK SC","PingFang SC","Microsoft YaHei","Segoe UI",system-ui,sans-serif;
+  background-image:
+    radial-gradient(ellipse 60% 40% at 50% -5%,rgba(37,99,235,.05),transparent),
+    radial-gradient(ellipse 50% 35% at 100% 5%,rgba(13,148,136,.04),transparent);}
+/* Topbar */
+.topbar{position:sticky;top:0;z-index:50;height:60px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 40px;background:rgba(255,255,255,.85);backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;color:var(--text-primary);font-size:15px;text-decoration:none}
+.logo .dot{width:9px;height:9px;border-radius:50%;background:var(--accent-blue);animation:pulse 2.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.top-actions{display:flex;align-items:center;gap:10px}
+.btn{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:600;text-decoration:none;
+  border-radius:9px;padding:8px 16px;transition:.28s;border:1px solid var(--border);color:var(--text-secondary);background:var(--bg-card)}
+.btn:hover{border-color:var(--border-hover);color:var(--accent-blue)}
+.btn.primary{background:linear-gradient(90deg,var(--accent-blue),var(--accent-cyan));color:#fff;border:none;box-shadow:var(--shadow-glow)}
+.btn.primary:hover{transform:translateY(-1px);color:#fff}
+/* Hero */
+.hero{max-width:960px;margin:0 auto;padding:48px 40px 6px;text-align:center}
+.hero .eyebrow{display:inline-block;font-size:12.5px;letter-spacing:.14em;color:var(--accent-blue);
+  background:var(--bg-tint);border:1px solid #dbeafe;border-radius:100px;padding:5px 14px;font-family:var(--font-mono)}
+.hero h1{margin:16px 0 12px;font-size:34px;line-height:1.25;color:var(--text-primary);font-weight:800}
+.hero h1 .grad{background:linear-gradient(90deg,var(--accent-blue),var(--accent-cyan),var(--accent-teal));
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.hero p{max-width:760px;margin:0 auto;font-size:15px;line-height:1.85;color:var(--text-secondary)}
+.badges{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:20px 0 0}
+.badge{font-size:12.5px;padding:5px 12px;border-radius:100px;background:var(--bg-card);
+  border:1px solid var(--border);color:var(--text-secondary)}
+/* TOC */
+.toc{max-width:960px;margin:28px auto 0;padding:0 40px;display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.toc a{display:block;background:var(--bg-card);border:1px solid var(--border);border-radius:14px;
+  padding:18px 22px;text-decoration:none;transition:.28s}
+.toc a:hover{transform:translateY(-4px);box-shadow:var(--shadow-glow);border-color:var(--border-hover)}
+.toc .n{font-family:var(--font-mono);font-size:12px;font-weight:700;color:#fff;display:inline-block;
+  background:linear-gradient(90deg,var(--accent-blue),var(--accent-cyan));border-radius:7px;padding:3px 9px}
+.toc h3{margin:10px 0 6px;font-size:16.5px;color:var(--text-primary)}
+.toc p{margin:0;font-size:13px;line-height:1.7;color:var(--text-secondary)}
+.toc .sub{margin-top:8px;font-size:12px;color:var(--text-muted);font-family:var(--font-mono)}
+/* Section */
+.section{max-width:960px;margin:0 auto;padding:50px 40px 6px;scroll-margin-top:72px}
+.section-head{display:flex;align-items:baseline;gap:14px;margin-bottom:6px;flex-wrap:wrap}
+.section-head h2{margin:0;font-size:22px;color:var(--text-primary);display:flex;align-items:center;gap:10px}
+.section-head h2 .idx{font-family:var(--font-mono);font-size:12px;font-weight:700;color:#fff;
+  background:linear-gradient(90deg,var(--accent-blue),var(--accent-cyan));border-radius:7px;padding:3px 9px}
+.section-head .sub{font-size:13.5px;color:var(--text-muted)}
+.section .desc{font-size:14px;color:var(--text-secondary);line-height:1.8;margin:8px 0 20px;max-width:860px}
+/* Steps */
+.step{background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:22px 26px;
+  margin-bottom:18px;position:relative;overflow:hidden;transition:.28s;scroll-margin-top:76px}
+.step::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;transform:scaleX(0);transform-origin:left;
+  background:linear-gradient(90deg,var(--accent-blue),var(--accent-cyan));transition:transform .35s cubic-bezier(.4,0,.2,1)}
+.step:hover{border-color:var(--border-hover);box-shadow:0 2px 10px rgba(15,23,42,.05)}
+.step:hover::before{transform:scaleX(1)}
+.step h3{margin:0 0 4px;font-size:17px;color:var(--text-primary);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.step h3 .sn{font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--accent-teal);
+  background:#f0fdfa;border:1px solid #ccfbf1;border-radius:7px;padding:2px 9px;flex:none}
+.step h3 .anchor{margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--text-muted);font-weight:400}
+.step p{margin:8px 0 0;font-size:14px;line-height:1.85;color:var(--text-secondary)}
+.step p b{color:var(--text-primary)}
+.step figure{margin:14px 0 0;background:var(--bg-soft);border:1px solid var(--border);border-radius:12px;padding:10px}
+.step figure img{width:100%;display:block;border-radius:8px}
+.step figcaption{font-size:12.5px;color:var(--text-muted);text-align:center;padding-top:8px}
+.step .substeps{margin:8px 0 0;padding-left:20px;font-size:14px;line-height:2;color:var(--text-secondary)}
+.step .substeps b{color:var(--text-primary)}
+/* code */
+.cmd{margin-top:14px;background:#0f172a;border-radius:11px;padding:14px 18px;position:relative}
+.cmd .lbl{font-family:var(--font-mono);font-size:11px;color:#7dd3fc;letter-spacing:.08em}
+.cmd code{display:block;margin-top:6px;font-family:var(--font-mono);font-size:13.5px;color:#e2e8f0;word-break:break-all}
+.cmd .hint{font-size:12px;color:#94a3b8;margin-top:8px}
+/* demo video link → B2 产品介绍 #video */
+.step a.vid{color:var(--accent-blue);font-weight:700;text-decoration:none;
+  border-bottom:1px dashed var(--accent-blue);padding-bottom:1px}
+.step a.vid:hover{color:var(--accent-cyan);border-bottom-color:var(--accent-cyan)}
+/* tips */
+.tip{margin-top:14px;border-radius:11px;padding:13px 16px;font-size:13.5px;line-height:1.8}
+.tip b.lab{display:block;margin-bottom:3px}
+.tip.amber{background:#fffbeb;border:1px solid #fde68a;color:#92400e}
+.tip.rose{background:#fff1f2;border:1px solid #fecdd3;color:#9f1239}
+.tip.teal{background:#f0fdfa;border:1px solid #ccfbf1;color:#115e59}
+.tip.blue{background:var(--bg-tint);border:1px solid #dbeafe;color:#1e40af}
+/* creds table */
+.creds{display:inline-grid;grid-template-columns:auto auto;gap:6px 18px;margin-top:10px;
+  background:var(--bg-soft);border:1px solid var(--border);border-radius:10px;padding:10px 16px;font-size:13.5px}
+.creds .k{color:var(--text-muted)}
+.creds .v{font-family:var(--font-mono);font-weight:700;color:var(--text-primary)}
+/* footer */
+footer{max-width:960px;margin:52px auto 0;padding:24px 40px 44px;border-top:1px solid var(--border);
+  text-align:center;font-size:12.5px;color:var(--text-muted)}
+.reveal{opacity:0;transform:translateY(16px);transition:opacity .5s,transform .5s}
+.reveal.visible{opacity:1;transform:none}
+/* 左侧章节导航栏 */
+html{scroll-behavior:smooth}
+.sidenav{display:none;position:fixed;top:0;left:0;bottom:0;width:236px;overflow-y:auto;background:rgba(255,255,255,.96);border-right:1px solid var(--border);padding:20px 14px 40px;z-index:60}
+.sidenav::-webkit-scrollbar{width:5px}
+.sidenav::-webkit-scrollbar-thumb{background:var(--border);border-radius:99px}
+.sidenav .nav-title{font-family:var(--font-mono);font-size:11px;font-weight:800;letter-spacing:.14em;color:var(--text-muted);margin:2px 10px 10px}
+.sidenav a{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:9px;color:var(--text-secondary);text-decoration:none;font-size:12.8px;line-height:1.45;transition:.18s;border-left:2px solid transparent;margin-bottom:1px}
+.sidenav a:hover{background:var(--bg-tint);color:var(--accent-blue)}
+.sidenav a .d{width:6px;height:6px;border-radius:50%;background:var(--border-hover);flex:none;transition:.18s}
+.sidenav a.grp{font-weight:700;color:var(--text-primary);font-size:13.2px;margin-top:4px}
+.sidenav a.grp .d{width:8px;height:8px;background:linear-gradient(90deg,var(--accent-blue),var(--accent-cyan))}
+.sidenav a.sub{margin-left:16px;font-size:12.2px;padding:5px 10px}
+.sidenav a.err{margin-top:14px;font-weight:700;color:var(--text-primary)}
+.sidenav a.err .d{background:linear-gradient(90deg,var(--accent-teal),var(--accent-cyan))}
+.sidenav a.on{background:linear-gradient(90deg,rgba(37,99,235,.12),rgba(8,145,178,.06));color:var(--accent-blue);border-left-color:var(--accent-blue);font-weight:700}
+.sidenav a.on .d{background:var(--accent-blue);box-shadow:0 0 0 3px rgba(37,99,235,.18)}
+@media (min-width:1100px){body{padding-left:236px}.sidenav{display:block}}
+@media (max-width:760px){
+  .topbar,.hero,.toc,.section,footer{padding-left:20px;padding-right:20px}
+  .toc{grid-template-columns:1fr}.hero h1{font-size:27px}
+}
+@media (prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="logo" href="../../../courses/index.html" title="返回课程首页"><span class="dot"></span>具身智能课程 · 快速上手</a>
+  <div class="top-actions">
+    <a class="btn" href="../index.html">B2 产品介绍</a>
+    <a class="btn primary" href="../../../courses/index.html">← 返回总首页</a>
+  </div>
+</div>
+
+<nav class="sidenav" id="sidenav" aria-label="章节导航">
+  <div class="nav-title">CONTENTS · 目录</div>
+  <a class="grp" href="#boot"><span class="d"></span>PART 1 · 一、开机步骤</a>
+  <a class="sub" href="#power"><span class="d"></span>1.1 接入供电线</a>
+  <a class="sub" href="#arm"><span class="d"></span>1.2 拿出机械臂</a>
+  <a class="sub" href="#powerbtn"><span class="d"></span>1.3 开关按钮</a>
+  <a class="sub" href="#login"><span class="d"></span>1.4 登录步骤</a>
+  <a class="sub" href="#desktop"><span class="d"></span>1.5 进入系统</a>
+  <a class="grp" href="#demo"><span class="d"></span>PART 2 · 二、功能演示</a>
+  <a class="sub" href="#terminal"><span class="d"></span>2.1 打开终端</a>
+  <a class="sub" href="#launch"><span class="d"></span>2.2 启动演示程序</a>
+  <a class="sub err" href="#f1"><span class="d"></span>功能 1 · 开始装货</a>
+  <a class="sub err" href="#f2"><span class="d"></span>功能 2 · 开始分拣</a>
+  <a class="sub err" href="#f3"><span class="d"></span>功能 3 · 开始码垛</a>
+  <a class="sub err" href="#f4"><span class="d"></span>功能 4 · 安全防护</a>
+</nav>
+
+<header class="hero reveal">
+  <span class="eyebrow">GETTING STARTED · B2 FLAGSHIP BOX</span>
+  <h1>具身智能实验箱 B2<br><span class="grad">快速上手指南</span></h1>
+  <p>拿到实验箱后照着做：接入供电 → 取出机械臂 → 开机登录 → 启动智慧工厂演示，约 10 分钟完成开箱到首个功能演示的全流程。每一步配实拍标注图，图中红圈 / 红箭头即操作位置。</p>
+  <div class="badges">
+    <span class="badge">⏱️ 全程约 10 分钟</span>
+    <span class="badge">🔌 供电 220V 交流</span>
+    <span class="badge">🖥️ 系统 gnome · 账号 iflytek</span>
+    <span class="badge">🗣️ 语音唤醒"小飞小飞"</span>
+  </div>
+</header>
+
+<nav class="toc reveal">
+  <a href="#boot">
+    <span class="n">PART 1</span>
+    <h3>一、开机步骤</h3>
+    <p>接入供电 → 取出机械臂并接相机线 → 按下开关 → 登录进入系统</p>
+    <div class="sub">#boot · #login · #desktop</div>
+  </a>
+  <a href="#demo">
+    <span class="n">PART 2</span>
+    <h3>二、智慧工厂功能演示</h3>
+    <p>打开终端 → 一条命令启动 → 装货 / 分拣 / 码垛 / 安全防护四功能</p>
+    <div class="sub">#demo · #f1 · #f2 · #f3 · #f4</div>
+  </a>
+</nav>
+
+<!-- ============ PART 1 开机步骤 ============ -->
+<section class="section" id="boot">
+  <div class="section-head">
+    <h2><span class="idx">PART 1</span>一、开机步骤</h2>
+    <span class="sub">供电 → 机械臂 → 开机 → 登录 → 进入系统</span>
+  </div>
+  <p class="desc">五小步从通电走到桌面。重点注意两处：机械臂取出后要接上双目相机的线、并且别让摄像头线被臂身缠住；登录后服务在后台预热，等约 30 秒再操作。</p>
+
+  <article class="step reveal" id="power">
+    <h3><span class="sn">1.1</span>接入供电线<span class="anchor">#power</span></h3>
+    <p>如下图黑色线材，接入黑色供电线，另一头接入 <b>220V 交流电</b>即可。下图中带红灯的红色开关为供电总开关：<b>拨动到下方</b>，打开供电电源。</p>
+    <figure>
+      <img src="assets/image-20261010172109458.png" alt="黑色供电线接入电源接口，右侧红色开关带红灯">
+      <figcaption>接入黑色供电线；红色开关拨至下方打开供电（开关亮红灯）</figcaption>
+    </figure>
+  </article>
+
+  <article class="step reveal" id="arm">
+    <h3><span class="sn">1.2</span>拿出机械臂<span class="anchor">#arm</span></h3>
+    <p>把机械臂<b>从卡扣中拿出来</b>。如果双目相机的接线没有接上，需要把相机的线接上（见下图"相机接线"标注）。</p>
+    <figure>
+      <img src="assets/image-20261010172709513.png" alt="机械臂取出，红箭头标注相机接线位置">
+      <figcaption>红箭头："相机接线"——接线未接上的先接上</figcaption>
+    </figure>
+    <p>机械臂是有一定<b>旋转限位</b>的，注意摄像头的线不要被缠绕（见下图标注）：</p>
+    <figure>
+      <img src="assets/image-20261010172546325.png" alt="机械臂线材走向标注，提示不要缠绕">
+      <figcaption>红箭头："注意线材缠绕"——整理好摄像头线再活动臂身</figcaption>
+    </figure>
+  </article>
+
+  <article class="step reveal" id="powerbtn">
+    <h3><span class="sn">1.3</span>开关按钮<span class="anchor">#powerbtn</span></h3>
+    <p>按下开关按钮，判定的标志是<b>开关按钮会下沉</b>，屏幕被点亮，系统开始运行（下图红圈即开关机按钮）。</p>
+    <figure>
+      <img src="assets/image-20261010172822674.png" alt="面板开关机按钮红圈标注，绿灯亮起">
+      <figcaption>红圈：开关机按钮——按下后下沉、屏幕点亮即为开机成功</figcaption>
+    </figure>
+  </article>
+
+  <article class="step reveal" id="login">
+    <h3><span class="sn">1.4</span>登录步骤<span class="anchor">#login</span></h3>
+    <p>显示如图画面后，选择账号为 <code>iflytek</code>，密码为 <code>admin123456</code>，输入回车进入系统。</p>
+    <div class="creds">
+      <span class="k">账号</span><span class="v">iflytek</span>
+      <span class="k">密码</span><span class="v">admin123456</span>
+    </div>
+    <figure>
+      <img src="assets/image-20261010173049278.png" alt="系统登录界面，选择 iflytek 账号">
+      <figcaption>登录界面：选择账号 iflytek，输入密码后回车</figcaption>
+    </figure>
+  </article>
+
+  <article class="step reveal" id="desktop">
+    <h3><span class="sn">1.5</span>进入系统<span class="anchor">#desktop</span></h3>
+    <p>进入系统后，显示如下。（注意：使用的是 <b>gnome 系统</b>，有些显示的服务还在后台运行，<b>需要等待 30 秒左右</b>，显示系统的功能才能完全正常，可以点击打开终端或者其他应用）</p>
+    <div class="tip amber"><b class="lab">⚠️ 等待约 30 秒</b>开机后不要急着敲命令——后台服务还没就绪，等半分钟功能才完全正常。</div>
+    <figure>
+      <img src="assets/image-20261010173214273.png" alt="进入系统后的桌面">
+      <figcaption>登录成功后的桌面（gnome）</figcaption>
+    </figure>
+  </article>
+</section>
+
+<!-- ============ PART 2 智慧工厂功能演示 ============ -->
+<section class="section" id="demo">
+  <div class="section-head">
+    <h2><span class="idx">PART 2</span>二、智慧工厂功能演示步骤</h2>
+    <span class="sub">一条命令启动 · 装货 / 分拣 / 码垛 / 安全防护</span>
+  </div>
+  <p class="desc">打开终端输入一条启动命令，然后用语音唤醒词"小飞小飞"逐个触发四个演示功能。每个功能的物块摆放位置图中都有红圈 / 实拍参考，摆放对了再发指令。</p>
+
+  <article class="step reveal" id="terminal">
+    <h3><span class="sn">2.1</span>打开终端<span class="anchor">#terminal</span></h3>
+    <p>左下角应用中心点击打开（自带键盘，有触摸板）<b>Terminal</b> 应用（下图红圈为应用中心入口，箭头指向 Terminal）。</p>
+    <figure>
+      <img src="assets/image-20261010173457450.png" alt="桌面左下角应用中心红圈，箭头指向 Terminal 图标">
+      <figcaption>红圈：左下角应用中心 → 点开后选择 Terminal</figcaption>
+    </figure>
+  </article>
+
+  <article class="step reveal" id="launch">
+    <h3><span class="sn">2.2</span>输入智慧工厂启动程序<span class="anchor">#launch</span></h3>
+    <p>输入以下命令并回车，启动智慧工厂演示程序：</p>
+    <div class="cmd">
+      <div class="lbl">TERMINAL</div>
+      <code>ros2 launch eai_factory eai_factory.launch.py</code>
+      <div class="hint">回车后等待节点全部拉起，屏幕出现实时日志即为启动成功</div>
+    </div>
+    <figure>
+      <img src="assets/image-20261010173604024.png" alt="终端中输入 ros2 launch eai_factory 命令">
+      <figcaption>终端输入启动命令并回车</figcaption>
+    </figure>
+  </article>
+
+  <article class="step reveal" id="f1">
+    <h3><span class="sn">功能 1</span>开始装货<span class="anchor">#f1</span></h3>
+    <p>物块放到如下大概的位置（红圈区域）：</p>
+    <figure>
+      <img src="assets/image-20261010174025782.png" alt="红圈标注装货物块摆放区域">
+      <figcaption>红圈：装货物块的摆放区域</figcaption>
+    </figure>
+    <p>对着麦克风说"<b>小飞小飞</b>"，被唤醒后，再说"<b>开始装货</b>"，机械臂开始执行<b>视觉自适应抓取</b>序列（可参考<a class="vid" href="../index.html#video" target="_blank" rel="noopener">产品介绍页演示视频</a>）：</p>
+    <figure>
+      <img src="assets/image-20261010174118905.png" alt="机械臂执行装货抓取">
+      <figcaption>装货：视觉自适应抓取执行中</figcaption>
+    </figure>
+    <div class="tip rose"><b class="lab">⚠️ 视觉抓取失败？</b>可能是抓取物块放置的位置超出、重新装配误差、螺丝松动等问题导致，可以进行重新校准；也可以微调摄像头的采集位置进行快速调整验证。</div>
+  </article>
+
+  <article class="step reveal" id="f2">
+    <h3><span class="sn">功能 2</span>开始分拣<span class="anchor">#f2</span></h3>
+    <p>此步骤为<b>固定位置分拣，不使用摄像头</b>，需要放置物块到固定位置，如图<b>靠分拣区中心偏下</b>的位置：</p>
+    <figure>
+      <img src="assets/image-20261010174216992.png" alt="分拣区固定摆放位置实拍">
+      <figcaption>分拣物块固定摆放位置（分拣区中心偏下）</figcaption>
+    </figure>
+    <p>对着麦克风重新说"<b>小飞小飞</b>"，被唤醒后，再说"<b>开始分拣</b>"，机械臂开始<b>固定姿态分拣</b>序列（可参考<a class="vid" href="../index.html#video" target="_blank" rel="noopener">产品介绍页演示视频</a>）：</p>
+    <figure>
+      <img src="assets/image-20261010174352990.png" alt="机械臂执行分拣序列">
+      <figcaption>分拣：固定姿态分拣执行中</figcaption>
+    </figure>
+  </article>
+
+  <article class="step reveal" id="f3">
+    <h3><span class="sn">功能 3</span>开始码垛<span class="anchor">#f3</span></h3>
+    <p>此步骤为配合<b>流水线检测抓取</b>，把红色物块<b>带有标签的向上放置</b>，并放到流水线如图的位置：</p>
+    <figure>
+      <img src="assets/image-20261010174517810.png" alt="红色物块放在流水线上的位置">
+      <figcaption>码垛：带标签面朝上，放上流水线指定位置</figcaption>
+    </figure>
+    <p>对着麦克风重新说"<b>小飞小飞</b>"，被唤醒后，再说"<b>开始码垛</b>"，流水线启动并进行检测抓取（可参考<a class="vid" href="../index.html#video" target="_blank" rel="noopener">产品介绍页演示视频</a>）：</p>
+    <figure>
+      <img src="assets/image-20261010174714679.png" alt="流水线启动，机械臂码垛抓取">
+      <figcaption>码垛：流水线运行中检测抓取</figcaption>
+    </figure>
+  </article>
+
+  <article class="step reveal" id="f4">
+    <h3><span class="sn">功能 4</span>安全防护<span class="anchor">#f4</span></h3>
+    <p>如下图的激光雷达（红箭头标注），具有<b>机械臂工作的防护功能</b>：</p>
+    <figure>
+      <img src="assets/image-20261010174749870.png" alt="红箭头标注激光雷达位置">
+      <figcaption>红箭头：激光雷达——安全防护的"眼睛"</figcaption>
+    </figure>
+    <p>手接近激光雷达（模拟工厂进入到危险区域时，<b>机械臂释放力矩，走开后力矩恢复</b>，可参考<a class="vid" href="../index.html#video" target="_blank" rel="noopener">产品介绍页视频演示</a>）：</p>
+    <figure>
+      <img src="assets/image-20261010174906568.png" alt="手接近激光雷达触发急停与恢复">
+      <figcaption>手接近触发急停；离开后力矩恢复</figcaption>
+    </figure>
+    <div class="tip teal"><b class="lab">✅ 完成开箱上手</b>四个功能都跑通后，就可以进入 <a href="../../../courses/index.html#core" style="color:var(--accent-teal);font-weight:700">核心课程</a> 开始系统学习了——智慧工厂还对应综合案例课《智慧工厂装货分拣码垛》。</div>
+  </article>
+</section>
+
+<footer>
+  具身智能实验箱 B2 快速上手指南 · 型号 XFLZ_EAI_B2_PRO · 讯飞聆智 · 图文对应《具身智能实验箱B2快速上手指南》源文档
+</footer>
+
+<script>
+var io=new IntersectionObserver(function(es){
+  es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('visible'); io.unobserve(e.target);} });
+},{threshold:.10});
+document.querySelectorAll('.reveal').forEach(function(el){io.observe(el)});
+</script>
+<script>
+/* 左侧章节导航 · 滚动高亮 */
+(function(){
+  var links=[].slice.call(document.querySelectorAll('#sidenav a'));
+  var targets=[];
+  links.forEach(function(a){var t=document.getElementById(a.getAttribute('href').slice(1));if(t)targets.push({a:a,t:t});});
+  if(!targets.length)return;
+  var raf=0;
+  function spy(){raf=0;var cur=targets[0];
+    targets.forEach(function(o){if(o.t.getBoundingClientRect().top<=110)cur=o;});
+    targets.forEach(function(o){o.a.classList.toggle('on',o===cur);});}
+  function onScroll(){if(!raf)raf=window.requestAnimationFrame(spy);}
+  window.addEventListener('scroll',onScroll,{passive:true});
+  window.addEventListener('resize',onScroll,{passive:true});
+  window.addEventListener('load',spy);spy();
+})();
+</script>
+</body>
+</html>

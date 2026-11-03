@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>老人跌倒监护综合项目 · 教程首页</title>
+<style>
+:root{
+  --bg-base:#f8fafc; --bg-surface:#ffffff; --bg-muted:#f1f5f9;
+  --text-primary:#0f172a; --text-secondary:#475569; --text-muted:#94a3b8;
+  --accent-teal:#0d9488; --accent-blue:#2563eb; --accent-amber:#d97706; --accent-violet:#7c3aed; --accent-rose:#e11d48;
+  --border:#e2e8f0;
+  --font-body:'Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif;
+  --font-mono:'Cascadia Code','JetBrains Mono','Consolas',monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:var(--font-body);background:var(--bg-base);color:var(--text-primary);line-height:1.7}
+a{text-decoration:none;color:inherit}
+.topbar{position:sticky;top:0;z-index:50;background:rgba(248,250,252,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--border)}
+.topbar-in{max-width:1200px;margin:0 auto;padding:.7rem 1.5rem;display:flex;align-items:center;justify-content:space-between}
+.logo{font-weight:800;font-size:.95rem}
+.logo span{color:var(--accent-teal)}
+.crumb{font-size:.85rem;color:var(--text-secondary)}
+.crumb a:hover{color:var(--accent-teal)}
+.hero{background:linear-gradient(135deg,#0f172a 0%,#064e3b 55%,#059669 100%);color:#fff;padding:3.5rem 1.5rem 3rem;text-align:center}
+.eyebrow{font-size:.8rem;letter-spacing:.28em;opacity:.75;margin-bottom:.8rem}
+.hero h1{font-size:clamp(1.7rem,4vw,2.6rem);font-weight:900;margin-bottom:.9rem}
+.hero h1 .grad{background:linear-gradient(90deg,#6ee7b7,#93c5fd);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.hero p{max-width:760px;margin:0 auto 1.4rem;opacity:.85;font-size:1rem}
+.bades{display:flex;gap:.6rem;justify-content:center;flex-wrap:wrap}
+.bade{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.28);padding:.3rem .85rem;border-radius:999px;font-size:.85rem}
+.wrap{max-width:1200px;margin:0 auto;padding:2.5rem 1.5rem}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:2.5rem}
+.stat{background:var(--bg-surface);border:1px solid var(--border);border-radius:14px;padding:1rem 1.2rem;text-align:center}
+.stat b{display:block;font-size:1.5rem;color:var(--accent-teal)}
+.stat span{font-size:.8rem;color:var(--text-secondary)}
+.sec-head{margin:2.4rem 0 1.2rem}
+.sec-head .k{font-size:.75rem;letter-spacing:.24em;color:var(--accent-teal);font-weight:700}
+.sec-head h2{font-size:1.45rem;font-weight:800;margin-top:.25rem}
+.sec-head p{color:var(--text-secondary);font-size:.92rem;margin-top:.3rem}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:1.1rem}
+.card{background:var(--bg-surface);border:1px solid var(--border);border-radius:16px;padding:1.2rem 1.3rem;transition:box-shadow .25s,transform .25s;display:flex;flex-direction:column}
+.card:hover{box-shadow:0 10px 30px rgba(5,150,105,.14);transform:translateY(-3px)}
+.card .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:.6rem}
+.card .code{font-family:var(--font-mono);font-size:.72rem;background:#d1fae5;color:#047857;padding:.15rem .55rem;border-radius:6px;font-weight:700}
+.card h3{font-size:1.05rem;font-weight:800;margin-bottom:.35rem}
+.card>p{font-size:.86rem;color:var(--text-secondary);margin-bottom:.7rem}
+.card .meta{display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.6rem}
+.tag{font-size:.7rem;background:var(--bg-muted);color:var(--text-secondary);padding:.14rem .55rem;border-radius:999px;border:1px solid var(--border)}
+.explist{list-style:none;max-height:1400px;overflow:hidden;margin-bottom:.7rem}
+.explist li{display:flex;align-items:center;gap:.5rem;font-size:.82rem;padding:.42rem 0;border-top:1px dashed var(--border);color:var(--text-secondary)}
+.explist .no{font-family:var(--font-mono);font-size:.7rem;color:var(--text-muted);min-width:2.1em}
+.explist .stars{color:var(--accent-amber);font-size:.7rem;letter-spacing:1px}
+.explist a.ttl{flex:1;min-width:0;color:var(--text-secondary);border-radius:4px;transition:color .2s}
+.explist a.ttl:hover{color:var(--accent-teal);text-decoration:underline}
+.explist a.dur{margin-left:auto;font-size:.7rem;color:var(--accent-blue);background:#eff6ff;border:1px solid #bfdbfe;border-radius:999px;padding:.05rem .55rem;transition:background .2s}
+.explist a.dur:hover{background:#dbeafe}
+.hint{font-size:.75rem;color:var(--accent-teal);margin-top:auto;padding-top:.55rem;display:flex;justify-content:space-between;align-items:center}
+.pills{display:flex;flex-wrap:wrap;gap:.65rem}
+.pill{display:inline-flex;align-items:center;gap:.45rem;background:var(--bg-surface);border:1px solid var(--border);border-radius:999px;padding:.4rem .95rem;font-size:.83rem;color:var(--text-secondary);transition:.2s}
+.pill:hover{border-color:var(--accent-teal);color:var(--accent-teal);transform:translateY(-2px)}
+.pill i{width:.55rem;height:.55rem;border-radius:50%;display:inline-block}
+.kgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:1rem}
+.kcard{background:var(--bg-surface);border:1px solid var(--border);border-radius:14px;padding:1.1rem 1.2rem}
+.kcard h4{font-size:.95rem;margin-bottom:.45rem;display:flex;align-items:center;gap:.5rem}
+.kcard p{font-size:.84rem;color:var(--text-secondary)}
+.dot{width:.5rem;height:.5rem;border-radius:50%;display:inline-block}
+footer{border-top:1px solid var(--border);background:var(--bg-surface);margin-top:3rem}
+.foot-in{max-width:1200px;margin:0 auto;padding:1.4rem 1.5rem;display:flex;justify-content:space-between;align-items:center;font-size:.82rem;color:var(--text-secondary);flex-wrap:wrap;gap:.5rem}
+.reveal{opacity:0;transform:translateY(22px);transition:opacity .55s ease,transform .55s ease}
+.reveal.show{opacity:1;transform:none}
+@media(max-width:760px){.stats{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-in">
+    <a class="logo" href="../../index.html" style="text-decoration:none;color:inherit" title="返回课程首页">🎓 具身智能课程 · <span>教程首页</span></a>
+    <div class="crumb"><a href="../../index.html">← 返回总首页</a></div>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="eyebrow">CATEGORY 2 · 综合项目 / CASE-03</div>
+  <h1><span class="grad">老人跌倒监护</span> 综合项目</h1>
+  <p>9 个递进实验、48 学时，从 R1–R12 需求分析与分层架构起步，吃透 fall_config.yaml 十四段配置，串联 XFM 六麦唤醒、sherpa-onnx zipformer 听写、YOLOv8/BlazePose 视觉感知、六状态机跌倒判定、串口告警与证据链，最终以 RKLLM Qwen3.5 对话、VLM 复核与 --mode camera/image/video 全功能验证收口 —— 每个实验均配原理讲解、动画演示与互动沙盒，并贯穿"先问后救"的人文关怀与视频隐私意识。</p>
+  <div class="bades">
+    <span class="bade">📚 9 个实验</span>
+    <span class="bade">⏱️ 48 学时</span>
+    <span class="bade">🤖 摄像头+六麦+工控主机</span>
+    <span class="bade">🎯 前置：Python 与深度学习基础</span>
+  </div>
+</section>
+
+<div class="wrap">
+
+  <div class="stats reveal">
+    <div class="stat"><b>9</b><span>递进实验</span></div>
+    <div class="stat"><b>48</b><span>总学时</span></div>
+    <div class="stat"><b>3</b><span>知识篇章</span></div>
+    <div class="stat"><b>⭐1~3</b><span>难度跨度</span></div>
+  </div>
+
+  <div class="sec-head reveal">
+    <div class="k">CASE OVERVIEW</div>
+    <h2>案例全景：一条"感知 → 判定 → 交互 → 告警"的能力链</h2>
+    <p>老人居家跌倒监护不是单点算法竞赛，而是软硬件协同的系统工程 —— 下面四个环节在 9 个实验中逐层落地。</p>
+  </div>
+  <div class="kgrid reveal">
+    <div class="kcard">
+      <h4><span class="dot" style="background:#0d9488"></span>感知输入 · 眼睛与耳朵</h4>
+      <p>深度摄像头（ROS2 订阅 /ascamera_hp60c 彩色图）+ XFM 六麦阵列（/dev/ttyACM0 硬件唤醒、ALSA 录音），图像帧与音频流构成系统的两条原始输入流水线。</p>
+    </div>
+    <div class="kcard">
+      <h4><span class="dot" style="background:#2563eb"></span>智能判定 · 几何 + 状态机</h4>
+      <p>YOLOv8 RKNN 检测 person、BlazePose/RTMPose 提取关节点，用躯干角 &gt;50°、宽高比 &lt;0.5 两条几何判据驱动 IDLE→FALLING→LYING→ASK→ALERT/CANCELLED 六状态机，cooldown 60s 防轰炸。</p>
+    </div>
+    <div class="kcard">
+      <h4><span class="dot" style="background:#7c3aed"></span>温和交互 · 先问后救</h4>
+      <p>跌倒确认后先 TTS 温和询问、开启 12s 聆听窗口：老人答"救命/帮帮"立即告警，答"没事"取消，沉默超时才升级；RKLLM Qwen3.5 负责自由对话与语义兜底。</p>
+    </div>
+    <div class="kcard">
+      <h4><span class="dot" style="background:#e11d48"></span>可靠告警 · 证据可回溯</h4>
+      <p>告警帧以 0xAA55 帧头 + CRC8 校验经串口发给下位机（LED/蜂鸣器/OLED），同步落盘"三件套"jpg / _post.jpg / avi 与 events.jsonl，让每一次告警都有据可查。</p>
+    </div>
+  </div>
+
+  <div class="sec-head reveal">
+    <div class="k">CHAPTER 1</div>
+    <h2>第 1 章 · 需求与配置设计</h2>
+    <p>动手前先想清楚：把居家跌倒场景拆成可验收的需求，画出分层架构，再把全部阈值收进一份 YAML。</p>
+  </div>
+  <div class="grid">
+
+    <article class="card reveal">
+      <div class="top"><span class="code">EXP-01</span><span class="tag">⭐ ×1 · 4 学时</span></div>
+      <h3>需求分析（R1–R12）</h3>
+      <p>从老人居家跌倒监护的真实场景提炼 R1–R12 十二条需求，按输入 / 检测 / 判定 / 交互 / 告警 / 证据 / 调试七维分组，画出跌倒检测、语音询问、告警存档三条核心时序，明确"先问后救"设计与六大时序防护。</p>
+      <div class="meta">
+        <span class="tag">需求工程 R1-R12</span><span class="tag">七维分组</span>
+        <span class="tag">三条核心时序</span><span class="tag">六时序防护</span>
+      </div>
+      <ul class="explist">
+        <li><a class="ttl" href="exp-01-requirements/index.html#s1">① 问题引入：居家跌倒为什么必须"先问后救"</a><span class="stars">⭐</span><a class="dur" href="exp-01-requirements/index.html#s1">4 学时 · 开始</a></li>
+        <li><a class="ttl" href="exp-01-requirements/index.html#s6">② 动画讲解：R1–R12 需求全景与三条核心时序</a><span class="stars">⭐</span><a class="dur" href="exp-01-requirements/index.html#s6">原理 + 动画</a></li>
+        <li><a class="ttl" href="exp-01-requirements/index.html#s7">③ 互动讲解：R5 与 R6 分流自查台</a><span class="stars">⭐</span><a class="dur" href="exp-01-requirements/index.html#s7">互动</a></li>
+        <li><a class="ttl" href="exp-01-requirements/index.html#s8">④ 实操步骤：精读 docs/01 并做覆盖核对</a><span class="stars">⭐</span><a class="dur" href="exp-01-requirements/index.html#s8">实操</a></li>
+        <li><a class="ttl" href="exp-01-requirements/index.html#s10">⑤ 总结与思考</a><span class="stars">⭐</span><a class="dur" href="exp-01-requirements/index.html#s10">验证</a></li>
+      </ul>
+      <div class="hint"><span>👆 点击小节标题或右侧标签直达对应章节</span></div>
+    </article>
+
+    <article class="card reveal">
+      <div class="top"><span class="code">EXP-02</span><span class="tag">⭐⭐ ×2 · 4 学时</span></div>
+      <h3>分层系统架构</h3>
+      <p>六层依赖把"摄像头/六麦进、告警出"的整条链路拆开：看懂 fall/monitor.py 三大接口（process_frame / has_ask_session / on_kws）与 voice_loop.py 语音状态机如何靠双流水线协同，理解文本通道只是同一个状态机的另一个入口。</p>
+      <div class="meta">
+        <span class="tag">六层依赖</span><span class="tag">monitor.py 三接口</span>
+        <span class="tag">voice_loop 状态机</span><span class="tag">双流水线</span>
+      </div>
+      <ul class="explist">
+        <li><a class="ttl" href="exp-02-architecture/index.html#s1">① 问题引入：多模块系统靠什么"接口"对接</a><span class="stars">⭐⭐</span><a class="dur" href="exp-02-architecture/index.html#s1">4 学时 · 开始</a></li>
+        <li><a class="ttl" href="exp-02-architecture/index.html#s6">② 动画讲解：分层数据流与双流水线时序</a><span class="stars">⭐⭐</span><a class="dur" href="exp-02-architecture/index.html#s6">原理 + 动画</a></li>
+        <li><a class="ttl" href="exp-02-architecture/index.html#s7">③ 互动讲解：六层职责划分与接口连线台</a><span class="stars">⭐⭐</span><a class="dur" href="exp-02-architecture/index.html#s7">互动</a></li>
+        <li><a class="ttl" href="exp-02-architecture/index.html#s8">④ 实操步骤：精读 monitor.py / voice_loop.py 关键行</a><span class="stars">⭐⭐</span><a class="dur" href="exp-02-architecture/index.html#s8">实操</a></li>
+        <li><a class="ttl" href="exp-02-architecture/index.html#s10">⑤ 总结与思考</a><span class="stars">⭐⭐</span><a class="dur" href="exp-02-architecture/index.html#s10">验证</a></li>
+      </ul>
+      <div class="hint"><span>👆 点击小节标题或右侧标签直达对应章节</span></div>
+    </article>
+
+    <article class="card reveal">
+      <div class="top"><span class="code">EXP-03</span><span class="tag">⭐⭐ ×2 · 4 学时</span></div>
+      <h3>fall_config.yaml 配置详解</h3>
+      <p>十四段配置是整个系统的"总闸"：paths / model / detect / source / session / speech / state / interaction / alert / evidence / monitor / arm_reaction / server·display·save·log / llm。掌握 config_schema 必填与可缺省双轨、CLI &gt; yaml &gt; 代码默认的覆盖优先级，用 env_check 一键体检七库与模型文件。</p>
+      <div class="meta">
+        <span class="tag">十四段 YAML</span><span class="tag">config_schema</span>
+        <span class="tag">覆盖优先级</span><span class="tag">env_check 自检</span>
+      </div>
+      <ul class="explist">
+        <li><a class="ttl" href="exp-03-config/index.html#s1">① 问题引入：改一个阈值为什么要惊动全系统</a><span class="stars">⭐⭐</span><a class="dur" href="exp-03-config/index.html#s1">4 学时 · 开始</a></li>
+        <li><a class="ttl" href="exp-03-config/index.html#s6">② 动画讲解：十四段配置与三层覆盖优先级</a><span class="stars">⭐⭐</span><a class="dur" href="exp-03-config/index.html#s6">原理 + 动画</a></li>
+        <li><a class="ttl" href="exp-03-config/index.html#s7">③ 互动讲解：配置项开关与阈值对比台</a><span class="stars">⭐⭐</span><a class="dur" href="exp-03-config/index.html#s7">互动</a></li>
+        <li><a class="ttl" href="exp-03-config/index.html#s8">④ 实操步骤：env_check 自检 + CLI 覆盖实验</a><span class="stars">⭐⭐</span><a class="dur" href="exp-03-config/index.html#s8">实操</a></li>
+        <li><a class="ttl" href="exp-03-config/index.html#s10">⑤ 总结与思考</a><span class="stars">⭐⭐</span><a class="dur" href="exp-03-config/index.html#s10">验证</a></li>
+      </ul>
+      <div class="hint"><span>👆 点击小节标题或右侧标签直达对应章节</span></div>
+    </article>
+
+  </div>
+
+  <div class="sec-head reveal">
+    <div class="k">CHAPTER 2</div>
+    <h2>第 2 章 · 感知与交互子系统</h2>
+    <p>让系统真正"看得见、听得见、判得准"：语音唤醒与听写、人体检测与姿态几何、跌倒判定状态机三线并进。</p>
+  </div>
+  <div class="grid">
+
+    <article class="card reveal">
+      <div class="top"><span class="code">EXP-04</span><span class="tag">⭐⭐ ×2 · 6 学时</span></div>
+      <h3>语音交互子系统</h3>
+      <p>XFM 六麦硬件唤醒（/dev/ttyACM0，AIUI 0xA5 协议）→ ALSA 录音线程 → sherpa-onnx 中文 KWS（拼音@词表，阈值 0.25）→ zipformer ASR 端点断句 → Matcha-TTS + Vocos 合成；再用 feed_text 文本通道与 --text 模式在无麦克风环境下验证同一个 voice_loop 状态机。</p>
+      <div class="meta">
+        <span class="tag">XFM 六麦</span><span class="tag">sherpa-onnx KWS</span>
+        <span class="tag">zipformer ASR</span><span class="tag">Matcha-TTS · Vocos</span>
+      </div>
+      <ul class="explist">
+        <li><a class="ttl" href="exp-04-voice/index.html#s1">① 问题引入：为什么"听清"比"听懂"更难</a><span class="stars">⭐⭐</span><a class="dur" href="exp-04-voice/index.html#s1">6 学时 · 开始</a></li>
+        <li><a class="ttl" href="exp-04-voice/index.html#s6">② 动画讲解：唤醒 → 听写 → 播报的语音回路</a><span class="stars">⭐⭐</span><a class="dur" href="exp-04-voice/index.html#s6">原理 + 动画</a></li>
+        <li><a class="ttl" href="exp-04-voice/index.html#s7">③ 互动讲解：唤醒词改词三处同步与端点参数台</a><span class="stars">⭐⭐</span><a class="dur" href="exp-04-voice/index.html#s7">互动</a></li>
+        <li><a class="ttl" href="exp-04-voice/index.html#s8">④ 实操步骤：kws/asr/tts 三测试 + speech_text_demo</a><span class="stars">⭐⭐</span><a class="dur" href="exp-04-voice/index.html#s8">实操</a></li>
+        <li><a class="ttl" href="exp-04-voice/index.html#s10">⑤ 总结与思考</a><span class="stars">⭐⭐</span><a class="dur" href="exp-04-voice/index.html#s10">验证</a></li>
+      </ul>
+      <div class="hint"><span>👆 点击小节标题或右侧标签直达对应章节</span></div>
+    </article>
+
+    <article class="card reveal">
+      <div class="top"><span class="code">EXP-05</span><span class="tag">⭐⭐⭐ ×3 · 8 学时</span></div>
+      <h3>人体检测与姿态估计</h3>
+      <p>YOLOv8 转 RKNN 在 NPU 上做 letterbox + 类别内 NMS（iou 0.45，imgsz 640）检测 person，crop_margin 1.5 裁剪后由 BlazePose 33 点（或 RTMPose 17 点，vis_threshold 0.3）提关键点，计算躯干角 θ=arctan2 与宽高比 h/w 两条跌倒几何判据 —— 这是后面状态机的全部输入。</p>
+      <div class="meta">
+        <span class="tag">YOLOv8 RKNN</span><span class="tag">BlazePose 33 点</span>
+        <span class="tag">RTMPose 17 点</span><span class="tag">躯干角 / 宽高比</span>
+      </div>
+      <ul class="explist">
+        <li><a class="ttl" href="exp-05-pose-detection/index.html#s1">① 问题引入：摄像头看到的画面如何变成数字</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-05-pose-detection/index.html#s1">8 学时 · 开始</a></li>
+        <li><a class="ttl" href="exp-05-pose-detection/index.html#s6">② 动画讲解：检测 → 裁剪 → 关键点 → 几何判据</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-05-pose-detection/index.html#s6">原理 + 动画</a></li>
+        <li><a class="ttl" href="exp-05-pose-detection/index.html#s7">③ 互动讲解：score_thr / aspect 阈值误漏报台</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-05-pose-detection/index.html#s7">互动</a></li>
+        <li><a class="ttl" href="exp-05-pose-detection/index.html#s8">④ 实操步骤：detect_demo / pose_demo / 视频链路</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-05-pose-detection/index.html#s8">实操</a></li>
+        <li><a class="ttl" href="exp-05-pose-detection/index.html#s10">⑤ 总结与思考</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-05-pose-detection/index.html#s10">验证</a></li>
+      </ul>
+      <div class="hint"><span>👆 点击小节标题或右侧标签直达对应章节</span></div>
+    </article>
+
+    <article class="card reveal">
+      <div class="top"><span class="code">EXP-06</span><span class="tag">⭐⭐⭐ ×3 · 4 学时</span></div>
+      <h3>跌倒判定状态机</h3>
+      <p>每人一台六状态机：IDLE→FALLING（falling_window 1.5s）→LYING（lying_time 3.0s）→ASK（ask_timeout 12.0s 超时升级、confirm/cancel words 分流）→ALERT（恢复判据 aspect&gt;1.8 或 angle&lt;25° 持续 2s 回 IDLE）/ CANCELLED；cooldown 60s 只挡重复询问不挡新跌倒，IoU 贪心关联支撑多人跟踪。</p>
+      <div class="meta">
+        <span class="tag">六状态机</span><span class="tag">1.5s / 3.0s / 12s</span>
+        <span class="tag">cooldown 60s</span><span class="tag">IoU 多人关联</span>
+      </div>
+      <ul class="explist">
+        <li><a class="ttl" href="exp-06-fall-judgment/index.html#s1">① 问题引入：单帧"像跌倒"为什么不能直接报警</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-06-fall-judgment/index.html#s1">4 学时 · 开始</a></li>
+        <li><a class="ttl" href="exp-06-fall-judgment/index.html#s6">② 动画讲解：六状态机流转与 EVENT 日志</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-06-fall-judgment/index.html#s6">原理 + 动画</a></li>
+        <li><a class="ttl" href="exp-06-fall-judgment/index.html#s7">③ 互动讲解：事件步进器 —— 亲手推进一台状态机</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-06-fall-judgment/index.html#s7">互动</a></li>
+        <li><a class="ttl" href="exp-06-fall-judgment/index.html#s8">④ 实操步骤：fall_video_demo --text 观察状态迁移</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-06-fall-judgment/index.html#s8">实操</a></li>
+        <li><a class="ttl" href="exp-06-fall-judgment/index.html#s10">⑤ 总结与思考</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-06-fall-judgment/index.html#s10">验证</a></li>
+      </ul>
+      <div class="hint"><span>👆 点击小节标题或右侧标签直达对应章节</span></div>
+    </article>
+
+  </div>
+
+  <div class="sec-head reveal">
+    <div class="k">CHAPTER 3</div>
+    <h2>第 3 章 · 告警、对话与全链路验证</h2>
+    <p>把告警发出去、把证据留下来、把大模型接进来，最后用 image / video / camera 三种模式验证整条链路。</p>
+  </div>
+  <div class="grid">
+
+    <article class="card reveal">
+      <div class="top"><span class="code">EXP-07</span><span class="tag">⭐⭐⭐ ×3 · 4 学时</span></div>
+      <h3>告警与证据链</h3>
+      <p>串口告警帧 [AA][55][Func][Len][Data][CRC8]（CRC-8/MAXIM，poly 0x8C，对 Func→Data 求校验）驱动下位机 LED / 蜂鸣器 / OLED（Func 0x01 / 0x02 / 0x0A）；证据链用 FrameRing 保留 pre 3.0s + post 2.0s 帧，落盘三件套与 events.jsonl，双节流 buzzer 5s / TTS 10s 防止告警轰炸。</p>
+      <div class="meta">
+        <span class="tag">0xAA55 帧头</span><span class="tag">CRC-8/MAXIM</span>
+        <span class="tag">FrameRing 三件套</span><span class="tag">双节流</span>
+      </div>
+      <ul class="explist">
+        <li><a class="ttl" href="exp-07-alert-evidence/index.html#s1">① 问题引入：报警发出去了，凭什么说"报过"</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-07-alert-evidence/index.html#s1">4 学时 · 开始</a></li>
+        <li><a class="ttl" href="exp-07-alert-evidence/index.html#s6">② 动画讲解：串口告警帧结构与证据三件套</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-07-alert-evidence/index.html#s6">原理 + 动画</a></li>
+        <li><a class="ttl" href="exp-07-alert-evidence/index.html#s7">③ 互动讲解：CRC8 校验手算台与节流开关</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-07-alert-evidence/index.html#s7">互动</a></li>
+        <li><a class="ttl" href="exp-07-alert-evidence/index.html#s8">④ 实操步骤：跑 fall_video_demo 验证告警与落盘</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-07-alert-evidence/index.html#s8">实操</a></li>
+        <li><a class="ttl" href="exp-07-alert-evidence/index.html#s10">⑤ 总结与思考</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-07-alert-evidence/index.html#s10">验证</a></li>
+      </ul>
+      <div class="hint"><span>👆 点击小节标题或右侧标签直达对应章节</span></div>
+    </article>
+
+    <article class="card reveal">
+      <div class="top"><span class="code">EXP-08</span><span class="tag">⭐⭐⭐ ×3 · 8 学时</span></div>
+      <h3>LLM 对话与 VLM 复核</h3>
+      <p>RKLLM 加载 Qwen3.5-0.8B w4a16 量化模型（约 1.5G），ctypes 绑定 librkllmrt.so 起 Flask 服务（/v1/models、/v1/chat/completions，端口 8080）；LLMChat 按 max_history=6 拼接上下文。VLM 默认关闭（model.vlm.enabled=false），开启后对跌倒截图三分类 fall / not_fall / uncertain 辅助复核，优先级 ALERT &gt; ASK &gt; SPEAKING &gt; LLM。</p>
+      <div class="meta">
+        <span class="tag">RKLLM Qwen3.5</span><span class="tag">OpenAI 兼容接口</span>
+        <span class="tag">VLM 三分类复核</span><span class="tag">应答优先级</span>
+      </div>
+      <ul class="explist">
+        <li><a class="ttl" href="exp-08-llm-vlm/index.html#s1">① 问题引入：关键词匹配接不住老人的"随便聊聊"</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-08-llm-vlm/index.html#s1">8 学时 · 开始</a></li>
+        <li><a class="ttl" href="exp-08-llm-vlm/index.html#s6">② 动画讲解：LLM 服务拉起、历史拼接与复核链路</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-08-llm-vlm/index.html#s6">原理 + 动画</a></li>
+        <li><a class="ttl" href="exp-08-llm-vlm/index.html#s7">③ 互动讲解：应答优先级仲裁与 vlm.enabled 开关</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-08-llm-vlm/index.html#s7">互动</a></li>
+        <li><a class="ttl" href="exp-08-llm-vlm/index.html#s8">④ 实操步骤：llm_chat_test / curl /v1/models / vlm_demo</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-08-llm-vlm/index.html#s8">实操</a></li>
+        <li><a class="ttl" href="exp-08-llm-vlm/index.html#s10">⑤ 总结与思考</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-08-llm-vlm/index.html#s10">验证</a></li>
+      </ul>
+      <div class="hint"><span>👆 点击小节标题或右侧标签直达对应章节</span></div>
+    </article>
+
+    <article class="card reveal">
+      <div class="top"><span class="code">EXP-09</span><span class="tag">⭐⭐⭐ ×3 · 6 学时</span></div>
+      <h3>全功能验证</h3>
+      <p>fall_app.py 以 --mode camera / image / video 三模式跑通全流程：先 env_check 体检，再按 text → audio → camera 三级递进验证；camera 模式需先 ros2 launch 拉起深度相机、等 loop.wake_seen 事件；关注内存水位（ASR+TTS+LLM+YOLO/pose 约 2.7G，再开 VLM 破 3.8G 易 OOM）与证据完整性核验。</p>
+      <div class="meta">
+        <span class="tag">--mode camera/image/video</span><span class="tag">三级递进验证</span>
+        <span class="tag">内存水位</span><span class="tag">证据完整性</span>
+      </div>
+      <ul class="explist">
+        <li><a class="ttl" href="exp-09-full-verification/index.html#s1">① 问题引入：单点都通了，合起来为什么可能崩</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-09-full-verification/index.html#s1">6 学时 · 开始</a></li>
+        <li><a class="ttl" href="exp-09-full-verification/index.html#s6">② 动画讲解：三模式启动序列与资源占用曲线</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-09-full-verification/index.html#s6">原理 + 动画</a></li>
+        <li><a class="ttl" href="exp-09-full-verification/index.html#s7">③ 互动讲解：五步验收清单与故障决策台</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-09-full-verification/index.html#s7">互动</a></li>
+        <li><a class="ttl" href="exp-09-full-verification/index.html#s8">④ 实操步骤：env_check → video → camera 三关验证</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-09-full-verification/index.html#s8">实操</a></li>
+        <li><a class="ttl" href="exp-09-full-verification/index.html#s10">⑤ 总结与思考</a><span class="stars">⭐⭐⭐</span><a class="dur" href="exp-09-full-verification/index.html#s10">验证</a></li>
+      </ul>
+      <div class="hint"><span>👆 点击小节标题或右侧标签直达对应章节</span></div>
+    </article>
+
+  </div>
+
+  <div class="sec-head reveal">
+    <div class="k">TECH STACK</div>
+    <h2>技术栈与硬件平台</h2>
+    <p>全课程围绕工控主机 + 深度摄像头 + 六麦阵列展开，实验数据全部来自 elderly_companion 实验讲义实测。</p>
+  </div>
+  <div class="pills reveal">
+    <span class="pill"><i style="background:#059669"></i>需求工程 R1–R12</span>
+    <span class="pill"><i style="background:#0d9488"></i>六层分层架构</span>
+    <span class="pill"><i style="background:#2563eb"></i>fall_config.yaml 十四段</span>
+    <span class="pill"><i style="background:#7c3aed"></i>sherpa-onnx + zipformer</span>
+    <span class="pill"><i style="background:#e11d48"></i>YOLOv8 RKNN</span>
+    <span class="pill"><i style="background:#d97706"></i>BlazePose 33 点</span>
+    <span class="pill"><i style="background:#0891b2"></i>六状态机 · cooldown</span>
+    <span class="pill"><i style="background:#4f46e5"></i>RKLLM Qwen3.5</span>
+    <span class="pill"><i style="background:#be185d"></i>VLM 三分类复核</span>
+    <span class="pill"><i style="background:#b45309"></i>串口告警 · CRC8</span>
+    <span class="pill"><i style="background:#334155"></i>FrameRing 证据链</span>
+    <span class="pill"><i style="background:#0f766e"></i>摄像头 · 六麦 · 工控主机</span>
+  </div>
+
+  <div class="sec-head reveal">
+    <div class="k">LEARNING PATH</div>
+    <h2>学习路径建议</h2>
+  </div>
+  <div class="kgrid reveal">
+    <div class="kcard"><h4><span class="dot" style="background:#0d9488"></span>先立需求，再写代码</h4><p>EXP-01 的 R1–R12 与三条核心时序是全项目的"合同"：后面每一段代码、每一个阈值都能回溯到某条需求 —— 卡住时先回头对需求。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#2563eb"></span>配置是全系统的总闸</h4><p>EXP-03 吃透十四段 YAML 与覆盖优先级，调参时永远先问"改 yaml 还是加 CLI 参数"，env_check 不过不动手。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#7c3aed"></span>感知与状态机分两步验证</h4><p>先用 detect_demo / pose_demo 单图看懂几何判据，再进 fall_video_demo 看状态迁移 —— 混在一起调，出了误报永远不知道该改哪层。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#e11d48"></span>最后才开大模型与摄像头</h4><p>LLM/VLM 最吃内存也最不稳定：先用 --text 与 --mode video 把链路跑绿，再逐级开 audio、camera，随时盯 2.7G→3.8G 的内存水位。</p></div>
+  </div>
+
+  <div class="sec-head reveal">
+    <div class="k">DELIVERABLES</div>
+    <h2>九实验产出与学时一览</h2>
+    <p>每个实验的核心交付物，按篇章顺序累积成期末验收拼图 —— 报告缺项可回到对应实验的「08 实操步骤 · 记录要点」补齐。</p>
+  </div>
+  <div class="kgrid reveal" style="grid-template-columns:1fr">
+    <div class="kcard" style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:.84rem">
+        <thead><tr><th style="text-align:left;padding:.45rem .6rem;border-bottom:2px solid var(--border)">实验</th><th style="text-align:left;padding:.45rem .6rem;border-bottom:2px solid var(--border)">学时 / 类型</th><th style="text-align:left;padding:.45rem .6rem;border-bottom:2px solid var(--border)">核心交付物</th></tr></thead>
+        <tbody>
+          <tr><td style="padding:.4rem .6rem;border-bottom:1px solid var(--border)">EXP-01 需求分析</td><td style="padding:.4rem .6rem;border-bottom:1px solid var(--border)">4 学时 · 验证性</td><td style="padding:.4rem .6rem;border-bottom:1px solid var(--border)">R1–R12 覆盖核对表 + 三条核心时序图</td></tr>
+          <tr><td style="padding:.4rem .6rem;border-bottom:1px solid var(--border)">EXP-02 分层架构</td><td style="padding:.4rem .6rem;border-bottom:1px solid var(--border)">4 学时 · 设计性</td><td style="padding:.4rem .6rem;border-bottom:1px solid var(--border)">六层依赖图 + monitor 三接口调用关系笔记</td></tr>
+          <tr><td style="padding:.4rem .6rem;border-bottom:1px solid var(--border)">EXP-03 配置详解</td><td style="padding:.4rem .6rem;border-bottom:1px solid var(--border)">4 学时 · 设计性</td><td style="padding:.4rem .6rem;border-bottom:1px solid var(--border)">env_check 全绿截图 + CLI 覆盖优先级实验记录</td></tr>
+          <tr><td style="padding:.4rem .6rem;border-bottom:1px solid var(--border)">EXP-04 语音交互</td><td style="padding:.4rem .6rem;border-bottom:1px solid var(--border)">6 学时 · 综合性</td><td style="padding:.4rem .6rem;border-bottom:1px solid var(--border)">kws/asr/tts 三测试日志 + 唤醒词三处同步改词记录</td></tr>
+          <tr><td style="padding:.4rem .6rem;border-bottom:1px solid var(--border)">EXP-05 检测与姿态</td><td style="padding:.4rem .6rem;border-bottom:1px solid var(--border)">8 学时 · 综合性</td><td style="padding:.4rem .6rem;border-bottom:1px solid var(--border)">detect/pose_demo 实测（延迟、score_thr 对比）+ 几何判据推演</td></tr>
+          <tr><td style="padding:.4rem .6rem;border-bottom:1px solid var(--border)">EXP-06 跌倒状态机</td><td style="padding:.4rem .6rem;border-bottom:1px solid var(--border)">4 学时 · 综合性</td><td style="padding:.4rem .6rem;border-bottom:1px solid var(--border)">状态迁移 EVENT 日志 + T8 用例 Pass/Fail 表</td></tr>
+          <tr><td style="padding:.4rem .6rem;border-bottom:1px solid var(--border)">EXP-07 告警证据链</td><td style="padding:.4rem .6rem;border-bottom:1px solid var(--border)">4 学时 · 综合性</td><td style="padding:.4rem .6rem;border-bottom:1px solid var(--border)">CRC 手工对拍 + 证据四件套验证 + T9 用例表 + 清理清单</td></tr>
+          <tr><td style="padding:.4rem .6rem;border-bottom:1px solid var(--border)">EXP-08 LLM·VLM</td><td style="padding:.4rem .6rem;border-bottom:1px solid var(--border)">8 学时 · 综合性</td><td style="padding:.4rem .6rem;border-bottom:1px solid var(--border)">llm_chat_test 会话记录（含耗时）+ vlm_demo 三分类输出</td></tr>
+          <tr><td style="padding:.4rem .6rem;border-bottom:1px solid var(--border)">EXP-09 全功能验证</td><td style="padding:.4rem .6rem;border-bottom:1px solid var(--border)">6 学时 · 综合性</td><td style="padding:.4rem .6rem;border-bottom:1px solid var(--border)">五步手册验收表 + 证据三件套完整性确认 + 四层清理复核</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="sec-head reveal">
+    <div class="k">LAB ENVIRONMENT</div>
+    <h2>实验环境与运行产物</h2>
+    <p>全课程共用一套实验室基线：离线模式只需板端，实时模式补齐深度相机与六麦即可。</p>
+  </div>
+  <div class="kgrid reveal">
+    <div class="kcard">
+      <h4><span class="dot" style="background:#0d9488"></span>硬件平台</h4>
+      <p>具身智能机器人小车 C1（RK3576 + STM32F407）；HP60C RGB-D 深度相机（ROS2 话题 /ascamera_hp60c/camera_publisher/rgb0/image）；XFM 六麦阵列（/dev/ttyACM0）；扬声器 plughw:3,0、录音 plughw:4,0；告警串口 /dev/ttyUSB0（1Mbps）。</p>
+    </div>
+    <div class="kcard">
+      <h4><span class="dot" style="background:#2563eb"></span>软件与依赖</h4>
+      <p>Ubuntu 22.04 + ROS 2 Humble；板端 venv /home/iflytek/ros2_venv/bin/python3（Python 3.10），预装 rknnlite 2.3.2、sherpa-onnx 1.13.4、opencv-python 4.11.0、flask、pyserial 3.5、mjpeg_streamer；板端禁自动 pip install。</p>
+    </div>
+    <div class="kcard">
+      <h4><span class="dot" style="background:#7c3aed"></span>模型清单</h4>
+      <p>yolov8n.rknn 检测 · pose_landmark_full.rknn 姿态 · zipformer KWS（encoder/decoder/joiner）· zipformer ASR 三件套 · Matcha-TTS+Vocos 八件套 · RKLLM Qwen3.5（w4a16 ≈1.5G）· VLM 视觉模型（默认不启用）。</p>
+    </div>
+    <div class="kcard">
+      <h4><span class="dot" style="background:#e11d48"></span>运行产物管理</h4>
+      <p>runs/evidence/ 存证据三件套（max_files=100 轮转）、runs/tts_cache/ 预合成缓存（二次启动零延迟）、runs/*.log 日志；三者与 testdata/ 测试视频全部 gitignore 不入库，证据增长快需定期 rm 释放磁盘。</p>
+    </div>
+  </div>
+
+  <div class="sec-head reveal">
+    <div class="k">QUICK FIX</div>
+    <h2>实验室通用排障速查</h2>
+    <p>四个出现频率最高的"拦路虎"，先查这里再翻日志。</p>
+  </div>
+  <div class="kgrid reveal">
+    <div class="kcard"><h4><span class="dot" style="background:#d97706"></span>env_check 报大片 MISSING</h4><p>九成是用错了解释器 —— 系统 python3 没有 rknnlite/sherpa_onnx。改用 /home/iflytek/ros2_venv/bin/python3 或先激活板端 venv，再跑自检。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#e11d48"></span>唤醒没反应 / 播报无声</h4><p>查两处独占：log_server 抢了 /dev/ttyACM0（pkill -f log_server）、aplay 残留占着 plughw:3,0（pkill -9 aplay）。设备句柄排他，占着就是静默失败。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#2563eb"></span>启动报端口冲突</h4><p>MJPEG 8088 与 LLM 8080/自定义端口撞车时启动即报错退出 —— 用 ss -tlnp 找残留进程，改 server.port 或 llm.server.port 分开配置。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#7c3aed"></span>camera 模式无画面</h4><p>只缺一步：终端 1 先 ros2 launch car1_peripherals depth_camera.launch.py，再用 ros2 topic hz /ascamera_hp60c/camera_publisher/rgb0/image 确认话题有数。</p></div>
+  </div>
+
+  <div class="sec-head reveal">
+    <div class="k">COURSE MAP</div>
+    <h2>三篇章教学安排</h2>
+    <p>9 个实验按依赖关系分为三个篇章，建议按序推进，篇章内实验共享前序产出。</p>
+  </div>
+  <div class="kgrid reveal">
+    <div class="kcard"><h4><span class="dot" style="background:#059669"></span>第 1 章 · 需求与配置设计（EXP-01 ~ 03）</h4><p>先立需求 R1-R12，再画六层架构，最后落地 fall_config.yaml 十四段 —— 不接硬件的 12 学时"纸上谈兵"，却是后续所有子系统的图纸。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#2563eb"></span>第 2 章 · 感知与交互子系统（EXP-04 ~ 06）</h4><p>语音环（XFM 六麦 + zipformer）、视觉环（YOLOv8 + BlazePose/RTMPose）、判定核心（躯干角/宽高比 + 六状态机）三条线并进，合计 18 学时重头戏。</p></div>
+    <div class="kcard"><h4><span class="dot" style="background:#7c3aed"></span>第 3 章 · 告警、对话与全链路验证（EXP-07 ~ 09）</h4><p>串口告警帧 + 证据链、RKLLM 对话与 VLM 复核，最后用 --mode 三入口做 6 学时集成验收 —— 把前两章拼成一台能交付的机器。</p></div>
+  </div>
+
+</div>
+
+<footer>
+  <div class="foot-in">
+    <span>🎓 具身智能课程 · CASE-03 · 老人跌倒监护综合项目（CASE-03 · 48 学时 · 9 实验）</span>
+    <span><a href="../../index.html">总首页</a> · 基于 elderly_companion 实验讲义改编，含原理讲解与互动演示</span>
+  </div>
+</footer>
+
+<script>
+var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('show');io.unobserve(e.target);}});},{threshold:.12});
+document.querySelectorAll('.reveal').forEach(function(el){io.observe(el);});
+</script>
+</body>
+</html>

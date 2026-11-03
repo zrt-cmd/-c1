@@ -1,0 +1,263 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/cases/exp006b-object-tracking/exp-02-track-engine/index.html
+TITLE: EXP-02 · TrackEngine 单状态机架构 — 通用目标追踪综合项目
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+EXP-02 · TrackEngine 单状态机架构 — 通用目标追踪综合项目
+🎓 具身智能课程 ·
+通用目标追踪
+综合项目
+/
+通用目标追踪
+/ EXP-02
+本页目录
+01 问题引入：语音和画面凭什么不互相卡
+02 原理通俗讲解：电梯楼层调度
+03 关联知识点
+04 实验目标
+05 实验环境与准备
+06 动画讲解：单状态机五步循环与指令流
+07 互动讲解：状态机事件步进器
+08 实操步骤：源码定位双流水线关键行
+09 重点与易错点
+10 总结与思考
+CH1 · 需求与架构设计
+EXP-01 需求分析
+EXP-02 单状态机架构
+EXP-03 配置详解
+CH2 · 感知与交互核心
+EXP-04 DeepSORT 底座
+EXP-05 LLM 门控
+EXP-06 VLM 选目标
+CH3 · 语音、可靠性与验收
+EXP-07 语音打断
+EXP-08 事件降级
+EXP-09 全功能验证
+EXP-02 · 第 1 章 · 设计性 · 4 学时
+TrackEngine 单状态机架构
+视觉一秒钟几十帧、语音一句话几秒钟 —— 两种节奏的活儿凭什么同居一进程还不打架？答案是
+单状态机
+：TrackEngine 只有一条 RUN 主循环（读帧 → 处理 → 排干指令 → 计算绘制 → 发布），耗时的 LLM 调用全部推给独立线程 CommandWorker；指令满了丢最旧（Queue maxsize=8），等指令时暂停处理但
+30 秒看门狗
+自动恢复。
+难度 ⭐⭐ · 4 学时
+engine.run
+CommandWorker
+_native_gate
+pending/epoch
+01
+问题引入：语音和画面凭什么不互相卡
+一次 LLM FunctionCall 往返动辄秒级，而视频帧 30ms 一帧。若把"跑 LLM"直接塞进主循环，画面立刻冻成幻灯片；若每个线程都能随便改追踪状态，ID 表会被改出"灵异事件"。源工程用两个设计解掉这对矛盾：
+1
+主循环
+只做便宜的事
+：读帧、跑管线、排干指令、绘制、发布
+2
+贵的事丢给
+CommandWorker
+（独立线程 + Queue maxsize=8），put_nowait 满则丢最旧
+3
+指令到了主线程才生效：_drain_commands 把队列排干再统一 apply
+4
+等指令时用
+pending 事件
+只暂停"处理"不暂停"读帧"，pause_timeout 30s 兜底
+💡 一句话架构
+整个应用只有
+一条状态主线
+：谁在什么时候能改 follow_ids / session 状态，全部由主循环说了算 —— 这就是"单状态机"：状态只有一个写者，其它线程只能
+递纸条
+（队列）进来。
+02
+原理通俗讲解：电梯楼层调度
+把 TrackEngine 想成
+电梯调度系统
+：轿厢（主循环）沿固定节拍"开门—关门—上下行—播报楼层"，每一步都有规程，不会因为某个乘客（指令）催两句就跳过关门流程直接冲刺。乘客按键（语音指令）只是
+登记进按键队列
+，调度器在每个到达层统一取按钮执行 —— 电梯永远不会"一边开门一边加速"，正是因为它
+一次只处于一种状态、按固定顺序流转
+。
+调度员
+engine.run 五步节拍
+L89-93 起的主循环：读帧 → pipeline.process → _drain_commands → _compute_draw → _publish（L63 发布）。每圈固定顺序，杜绝"跳步"。
+大堂前台
+CommandWorker 独立线程
+apps/track_app.py L196-235：threading.Thread 起线程，队列 Queue(maxsize=8)，L232-236 put_nowait —— 队满丢最旧，绝不阻塞。
+对讲机
+_handle 指令分发
+L246-269：pending.set 通知主循环 → epoch+1 丢弃迟到指令（L249-251）→ 场景上下文 → LLM → dispatch → on_reply 回播报。
+电梯门传感器
+pending + 看门狗
+tracking.pause_wait=true 时主循环停在"处理"步等待 pending；超 pause_timeout=30.0 秒自动放弃等待恢复跑，防死等。
+🔍 为什么不用多状态机
+多线程各持状态 → 竞态、死锁、"我明明清除成功怎么又跟上了"。单写者把并发问题压缩成一个点：
+所有状态变更都发生在主循环里
+，其它线程只能通过队列"预约办理"。
+03
+关联知识点
+知识点一
+生产者-消费者与有界队列
+Queue(maxsize=8) 是有界缓冲：队满 put_nowait 抛出即丢弃，且丢最旧 —— 指令是"过期即失效"的，丢旧比丢新更符合交互语义。
+知识点二
+pending 事件与 epoch 世代号
+pending 是 threading.Event：指令线程 set 通知，主循环 wait；epoch 是世代计数，每轮新指令 +1，旧世代的迟到结果一律丢弃。
+知识点三
+_native_gate 门控五分支
+判定顺序即优先级：清除短路 → 非指令回落闲聊 → ID 存在性对齐 → 无 id 带描述走 VLM → else 放行（详见 EXP-05）。
+知识点四
+卡尔曼门控（架构层预览）
+pipeline 内部，8 维状态 [cx,cy,aspect,height,vx,vy,va,vh] 按 F=np.eye(8); F[0:4,4:]=np.eye(4) 预测；CHI2INV95（df4=9.4877）卡关联。
+角色
+运行位置
+能做什么
+不能做什么
+主循环
+engine.run
+改追踪状态、apply 指令、绘制发布
+不能阻塞等 LLM
+CommandWorker
+子线程
+调 LLM、门控判定、往队列塞结果
+不能直接改 follow_ids
+词表预路由
+入队前
+清除词/口令词直接给语义
+不能代替门控最终判定
+04
+实验目标
+默画 RUN 主循环五步（L89-93 ← L63 发布），并说出每步该在源码哪一行
+解释 CommandWorker 与主循环的
+唯一通信渠道
+：Queue(maxsize=8) + put_nowait
+说清 pending 暂停的是"处理帧"而非"读帧"，以及 30s 兜底语义
+按顺序复述 _native_gate 五分支优先级（清除 > 闲聊回落 > 存在性 > VLM > 放行）
+读懂 session.py L12-25 的 set_follow / visible_ids 对状态的两种写入口
+用 grep 在 5 分钟内定位 CommandWorker、_native_gate、submit_effect、pending、epoch 五处锚点
+05
+实验环境与准备
+核心文件
+apps/track_app.py
+主入口：CommandWorker（L196-235）、_handle（L246-269）、词表路由 parse_instruction（L45-68）、_native_gate（L320-366）。
+追踪模块
+tracking/ engine · session
+engine.py：run 主循环、_drain_commands、事件处理 _handle_event、_compute_draw、_publish；session.py L12-25：set_follow、visible_ids。
+验证手段
+文本模式最稳
+无需相机与麦克风：
+--video ... --text
+直接在 stdin 敲指令，终端上能看到 [cmd] 打印的门控分支走向。
+# 进入工程，确认修改时间与你要读的文件同批
+cd
+~/ros2_ws/src/xflz_eai_car1/app/object_tracking
+ls
+apps/ tracking/ session/ 2>/dev/null ||
+ls
+apps/ tracking/
+# 准备一份离线测试视频（讲义所用样例）
+# /home/iflytek/ros2_ws/src/xflz_eai_car1/vision/07_multi_object_tracking/test.mp4
+06
+动画讲解：单状态机五步循环与指令流
+左边是主循环节拍，右边是 CommandWorker 线程 —— 看两者如何通过那条 8 格有界队列握手：
+主循环五步节拍 × CommandWorker（6 秒循环）
+① 读帧
+② pipeline
+③ 排干指令
+④ 计算绘制
+⑤ _publish 发布 → 回到①
+Queue(maxsize=8)
+put_nowait 队满丢最旧
+CommandWorker 子线程
+_handle：pending.set（L246-269）
+epoch+1 → 校验门控判定
+dispatch → on_reply 文案
+submit_effect 入队（L232-236）
+pause_timeout=30s：超时放弃等待
+状态唯一写者=主循环；子线程只能递纸条进 8 格队列
+动画 2-1｜五步节拍恒定顺序；指令从右侧线程经 8 格有界队列汇入第 ③ 步，队满丢最旧、超时 30s 自愈
+07
+互动讲解：状态机事件步进器
+按顺序点事件，观察主循环停在哪一步、队列与 pending/epoch 如何变化：
+状态机事件步进器 · Engine Stepper
+📹 拍到一帧
+🗣 发出"追踪 id3"
+⚡ 连发 10 条指令
+⏱ pending 卡满 30 秒
+↺ 复位
+// 从"拍到一帧"开始，按点击顺序观察状态迁移
+初始：RUN 循环空转，队列空，pending 未置位，epoch=N。
+💡 对照实验
+步进器里"卡 30 秒"的分支对应真实工程的 pause_timeout=30.0：
+看门狗不是 bug 修复，而是架构预设
+—— 设计者预见到 LLM 可能永远不回话，于是给等待加了上限。
+08
+实操步骤：源码定位双流水线关键行
+1
+一条 grep 把 CommandWorker / 门控 / 提交 / 同步原语全部抓出来
+2
+打开 engine.run（L89-93）逐行对照五步节拍，确认与动画一致
+3
+读 _handle（L246-269）：pending.set → epoch 丢弃 → LLM → dispatch → on_reply
+4
+文本模式跑一条指令，看 [cmd] 打印的门控分支与你预判是否一致
+5
+读 session.py L12-25，画出 follow_ids / visible_ids 两个状态写入口
+# ① 五处架构锚点一次抓齐（源讲义原命令）
+grep
+-n "class CommandWorker\|_native_gate\|submit_effect\|pending\|epoch" apps/track_app.py
+# ② 主循环五步：打开 run 看 L89-93，发布在 L63
+grep
+-n "def run\|_drain_commands\|_compute_draw\|_publish" tracking/engine.py
+# ③ 文本模式实测一条指令（离线样例视频）
+python3
+apps/track_app.py --video /home/iflytek/ros2_ws/src/xflz_eai_car1/vision/07_multi_object_tracking/test.mp4 --text
+# 终端敲：追踪 id3
+# [cmd] track_ids {3}   → 回复"好的，只追踪 id3"，主循环第③步 apply
+# ④ session 两个状态入口
+grep
+-n "set_follow\|visible_ids" tracking/session.py
+# L12-25
+🔍 指令生命周期
+一句话过全链：stdin/ASR → 词表预路由 → 队列（8 格，满丢最旧）→ _handle pending.set（暂停"处理"）→ epoch+1 防旧指令复活 → LLM FunctionCall → _native_gate 五分支 → dispatch → on_reply 回 TTS，主循环第③步统一 apply。
+09
+重点与易错点
+⚠️ 头号易错
+pending 是
+只暂停"处理"不丢任何帧源读取节奏
+的开关：命令 pending.set 之后主循环停在处理步（L249-251 顺带 epoch+1 丢弃旧指令），但读帧照常 —— 恢复那一刻看到的永远是"最新画面"，不会补播旧帧造成状态错乱。
+⚠️ 常见坑
+现象 → 解法
+队列满以为是 bug
+连敲指令丢消息 → 设计如此：maxsize=8 + put_nowait，队满丢最旧（L232-236）
+改状态不走主循环
+在子线程直接改 follow_ids → 违反单写者原则，必须 submit_effect 入队由主循环 apply
+等 LLM 引发死等
+模型无响应画面停 → 正常应靠 pause_timeout=30.0 自愈；若真停了查 pause_wait 配置
+迟到指令突然生效
+打断后旧指令又执行 → epoch 未递增；确认 _handle L249-251 有"epoch 已变，丢弃迟到指令"
+门控分支顺序记反
+以为 ID 判定先于清除 → 实际五分支：清除短路 → 闲聊回落 → ID 存在性 → 无 id 带描述 VLM → else 放行
+pause_timeout 调太小
+LLM 首次加载 30-60s 被误杀 → timeout 与模型就绪时间要匹配，别小于服务启动耗时
+五步节拍与源码行号（L89-93 / L63 / L246-269 / L232-236 / session L12-25）能对上
+能画出"两条流水线 + 8 格队列"的架构草图
+把 pause_wait 与 pause_timeout 的语义用自己的话讲给同桌听
+门控五分支顺序倒背如流（下一步 EXP-05 会考）
+10
+总结与思考
+✅ 完成成果
+架构草图 + 五处源码锚点
+主循环五步、子线程队列、pending/epoch 同步机制全部定位到行号。
+🧠 原理收获
+单写者并发哲学
+状态只有一个写者，其余线程递纸条；竞态区被压缩到主循环一处。
+🛠 技能收获
+grep 锚点定位法
+用关键词清单在陌生大型文件里快速建立坐标系。
+➡ 承上启下
+队列里的"配置之手"
+maxsize、pause_timeout、门控开关都来自 track_config.yaml —— 下个实验拆它。
+📝 思考题 1
+_native_gate 五分支为什么把"清除短路"放第一位、把"else 放行"放最后？如果把顺序反过来（先放行再判清除），哪条需求（提示：R9）会最先被违反？
+📝 思考题 2
+队列策略选了"满时丢最旧"而非"丢最新"或"阻塞等待"。结合语音交互连续下达指令的场景，说明为什么丢旧是唯一合理选择；再想什么场景下这个策略会出问题。
+CASE-04 · 通用目标追踪综合项目 · EXP-02 TrackEngine 单状态机架构
+4 学时 · 设计性 · 基于 object_tracking 实验讲义改编

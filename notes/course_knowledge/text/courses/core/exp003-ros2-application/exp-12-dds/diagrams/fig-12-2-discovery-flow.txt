@@ -1,0 +1,33 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp003-ros2-application/exp-12-dds/diagrams/fig-12-2-discovery-flow.html
+TITLE: 图 12-2 · 两阶段发现
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+图 12-2 · 两阶段发现
+图 12-2 · 两阶段发现：先 SPDP 找人，再 SEDP 找端点
+本图回答的问题：没写连接代码，两个节点后台分几步完成匹配？
+节点 A · Participant
+GUID 0x1a… · 域 0
+节点 B · Participant
+GUID 0x2b… · 域 0
+① SPDP · 每周期向组播喊"我来了"
+组播 239.255.0.1 · 7400
+BestEffort · 丢一两条下周期再喊
+记进花名册
+花名册：互记 GUID + 楼号
+只是"知道有谁"，无数据流动
+② SEDP · 交换端点
+端点清单 + QoS 互相交换
+话题名 · 类型 · QoS 合同
+③ 三门判定
+同域 + 同话题类型
+且 QoS 请求 ≤ 提供 ?
+是
+撮合成功 · 数据链路建立
+publish → subscribe 送达
+否
+拒绝撮合
+count: 0 · 无报错
+✅ 结论：SPDP 找人 → SEDP 找端点，零配置完成建链
+⚠️ 风险：任一门不过即无声失败，无任何报错提示
+🔍 验证：互动 12-1 四步 + 04 节 B-2（count: 0）
+EXP-12 · DDS 通信中间件剖析

@@ -1,0 +1,172 @@
+/* =============================================================
+   beginner.css — 初学者版课程组件（叠加在 tutorial.css 之上）
+   用法：<link rel="stylesheet" href="../shared/tutorial.css">
+         <link rel="stylesheet" href="../shared/beginner.css">
+   原则：一屏一个概念，能少一个字就少一个字。
+   ============================================================= */
+
+/* ---------- ① 一句话原理卡（页面最上方，必须 30 秒看懂） ---------- */
+.idea{
+  background:linear-gradient(135deg,#f0fdfa 0%,#eff6ff 100%);
+  border:1.5px solid #99f6e4;border-radius:16px;
+  padding:20px 24px;margin:0 0 26px;
+}
+.idea .tag1{
+  display:inline-block;font-family:var(--font-mono);font-size:11px;font-weight:700;
+  letter-spacing:.16em;color:#0f766e;background:#ccfbf1;border:1px solid #99f6e4;
+  border-radius:999px;padding:2px 10px;margin-bottom:10px;
+}
+.idea p.big{font-size:17px;line-height:1.85;color:#134e4a;margin:0 0 10px;font-weight:600}
+.idea p.big b{color:#0f766e;background:linear-gradient(180deg,transparent 62%,#ccfbf1 62%);padding:0 2px}
+.idea .analogy{
+  font-size:14.5px;color:#334155;line-height:1.8;margin:0;padding:12px 16px;
+  background:rgba(255,255,255,.72);border-radius:10px;border-left:3px solid #14b8a6;
+}
+.idea .analogy b{color:#0f766e}
+
+/* ---------- ② 三步实操（初学者只看这个就能做出来） ---------- */
+.steps3{counter-reset:s3;list-style:none;padding:0;margin:16px 0}
+.steps3>li{
+  counter-increment:s3;position:relative;
+  background:#fff;border:1.5px solid var(--border);border-radius:14px;
+  padding:16px 18px 16px 60px;margin-bottom:12px;
+}
+.steps3>li::before{
+  content:counter(s3);position:absolute;left:16px;top:15px;
+  width:30px;height:30px;border-radius:50%;background:var(--theme,#0d9488);color:#fff;
+  font-family:var(--font-mono);font-weight:700;font-size:15px;
+  display:flex;align-items:center;justify-content:center;
+}
+.steps3>li>.st{font-size:15.5px;font-weight:700;color:var(--head);margin-bottom:6px;display:block}
+.steps3>li>.st em{
+  font-style:normal;font-size:12px;font-weight:600;color:#0f766e;background:#ccfbf1;
+  border-radius:6px;padding:1px 7px;margin-left:8px;
+}
+.steps3>li p{font-size:14px;margin-bottom:8px;color:#475569}
+.steps3>li p:last-child{margin-bottom:0}
+.steps3 pre{margin:8px 0 8px}
+
+/* ---------- ③ 预期输出（你该看到什么） ---------- */
+.expect{
+  background:#0b1220;border:1px solid #1e293b;border-left:4px solid #4ade80;
+  border-radius:12px;padding:14px 18px;margin:12px 0;
+  font-family:var(--font-mono);font-size:13px;line-height:1.85;color:#cbd5e1;
+  white-space:pre-wrap;overflow-x:auto;
+}
+.expect::before{
+  content:'✓ 你应该看到 / EXPECTED';display:block;
+  font-size:11px;letter-spacing:.14em;color:#4ade80;font-weight:700;margin-bottom:8px;
+}
+.expect b{color:#fbbf24;font-weight:700}
+.expect i{color:#64748b;font-style:normal}
+
+/* ---------- ④ 一句话总结（每节结尾固定收束） ---------- */
+.oneline{
+  display:flex;gap:10px;align-items:flex-start;
+  background:#fffbeb;border:1px solid #fde68a;border-radius:12px;
+  padding:12px 16px;margin:14px 0;font-size:14.5px;line-height:1.8;color:#78350f;
+}
+.oneline::before{content:'🔑';flex:none;font-size:15px}
+.oneline b{color:#92400e}
+
+/* ---------- ⑤ 折叠块：进阶内容默认收起 ---------- */
+details.deep{
+  border:1px solid var(--border);border-radius:12px;background:#f8fafc;
+  margin:14px 0;padding:0;overflow:hidden;
+}
+details.deep>summary{
+  cursor:pointer;list-style:none;padding:12px 16px;
+  font-size:14px;font-weight:700;color:#475569;
+  display:flex;align-items:center;gap:8px;
+}
+details.deep>summary::-webkit-details-marker{display:none}
+details.deep>summary::before{
+  content:'▸';color:var(--theme,#0d9488);font-size:14px;transition:transform .2s;
+}
+details.deep[open]>summary::before{transform:rotate(90deg)}
+details.deep[open]>summary{border-bottom:1px solid var(--border);color:var(--head)}
+details.deep>summary em{
+  font-style:normal;font-size:11.5px;font-weight:600;color:#94a3b8;margin-left:auto;
+}
+details.deep>.deep-body{padding:14px 18px;font-size:14px;line-height:1.8;color:#475569}
+details.deep>.deep-body>*:first-child{margin-top:0}
+
+/* ---------- ⑥ 输入/输出对照（这个实验吃什么、吐什么） ---------- */
+.io2{display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:stretch;margin:16px 0}
+.io2 .cellbox{background:#f8fafc;border:1.5px solid var(--border);border-radius:12px;padding:14px 16px}
+.io2 .cellbox .lb{
+  font-size:11px;letter-spacing:.14em;font-weight:700;color:#94a3b8;
+  display:block;margin-bottom:8px;font-family:var(--font-mono);
+}
+.io2 .cellbox .v{font-size:14.5px;color:var(--head);font-weight:700;margin-bottom:4px}
+.io2 .cellbox .d{font-size:13px;color:#64748b;line-height:1.65;margin:0}
+.io2 .cellbox.in{border-color:#bfdbfe;background:#eff6ff}
+.io2 .cellbox.out{border-color:#bbf7d0;background:#f0fdf4}
+.io2 .arw{display:flex;align-items:center;justify-content:center;font-size:20px;color:var(--theme,#0d9488);font-weight:800}
+@media(max-width:700px){.io2{grid-template-columns:1fr}.io2 .arw{transform:rotate(90deg);padding:4px 0}}
+
+/* ---------- ⑦ 踩坑速查（一条一行，现象 → 原因 → 动作） ---------- */
+table.pit2{width:100%;border-collapse:collapse;font-size:13.5px;margin:12px 0}
+table.pit2 th{background:#fef2f2;color:#991b1b;text-align:left;padding:9px 12px;border:1px solid #fecaca;font-weight:600;font-size:12.5px}
+table.pit2 td{padding:9px 12px;border:1px solid var(--border);vertical-align:top;line-height:1.7}
+table.pit2 td:first-child{color:#991b1b;font-weight:600;width:30%}
+table.pit2 td:last-child{color:#047857;width:32%}
+table.pit2 tr:nth-child(even) td{background:#fff}
+table.pit2 tr:nth-child(even) td:first-child{background:#fffbfb}
+
+/* ---------- ⑧ 随堂小测（点选项即时判定） ---------- */
+.quiz2{background:#fff;border:1.5px solid var(--border);border-radius:14px;padding:18px 20px;margin:14px 0}
+.quiz2 .qq{font-size:14.5px;font-weight:700;color:var(--head);margin-bottom:12px;line-height:1.7}
+.quiz2 .qq .qn{
+  display:inline-block;font-family:var(--font-mono);font-size:11.5px;font-weight:700;
+  background:var(--theme,#0d9488);color:#fff;border-radius:6px;padding:1px 8px;margin-right:8px;
+}
+.quiz2 .opt{
+  display:block;background:#f8fafc;border:1.5px solid var(--border);border-radius:10px;
+  padding:10px 14px;margin-bottom:8px;cursor:pointer;font-size:14px;color:#334155;
+  transition:.18s;
+}
+.quiz2 .opt:hover{border-color:var(--theme,#0d9488);background:#f0fdfa}
+.quiz2 .opt.ok{border-color:#34d399;background:#f0fdf4;color:#047857;font-weight:600}
+.quiz2 .opt.ok::after{content:'  ✓ 对了';font-size:12.5px;color:#059669}
+.quiz2 .opt.no{border-color:#fca5a5;background:#fef2f2;color:#991b1b}
+.quiz2 .opt.no::after{content:'  ✗ 再想想';font-size:12.5px;color:#dc2626}
+.quiz2 .fb{font-size:13.5px;line-height:1.75;color:#475569;padding:10px 14px;border-radius:10px;background:#f1f5f9;margin-top:4px;display:none}
+.quiz2 .fb.on{display:block}
+.quiz2 .fb b{color:#0f766e}
+
+/* ---------- ⑨ 参数实验台（简化版：1~2 个滑块） ---------- */
+.lab2{background:#0f172a;border-radius:14px;padding:18px 20px;margin:16px 0;color:#e2e8f0}
+.lab2 .lh{font-size:13.5px;font-weight:700;color:#fbbf24;margin-bottom:14px;letter-spacing:.04em}
+.lab2 .lr{display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+.lab2 .lr label{font-size:13px;color:#cbd5e1;min-width:120px}
+.lab2 .lr input[type=range]{flex:1;min-width:140px;accent-color:#14b8a6;height:24px}
+.lab2 .lr output{font-family:var(--font-mono);font-size:13px;color:#5eead4;min-width:56px;text-align:right}
+.lab2 .vis{background:#020617;border:1px solid #1e293b;border-radius:10px;padding:12px;margin-top:10px}
+.lab2 .vis svg{display:block;width:100%;height:auto}
+.lab2 .say{font-size:13px;line-height:1.7;color:#94a3b8;margin-top:10px;min-height:44px}
+.lab2 .say b{color:#5eead4}
+
+/* ---------- ⑩ 学习路径小条（顶部进度指示） ---------- */
+.pathline{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 20px;font-size:12px}
+.pathline span{
+  background:#fff;border:1px solid var(--border);border-radius:999px;padding:3px 11px;color:#94a3b8;
+}
+.pathline span.cur{background:var(--theme-bg,#ccfbf1);border-color:var(--theme-bd,#99f6e4);color:var(--theme-deep,#0f766e);font-weight:700}
+
+/* ---------- ⑪ 术语小卡片（初学者必须先认识的 3~5 个词） ---------- */
+.terms{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin:14px 0}
+.term{background:#fff;border:1px solid var(--border);border-radius:12px;padding:12px 14px}
+.term .w{font-size:14px;font-weight:700;color:var(--theme-deep,#0f766e);margin-bottom:3px}
+.term .w em{font-style:normal;font-size:11px;color:#94a3b8;font-weight:400;margin-left:5px;font-family:var(--font-mono)}
+.term .m{font-size:13px;color:#475569;line-height:1.65;margin:0}
+
+/* ---------- ⑫ 图注统一 ---------- */
+.cap{font-size:12.5px;color:#94a3b8;text-align:center;margin-top:8px;line-height:1.6}
+
+/* ---------- ⑬ 打印友好：实操页导出给学生 ---------- */
+@media print{
+  .side,.expnav,.pathline,details.deep{display:none!important}
+  .blk{break-inside:avoid;border:none;padding:0}
+  body{font-size:12pt}
+}

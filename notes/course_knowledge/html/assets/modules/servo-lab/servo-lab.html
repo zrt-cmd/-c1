@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>舵机实验室 · Servo Lab — 具身智能课程共享模块</title>
+<style>
+:root{--theme:#dc2626;--theme-deep:#b91c1c;--ink:#0f172a;--mut:#64748b;--line:#e2e8f0;--bg:#f8fafc;--card:#ffffff;--blue:#2563eb;--amber:#d97706;--green:#059669;}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;background:var(--bg);color:var(--ink);display:flex;flex-direction:column;overflow:hidden}
+header{display:flex;align-items:center;gap:14px;padding:10px 16px;background:var(--card);border-bottom:1px solid var(--line);flex:0 0 auto}
+header .h-title{font-weight:700;font-size:15px}
+header .h-title i{color:var(--theme);font-style:normal}
+.badge{font-size:11px;padding:2px 8px;border-radius:99px;background:#fee2e2;color:var(--theme-deep);border:1px solid #fecaca}
+.badge.b2{background:#dbeafe;color:#1d4ed8;border-color:#bfdbfe}
+.modes{margin-left:auto;display:flex;gap:8px}
+.modes a{font-size:12px;text-decoration:none;color:var(--mut);border:1px solid var(--line);padding:5px 12px;border-radius:8px;background:#fff}
+.modes a.on{background:var(--theme);border-color:var(--theme);color:#fff;font-weight:700}
+main{flex:1 1 auto;display:flex;min-height:0}
+#stage{position:relative;flex:1 1 auto;min-width:0;background:linear-gradient(#f1f5f9,#e9eef5)}
+#cv3d{width:100%;height:100%;display:block}
+.hud{position:absolute;pointer-events:none;font-family:Consolas,monospace}
+#hudPwm{left:14px;top:12px;font-size:22px;font-weight:800;color:#1e293b;text-shadow:0 1px 0 #fff}
+#hudPwm small{font-size:12px;color:var(--mut);font-weight:400}
+#hudAngles{left:14px;top:58px;font-size:12.5px;line-height:1.75;color:#334155;background:rgba(255,255,255,.82);border:1px solid var(--line);border-radius:8px;padding:7px 11px}
+#hudAngles b{color:var(--blue)}
+#hudWarn{left:14px;bottom:12px;font-size:12.5px;font-weight:700;color:#b91c1c;background:#fff1f2;border:1px solid #fecaca;border-radius:8px;padding:6px 10px;display:none}
+#hudFree{right:14px;top:12px;font-size:12px;font-weight:700;color:#7c3aed;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;padding:5px 9px;display:none}
+aside{flex:0 0 340px;background:var(--card);border-left:1px solid var(--line);overflow-y:auto;padding:14px}
+aside h3{font-size:13px;color:var(--mut);font-weight:700;margin:14px 0 8px;letter-spacing:.5px}
+aside h3:first-child{margin-top:0}
+.ctl{width:100%;display:flex;align-items:center;gap:9px}
+input[type=range]{flex:1;accent-color:var(--theme)}
+input[type=number]{width:78px;border:1px solid var(--line);border-radius:7px;padding:5px 7px;font-family:Consolas,monospace;font-size:13.5px}
+.presets{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}
+.btn{border:1px solid var(--theme);background:var(--theme);color:#fff;font-size:12.5px;padding:5px 11px;border-radius:7px;cursor:pointer}
+.btn.ghost{background:#fff;color:var(--theme)}
+.btn.blue{background:var(--blue);border-color:var(--blue)}
+.btn.gray{background:#fff;border-color:var(--line);color:var(--mut)}
+.btn:hover{filter:brightness(1.06)}
+.scope{margin-top:10px;border:1px solid var(--line);border-radius:9px;background:#fff;padding:7px}
+.scope canvas{width:100%;height:64px;display:block}
+.scope .cap{font-size:11px;color:var(--mut);margin-top:4px;text-align:center}
+.io{background:#0f172a;color:#cbd5e1;font-family:Consolas,monospace;font-size:12px;border-radius:9px;padding:9px 11px;line-height:1.7;white-space:pre-wrap;word-break:break-all;min-height:60px}
+.io .ok{color:#4ade80}.io .warn{color:#fbbf24}.io .bad{color:#f87171}.io .dim{color:#64748b}.io .b{color:#60a5fa}
+.readout{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:9px}
+.rd{border:1px solid var(--line);border-radius:8px;padding:7px 9px;background:var(--bg)}
+.rd .k{font-size:11px;color:var(--mut)}
+.rd .v{font-family:Consolas,monospace;font-size:15.5px;font-weight:700;margin-top:2px}
+.rd .v.t{color:var(--theme-deep)}.rd .v.a{color:var(--blue)}.rd .v.e{color:var(--amber)}
+.chartbox{border:1px solid var(--line);border-radius:9px;background:#fff;padding:7px;margin-top:9px}
+.chartbox canvas{width:100%;height:132px;display:block}
+.chartbox .lg{font-size:11px;color:var(--mut);text-align:center;margin-top:4px}
+.chartbox .lg i{font-style:normal}.chartbox .lg .c1{color:var(--theme)}.chartbox .lg .c2{color:var(--blue)}
+.parts{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.pt{border:1px solid var(--line);border-radius:8px;padding:7px 9px;cursor:pointer;background:var(--bg);transition:.15s}
+.pt:hover{border-color:var(--blue);background:#eff6ff}
+.pt.on{border-color:var(--theme);background:#fef2f2}
+.pt .n{font-size:12.5px;font-weight:700}
+.pt .d{font-size:11px;color:var(--mut);margin-top:2px;line-height:1.5}
+.switch{display:flex;align-items:center;gap:7px;font-size:12.5px;color:#334155;margin-top:10px}
+.formula{font-family:Consolas,monospace;font-size:12.5px;background:#fffbeb;border:1px dashed #fcd34d;border-radius:8px;padding:8px 10px;color:#92400e;line-height:1.7;margin-top:9px}
+/* ---- 协议模式 ---- */
+.protoTable{width:100%;border-collapse:collapse;font-size:12px}
+.protoTable th,.protoTable td{border:1px solid var(--line);padding:6px 6px;text-align:left;vertical-align:top}
+.protoTable th{background:var(--bg);color:var(--mut);font-size:11.5px}
+.protoTable tr.row{cursor:pointer}
+.protoTable tr.row:hover td{background:#eff6ff}
+.protoTable tr.row.on td{background:#fef2f2;border-color:#fecaca}
+.protoTable code{font-size:11.5px}
+.frames{background:#0f172a;border-radius:9px;padding:9px 11px;font-family:Consolas,monospace;font-size:12px;line-height:1.85;min-height:110px;max-height:220px;overflow-y:auto;white-space:pre-wrap;word-break:break-all}
+.frames .hd{color:#60a5fa}.frames .fn{color:#fbbf24}.frames .dt{color:#4ade80}.frames .crc{color:#f87171}.frames .dim{color:#64748b}.frames .in{color:#a78bfa}
+.stTable{width:100%;border-collapse:collapse;font-size:12px;font-family:Consolas,monospace}
+.stTable th,.stTable td{border:1px solid var(--line);padding:4px 6px;text-align:right}
+.stTable th{background:var(--bg);color:var(--mut);font-weight:600;font-size:11px}
+.stTable td:first-child,.stTable th:first-child{text-align:left}
+.stTable .hot{color:var(--theme-deep);font-weight:700}
+.tipbox{font-size:12px;line-height:1.7;color:#334155;background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:8px 10px;margin-top:9px}
+.tipbox b{color:#0369a1}
+footer{flex:0 0 auto;display:flex;gap:16px;padding:6px 14px;border-top:1px solid var(--line);background:var(--card);font-size:11.5px;color:var(--mut)}
+footer .ok{color:var(--green)}
+@media (max-width:900px){aside{flex-basis:300px}}
+.glNotice{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:#f1f5f9;color:var(--mut);font-size:14px;text-align:center;padding:30px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="h-title">⚙️ 舵机实验室 · <i>Servo Lab</i></div>
+  <span class="badge" id="modeBadge">原理模式</span>
+  <span class="badge b2">EXP-02 · 共享模块</span>
+  <nav class="modes">
+    <a href="?mode=lab" id="lnkLab">原理 · 剖面闭环</a>
+    <a href="?mode=proto" id="lnkProto">协议 · 接口联动</a>
+  </nav>
+</header>
+
+<main>
+  <div id="stage">
+    <canvas id="cv3d"></canvas>
+    <div class="glNotice" id="glNotice">当前浏览器不支持 WebGL，无法显示 3D 剖面仿真。<br>请改用 Chrome / Edge 打开本页。</div>
+    <div class="hud" id="hudPwm"></div>
+    <div class="hud" id="hudAngles"></div>
+    <div class="hud" id="hudWarn">⚠ 超出安全窗 500~2500μs：已按撞机械限位处理（堵转 → 发热 → 打齿轮风险）</div>
+    <div class="hud" id="hudFree">🖐 释放力矩模式 · 手掰滑块生效</div>
+  </div>
+
+  <!-- ========== 左侧：模式 A 原理 ========== -->
+  <aside id="panelLab">
+    <h3>① 输入脉宽 · 驱动闭环</h3>
+    <div class="ctl">
+      <span style="font-size:12px;color:#64748b">PWM</span>
+      <input type="range" id="pwmRange" min="500" max="2500" step="10" value="1500">
+      <input type="number" id="pwmNum" min="300" max="3500" step="10" value="1500">
+      <span style="font-size:12px;color:#64748b">μs</span>
+    </div>
+    <div class="presets">
+      <button class="btn ghost" onclick="setPwm(1000)">1000μs</button>
+      <button class="btn ghost" onclick="setPwm(1500)">1500 中位</button>
+      <button class="btn ghost" onclick="setPwm(1520)">1520 微调</button>
+      <button class="btn ghost" onclick="setPwm(2000)">2000μs</button>
+      <button class="btn gray" onclick="setPwm(3000)">× 越界 3000</button>
+      <button class="btn gray" onclick="resetLoop()">↺ 复位</button>
+    </div>
+    <div class="formula">目标角 = (PWM − 1500) × <b>0.002356</b> rad<br>1500μs = 中位 0 rad；安全窗 500~2500μs</div>
+
+    <div class="scope">
+      <canvas id="scopeCv" width="620" height="128"></canvas>
+      <div class="cap">串口线上只有脉宽信息：高电平宽度 = 目标位置（示意 PWM 波形，非实测）</div>
+    </div>
+
+    <div class="readout">
+      <div class="rd"><div class="k">目标角（指令）</div><div class="v t" id="rdTgt">0.00°</div></div>
+      <div class="rd"><div class="k">编码器反馈（实测）</div><div class="v a" id="rdEnc">0.00°</div></div>
+      <div class="rd"><div class="k">跟踪误差 e(t)</div><div class="v e" id="rdErr">0.00°</div></div>
+      <div class="rd"><div class="k">电机状态</div><div class="v" id="rdMot">待机</div></div>
+    </div>
+
+    <div class="chartbox">
+      <canvas id="chartCv" width="620" height="264"></canvas>
+      <div class="lg"><i class="c1">━ 目标角</i>　<i class="c2">━ 编码器反馈</i>　近 8 秒 · 误差=两线之差</div>
+    </div>
+
+    <h3>② 点击部件 · 对照观察</h3>
+    <div class="parts">
+      <div class="pt" data-part="motor" onclick="pickPart(this)"><div class="n">电机 Motor</div><div class="d">把电能转成转速，只管转多快，不管转到哪</div></div>
+      <div class="pt" data-part="gears" onclick="pickPart(this)"><div class="n">减速器 Gear</div><div class="d">降速增矩：电机转 2.5 圈，输出才转 1 圈</div></div>
+      <div class="pt" data-part="encoder" onclick="pickPart(this)"><div class="n">磁编码器 Encoder</div><div class="d">输出轴末端的径向磁铁跟着转，静止芯片感知磁场两分量，解出绝对角度</div></div>
+      <div class="pt" data-part="driver" onclick="pickPart(this)"><div class="n">驱动板 Driver</div><div class="d">收脉宽→和编码器读数比误差→调电机电流，闭环的大脑</div></div>
+    </div>
+    <div class="io" id="encIo"><span class="dim">// 磁编码器解码（拖动 PWM 让磁铁转起来，看 Bx/By 跟着变）</span></div>
+    <div class="tipbox"><b>一句话串起来：</b>驱动板收到脉宽（目标）→ 磁编码器从磁场解出输出轴现状（反馈）→ 两者相减得误差 → 驱动电机朝误差减小的方向转 → 误差≈0 时停。这就是"伺服（Servo）"——<b>自动纠偏的闭环</b>。</div>
+
+    <h3>③ 观察任务</h3>
+    <div class="tipbox">① 拖 PWM，看<b>蓝线（反馈）总是追着红线（目标）</b>——差值就是误差；<br>② 点"越界 3000"：目标被钳在 2500 等效位置且报警亮——这就是安全窗在实机上的意义；<br>③ 想清楚：串口里从头到尾<b>没有角度</b>，流动的只是"脉宽"这一个数。</div>
+  </aside>
+
+  <!-- ========== 右侧：模式 B 协议 ========== -->
+  <aside id="panelProto" style="display:none">
+    <h3>① 点击接口行 · 3D 同步执行</h3>
+    <table class="protoTable">
+      <thead><tr><th style="width:86px">子命令</th><th>功能</th><th style="width:70px">方向</th></tr></thead>
+      <tbody>
+        <tr class="row on" data-cmd="move" onclick="pickCmd(this)">
+          <td><code>0x01</code></td><td><b>写多舵机目标</b>（带时长插值）<br><span style="color:#64748b">move_servos：0x01 + 时长 + N×(id,PWM)</span></td><td>PC→舵机</td></tr>
+        <tr class="row" data-cmd="readpos" onclick="pickCmd(this)">
+          <td><code>0x05</code></td><td><b>读位置</b><br><span style="color:#64748b">应答 [05 id status pos:2]</span></td><td>问→答</td></tr>
+        <tr class="row" data-cmd="states" onclick="pickCmd(this)">
+          <td><code>0x08</code></td><td><b>全舵机状态持续上报</b><br><span style="color:#64748b">status+PWM+温度+电压，save 的数据源</span></td><td>下位机→PC</td></tr>
+        <tr class="row" data-cmd="free" onclick="pickCmd(this)">
+          <td><code>0x0B</code></td><td><b>释放力矩</b>（微阻力，可手掰）<br><span style="color:#64748b">interactive_mode: free</span></td><td>PC→舵机</td></tr>
+        <tr class="row" data-cmd="load" onclick="pickCmd(this)">
+          <td><code>0x0C</code></td><td><b>锁定力矩</b>（保持位置）<br><span style="color:#64748b">interactive_mode: load</span></td><td>PC→舵机</td></tr>
+        <tr class="row" data-cmd="eeprom" onclick="pickCmd(this)">
+          <td><code>0x40</code></td><td><b>写开机模式</b>（写 EEPROM 无应答）<br><span style="color:#64748b">写完舵机自动重启 2~3 秒</span></td><td>PC→舵机</td></tr>
+      </tbody>
+    </table>
+    <div class="tipbox" id="cmdTip"><b>选中：写多舵机目标。</b>点击"发送演示帧"，观察右侧 3D：输出轴按帧里装的脉宽转动——帧的 data 段就是 s2 模式里那个输入框的数。</div>
+    <div class="presets">
+      <button class="btn" onclick="sendDemoFrame()">▶ 发送演示帧</button>
+      <button class="btn blue" onclick="demoSequence()">▶▶ 六步动作序列</button>
+      <button class="btn gray" id="btnManhandle" style="display:none" onclick="toggleMan()">🖐 收起/展开手掰</button>
+    </div>
+
+    <h3>② 线上字节 · 对照协议表</h3>
+    <div class="frames" id="frameLog"><span class="dim">// 帧格式：AA 55 &lt;func&gt; &lt;len&gt; &lt;data…&gt; &lt;CRC8&gt;
+// CRC8 覆盖 func 到 data（与源码 _CRC8_TABLE 一致）
+// 点击上表或按"发送演示帧"开始</span></div>
+
+    <h3>③ 0x08 状态上报（实时缓存）</h3>
+    <table class="stTable" id="stTable">
+      <thead><tr><th>ID</th><th>PWM</th><th>温度℃</th><th>电压V</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div class="tipbox"><b>save 为什么"有数据"？</b>下位机每隔几十毫秒广播一帧 <code>0x08</code>，后台线程收到就覆盖缓存——<b>你按 save 那一刻读的是缓存，不是现问的</b>。所以上表会自己跳动，你什么都不用发。</div>
+  </aside>
+</main>
+
+<footer>
+  <span id="ftMode">原理模式 · 本地 three.js · 无 CDN</span>
+  <span id="ftProto">协议数据源：<code>test_servo_direct.py</code>（0x05/0x08/0x0B/0x0C/0x40/0x42、_CRC8_TABLE）</span>
+  <span class="ok" id="ftFps"></span>
+</footer>
+
+<script src="three.min.js"></script>
+<script src="OrbitControls.js"></script>
+<script>
+/* ============ 公共：模式切换 ============ */
+var MODE = (location.search.indexOf('mode=proto') >= 0) ? 'proto' : 'lab';
+function applyMode(){
+  document.getElementById('panelLab').style.display = (MODE==='lab')?'':'none';
+  document.getElementById('panelProto').style.display = (MODE==='proto')?'':'none';
+  document.getElementById('lnkLab').className = (MODE==='lab')?'on':'';
+  document.getElementById('lnkProto').className = (MODE==='proto')?'on':'';
+  /* 按需加载：单模式 iframe 里隐藏跨模式的切换入口与协议脚注 */
+  document.getElementById('lnkLab').style.display = (MODE==='lab')?'':'none';
+  document.getElementById('lnkProto').style.display = (MODE==='proto')?'':'none';
+  document.getElementById('ftProto').style.display = (MODE==='proto')?'':'none';
+  document.getElementById('modeBadge').textContent = (MODE==='lab')?'原理模式':'协议模式';
+  document.getElementById('ftMode').textContent = (MODE==='lab')?'原理模式':'协议模式';
+}
+applyMode();
+
+/* ============ CRC8（与源码 _CRC8_TABLE 逐项一致） ============ */
+var CRC8_TABLE=[0,94,188,226,97,63,221,131,194,156,126,32,163,253,31,65,
+157,195,33,127,252,162,64,30,95,1,227,189,62,96,130,220,
+35,125,159,193,66,28,254,160,225,191,93,3,128,222,60,98,
+190,224,2,92,223,129,99,61,124,34,192,158,29,67,161,255,
+70,24,250,164,39,121,155,197,132,218,56,102,229,187,89,7,
+219,133,103,57,186,228,6,88,25,71,165,251,120,38,196,154,
+101,59,217,135,4,90,184,230,167,249,27,69,198,152,122,36,
+248,166,68,26,153,199,37,123,58,100,134,216,91,5,231,185,
+140,210,48,110,237,179,81,15,78,16,242,172,47,113,147,205,
+17,79,173,243,112,46,204,146,211,141,111,49,178,236,14,80,
+175,241,19,77,206,144,114,44,109,51,209,143,12,82,176,238,
+50,108,142,208,83,13,239,177,240,174,76,18,145,207,45,115,
+202,148,118,40,171,245,23,73,8,86,180,234,105,55,213,139,
+87,9,235,181,54,104,138,212,149,203,41,119,244,170,72,22,
+233,183,85,11,136,214,52,106,43,117,151,201,74,20,246,168,
+116,42,200,150,21,75,169,247,182,232,10,84,215,137,107,53];
+function crc8(bytes){var c=0;for(var i=0;i<bytes.length;i++){c=CRC8_TABLE[c^bytes[i]];}return c&0xFF;}
+function hex2(n){return (n<16?'0':'')+n.toString(16).toUpperCase();}
+function buildFrame(func,data){
+  var body=[func,data.length].concat(data);
+  var c=crc8(body);
+  return {bytes:[0xAA,0x55].concat(body,[c]),crc:c,body:body};
+}
+function frameHtml(f,dirPrefix){
+  var b=f.bytes,h='',i;
+  h+='<span class="dim">'+(dirPrefix||'TX')+' </span>';
+  h+='<span class="hd">'+hex2(b[0])+' '+hex2(b[1])+'</span> ';
+  h+='<span class="fn">'+hex2(b[2])+' '+hex2(b[3])+'</span> ';
+  for(i=4;i<b.length-1;i++)h+='<span class="dt">'+hex2(b[i])+'</span> ';
+  h+='<span class="crc">'+hex2(b[b.length-1])+'</span>';
+  return h;
+}
+function logFrame(html){
+  var el=document.getElementById('frameLog');
+  if(el.dataset.clean!=='1'){el.innerHTML='';el.dataset.clean='1';}
+  el.innerHTML+=html+'\n';
+  el.scrollTop=el.scrollHeight;
+  while(el.childNodes.length>40)el.removeChild(el.firstChild);
+}
+
+/* ============ 闭环状态（两模式共用） ============ */
+var PWM_MIN=500,PWM_MAX=2500,CENTER=1500,PT=0.002356;
+var pwmRaw=1500;              // 用户输入（可越界）
+var tgtDeg=0;                 // 有效目标角（钳位后）
+var actDeg=0;                 // 实际输出角（编码器）
+var staleUs=0;                // 越界累计 → 触发限位徽标
+var limitHit=false;
+var freeMode=false;           // 0x0B
+var eepromBlink=0;            // 0x40 LED 闪
+var eepromOff=0;              // 0x40 舵机重启窗
+var hist=[];                  // {t,tg,ac}
+var stPwm=[1500,1100,2200,1850,1500,1500]; // 0x08 缓存
+var stTemp=[32,31,33,32,31,30];
+var stVolt=12.0;
+
+function degOf(p){return (p-CENTER)*PT*180/Math.PI;}
+function setPwm(p,silent){
+  pwmRaw=p;
+  document.getElementById('pwmRange').value=Math.max(PWM_MIN,Math.min(PWM_MAX,p));
+  document.getElementById('pwmNum').value=p;
+  updateTarget();
+  drawScope();
+  if(!silent&&MODE==='proto')pushMoveFrame(p);
+}
+function updateTarget(){
+  var inWin=(pwmRaw>=PWM_MIN&&pwmRaw<=PWM_MAX);
+  limitHit=!inWin;
+  var eff=Math.max(PWM_MIN,Math.min(PWM_MAX,pwmRaw));
+  tgtDeg=degOf(eff);
+  document.getElementById('hudWarn').style.display=limitHit?'block':'none';
+  stPwm[0]=eff;
+}
+function resetLoop(){
+  pwmRaw=1500;actDeg=0;hist=[];limitHit=false;freeMode=false;eepromBlink=0;eepromOff=0;
+  setPwm(1500,true);
+  document.getElementById('hudFree').style.display='none';
+  document.getElementById('btnManhandle').style.display='none';
+  logFrame('<span class="dim">// ---- 仿真复位 ----</span>');
+}
+
+/* ============ 3D 场景 ============ */
+var renderer,scene,cam,ctrl;
+var motorMat,gearMat,pinMat,ledMat,chipMat,hornGroup,pinionGroup,motorRotor,ledMesh,shaftMesh,parts={};
+var glOK=true;
+try{
+  renderer=new THREE.WebGLRenderer({canvas:document.getElementById('cv3d'),antialias:true});
+}catch(e){glOK=false;}
+if(!renderer||!renderer.getContext()){glOK=false;}
+if(!glOK){document.getElementById('glNotice').style.display='flex';}
+
+function labelSprite(text,color){
+  var cv=document.createElement('canvas');cv.width=256;cv.height=64;
+  var g=cv.getContext('2d');
+  g.fillStyle='rgba(255,255,255,.92)';g.strokeStyle=color||'#475569';g.lineWidth=3;
+  g.beginPath();g.moveTo(6,3);g.lineTo(250,3);g.quadraticCurveTo(256,3,256,9);
+  g.lineTo(256,55);g.quadraticCurveTo(256,61,250,61);g.lineTo(6,61);
+  g.quadraticCurveTo(0,61,0,55);g.lineTo(0,9);g.quadraticCurveTo(0,3,6,3);g.closePath();g.fill();g.stroke();
+  g.fillStyle='#0f172a';g.font='bold 27px "Microsoft YaHei"';g.textAlign='center';g.textBaseline='middle';
+  g.fillText(text,128,33);
+  var sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(cv),transparent:true,depthTest:false}));
+  sp.scale.set(1.35,0.34,1);return sp;
+}
+function tickRing(r,n,color,parent,axis){// 刻度盘
+  var geo=new THREE.BoxGeometry(0.055,0.012,0.016),mat=new THREE.MeshStandardMaterial({color:color});
+  for(var i=0;i<n;i++){
+    var a=i/n*Math.PI*2,m=new THREE.Mesh(geo,mat);
+    m.position.set(Math.cos(a)*r,0,Math.sin(a)*r);m.rotation.y=-a;
+    parent.add(m);
+  }
+}
+function buildScene(){
+  if(!glOK)return;
+  var cv=document.getElementById('cv3d');
+  var W=cv.clientWidth||800,H=cv.clientHeight||600;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  renderer.setSize(W,H,false);
+  scene=new THREE.Scene();
+  scene.background=new THREE.Color(0xf1f5f9);
+  cam=new THREE.PerspectiveCamera(42,W/H,0.1,100);
+  cam.position.set(4.8,3.8,5.8);
+  ctrl=new THREE.OrbitControls(cam,renderer.domElement);
+  ctrl.target.set(0,1.1,0);ctrl.enableDamping=true;ctrl.maxPolarAngle=Math.PI*0.52;ctrl.minDistance=3.2;ctrl.maxDistance=11;
+  scene.add(new THREE.AmbientLight(0xffffff,0.72));
+  var dl=new THREE.DirectionalLight(0xffffff,0.85);dl.position.set(4,6,3);scene.add(dl);
+  var dl2=new THREE.DirectionalLight(0xffffff,0.3);dl2.position.set(-4,3,-2);scene.add(dl2);
+  var grid=new THREE.GridHelper(14,28,0xcbd5e1,0xe2e8f0);grid.position.y=0;scene.add(grid);
+
+  /* ---- 外壳（剖面：留 140° 观察窗） ---- */
+  var shellMat=new THREE.MeshStandardMaterial({color:0x94a3b8,transparent:true,opacity:0.22,side:THREE.DoubleSide,roughness:0.4});
+  var shell=new THREE.Mesh(new THREE.CylinderGeometry(1.15,1.15,2.2,48,1,true,Math.PI*0.42,Math.PI*2-1.35),shellMat);
+  shell.position.y=1.15;scene.add(shell);
+  var bottom=new THREE.Mesh(new THREE.CylinderGeometry(1.15,1.18,0.14,48),new THREE.MeshStandardMaterial({color:0x64748b,roughness:.6}));
+  bottom.position.y=0.07;scene.add(bottom);
+  var top=new THREE.Mesh(new THREE.CylinderGeometry(1.15,1.15,0.1,48,1,false,Math.PI*0.42,Math.PI*2-1.35),
+    new THREE.MeshStandardMaterial({color:0x94a3b8,transparent:true,opacity:0.3,side:THREE.DoubleSide}));
+  top.position.y=2.25;scene.add(top);
+  var topSolid=new THREE.Mesh(new THREE.RingGeometry(0.32,1.15,48,1,Math.PI*0.42,Math.PI*2-1.35),
+    new THREE.MeshStandardMaterial({color:0x94a3b8,transparent:true,opacity:0.35,side:THREE.DoubleSide}));
+  topSolid.rotation.x=-Math.PI/2;topSolid.position.y=2.305;scene.add(topSolid);
+
+  /* 输出轴顶面刻度环（固定） */
+  var scaleRing=new THREE.Group();
+  tickRing(0.85,24,0x475569,scaleRing);
+  // 每 30° 主刻度 + 度数
+  for(var d=0;d<360;d+=30){
+    var a=d*Math.PI/180,sp=labelSprite(String(d), '#94a3b8');
+    sp.scale.set(0.42,0.16,1);
+    sp.position.set(Math.cos(a)*0.98,2.36,Math.sin(a)*0.98);
+    scaleRing.add(sp);
+  }
+  scaleRing.position.y=0;scaleRing.visible=true;scene.add(scaleRing);
+
+  /* ---- 驱动板（PCB） ---- */
+  var driver=new THREE.Group();
+  var pcb=new THREE.Mesh(new THREE.BoxGeometry(0.16,1.5,1.15),new THREE.MeshStandardMaterial({color:0x166534,roughness:.55}));
+  driver.add(pcb);
+  var chip=new THREE.Mesh(new THREE.BoxGeometry(0.1,0.42,0.42),new THREE.MeshStandardMaterial({color:0x1e293b}));
+  chip.position.x=0.11;driver.add(chip);
+  ledMat=new THREE.MeshStandardMaterial({color:0xef4444,emissive:0x000000});
+  ledMesh=new THREE.Mesh(new THREE.SphereGeometry(0.07,16,16),ledMat);
+  ledMesh.position.set(0.1,0.55,0.35);driver.add(ledMesh);
+  driver.position.set(-0.78,1.0,0.15);scene.add(driver);
+
+  /* ---- 电机（偏置，输出齿轮面共面 y=1.285） ---- */
+  var motor=new THREE.Group();
+  motorMat=new THREE.MeshStandardMaterial({color:0x334155,metalness:.4,roughness:.4,emissive:0x000000});
+  var can=new THREE.Mesh(new THREE.CylinderGeometry(0.30,0.30,0.95,32),motorMat);
+  motor.add(can);
+  var capM=new THREE.Mesh(new THREE.CylinderGeometry(0.31,0.31,0.06,32),new THREE.MeshStandardMaterial({color:0x475569,metalness:.5}));
+  capM.position.y=0.50;motor.add(capM);
+  motorRotor=new THREE.Group();
+  var rotorShaft=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,0.30,16),new THREE.MeshStandardMaterial({color:0xf59e0b,metalness:.7,roughness:.3}));
+  rotorShaft.position.y=-0.05;motorRotor.add(rotorShaft);   /* 下探接电机盖：世界 y∈[1.105,1.405] */
+  /* 小齿轮 N2=16：盘 r=0.148，齿 节距22.5° 相位使 180° 方向（指向大齿轮）为齿心 */
+  var pinMatP=new THREE.MeshStandardMaterial({color:0xfbbf24,metalness:.6,roughness:.35,emissive:0x000000});
+  var pDisk=new THREE.Mesh(new THREE.CylinderGeometry(0.148,0.148,0.09,24),pinMatP);
+  motorRotor.add(pDisk);
+  var pToothGeo=new THREE.BoxGeometry(0.045,0.09,0.026);
+  for(var pi=0;pi<16;pi++){
+    var pa=pi/16*Math.PI*2,pt2=new THREE.Mesh(pToothGeo,pinMatP);
+    pt2.position.set(Math.cos(pa)*0.168,0,Math.sin(pa)*0.168);pt2.rotation.y=-pa;
+    motorRotor.add(pt2);
+  }
+  motorRotor.position.y=0.66;           /* 世界 y = 0.625+0.66 = 1.285，与大齿轮共面 */
+  motor.add(motorRotor);
+  motor.position.set(0.63,0.625,0);     /* 中心距 = 0.45+0.18 = 0.63（节圆相切） */
+  scene.add(motor);
+
+  /* ---- 减速器：输出大齿轮 N1=40（齿心 4.5°+9k，0° 方向留齿隙对准小齿轮） ---- */
+  var gear=new THREE.Group();
+  var gMat=new THREE.MeshStandardMaterial({color:0xd97706,metalness:.55,roughness:.35,emissive:0x000000});
+  gearMat=gMat;
+  var disk=new THREE.Mesh(new THREE.CylinderGeometry(0.415,0.415,0.1,48),gMat);
+  gear.add(disk);
+  var toothGeo=new THREE.BoxGeometry(0.06,0.1,0.030);
+  for(var i=0;i<40;i++){
+    var a=(i*9+4.5)*Math.PI/180,t=new THREE.Mesh(toothGeo,gMat);
+    t.position.set(Math.cos(a)*0.44,0,Math.sin(a)*0.44);t.rotation.y=-a;
+    gear.add(t);
+  }
+  gear.position.y=1.285;                /* 与小齿轮同平面：啮合而非穿模 */
+  pinionGroup=gear;
+  scene.add(gear);
+
+  /* ---- 磁编码器：轴端径向磁铁 + 静止芯片（Bx/By → atan2 解角） ---- */
+  var redMat=new THREE.MeshStandardMaterial({color:0xdc2626,roughness:.4,emissive:0x000000});
+  var blueMat=new THREE.MeshStandardMaterial({color:0x2563eb,roughness:.4,emissive:0x000000});
+  chipMat=new THREE.MeshStandardMaterial({color:0x0f172a,roughness:.45,emissive:0x000000});
+  var magGroup=new THREE.Group();
+  var halfN=new THREE.Mesh(new THREE.CylinderGeometry(0.11,0.11,0.1,24,1,false,0,Math.PI),redMat);
+  magGroup.add(halfN);
+  var halfS=new THREE.Mesh(new THREE.CylinderGeometry(0.11,0.11,0.1,24,1,false,Math.PI,Math.PI),blueMat);
+  magGroup.add(halfS);
+  /* 磁场方向矢量箭头（随磁铁转，紫色） */
+  var bBar=new THREE.Mesh(new THREE.BoxGeometry(0.24,0.015,0.035),new THREE.MeshStandardMaterial({color:0x7c3aed,emissive:0x4c1d95,emissiveIntensity:.5}));
+  bBar.position.set(0.10,0.065,0);magGroup.add(bBar);
+  var bTip=new THREE.Mesh(new THREE.ConeGeometry(0.045,0.1,12),new THREE.MeshStandardMaterial({color:0x7c3aed,emissive:0x4c1d95,emissiveIntensity:.5}));
+  bTip.rotation.z=-Math.PI/2;bTip.position.set(0.26,0.065,0);magGroup.add(bTip);
+  magGroup.position.set(0,1.03,0);      /* 磁铁套在输出轴末端：[0.98, 1.08] */
+  parts.mag=magGroup;
+  scene.add(magGroup);
+  /* 芯片支架：底座立柱 → L 形臂 → 中心平台（全部避开输出轴） */
+  var post=new THREE.Mesh(new THREE.BoxGeometry(0.06,0.72,0.06),new THREE.MeshStandardMaterial({color:0x94a3b8,metalness:.3}));
+  post.position.set(0.17,0.50,0.17);scene.add(post);
+  var arm1=new THREE.Mesh(new THREE.BoxGeometry(0.22,0.035,0.09),new THREE.MeshStandardMaterial({color:0x94a3b8,metalness:.3}));
+  arm1.position.set(0.08,0.865,0.17);scene.add(arm1);
+  var arm2=new THREE.Mesh(new THREE.BoxGeometry(0.09,0.035,0.26),new THREE.MeshStandardMaterial({color:0x94a3b8,metalness:.3}));
+  arm2.position.set(0.08,0.865,0.04);scene.add(arm2);
+  var chipBoard=new THREE.Mesh(new THREE.BoxGeometry(0.26,0.03,0.26),new THREE.MeshStandardMaterial({color:0x166534,roughness:.55}));
+  chipBoard.position.set(0,0.88,0);scene.add(chipBoard);
+  var chip=new THREE.Mesh(new THREE.BoxGeometry(0.16,0.05,0.16),chipMat);
+  chip.position.set(0,0.925,0);scene.add(chip);
+  var pinDot=new THREE.Mesh(new THREE.SphereGeometry(0.02,10,10),new THREE.MeshStandardMaterial({color:0xe2e8f0}));
+  pinDot.position.set(-0.06,0.955,0.06);scene.add(pinDot);
+  parts.chip=[chip];
+
+  /* ---- 输出轴（分段避让芯片平台：悬于磁铁上方的轴端插着磁铁） ---- */
+  var shaft=new THREE.Mesh(new THREE.CylinderGeometry(0.14,0.14,1.43,24),new THREE.MeshStandardMaterial({color:0xb45309,metalness:.6,roughness:.3}));
+  shaft.position.y=1.715;scene.add(shaft);shaftMesh=shaft;    /* y∈[1.00, 2.43]，底部插入磁铁 */
+  hornGroup=new THREE.Group();
+  var hornArm=new THREE.Mesh(new THREE.BoxGeometry(1.7,0.07,0.22),new THREE.MeshStandardMaterial({color:0x1e293b,roughness:.5}));
+  hornArm.position.x=0.72;hornGroup.add(hornArm);
+  var hornHub=new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.2,0.16,24),new THREE.MeshStandardMaterial({color:0x334155,metalness:.5}));
+  hornGroup.add(hornHub);
+  var ptr=new THREE.Mesh(new THREE.ConeGeometry(0.09,0.26,12),new THREE.MeshStandardMaterial({color:0xdc2626}));
+  ptr.rotation.x=-Math.PI/2;ptr.position.set(0.62,0,0);hornGroup.add(ptr);
+  hornGroup.position.y=2.42;
+  scene.add(hornGroup);
+
+  /* ---- 标签 ---- */
+  var L1=labelSprite('输出轴+摇臂','#dc2626');L1.position.set(0.1,3.35,0);scene.add(L1);
+  var L2=labelSprite('驱动板（闭环大脑）','#059669');L2.position.set(-2.0,2.45,0.2);scene.add(L2);
+  var L3=labelSprite('电机','#2563eb');L3.position.set(1.9,2.1,0);scene.add(L3);
+  var L4=labelSprite('减速齿轮组 40:16','#d97706');L4.position.set(2.15,1.62,0.5);scene.add(L4);
+  var L5=labelSprite('磁编码器：磁铁+芯片','#0ea5e9');L5.position.set(-1.9,1.35,0.9);scene.add(L5);
+
+  parts.motor=[motor];parts.gears=[];parts.driver=[driver];
+  var hi={motor:motorMat,gears:gearMat,driver:null,encoder:[redMat,blueMat,chipMat]};
+
+  window.pickPart=function(el){
+    var on=el.classList.contains('on');
+    document.querySelectorAll('.pt').forEach(function(x){x.classList.remove('on');});
+    if(on)return;
+    el.classList.add('on');
+    var key=el.dataset.part,m=hi[key];
+    var mats=Array.isArray(m)?m:(m?[m]:[]);
+    mats.forEach(function(mm){if(mm&&mm.emissive){mm.emissive.setHex(0x2563eb);setTimeout(function(){mm.emissive.setHex(0x000000);},1400);}});
+    if(!mats.length){
+      var objs=(parts[key]==null)?[]:[].concat(parts[key]);
+      objs.forEach(function(o){o.traverse&&o.traverse(function(c){if(c.material&&c.material.emissive){c.material.emissive.setHex(0x2563eb);setTimeout(function(){c.material.emissive.setHex(0x000000);},1400);}});});
+    }
+  };
+}
+if(!window.pickPart)window.pickPart=function(el){
+  document.querySelectorAll('.pt').forEach(function(x){x.classList.remove('on');});
+  el.classList.add('on');
+};
+buildScene();
+
+/* ============ 脉冲示意示波器 ============ */
+function drawScope(){
+  var cv=document.getElementById('scopeCv');if(!cv)return;
+  var g=cv.getContext('2d'),W=cv.width,H=cv.height;
+  g.clearRect(0,0,W,H);
+  g.fillStyle='#f8fafc';g.fillRect(0,0,W,H);
+  var padL=34,padR=16,baseY=H-30,topY=20,plotW=W-padL-padR;
+  g.strokeStyle='#e2e8f0';g.lineWidth=1;
+  g.beginPath();g.moveTo(padL,baseY);g.lineTo(W-padR,baseY);g.stroke();
+  g.fillStyle='#94a3b8';g.font='14px Consolas';
+  g.fillText('0',padL-14,baseY+5);
+  g.fillText('2500μs',W-padR-58,baseY+20);
+  function pulseAt(x0,pw,color){
+    var w=Math.max(4,pw/2500*plotW*(W/620));
+    g.strokeStyle=color;g.lineWidth=3;g.lineJoin='round';
+    g.beginPath();
+    g.moveTo(x0,baseY);g.lineTo(x0+10,baseY);
+    g.lineTo(x0+10,topY);g.lineTo(x0+10+w,topY);
+    g.lineTo(x0+10+ (58),topY);g.lineTo(x0+10+(58),baseY);
+    g.lineTo(x0+150,baseY);
+    g.stroke();
+    g.fillStyle=color;g.font='bold 15px Consolas';
+    g.fillText(pw+'μs',x0+18,topY-5);
+  }
+  var eff=Math.max(PWM_MIN,Math.min(PWM_MAX,pwmRaw));
+  g.fillStyle='#cbd5e1';g.font='13px "Microsoft YaHei"';
+  g.fillText('目标（线上）',padL,H-8);
+  pulseAt(padL+60,eff,'#dc2626');
+  g.fillStyle='#cbd5e1';
+  g.fillText('反馈（编码器）',padL+320,H-8);
+  pulseAt(padL+380,Math.max(PWM_MIN,Math.min(PWM_MAX,Math.round(actDeg*Math.PI/180/PT+CENTER))),'#2563eb');
+}
+
+/* ============ 数据曲线 ============ */
+function drawChart(){
+  var cv=document.getElementById('chartCv');if(!cv||MODE!=='lab')return;
+  var g=cv.getContext('2d'),W=cv.width,H=cv.height;
+  g.clearRect(0,0,W,H);g.fillStyle='#fff';g.fillRect(0,0,W,H);
+  var padL=46,padR=10,padT=12,padB=22;
+  var minY=-160,maxY=160;
+  function X(i){return padL+(W-padL-padR)*(i/Math.max(1,hist.length-1));}
+  function Y(v){return padT+(H-padT-padB)*(1-(v-minY)/(maxY-minY));}
+  // 网格 + 刻度
+  g.strokeStyle='#f1f5f9';g.fillStyle='#94a3b8';g.font='15px Consolas';g.textAlign='right';
+  [-150,-75,0,75,150].forEach(function(v){
+    g.beginPath();g.moveTo(padL,Y(v));g.lineTo(W-padR,Y(v));g.stroke();
+    g.fillText(v+'°',padL-6,Y(v)+5);
+  });
+  if(hist.length<2)return;
+  // 红：目标
+  g.strokeStyle='#dc2626';g.lineWidth=2.4;g.beginPath();
+  histforEach(hist,0,'tg',X,Y,g);
+  g.stroke();
+  // 蓝：反馈
+  g.strokeStyle='#2563eb';g.lineWidth=2.4;g.beginPath();
+  histforEach(hist,1,'ac',X,Y,g);
+  g.stroke();
+  // 误差填充
+  g.globalAlpha=0.12;g.fillStyle='#d97706';
+  g.beginPath();
+  histforEach(hist,0,'tg',X,Y,g);
+  for(var i=hist.length-1;i>=0;i--){(i===hist.length-1)?g.moveTo(X(i),Y(hist[i].ac)):g.lineTo(X(i),Y(hist[i].ac));}
+  g.closePath();g.fill();g.globalAlpha=1;
+  g.fillStyle='#94a3b8';g.font='14px "Microsoft YaHei"';g.textAlign='left';
+  g.fillText('近 8 秒',padL+4,H-6);
+  g.textAlign='right';g.fillText('现在 →',W-padR-2,H-6);g.textAlign='left';
+}
+function histforEach(h,unused,key,X,Y,g){
+  for(var i=0;i<h.length;i++){var x=X(i),y=Y(h[i][key]);i===0?g.moveTo(x,y):g.lineTo(x,y);}
+}
+
+/* ============ 物理步进 + 渲染循环 ============ */
+var lastT=0,tAcc=0,stAcc=0,fpsAcc=0,fpsN=0,seqTimers=[];
+function step(now){
+  requestAnimationFrame(step);
+  if(!glOK)return;
+  var dt=Math.min(0.05,(now-lastT)/1000||0.016);lastT=now;
+  // 闭环
+  if(freeMode){
+    // 无力矩：外力（手掰）已直接改 actDeg，此处仅极缓回中性演示
+    actDeg+= (0-actDeg)*dt*0.15;
+  }else if(!(eepromOff>0)){
+    var err=tgtDeg-actDeg;
+    var slew=Math.max(-260*dt,Math.min(260*dt,err));
+    // 一阶滞后 + 限速
+    actDeg+=slew+err*Math.min(1,dt*4)*0.15;
+  }
+  eepromOff=Math.max(0,eepromOff-dt);
+  if(eepromBlink>0){eepromBlink-=dt;ledMat.emissive.setHex((Math.floor(eepromBlink*6)%2)?0xff0000:0x000000);}
+  else ledMat.emissive.setHex(limitHit?0xff2200:0x000000);
+  // 电机：误差越大转越快（颜色=出力）
+  var errNow=tgtDeg-actDeg;
+  var load=Math.min(1,Math.abs(errNow)/60);
+  if(!freeMode&&!limitHit&&eepromOff<=0&&Math.abs(errNow)>0.05){
+    motorMat.emissive.setHex(0x7c3aed);
+    motorMat.emissiveIntensity=0.15+load*0.6;
+  }else{
+    motorMat.emissive.setHex(0x000000);
+  }
+  // 运动学：输出轴=实际角；大齿轮 1:1，小齿轮反向 2.5×（40:16 啮合）
+  var ar=actDeg*Math.PI/180;
+  hornGroup.rotation.y=ar;
+  if(parts.mag)parts.mag.rotation.y=ar;      /* 磁铁随输出轴转 → 磁场方向变 */
+  if(shaftMesh)shaftMesh.rotation.y=ar;
+  pinionGroup.rotation.y=ar;
+  if(motorRotor)motorRotor.rotation.y=-ar*2.5;
+  // 历史
+  hist.push({t:now,tg:tgtDeg,ac:actDeg});
+  while(hist.length&&now-hist[0].t>8000)hist.shift();
+  // HUD
+  var eff=Math.max(PWM_MIN,Math.min(PWM_MAX,pwmRaw));
+  document.getElementById('hudPwm').innerHTML=(MODE==='lab'?eff:pwmRaw)+'<small> μs · '+(Math.abs(tgtDeg-actDeg)<0.15?'到位':'跟踪中')+'</small>';
+  document.getElementById('hudAngles').innerHTML=
+    '目标 <b>'+tgtDeg.toFixed(2)+'°</b>　编码器 <b>'+actDeg.toFixed(2)+'°</b><br>'+
+    '误差 <b>'+errNow.toFixed(2)+'°</b>　PWM→rad '+((eff-CENTER)*PT).toFixed(4);
+  document.getElementById('rdTgt').textContent=tgtDeg.toFixed(2)+'°';
+  document.getElementById('rdEnc').textContent=actDeg.toFixed(2)+'°';
+  document.getElementById('rdErr').textContent=errNow.toFixed(2)+'°';
+  var mt=document.getElementById('rdMot');
+  if(freeMode){mt.textContent='无力矩';mt.style.color='#7c3aed';}
+  else if(eepromOff>0){mt.textContent='重启中';mt.style.color='#d97706';}
+  else if(limitHit){mt.textContent='堵转⚠';mt.style.color='#dc2626';}
+  else if(Math.abs(errNow)<0.15){mt.textContent='保持';mt.style.color='#059669';}
+  else{mt.textContent='驱动 '+Math.round(load*100)+'%';mt.style.color='#2563eb';}
+  // 0x08 状态缓存
+  stPwm[0]=eff;
+  stAcc+=dt;
+  if(stAcc>0.35){
+    stAcc=0;
+    for(var k=1;k<6;k++){stPwm[k]+=(Math.random()-0.5)*2;stPwm[k]=Math.max(500,Math.min(2500,stPwm[k]));}
+    for(var t2=0;t2<6;t2++){stTemp[t2]+=(Math.abs(errNow)>1?0.25:-0.12)+(Math.random()-0.5)*0.1;stTemp[t2]=Math.max(28,Math.min(60,stTemp[t2]));}
+    stVolt=12.0+(Math.random()-0.5)*0.15;
+    refreshStates();
+  }
+  // 曲线（30Hz 采样即可）
+  fpsAcc+=dt;fpsN++;
+  if(fpsAcc>0.05){
+    fpsAcc=0;
+    if(MODE==='lab'){drawChart();drawScope();}
+    var encEl=document.getElementById('encIo');
+    if(encEl){
+      var th=actDeg*Math.PI/180,B0=1.0;
+      var bx=B0*Math.cos(th),by=B0*Math.sin(th);
+      var dec=Math.atan2(by,bx)*180/Math.PI;
+      var agree=Math.abs(dec-actDeg)<0.01;
+      encEl.innerHTML='<span class="dim">// 磁编码器解码：磁场两分量 → atan2：</span>\n'+
+        '<span class="b">Bx='+bx.toFixed(3)+'  By='+by.toFixed(3)+'</span> → atan2(By,Bx) = <span class="ok">'+dec.toFixed(2)+'°</span>\n'+
+        (agree?'<span class="ok">✔ 与输出轴角 '+actDeg.toFixed(2)+'° 一致 —— 角度就是这样"看"出来的</span>'
+              :'<span class="warn">… 跟踪中</span>');
+    }
+    document.getElementById('ftFps').textContent='渲染中 · '+Math.round(1/(dt||0.016))+' FPS';
+  }
+  ctrl&&ctrl.update();
+  renderer.render(scene,cam);
+}
+function activeMid(){return CENTER;}
+requestAnimationFrame(function(t){lastT=t;requestAnimationFrame(step);});
+
+window.addEventListener('resize',function(){
+  if(!glOK)return;
+  var cv=document.getElementById('cv3d'),W=cv.clientWidth,H=cv.clientHeight;
+  cam.aspect=W/H;cam.updateProjectionMatrix();renderer.setSize(W,H,false);
+});
+
+/* ============ 原理模式控件 ============ */
+document.getElementById('pwmRange').addEventListener('input',function(){setPwm(parseInt(this.value,10),true);});
+document.getElementById('pwmNum').addEventListener('change',function(){setPwm(parseInt(this.value,10)||1500,true);});
+drawScope();
+
+/* ============ 协议模式 ============ */
+var curCmd='move';
+var CMD_INFO={
+  move:{tip:'<b>选中：写多舵机目标（0x01）。</b>data 段 = [0x01, 时长Lo, 时长Hi, 数量, id, pwmLo, pwmHi …]。点"发送演示帧"：输出轴按帧里的脉宽转动——这一帧 data 段装的数，就是原理模式里你拖的那个输入框。'},
+  readpos:{tip:'<b>选中：读位置（0x05）。</b>请求 [05 id]，舵机应答 [05 id status posLo posHi]——这是一问一答的"单发读"。想看更猛的：0x08 是下位机<b>主动持续广播</b>，不用你问。'},
+  states:{tip:'<b>选中：全舵机状态上报（0x08）。</b>下位机每隔几十毫秒推一帧，含 status/PWM/温度/电压。下方表格就是它的缓存——<b>save 命令读的就是这份缓存</b>。'},
+  free:{tip:'<b>选中：释放力矩（0x0B）。</b>发送后电机断力、微阻力，可用"手掰"滑块直接改变输出轴角度——录动作前摆姿势就靠它。再发 0x0C 锁回当前位置。'},
+  load:{tip:'<b>选中：锁定力矩（0x0C）。</b>舵机拼命保持当前角度；你拖原理模式的 PWM 试试对抗——真实机械臂 resume 后第一件事就是 load，防止手臂瘫软。'},
+  eeprom:{tip:'<b>选中：写开机模式（0x40）。</b>写 EEPROM 后舵机<b>自动重启 2~3 秒</b>（应答缺失是正常的），板载 LED 快闪示意。对应脚本命令 csm 1~4。'}
+};
+function pickCmd(tr){
+  document.querySelectorAll('.protoTable tr.row').forEach(function(r){r.classList.remove('on');});
+  tr.classList.add('on');
+  curCmd=tr.dataset.cmd;
+  document.getElementById('cmdTip').innerHTML=CMD_INFO[curCmd].tip;
+  if(curCmd==='free'){setFree(true);}
+  else if(curCmd==='load'){setFree(false);}
+  if(curCmd==='states'){logFrame('<span class="in">RX </span><span class="dim">见下方 0x08 缓存表（持续广播，无需请求）</span>');}
+}
+function pushMoveFrame(p){
+  // 与源码 move_servos 相同的组帧：0x01 dur N (id pwm)×N —— 演示用单舵机 id0
+  var dur=2000;
+  var data=[0x01,dur&0xFF,(dur>>8)&0xFF,1,0,p&0xFF,(p>>8)&0xFF];
+  var f=buildFrame(0x05,data);
+  logFrame(frameHtml(f)+'   <span class="dim">// 写目标 '+p+'μs</span>');
+}
+function sendDemoFrame(){
+  if(curCmd==='move'){var p=[1000,1520,1500,2000,1100][Math.floor(Math.random()*5)];setPwm(p);pushMoveFrame(p);
+    logFrame('<span class="dim">→ 输出轴目标 '+degOf(p).toFixed(1)+'°，闭环跟踪中…</span>');}
+  else if(curCmd==='readpos'){var f1=buildFrame(0x05,[0x05,0]);logFrame(frameHtml(f1)+'   <span class="dim">// 请求 id0 位置</span>');
+    var pos=Math.max(0,Math.round(actDeg*Math.PI/180/PT+CENTER));
+    var resp={bytes:[0xAA,0x55,0x05,0x05,0x05,0x00,0x00,pos&0xFF,(pos>>8)&0xFF,0]};
+    resp.crc=crc8(resp.bytes.slice(2,9));resp.bytes[9]=resp.crc;
+    setTimeout(function(){logFrame(frameHtml(resp,'RX ')+'   <span class="dim">// 应答 pos='+pos+'μs ✔</span>');},320);}
+  else if(curCmd==='states'){logFrame('<span class="in">RX 05 08 06 </span><span class="dt">(6×: id status PWM:2 temp volt:2)</span><span class="crc"> CRC</span><span class="dim"> → 最新覆盖入缓存</span>');refreshStates(true);}
+  else if(curCmd==='free'){setFree(true);}
+  else if(curCmd==='load'){setFree(false);}
+  else if(curCmd==='eeprom'){eepromBlink=3;eepromOff=2.6;
+    var f2=buildFrame(0x05,[0x40,0,2]);logFrame(frameHtml(f2)+'   <span class="dim">// 固化 CSM2 · 舵机重启中 2~3s（无应答）</span>');}
+}
+function setFree(on){
+  freeMode=on;
+  ensureManSlider();
+  document.getElementById('hudFree').style.display=on?'block':'none';
+  document.getElementById('btnManhandle').style.display=on?'':'none';
+  manSlider.style.display=on?'flex':'none';
+  var f=on?buildFrame(0x05,[0x0B,0]):buildFrame(0x05,[0x0C,0]);
+  logFrame(frameHtml(f)+'   <span class="dim">// '+(on?'释放力矩：可手掰':'锁定力矩：保持位置')+'</span>');
+}
+function toggleMan(){
+  ensureManSlider();
+  manSlider.style.display=(manSlider.style.display==='flex')?'none':'flex';
+}
+var manSlider=null;
+function ensureManSlider(){
+  if(manSlider)return;
+  manSlider=document.createElement('div');
+  manSlider.style.cssText='position:absolute;right:14px;bottom:14px;background:rgba(255,255,255,.95);border:1px solid var(--line);border-radius:9px;padding:9px 12px;display:none;flex-direction:column;gap:6px;width:220px';
+  manSlider.innerHTML='<div style="font-size:12px;color:#64748b">手掰输出轴：<input type="range" min="-140" max="140" value="0" id="manR" style="width:130px;accent-color:#7c3aed"></div><div style="font-size:11px;color:#7c3aed" id="manV">0°</div>';
+  document.getElementById('stage').appendChild(manSlider);
+  document.getElementById('manR').addEventListener('input',function(){
+    if(!freeMode)return;
+    actDeg=parseFloat(this.value);tgtDeg=actDeg;
+    document.getElementById('manV').textContent=actDeg.toFixed(1)+'°';
+  });
+}
+function demoSequence(){
+  seqTimers.forEach(clearTimeout);seqTimers=[];
+  var poses=[['预抓取 pre_grasp',1500],['下探 grasp_down',1100],['抬升 lift',1850],['回工作位 work',1500]];
+  poses.forEach(function(pp,i){
+    seqTimers.push(setTimeout(function(){
+      setPwm(pp[1]);
+      logFrame('<span class="b">['+pp[0]+']</span> '+frameHtml(buildFrame(0x05,[0x01,0xD0,0x07,1,0,pp[1]&0xFF,(pp[1]>>8)&0xFF])));
+    },i*2200));
+  });
+  seqTimers.push(setTimeout(function(){logFrame('<span class="ok">✓ 序列回放完成 —— 这就是 save→play 的本质：按顺序发同一种帧</span>');},poses.length*2200));
+}
+function refreshStates(force){
+  if(MODE!=='proto'&&!force)return;
+  var tb=document.querySelector('#stTable tbody');if(!tb)return;
+  var names=['J0 底座','J1 肩','J2 肘','J3 腕俯','J4 腕旋','J5 夹爪'];
+  var h='';
+  for(var i=0;i<6;i++){
+    var hot=(i===0)?' class="hot"':'';
+    h+='<tr><td'+hot+'>'+names[i]+' ('+i+')</td><td'+hot+'>'+Math.round(stPwm[i])+'</td><td'+(stTemp[i]>45?' class="hot"':'')+'>'+stTemp[i].toFixed(1)+'</td><td>'+stVolt.toFixed(1)+'</td></tr>';
+  }
+  tb.innerHTML=h;
+}
+refreshStates(true);
+if(MODE==='proto'){document.getElementById('cmdTip').innerHTML=CMD_INFO.move.push?CMD_INFO.move.tip:CMD_INFO.move.tip;logFrame('<span class="dim">// 选中"写多舵机目标"，按 ▶ 发送演示帧</span>');}
+</script>
+</body>
+</html>

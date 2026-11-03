@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-07 视觉动态抓取 · 机器人机械臂应用与开发</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+:root{--theme:#dc2626;--theme-deep:#b91c1c;--theme-bg:#fee2e2;--theme-bd:#fecaca}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit" title="返回课程首页">🤖 具身智能课程 · <i>教程首页</i></a>
+  <div class="crumb"><a href="../../../index.html#core">核心课程</a> / <a href="../index.html">机械臂应用与开发</a> / EXP-07</div>
+</div>
+
+<div class="wrap">
+<aside class="side">
+  <h4>本页目录</h4>
+  <nav>
+    <a class="now" href="#s1">01 · 问题引入</a>
+    <a href="#s2">02 · 原理通俗讲解</a>
+    <a href="#s3">03 · 关联知识点</a>
+    <a href="#s4">04 · 实验目标</a>
+    <a href="#s5">05 · 实验环境与准备</a>
+    <a href="#s6">06 · 动画讲解</a>
+    <a href="#s7">07 · 互动讲解</a>
+    <a href="#s8">08 · 实操步骤</a>
+    <a href="#s9">09 · 重点与易错点</a>
+    <a href="#s10">10 · 总结与思考</a>
+  </nav>
+  <h4>本课程实验</h4>
+  <nav>
+    <a href="../exp-01-urdf-simulation/index.html">EXP-01 URDF 模型与仿真控制</a>
+    <a href="../exp-02-serial-pwm/index.html">EXP-02 串口协议与 PWM</a>
+    <a href="../exp-03-kinematics/index.html">EXP-03 正运动学基础</a>
+    <a href="../exp-04-ik-solver/index.html">EXP-04 逆运动学基础与 IK 解算</a>
+    <a href="../exp-05-action-replay/index.html">EXP-05 ROS2 架构与动作回放</a>
+    <a href="../exp-06-fixed-grasp/index.html">EXP-06 逆运动学固定抓取</a>
+    <a class="now" href="../exp-07-visual-grasp/index.html">EXP-07 视觉动态抓取</a>
+  </nav>
+</aside>
+
+<main>
+<div class="exp-head">
+  <span class="code">EXP-07 · 第 3 章 · 综合性 · 8 学时</span>
+  <h1>视觉动态抓取</h1>
+  <p class="desc">课程大一统：深度相机看世界、HSV 找颜色、反投影定三维、TF 换算到基座、IK 反解、状态机执行——visual_grasp.launch.py 一条命令拉起 5 节点，人机协同的 start/confirm/skip/abort 服务把"看见→确认→抓起"变成可运营的流水线。</p>
+  <span class="tag hl">⭐⭐⭐ · HSV+深度+TF · 8 学时</span>
+</div>
+
+<!-- 01 -->
+<section class="blk" id="s1">
+<h2><span class="no">01</span>问题引入</h2>
+<p>EXP-06 的坐标是尺子量的——物体一挪就抓空。要让机械臂"看到"物体，需要把一帧彩色图像变成 base_link 下的 3D 坐标，再交给你已经熟悉的 IK+抓取链路。这中间横着三座桥：</p>
+<ul class="check">
+  <li><b>颜色桥（HSV）</b>：图像成千上万像素，哪些属于目标？光照一变 RGB 全乱，HSV 才稳。</li>
+  <li><b>深度桥（反投影）</b>：像素 (u,v) 只有二维，加上深度图的 d 才能还原相机坐标系里的 (X,Y,Z)。</li>
+  <li><b>坐标桥（TF）</b>：相机装在夹爪上随臂晃动，相机系的点必须实时换到 base_link 才能抓。</li>
+</ul>
+<p>本实验 8 学时：一条 launch 拉起全栈，rqt 三栏盯着它看，四个人机服务管着节奏，最后拿红色物体（30~50mm）做成功率验收。</p>
+</section>
+
+<!-- 02 -->
+<section class="blk" id="s2">
+<h2><span class="no">02</span>原理通俗讲解</h2>
+<p><b>HSV 分色像用"色相环"筛豆子。</b>RGB 是红绿蓝三盏灯的混合亮度，灯一暗全都变样；HSV 把"什么颜色（H）"、"多纯（S）"、"多亮（V）"拆开——只圈定 H 的范围，屋内灯稍亮稍暗都不影响筛选。<code>inRange</code> 就是拿一个区间筛子过一遍像素，命中的涂白成掩膜。</p>
+<p><b>深度反投影像"由近及远钉钉子"。</b>已知像素在画面偏右 100 像素、深度 0.5m：乘内参（fx≈614）一除，就知道它在相机右侧约 8 厘米、正前方半米——(u,v,d)→(X,Y,Z) 就是这一除。深度图单位是 uint16 的<b>毫米</b>，用前必须 /1000，这是最经典的翻车点。</p>
+<p><b>TF 像"随军翻译"。</b>相机说"在我右前方 30cm"（camera_depth_optical_frame 系，X右/Y下/Z前，REP-103），底座听不懂；tf_buffer.transform 一换算，底座就知道"在base_link 前方多少"。相机装在手上，臂一动翻译表就更新——这就是 TF 的实时性。</p>
+<p><b>look-then-move 是"看准了再伸手"。</b>观察（OBSERVE）→ 有人按确认（CONFIRM）→ 猛抓（PICK）→ 回怠速（IDLE）。光看不确认就动是鲁莽，确认了快动是果断——五态循环把二者拆开。</p>
+<div class="kgrid">
+  <div class="kcard"><div class="kd">形态学开闭</div><div class="kt">先擦后补的橡皮擦</div><p>开运算（先蚀后胀，5×5 核）擦掉小噪点；闭运算（先胀后蚀）补上掩膜窟窿，让轮廓完整。</p></div>
+  <div class="kcard"><div class="kd">安全熔断</div><div class="kt">面积 &lt; 100 像素不抓</div><p>轮廓太小按噪声处理，宁可 skip 也不夹空气——防误抓的第一道闸（源码实际阈值 100；想更稳可自己提到 500）。</p></div>
+</div>
+</section>
+
+<!-- 03 -->
+<section class="blk" id="s3">
+<h2><span class="no">03</span>关联知识点</h2>
+<table>
+<tr><th>环节</th><th>真实参数/接口</th></tr>
+<tr><td>启动</td><td><code>ros2 launch car1_app visual_grasp.launch.py</code>（分时启动：<b>t=0 bringup</b> → <b>t=5s arm_controller</b> → <b>t=8s 深度相机</b> → <b>t=12s visual_grasp 节点</b> → <b>t=14s rqt 窗口</b>）</td></tr>
+<tr><td>图像话题</td><td>直接订相机驱动的<b>原生名</b>（不能 remap，驱动靠话题名里的 <code>rgb0</code>/<code>depth0</code> 子串来开关出流）：<br>RGB <code>/ascamera_hp60c/camera_publisher/rgb0/image</code> · 深度 <code>/ascamera_hp60c/camera_publisher/depth0/image_raw</code> · 内参 <code>/ascamera_hp60c/camera_publisher/depth0/camera_info</code></td></tr>
+<tr><td>HSV 阈值</td><td><b>默认认红（H 环两端两段取并集）</b>：主段 (0,100,80)-(15,255,255) ∪ 副段 (160,100,80)-(180,255,255)。<b>实测红块 H 落在 167~178</b>，所以真正起作用的是副段——只调主段会"怎么看都检测不到"。换色参考区间：yellow (20~40) · blue (100~130) · green (40~80)</td></tr>
+<tr><td>掩膜</td><td>cv2.inRange ×2 → bitwise_or 合并 → morphologyEx <b>OPEN 后 CLOSE</b>（<b>5×5 椭圆核</b>）→ findContours(RETR_EXTERNAL) → 取最大轮廓（<b>面积 &lt; 100 直接丢弃</b>）→ cv2.moments 求<b>质心</b></td></tr>
+<tr><td>深度</td><td><b>不是取质心单点</b>：先把轮廓填成实心 mask，与有效深度（&gt;0）取交集，<b>至少 30 个样本</b>才继续；再用 <b>中位数 ± 2.5×MAD</b> 剔除离群值，最后取中位数作 z。深度是 uint16 <b>毫米</b>，按 dtype 判断后 ÷1000（不用 <code>z&gt;100</code> 这种幅度猜测——近距离物体会被误判）</td></tr>
+<tr><td>反投影</td><td><code>x_cam=(u−cx)·z/fx, y_cam=(v−cy)·z/fy, z_cam=z</code>；<b>内参从 camera_info 的 k[0]/k[4]/k[2]/k[5] 实时读取</b>（不要写死 614/320/240，实测值只是它等于这些数）</td></tr>
+<tr><td>TF</td><td><code>tf_buffer.lookup_transform("base_link", "camera_depth_optical_frame", …)</code> → <code>do_transform_point</code>；链路 …→arm_link4→…→<b>tcp_link→camera_depth_optical_frame</b>（相机是<b>眼在手上</b>，装在 link4 侧，所以每一跳都随臂姿态变）；REP-103：X右/Y下/Z前</td></tr>
+<tr><td>服务</td><td>/visual_grasp/start、/confirm、/skip、/abort 四个 <code>std_srvs/Trigger</code></td></tr>
+<tr><td>状态机</td><td>源码是 <b>11 态</b>枚举：IDLE→INIT→MOVE_TO_OBSERVE→WAIT_STABLE→REFRESH_JOINTS→DETECT→WAIT_CONFIRMATION→COMPUTE_TARGET→PICK→DONE/FAILED（跑完回 IDLE，节点可反复触发不用重启）</td></tr>
+<tr><td>可视化</td><td>主要看 <code>/visual_grasp/visualization</code>（三栏合成图，launch 会自动开 rqt_image_view）；另有 <code>/visual_grasp/mask</code>（纯二值真相）与 <code>/visual_grasp/debug_image</code>（RGB+轮廓）</td></tr>
+</table>
+<div class="tip amber"><span class="lab">⚠️ 三处和讲义/直觉不一样，先纠正再动手</span>
+<b>① 定位方法不是 <code>minEnclosingCircle</code>，是 <code>cv2.moments</code> 质心。</b>源码注释写得很直白：质心比最小外接圆圆心更稳（对不规则团块），而且更贴近物体本体。<br>
+<b>② 最小面积阈值是 <code>100</code>，不是 500。</b>讲义/旧版写的 500 是更保守的建议值，但代码里实际判的是 <code>area &lt; 100</code>。差别很实际：30 mm 物体在 0.5 m 处大约 35×35 = 1200 px²，如果按 500 卡，稍远一点就被丢掉。<b>答题写 100（以源码为准），调参时可以自己往上提到 500 减少误检。</b><br>
+<b>③ 三栏里没有 <code>depth_overlay</code>、<code>rgb_annotated</code> 这两个话题。</b>真正的三栏是<b>一张合成图</b> <code>/visual_grasp/visualization</code>（RGB + Depth 伪彩 + Mask 横向拼接），用 <code>rqt_image_view</code> 订阅它一个就够；如果你按旧名字分三个窗口订阅，会一个都找不到。
+</div>
+<div class="tip tealb"><span class="lab">🔍 还有一个"隐藏动作"决定了定位精度</span>DETECT 之前有个 <b>REFRESH_JOINTS</b> 状态：先调 <code>/servo_controller/refresh_positions</code> 让 <code>/joint_states</code> 换成<b>舵机实测角度</b>（平时它反映的是"指令值"，因为那样快、不抢总线），丢给 TF 之后才做 lookup。<b>为什么必须这样</b>：IK 有误差、舵机有回差，臂<b>实际</b>停的位置和你<b>以为</b>它停的位置差几度，TF 就会把相机算到错的地方——物体定位直接偏几厘米。<b>这一步是"手眼"精度的隐形守门员。</b>TF 查询失败时它<b>不退回旧位姿</b>，直接返回 None 让上层重试，也是同一个道理。</div>
+<p><b>基线指标</b>：OBSERVE 检测 &lt;1s；PICK &lt;8s；单周期 &lt;15s；HSV 检测成功率 &gt;95%；1m 处反投影误差 ±2-3cm；TF 换算误差 &lt;1cm；整体抓取成功率 &gt;85%；误抓率 &lt;5%（面积&lt;500 剔除 + 重复抓取自动 skip）。相机按课程规格书为 HP60C（讲义环境表记 realsense2_camera 驱动，如设备不同仅影响驱动参数，五节点流水线不变）。</p>
+</section>
+
+<!-- 04 -->
+<section class="blk" id="s4">
+<h2><span class="no">04</span>实验目标</h2>
+<ul class="check">
+  <li>理解视觉抓取端到端原理：HSV 检测 → 深度反投影 → TF 变换 → IK → 状态机，五模块各司其职。</li>
+  <li>独立完成一站式启动 <code>visual_grasp.launch.py</code> 并跑通"start → 观察 → confirm → 抓取"动态闭环。</li>
+  <li>能调 HSV 阈值适配新颜色物体（hsv_tuner.py），检测成功率 &gt;95%。</li>
+  <li>能调 gripper_depth 适配 30~50mm 物体，并解释 look-then-move 与眼在手下压失视野问题的对策。</li>
+  <li>掌握四服务人机节奏与重复抓取处理（目标已抓走时自动 skip，避免夹空气）。</li>
+</ul>
+</section>
+
+<!-- 05 -->
+<section class="blk" id="s5">
+<h2><span class="no">05</span>实验环境与准备</h2>
+<table>
+<tr><th>项</th><th>要求</th></tr>
+<tr><td>主入口</td><td><code>app/car1_app/launch/visual_grasp.launch.py</code>；核心节点 <code>car1_app/visual_grasp.py</code>；公共函数 <code>car1_app/common.py</code></td></tr>
+<tr><td>前置实验</td><td>EXP-06（抓取链路与参数已调通）；rgb8 + aligned depth 图像话题正常</td></tr>
+<tr><td>相机</td><td>HP60C 深度相机（课程规格）；讲义环境基于 realsense2_camera 驱动，RGB-D 双路输出</td></tr>
+<tr><td>场地</td><td>30~50mm 红色物体置于视野中央桌面；背景与目标色区分明显（<b>实测红块 HSV 的 H 落在 167~178</b>，属"副段"；换绿色/蓝色物体记得连段数一起改）</td></tr>
+<tr><td>工具</td><td>rqt_image_view（合成图 /visual_grasp/visualization）、四个 Service 终端窗口、<code>dry_run:=true</code> 作为安全预演开关</td></tr>
+<tr><td>分阶段</td><td>阶段1 启动与检测 120min；阶段2 状态机与服务 120min；阶段3 抓取执行与调优 120min</td></tr>
+</table>
+<div class="tip amber"><b>启动前检查：</b>机械臂零位/急停可用；bringup 与相机不冲突（visual_grasp.launch 会自管其节点）；调试默认 <code>wait_for_confirmation:=true</code>——设 false 才会跳过人工 confirm 直连抓取，首次务必留 true。</div>
+</section>
+
+<!-- 06 -->
+<section class="blk" id="s6">
+<h2><span class="no">06</span>动画讲解：观察—确认—抓取三乐章</h2>
+<div class="anim-box">
+<svg viewBox="0 0 640 300" xmlns="http://www.w3.org/2000/svg">
+  <rect x="0" y="0" width="640" height="300" fill="#0b1120"></rect>
+  <!-- 相机视野 -->
+  <rect x="40" y="40" width="200" height="120" fill="#0f172a" stroke="#334155"></rect>
+  <text x="46" y="34" fill="#64748b" font-size="12" font-family="monospace">RGB + Depth @ 相机</text>
+  <!-- 目标与扫描框 -->
+  <rect x="150" y="105" width="22" height="22" fill="#ef4444">
+    <animate attributeName="opacity" values="1;1;0.15;1;1" keyTimes="0;0.3;0.5;0.9;1" dur="9s" repeatCount="indefinite"/>
+  </rect>
+  <rect x="144" y="99" width="34" height="34" fill="none" stroke="#4ade80" stroke-width="2" stroke-dasharray="6 4">
+    <animate attributeName="opacity" values="0;1;1;0;0" keyTimes="0;0.12;0.4;0.5;1" dur="9s" repeatCount="indefinite"/>
+    <animate attributeName="stroke-dashoffset" values="40;0" dur="1.2s" repeatCount="indefinite"/>
+  </rect>
+  <text x="52" y="150" fill="#4ade80" font-size="11" font-family="monospace">HSV mask → 质心 (u,v) → depth d → (X,Y,Z)</text>
+  <!-- 光流箭头：相机→TF→基座 -->
+  <line x1="250" y1="100" x2="330" y2="100" stroke="#fbbf24" stroke-width="2.5" marker-end="url(#ar)">
+    <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.12;0.4;0.5" dur="9s" repeatCount="indefinite"/>
+  </line>
+  <defs><marker id="ar" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#fbbf24"/></marker></defs>
+  <text x="255" y="88" fill="#fbbf24" font-size="11" font-family="monospace">TF→base_link</text>
+  <!-- 状态机指示 -->
+  <g font-family="monospace" font-size="12">
+    <rect x="340" y="45" width="270" height="86" fill="#0f172a" stroke="#1e293b"></rect>
+    <text x="350" y="65" fill="#94a3b8">源码 11 态：IDLE→INIT→OBSERVE→…→PICK→DONE</text>
+  </g>
+  <circle cx="356" cy="88" r="6" fill="#4ade80">
+    <animate attributeName="cx" values="356;448;528;588;356" keyTimes="0;0.3;0.45;0.75;1" dur="9s" repeatCount="indefinite"/>
+    <animate attributeName="fill" values="#4ade80;#fbbf24;#f87171;#60a5fa;#4ade80" keyTimes="0;0.3;0.45;0.75;1" dur="9s" repeatCount="indefinite"/>
+  </circle>
+  <text x="350" y="118" fill="#64748b" font-size="11" font-family="monospace">start → 检测(绿) → 等 confirm(黄) → 抓取(红) → 回位(蓝)</text>
+  <!-- 简易机械臂抓取（PICK 段） -->
+  <line x1="161" y1="270" x2="161" y2="230" stroke="#475569" stroke-width="10" stroke-linecap="round"></line>
+  <line x1="161" y1="230" x2="300" y2="230" stroke="#f87171" stroke-width="7" stroke-linecap="round">
+    <animate attributeName="x2" values="161;161;300;300;300;300;161" keyTimes="0;0.4;0.5;0.7;0.85;0.95;1" dur="9s" repeatCount="indefinite"/>
+    <animate attributeName="y2" values="230;200;200;248;200;230;230" keyTimes="0;0.4;0.5;0.7;0.85;0.95;1" dur="9s" repeatCount="indefinite"/>
+  </line>
+  <rect x="294" y="258" width="18" height="10" fill="#fbbf24">
+    <animate attributeName="opacity" values="1;1;1;1;0;0;1" keyTimes="0;0.5;0.7;0.78;0.8;0.95;1" dur="9s" repeatCount="indefinite"/>
+    <animate attributeName="x" values="294;294;294;294;300;300;294" keyTimes="0;0.5;0.7;0.78;0.8;0.95;1" dur="9s" repeatCount="indefinite"/>
+    <animate attributeName="y" values="258;258;258;258;216;216;258" keyTimes="0;0.5;0.7;0.78;0.8;0.95;1" dur="9s" repeatCount="indefinite"/>
+  </rect>
+  <line x1="40" y1="272" x2="610" y2="272" stroke="#334155" stroke-width="2"></line>
+  <text x="40" y="292" fill="#64748b" font-size="12" font-family="monospace">9 秒一循环：看（observe）→ 报坐标 → 等人点头（confirm）→ look-then-move 抓取 → idle</text>
+</svg>
+</div>
+<p class="anim-cap">动画 9 秒一循环：左框里绿色虚线框住红色目标并提取质心，经 TF 换算到 base_link；右上状态机光点在 OBSERVE(绿)→CONFIRM(黄)→PICK(红)→IDLE(蓝) 间移动；下方机械臂在 PICK 段伸出、合爪、带物回位——"看准了再伸手"的节奏一目了然。</p>
+</section>
+
+<!-- 07 -->
+<section class="blk" id="s7">
+<h2><span class="no">07</span>互动讲解：HSV 掩膜调参台 + 反投影验算</h2>
+<div class="ix-panel">
+  <div class="ix-title">互动台 · 换色适配 + (u,v,d)→(X,Y,Z) 验算</div>
+  <div class="ctl-row">
+    <label class="ctl">目标颜色预设
+      <select id="col" onchange="fillHsv()">
+        <option value="r" selected>红 red 主段 (0-15) · 默认</option>
+        <option value="y">黄 yellow (20-40)</option>
+        <option value="b">蓝 blue (100-130)</option>
+        <option value="g">绿 green (40-80)</option>
+      </select>
+    </label>
+    <label class="ctl">H 下限<input type="number" id="h0" value="0"></label>
+    <label class="ctl">H 上限<input type="number" id="h1" value="15"></label>
+    <label class="ctl">u<input type="number" id="u" value="360"></label>
+    <label class="ctl">v<input type="number" id="v" value="260"></label>
+    <label class="ctl">深度 d (mm)<input type="number" id="d" value="500"></label>
+    <button class="btn" onclick="maskCheck()">判掩膜窗口</button>
+    <button class="btn" onclick="bpCalc()">反投影</button>
+  </div>
+  <div class="io" id="ixout">默认红目标 = <b>两段并集</b>：主段 H∈[0,15] ∪ 副段 [160,180]（红卡在 H 环两端，<b>实测红块落在 167~178，起作用的其实是副段</b>），S≥100、V≥80（launch 实参 [0,100,80]）；本台窗口只模拟主段。反投影内参：<b>运行时从 camera_info 读</b>，实测 fx=fy=614、cx=320、cy=240；深度 uint16 单位 mm，须 /1000。</div>
+</div>
+<p>先点"判掩膜窗口"：H 区间与预设完全一致报 ok，部分重叠报 warn（会漏检边缘色阶），完全无关报 bad。<b>特别注意</b>：如果你只在主段 [0,15] 里调，而手里红块的实际 H 在 167~178，那么无论怎么调都是 bad——这正是"两段并集"存在的理由。再点"反投影"：输入质心像素与深度毫米数，按 <code>X=(u−cx)·d/fx, Y=(v−cy)·d/fy, Z=d</code> 算相机系坐标——和你在 rqt Mask 栏看到的白色团块互为印证。</p>
+</section>
+
+<!-- 08 -->
+<section class="blk" id="s8">
+<h2><span class="no">08</span>实操步骤</h2>
+<div class="flow">
+  <div class="step"><b>Step 1 · 一站式启动</b><br>拉起 5 节点，等相机出流。</div>
+  <div class="arr">→</div>
+  <div class="step"><b>Step 2 · HSV 调参</b><br>rqt 三栏 + hsv_tuner 锁定颜色。</div>
+  <div class="arr">→</div>
+  <div class="step"><b>Step 3 · 反投影验证</b><br>标定物对照，误差 ±2-3cm@1m。</div>
+  <div class="arr">→</div>
+  <div class="step"><b>Step 4 · TF 确认</b><br>tf2_echo 查 optical→base_link。</div>
+  <div class="arr">→</div>
+  <div class="step"><b>Step 5 · 服务闭环</b><br>start→观察→confirm→PICK→IDLE。</div>
+  <div class="arr">→</div>
+  <div class="step"><b>Step 6 · 换色验收</b><br>改 HSV 抓新色块，记四指标。</div>
+</div>
+<pre><span class="c"># 步骤 1 · 一站式启动（分时拉 4 组东西：bringup → arm_controller → 相机 → 节点 → rqt）</span>
+ros2 launch car1_app visual_grasp.launch.py
+<span class="g"># [INFO] [visual_grasp_node]: State IDLE, waiting for /visual_grasp/start</span>
+<span class="y"># 启动时序 t=0/5/8/12/14s：先串口与 TF → 控制器 → 相机出流 → 检测节点 → rqt 窗口</span>
+<span class="y"># 别在 t&lt;12s 就急着 call start：节点还没起，服务不存在</span>
+
+<span class="c"># 步骤 2 · 三栏可视化（一个话题就够，launch 已自动开 rqt_image_view）</span>
+ros2 run rqt_image_view rqt_image_view /visual_grasp/visualization
+<span class="y"># 合成图：左 RGB（绿轮廓+黄框+红十字质心）｜中 Depth 伪彩（标 mm 读数）｜右 HSV Mask 二值真相</span>
+<span class="y"># 想看纯掩膜：ros2 run rqt_image_view rqt_image_view /visual_grasp/mask</span>
+<span class="y"># hsv_tuner.py 是讲义提供的离线调参脚本；线上调参直接改 launch 参数里的两段 H/S/V</span>
+
+<span class="c"># 步骤 3 · 反投影自测（内参请从 camera_info 读，别写死）</span>
+ros2 topic echo /ascamera_hp60c/camera_publisher/depth0/camera_info --once
+<span class="y"># 看 k[0]=fx、k[4]=fy、k[2]=cx、k[5]=cy；实测 ≈614/614/320/240</span>
+<span class="y"># 手算：u,v=320,240 → X=Y=0（正好光轴中心），Z=d/1000；偏 200px、d=0.5m → X=(200)*0.5/614≈0.163m</span>
+<span class="y"># 标定物实测：1m 距离误差预期 ±2-3cm；超差先查 camera_info 是否已更新</span>
+
+<span class="c"># 步骤 4 · TF 链与时序</span>
+ros2 run tf2_tools view_frames      <span class="c"># … → arm_link4 → … → tcp_link → camera_depth_optical_frame</span>
+ros2 run tf2_ros tf2_echo base_link camera_depth_optical_frame
+
+<span class="c"># 步骤 5 · 人机协同四服务（Trigger 类，命令体留空）</span>
+ros2 service call /visual_grasp/start   std_srvs/srv/Trigger "{}"
+<span class="y"># 日志：State IDLE -&gt; ... -&gt; DETECT → Contour: area=…, centroid=(u,v) → WAIT_CONFIRMATION</span>
+ros2 service call /visual_grasp/confirm std_srvs/srv/Trigger "{}"   <span class="y"># 确认后进 PICK</span>
+ros2 service call /visual_grasp/skip    std_srvs/srv/Trigger "{}"   <span class="y"># 放弃本目标</span>
+ros2 service call /visual_grasp/abort   std_srvs/srv/Trigger "{}"   <span class="y"># 中止回 IDLE</span></pre>
+<pre><span class="c"># 步骤 6 · 换色验收（以抓 30~50mm 红色物体为例）</span>
+<span class="y"># 1) 改 HSV 两段阈值：优先确保"副段 160~180"覆盖住你手里的红块（实测 H 落在 167~178）</span>
+<span class="y"># 2) 桌面摆放物体，start → DETECT 出轮廓 → confirm → 看 PICK 是否 &lt;8s 完成</span>
+<span class="y"># 3) 拿走物体再 start：轮廓面积 &lt;100 应被熔断（"Largest red contour too small"）→ 不抓空气</span>
+<span class="y"># 4) 免确认直连（首次务必先过一遍带确认的）</span>
+ros2 launch car1_app visual_grasp.launch.py wait_for_confirmation:=false
+<span class="c"># 安全预演：只定位不抓，机械臂只升到观察位</span>
+ros2 launch car1_app visual_grasp.launch.py dry_run:=true
+<span class="c"># 验收指标：HSV 检测成功率&gt;95% · 单周期&lt;15s · 抓取成功率&gt;85% · 误抓&lt;5%</span></pre>
+<div class="tip tealb"><span class="lab">🔍 调不出结果时，第一个该用的参数是 dry_run</span><code>dry_run:=true</code> 让节点<b>只检测、只打印 base_link 坐标，不发 target_pose、不调 pick</b>——机械臂最多升到观察位，绝不会往物体下压。<b>验证定位精度必须先用它</b>：拿卷尺量一下物体实际位置，和日志里的坐标比对，差了 3 cm 以上就别急着抓，先查内参/深度/TF，否则你会在"抓偏"和"到底哪一步偏"之间反复折腾。</div>
+</section>
+
+<!-- 09 -->
+<section class="blk" id="s9">
+<h2><span class="no">09</span>重点与易错点</h2>
+<div class="tip tealb"><b>难点预警——眼在手下压失视野：</b>相机装在腕部，机械臂 DESCEND 下压时目标会滑出视野甚至贴得太近失焦。对策即 look-then-move 的本义：<b>观察阶段锁定 base_link 坐标</b>，抓取段只信这份额定坐标，中途不再追着实时像素跑（需要复看就抬回观察位再 OBSERVE）。</div>
+<table>
+<tr><th>坑</th><th>现象</th><th>对策</th></tr>
+<tr><td>深度单位混淆</td><td>反投影差 1000 倍</td><td>HP60C 深度 uint16 单位是 mm。<b>别用 <code>if z&gt;100</code> 猜</b>——源码按 <code>dtype</code> 判断（整数÷1000，浮点已是米），近距离物体会被猜错</td></tr>
+<tr><td>只调了主段 H 区间</td><td>怎么调都检测不到红块</td><td><b>实测红块 H 在 167~178</b>，起作用的<b>是副段</b> 160~180。两段都要在</td></tr>
+<tr><td>按旧名找话题</td><td>三栏窗口一个都打不开</td><td>不存在 <code>rgb_annotated</code>/<code>depth_overlay</code>；看合成图 <code>/visual_grasp/visualization</code> 或掩膜 <code>/visual_grasp/mask</code></td></tr>
+<tr><td>深度取单点</td><td>z 偶发跳变、定位忽准忽偏</td><td>源码用"轮廓内多点 + 中位数 ±2.5×MAD + 样本≥30"；取质心单点遇到空洞/高光就废</td></tr>
+<tr><td>内参写死</td><td>换分辨率后越抓越偏</td><td>从 <code>camera_info</code> 的 k[0]/k[4]/k[2]/k[5] 读；614/320/240 只是实测值不是常量</td></tr>
+<tr><td>坐标系方向错</td><td>抓取整体偏 90°</td><td>optical 系 X右/Y下/Z前；用 <code>tf2_echo</code> 核对链路每一跳</td></tr>
+<tr><td>关节角用的是"指令值"</td><td>定位偏几厘米，且每次都差不多</td><td>REFRESH_JOINTS 状态会先调 <code>refresh_positions</code> 拿实测角；若你自写节点，必须自己补这一步</td></tr>
+<tr><td>t&lt;12s 就 call start</td><td>"服务不存在"</td><td>launch 是分时启动的，等日志打出 "waiting for /visual_grasp/start" 再触发</td></tr>
+<tr><td>空抓/夹空气</td><td>PICK 落空</td><td>先用 <code>dry_run:=true</code> 核对坐标；面积熔断（&lt;100）只挡"没检测到"，挡不住"坐标错了"</td></tr>
+</table>
+<div class="tip tealb"><span class="lab">⚠️ 一句必须说清的实话</span><b>"重复抓取自动 skip"不是代码里的一行判断。</b>源码<b>没有</b>"记住已抓过哪个物体"的逻辑——离开视野的物体本来就检测不到了；留在视野里的空位置则因为<b>面积 &lt;100 被熔断</b>而不会抓。所以"误抓率 &lt;5%"靠的是<b>熔断 + 人工 confirm</b> 两道闸，不是自动去重。<b>想要真正的去重</b>，得自己记一份已抓物体的 base_link 坐标清单，在新目标与已有清单足够近时 skip——这是本实验的进阶改造题。</div>
+<ul class="check">
+  <li>交付四件套：换色检测成功率 &gt;95%、单周期 &lt;15s、整体成功率 &gt;85%、误抓 &lt;5%。</li>
+  <li>三栏图像必须都看过才收工：rgb_annotated（框）、depth_overlay（深度着色）、mask（二值真相）。</li>
+  <li>留档一组"失败样本"截图 + 当时 HSV/深度/TF 日志——调试能力比一次成功更值钱。</li>
+</ul>
+</section>
+
+<!-- 10 -->
+<section class="blk" id="s10">
+<h2><span class="no">10</span>总结与思考</h2>
+<div class="kgrid">
+  <div class="kcard"><div class="kd">三座桥</div><div class="kt">HSV · 反投影 · TF</div><p>颜色→掩膜→像素质心→毫米→米→base_link。</p></div>
+  <div class="kcard"><div class="kd">五节点一键</div><div class="kt">visual_grasp.launch</div><p>相机+检测+状态机+服务同起，时序自管。</p></div>
+  <div class="kcard"><div class="kd">人机四服务</div><div class="kt">start/confirm/skip/abort</div><p>看→点头→抓→回，重复目标自动 skip。</p></div>
+  <div class="kcard"><div class="kd">验收指标</div><div class="kt">95% / 85% / 5%</div><p>检测率、成功率、误抓率三线齐守。</p></div>
+</div>
+<div class="tip violet"><b>思考题 1：</b>把 S 阈值下限从 100 降到 30 会让更多像素进入掩膜——检测率会上升还是误检率会上升？结合"开运算 5×5 去噪"和"最小面积 500"设计一组你自己的调参顺序（先调谁、后调谁、每次依据什么栏判断）。</div>
+<div class="tip violet"><b>思考题 2：</b>look-then-move 在物体被人挪动的场景里会抓空。若要升级为"持续跟随"，五态循环哪里要改？把眼在手下压失视野的约束、TF 实时更新能力、以及 EXP-06 的分步移动一起纳入你的方案草案。</div>
+</section>
+
+<nav class="expnav">
+  <a href="../exp-06-fixed-grasp/index.html"><span class="lb">← 上一个实验</span>EXP-06 逆运动学固定抓取</a>
+  <a class="next" href="../index.html"><span class="lb">返回课程目录 →</span>CORE-05 全部 7 个实验</a>
+</nav>
+<footer>
+  <span>CORE-05 · 机器人机械臂应用与开发 · EXP-07 视觉动态抓取</span>
+  <span>8 学时 · 综合性 · 基于 arm_practice 实验讲义改编</span>
+</footer>
+</main>
+</div>
+
+<script>
+function fillHsv(){
+  var c=document.getElementById('col').value;
+  var r={y:[20,40],r:[0,15],b:[100,130],g:[40,80]}[c];
+  document.getElementById('h0').value=r[0];
+  document.getElementById('h1').value=r[1];
+}
+function maskCheck(){
+  var c=document.getElementById('col').value;
+  var std={y:[20,40],r:[0,15],b:[100,130],g:[40,80]}[c];
+  var name={y:'yellow',r:'red 主段(0,15)+副段160~180',b:'blue',g:'green'}[c];
+  var h0=parseInt(document.getElementById('h0').value),h1=parseInt(document.getElementById('h1').value);
+  var s,hit,half;
+  if(h0===std[0]&&h1===std[1]){s='<span class="ok">ok：与讲义 '+name+' 阈值 ('+std[0]+','+std[1]+') 完全一致</span>';hit=true;half=false;}
+  else{
+    hit=(h0<=std[1]&&h1>=std[0]);
+    half=hit&&!(h0<=std[0]&&h1>=std[1]);
+    s=hit?(half?'<span class="warn">warn：与 '+name+' 区间部分重叠——边缘色阶会被漏检/误检，建议覆盖全区间</span>':'<span class="warn">warn：覆盖了 '+name+' 但偏窄，光照变化时易掉线</span>'):'<span class="bad">bad：与 '+name+' 阈值无重叠，该颜色目标不会出现在 Mask 栏</span>';
+  }
+  var w=Math.max(0,Math.min(h1,179)-Math.max(h0,0));
+  document.getElementById('ixout').innerHTML=
+    'HSV 掩膜窗口判定：H∈['+h0+','+h1+']（宽度 '+w+'）\n'+s+'\n'
+    +'S≥100、V≥80（launch 默认 [0,100,80]）；开闭运算核 5×5；最小轮廓面积 500（&lt;500 熔断不抓）\n'
+    +'<span class="dim">依据 rqt Mask 栏二值图调参：目标成实心白块、背景基本全黑即到位</span>';
+}
+function bpCalc(){
+  var u=parseFloat(document.getElementById('u').value),
+      v=parseFloat(document.getElementById('v').value),
+      dmm=parseFloat(document.getElementById('d').value);
+  var fx=614.0,cx=320.0,cy=240.0;
+  if(!(dmm>0)||dmm/1000>2.0){
+    document.getElementById('ixout').innerHTML=
+      '<span class="bad">深度无效：d='+dmm+'mm，要求 0 &lt; d ≤ 2000mm（有效窗 0&lt;d≤2.0m）</span>\n'
+      +'<span class="dim">先查深度图是否有空洞/反光，uint16 单位是 mm 不是 m</span>';
+    return;
+  }
+  var d=dmm/1000.0;
+  var X=(u-cx)*d/fx, Y=(v-cy)*d/fy, Z=d;
+  var offCenter=(Math.abs(u-cx)<3&&Math.abs(v-cy)<3)?'（质心≈光轴中心）':'';
+  document.getElementById('ixout').innerHTML=
+    '相机系反投影（camera_depth_optical_frame，X右/Y下/Z前）：\n'
+    +'X = ('+u+'−320)×'+d.toFixed(3)+'/614 = <b>'+X.toFixed(4)+'</b> m\n'
+    +'Y = ('+v+'−240)×'+d.toFixed(3)+'/614 = <b>'+Y.toFixed(4)+'</b> m\n'
+    +'Z = d = <b>'+Z.toFixed(3)+'</b> m '+offCenter+'\n'
+    +'<span class="dim">下一步交给 tf_buffer.transform(→"base_link")；1m 处系统误差预期 ±2-3cm</span>';
+}
+</script>
+<script src="../shared/tutorial.js" defer></script>
+</body>
+</html>

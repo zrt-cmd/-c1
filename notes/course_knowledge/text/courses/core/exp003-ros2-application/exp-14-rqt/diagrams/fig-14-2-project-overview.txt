@@ -1,0 +1,41 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp003-ros2-application/exp-14-rqt/diagrams/fig-14-2-project-overview.html
+TITLE: 图 14-2 · 工程全景
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+图 14-2 · 工程全景
+图 14-2 · 工程全景：三终端 + 四插件盯住同一条电压话题
+本图回答的问题：本实验动了哪些终端和插件，数据从哪来到哪去？
+入口层 · 三终端
+插件层 · rqt 四双眼睛
+数据层 · CLI 验证与交叉验证
+消息层 · 本机真实话题
+终端 1 · CLI 验话题
+list / info / hz
+终端 2 · rqt_graph
+ros2 run rqt_graph
+终端 3 · rqt_plot / console
+字段级路径 · 级别过滤
+rqt_graph · 拓扑
+Hide Debug 看主链路
+rqt_plot · 波形
+/…/battery 曲线滚动
+rqt_image_view / console
+画面 + 日志级别过滤
+终端 1 · echo --once 拿精确值
+与曲线右端比对
+交叉验证 · 看图定关系
+曲线冻结 ≠ 节点死 → 回 graph/hz
+/car1_base_driver/battery
+Float32 · 1.000 Hz · 电压
+/camera/color/image_raw 等
+Image · 30fps（image_view 用）
+先验活
+CLI 定案
+GUI 提速
+订阅
+画面来源
+实操顺序：验活 → graph 拓扑 → plot 波形 → image_view 画面 → 日志过滤 → Perspective 存盘
+✅ 结论：CLI 先验活，GUI 再看图，两边对同一话题交叉印证
+⚠️ 风险：话题未验活就开插件 → 全空难判断谁的锅
+🔍 验证：04 节四步 + echo --once 与曲线右端比对
+EXP-14 · rqt 可视化工具箱

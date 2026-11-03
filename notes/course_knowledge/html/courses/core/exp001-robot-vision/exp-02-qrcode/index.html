@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-02 · 二维码生成与识别 — 机器人视觉入门课</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<link rel="stylesheet" href="../shared/beginner.css">
+<style>:root{--theme:#7c3aed;--theme-deep:#6d28d9;--theme-bg:#ede9fe;--theme-bd:#ddd6fe}</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit">🧠 具身智能课程 · <i>机器人视觉入门</i></a>
+  <div class="crumb"><a href="../../../index.html#core">核心课程</a> / <a href="../index.html">视觉入门课</a> / EXP-02</div>
+</div>
+
+<div class="wrap">
+
+<aside class="side">
+  <h4>本页步骤</h4>
+  <a href="#s1" class="now">01 这个实验解决什么问题</a>
+  <a href="#s2">02 三分钟讲懂：二维码为什么能被认出来</a>
+  <a href="#s3">03 先认识 4 个词</a>
+  <a href="#s4">04 它吃什么、吐什么</a>
+  <a href="#s5">05 三步跑起来</a>
+  <a href="#s6">06 你该看到的画面</a>
+  <a href="#s7">07 改一个参数看变化</a>
+  <a href="#s8">08 踩坑速查</a>
+  <a href="#s9">09 进阶（可选）</a>
+  <a href="#s10">10 随堂小测</a>
+  <h4>本课程实验</h4>
+  <a href="../exp-01-color-hsv/index.html">EXP-01 颜色识别</a>
+  <a href="../exp-02-qrcode/index.html" style="color:#0f766e;font-weight:700">EXP-02 二维码</a>
+  <a href="../exp-03-contour-polygon/index.html">EXP-03 多边形轮廓</a>
+  <a href="../exp-04-industrial-defect/index.html">EXP-04 工业缺陷检测</a>
+  <a href="../exp-05-garbage-classification/index.html">EXP-05 垃圾分类</a>
+  <a href="../exp-06-semantic-segmentation/index.html">EXP-06 语义分割</a>
+  <a href="../exp-07-deepsort-tracking/index.html">EXP-07 多目标跟踪</a>
+  <a href="../exp-08-face-landmarks/index.html">EXP-08 人脸关键点</a>
+  <a href="../exp-09-pose-landmark/index.html">EXP-09 骨骼关键点</a>
+  <a href="../exp-10-depth-3d/index.html">EXP-10 深度 3D</a>
+  <a href="../exp-11-pose-control/index.html">EXP-11 体感控制</a>
+  <a href="../exp-12-hand-control/index.html">EXP-12 手势识别</a>
+</aside>
+
+<main class="content">
+
+<div class="exp-head">
+  <span class="code">EXP-02 · 第 1 阶段 · 传统视觉 · 验证性 · 4 学时</span>
+  <h1>二维码：自己生成一张，再让相机读回来</h1>
+  <p class="desc">二维码是"机器写给机器看"的图案。本实验先让你用几行代码生成一张二维码，再让相机把它读回来 —— 一写一读，闭环。中间你会看到二维码的三个"回"字角标是怎么让机器一眼定位的，以及为什么调错一个参数，汉字就全变乱码。</p>
+  <div class="meta">
+    <span class="tag hl">难度 ⭐ · 4 学时</span>
+    <span class="tag">qrcode 库生成</span><span class="tag">OpenCV 检测</span>
+    <span class="tag">纠错等级</span>
+  </div>
+</div>
+
+<div class="pathline">
+  <span>01 颜色</span><span class="cur">02 二维码</span><span>03 轮廓</span><span>04 检测</span><span>05 分类</span><span>06 分割</span><span>07 跟踪</span><span>08 人脸</span><span>09 骨骼</span><span>10 3D</span><span>11 体感</span><span>12 手势</span>
+</div>
+
+<section class="blk" id="s1">
+  <h2><span class="no">01</span>这个实验解决什么问题</h2>
+
+  <div class="idea">
+    <span class="tag1">CORE IDEA · 一句话原理</span>
+    <p class="big">二维码 = <b>3 个定位角标</b>（告诉机器图在哪、转过没有）+ <b>一堆黑白格子</b>（存内容）+ <b>纠错码</b>（脏了也能读）。</p>
+    <p class="analogy"><b>打个比方：</b>就像快递单上的条码，只不过二维码是<b>二维的</b> —— 横竖都能存信息，所以能存几百个字，而条码只能存十几个数字。</p>
+  </div>
+
+  <p>为什么机器人需要二维码？因为它是目前<b>最便宜、最可靠</b>的"身份标签"：</p>
+  <ul>
+    <li>贴在货架上 → 机器人一扫就知道"这是 3 号库位的零件 A"</li>
+    <li>贴在工位上 → 相机一扫就知道"现在该执行哪道工序"</li>
+    <li>贴在门上 → 巡检机器人一扫就知道"我到 2 楼了"</li>
+  </ul>
+  <p>成本？一张纸。可靠性？<b>被遮住一部分还能读出来。</b>这就是它到今天还没被取代的原因。</p>
+
+  <div class="oneline"><span>本实验的目标：<b>自己生成一张二维码 → 打印或用手机显示 → 相机对着它，读出里面的文字。</b></span></div>
+</section>
+
+<section class="blk" id="s2">
+  <h2><span class="no">02</span>三分钟讲懂：二维码为什么能被认出来</h2>
+
+  <p class="lead">先看它长什么样、每一块是干什么的。看懂这张图，后面全通。</p>
+
+  <div class="anim-box">
+    <svg viewBox="0 0 740 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="二维码结构分解：三个定位角标 校正图形 时序线 数据区 静区">
+      <rect x="6" y="6" width="728" height="248" rx="12" fill="#111827" stroke="#334155"/>
+      <text x="370" y="30" text-anchor="middle" font-size="13" font-weight="700" fill="#c4b5fd" font-family="sans-serif">一张二维码的解剖图</text>
+
+      <!-- 码图 -->
+      <g transform="translate(40,48)">
+        <rect x="-8" y="-8" width="176" height="176" fill="#fff" rx="3"/>
+        <!-- 三个定位角标 -->
+        <g fill="#000">
+          <rect x="0" y="0" width="44" height="44"/><rect x="8" y="8" width="28" height="28" fill="#fff"/><rect x="15" y="15" width="14" height="14"/>
+          <rect x="116" y="0" width="44" height="44"/><rect x="124" y="8" width="28" height="28" fill="#fff"/><rect x="131" y="15" width="14" height="14"/>
+          <rect x="0" y="116" width="44" height="44"/><rect x="8" y="124" width="28" height="28" fill="#fff"/><rect x="15" y="131" width="14" height="14"/>
+        </g>
+        <!-- 时序线 -->
+        <g fill="#000">
+          <rect x="52" y="6" width="6" height="6"/><rect x="64" y="6" width="6" height="6"/><rect x="76" y="6" width="6" height="6"/>
+          <rect x="88" y="6" width="6" height="6"/><rect x="100" y="6" width="6" height="6"/>
+          <rect x="6" y="52" width="6" height="6"/><rect x="6" y="64" width="6" height="6"/><rect x="6" y="76" width="6" height="6"/>
+          <rect x="6" y="88" width="6" height="6"/><rect x="6" y="100" width="6" height="6"/>
+        </g>
+        <!-- 校正图形 -->
+        <g fill="#000"><rect x="112" y="112" width="20" height="20"/><rect x="117" y="117" width="10" height="10" fill="#fff"/><rect x="120" y="120" width="4" height="4"/></g>
+        <!-- 数据区（随机格子） -->
+        <g fill="#000" opacity=".82">
+          <rect x="52" y="52" width="6" height="6"/><rect x="64" y="58" width="6" height="6"/><rect x="76" y="52" width="6" height="6"/>
+          <rect x="88" y="64" width="6" height="6"/><rect x="58" y="70" width="6" height="6"/><rect x="70" y="76" width="6" height="6"/>
+          <rect x="94" y="52" width="6" height="6"/><rect x="100" y="76" width="6" height="6"/><rect x="52" y="88" width="6" height="6"/>
+          <rect x="64" y="94" width="6" height="6"/><rect x="76" y="100" width="6" height="6"/><rect x="88" y="106" width="6" height="6"/>
+          <rect x="100" y="94" width="6" height="6"/><rect x="52" y="112" width="6" height="6"/><rect x="64" y="124" width="6" height="6"/>
+          <rect x="76" y="136" width="6" height="6"/><rect x="88" y="124" width="6" height="6"/><rect x="100" y="136" width="6" height="6"/>
+          <rect x="52" y="140" width="6" height="6"/><rect x="64" y="150" width="6" height="6"/><rect x="142" y="52" width="6" height="6"/>
+          <rect x="150" y="64" width="6" height="6"/><rect x="142" y="76" width="6" height="6"/><rect x="150" y="88" width="6" height="6"/>
+          <rect x="142" y="100" width="6" height="6"/><rect x="52" y="58" width="6" height="6"/><rect x="150" y="112" width="6" height="6"/>
+          <rect x="142" y="124" width="6" height="6"/><rect x="150" y="136" width="6" height="6"/><rect x="88" y="140" width="6" height="6"/>
+          <rect x="100" y="150" width="6" height="6"/><rect x="76" y="148" width="6" height="6"/><rect x="64" y="136" width="6" height="6"/>
+          <rect x="52" y="128" width="6" height="6"/><rect x="112" y="142" width="6" height="6"/><rect x="126" y="150" width="6" height="6"/>
+        </g>
+      </g>
+
+      <!-- 标注 -->
+      <g font-family="sans-serif" font-size="11">
+        <path d="M92,70 L196,70" stroke="#f472b6" stroke-width="1.4" fill="none"/>
+        <text x="202" y="68" fill="#f472b6" font-weight="700">① 定位角标 ×3</text>
+        <text x="202" y="84" fill="#94a3b8" font-size="10">"回"字形，一眼就能找到</text>
+
+        <path d="M92,152 L196,110" stroke="#facc15" stroke-width="1.4" fill="none"/>
+        <text x="202" y="110" fill="#facc15" font-weight="700">② 矫正图形</text>
+        <text x="202" y="126" fill="#94a3b8" font-size="10">拍歪了也能把图摆正</text>
+
+        <path d="M104,56 L196,148" stroke="#22d3ee" stroke-width="1.4" fill="none"/>
+        <text x="202" y="152" fill="#22d3ee" font-weight="700">③ 时序线</text>
+        <text x="202" y="168" fill="#94a3b8" font-size="10">黑白相间，告诉机器格子多大</text>
+
+        <path d="M140,120 L196,190" stroke="#4ade80" stroke-width="1.4" fill="none"/>
+        <text x="202" y="194" fill="#4ade80" font-weight="700">④ 数据区 + 纠错码</text>
+        <text x="202" y="210" fill="#94a3b8" font-size="10">内容 + 备份（脏了也能读）</text>
+      </g>
+
+      <text x="470" y="238" text-anchor="middle" font-size="11" fill="#64748b" font-family="sans-serif">外面那圈白边叫"静区"，不能裁掉 —— 没它机器容易找不到边界</text>
+    </svg>
+  </div>
+  <div class="cap">图 4-1｜四个关键部件。其中①②③都是为"让机器能定位"服务的，只有④才是真正存数据的地方。</div>
+
+  <h3>机器读码的四步</h3>
+  <table>
+    <thead><tr><th style="width:20%">步骤</th><th style="width:30%">干什么</th><th>为什么需要</th></tr></thead>
+    <tbody>
+      <tr><td>① 找角标</td><td>在画面里找三个"回"字形的方块</td><td>三个点能唯一确定一个平面 —— 有了它们才知道二维码在哪、倾斜多少、转过多少度</td></tr>
+      <tr><td>② 摆正</td><td>用矫正图形把透视变形拉回正方形</td><td>你斜着拍，格子会变成梯形。不先摆正，格子就切不准</td></tr>
+      <tr><td>③ 切格子</td><td>按时序线确定每个格子的大小和位置</td><td>把图案变成一串 0 和 1</td></tr>
+      <tr><td>④ 解内容</td><td>按编码规则还原成文字，用纠错码修复错误</td><td>这一步才知道里面写的什么</td></tr>
+    </tbody>
+  </table>
+
+  <h3>纠错等级：为什么要留"备份"</h3>
+  <table>
+    <thead><tr><th style="width:14%">等级</th><th style="width:20%">能修复多少</th><th style="width:22%">格子密度</th><th>什么时候用</th></tr></thead>
+    <tbody>
+      <tr><td><b>L</b>（低）</td><td>约 7%</td><td>最稀疏</td><td>图很干净、要存很多字</td></tr>
+      <tr><td><b>M</b>（中）</td><td>约 15%</td><td>中等</td><td><b>默认值，绝大多数场景够用</b></td></tr>
+      <tr><td><b>Q</b>（较高）</td><td>约 25%</td><td>较密</td><td>可能被弄脏、贴在户外</td></tr>
+      <tr><td><b>H</b>（高）</td><td>约 30%</td><td>最密</td><td>要在中间放 logo</td></tr>
+    </tbody>
+  </table>
+
+  <div class="tip amber"><span class="lab">⚠️ 本实验的配置里特意写了"勿用 H"</span>不是 H 不好，而是板子上这个检测器实测读不了 H 等级 + 中文的组合（M/Q 正常）。工程上这叫"特定实现的支持范围有限" —— 遇到这种情况，换参数比查规范更快。这是实战中的常识。</div>
+
+  <div class="oneline"><span><b>一句话理解纠错：</b>二维码把内容写了好几遍（用数学方法压缩冗余）。<b>弄脏一部分，剩下的还能把它推回来。</b>所以二维码中间放个 logo 也能扫出来。</span></div>
+</section>
+
+<section class="blk" id="s3">
+  <h2><span class="no">03</span>先认识 4 个词</h2>
+  <div class="terms">
+    <div class="term"><div class="w">版本 <em>version</em></div><p class="m">二维码的大小规格，从 1 到 40。数字越大格子越多、能存越多字。设 <code>fit=True</code> 会让它自动选够用的最小版本。</p></div>
+    <div class="term"><div class="w">纠错等级</div><p class="m">L/M/Q/H，代表"能修复多少破损"。越高级别码越密，但越抗造。</p></div>
+    <div class="term"><div class="w">box_size</div><p class="m">每个小格子画多少像素。设 5 就是每格 5×5 像素 —— 太小打印出来扫不出来。</p></div>
+    <div class="term"><div class="w">border</div><p class="m">外面那圈白边（静区）有几格宽。标准最小是 4，别改成 0。</p></div>
+  </div>
+</section>
+
+<section class="blk" id="s4">
+  <h2><span class="no">04</span>它吃什么、吐什么</h2>
+
+  <div class="io2">
+    <div class="cellbox in">
+      <span class="lb">生成模式 · INPUT</span>
+      <div class="v">一段文字</div>
+      <p class="d">任意字符串，比如 <code>"HELLO-ROBOT-001"</code>。中文也可以，但注意下面的坑。</p>
+    </div>
+    <div class="arw">→</div>
+    <div class="cellbox out">
+      <span class="lb">生成模式 · OUTPUT</span>
+      <div class="v">一张二维码图片</div>
+      <p class="d">黑白 PNG，可以直接打印，或用手机显示给相机看。</p>
+    </div>
+  </div>
+
+  <div class="io2">
+    <div class="cellbox in">
+      <span class="lb">识别模式 · INPUT</span>
+      <div class="v">相机画面 / 图片</div>
+      <p class="d">画面上有一个或多个二维码，可以有倾斜、可以有缺损。</p>
+    </div>
+    <div class="arw">→</div>
+    <div class="cellbox out">
+      <span class="lb">识别模式 · OUTPUT</span>
+      <div class="v">绿框 + 解析出的文字</div>
+      <p class="d">终端打印内容，画面上框住二维码并标出文字（太长会截断显示）。</p>
+    </div>
+  </div>
+
+  <pre><span class="c"># 配置里的生成参数</span>
+<span class="b">generate:</span>
+  version: 1              <span class="c"># 1-40，fit=True 时自动扩版</span>
+  <span class="y">error_correction: M</span>     <span class="c"># L/M/Q/H — 本板实测别用 H</span>
+  box_size: 5             <span class="c"># 每格 5 像素</span>
+  border: 4               <span class="c"># 白边 4 格</span>
+
+<span class="b">detect:</span>
+  scale: 0.5              <span class="c"># 检测前先缩一半，提速</span></pre>
+</section>
+
+<section class="blk" id="s5">
+  <h2><span class="no">05</span>三步跑起来</h2>
+
+  <ol class="steps3">
+    <li>
+      <span class="st">先自己生成一张二维码<em>约 1 分钟</em></span>
+      <p>用 <code>--generate</code> 参数，后面跟你要存的文字。</p>
+      <pre><span class="g">cd</span> ~/ros2_ws/src/xflz_eai_car1/vision/04_qrcode
+<span class="g">python</span> src/app.py --generate <span class="y">"HELLO-ROBOT-001"</span> --save my_qr.png</pre>
+      <div class="expect">generated -&gt; my_qr.png
+version=1  ec=M  size=29x29  box=5px</div>
+      <p><b>现在你有了一张自己的二维码。</b>打开看它一眼，找找那三个"回"字角标在哪。</p>
+      <p style="color:#b45309;font-size:13.5px">⚠️ 板上如果没有 <code>qrcode</code> 库，先装：<code>pip install qrcode pillow</code>（用清华镜像会快很多）。</p>
+    </li>
+
+    <li>
+      <span class="st">用图片测一下能不能读回来<em>约 30 秒</em></span>
+      <p>先不折腾相机，直接拿刚生成的图喂给检测器 —— 这是最快的自检。</p>
+      <pre><span class="g">python</span> src/app.py --detect --image my_qr.png --save out.png</pre>
+      <div class="expect">detected 1 code(s)
+  [1] HELLO-ROBOT-001
+saved -&gt; out.png</div>
+      <p><b>读回来的文字和你写进去的一模一样 —— 闭环成了。</b>这一步如果失败，说明库没装好或参数有问题，别急着上相机。</p>
+    </li>
+
+    <li>
+      <span class="st">实时识别：对着屏幕上的码扫<em>约 3 分钟</em></span>
+      <p>终端 1 起相机：</p>
+      <pre><span class="g">source</span> /opt/ros/humble/setup.bash &amp;&amp; <span class="g">source</span> ~/ros2_ws/install/setup.bash
+<span class="g">export</span> ROS_DOMAIN_ID=2
+<span class="g">ros2</span> launch ascamera hp60c.launch.py</pre>
+      <p>终端 2 开识别。把 <code>my_qr.png</code> 在电脑或手机上打开，举到相机前：</p>
+      <pre><span class="g">cd</span> ~/ros2_ws/src/xflz_eai_car1/vision/04_qrcode
+<span class="g">python</span> src/app.py --detect --ros</pre>
+      <div class="expect">detected 1 code(s)
+  [1] HELLO-ROBOT-001
+<i>浏览器：http://&lt;板子IP&gt;:8080/qrcode.mjpg</i></div>
+      <p>试试这几个动作，观察识别率怎么变：<b>正对 → 斜着</b>、<b>近 → 远</b>、<b>把码挡掉一个角</b>。第三个特别有意思 —— 挡一个角它还能读出来，这就是纠错码在工作。</p>
+    </li>
+  </ol>
+
+  <div class="oneline"><span>这个实验是整门课里唯一能"一写一读"闭环的 —— <b>你亲手造了一个机器可读的标签，又亲手把它读回来。</b>这个感觉很值得体验一次。</span></div>
+</section>
+
+<section class="blk" id="s6">
+  <h2><span class="no">06</span>你该看到的画面</h2>
+
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">画面 A · 单码</div><div class="kt">绿框 + 文字</div><p>二维码被绿色方框框住，旁边标着解读出的内容。终端同步打印 <code>detected 1 code(s)</code>。</p></div>
+    <div class="kcard"><div class="kd">画面 B · 多码</div><div class="kt">一帧里几个框</div><p>画面里放多张码时，程序会逐个检测，每个都框出来。它用"掩膜"方式防止同一个码被重复读。</p></div>
+    <div class="kcard"><div class="kd">画面 C · 无码</div><div class="kt">没有框，但程序不崩</div><p>看不到码时终端打印 <code>detected 0 code(s)</code>，画面继续刷新。这是正常状态。</p></div>
+  </div>
+
+  <div class="tip tealb"><span class="lab">🔍 为什么先缩一半再检测？</span>配置里 <code>scale: 0.5</code> 表示检测前把画面缩小一半。<b>二维码本来格子就大，缩小后依然认得出来，但计算量只有原来的 1/4</b> —— 这是个很典型的"用分辨率换速度"的工程手段。如果远处的小码认不出，把 scale 改成 1.0 试试。</div>
+</section>
+
+<section class="blk" id="s7">
+  <h2><span class="no">07</span>改一个参数看变化</h2>
+  <p class="lead">最有教育意义的改动是纠错等级。改它，你能亲眼看到"抗破损能力"和"码的密度"之间的取舍。</p>
+
+  <pre><span class="g">nano</span> config/qrcode_config.yaml</pre>
+  <pre><span class="b">generate:</span>
+  <span class="y">error_correction: M</span>   <span class="c">← 改成 L / Q / H 各试一次</span>
+  box_size: 5
+  border: 4</pre>
+
+  <p>改完重新生成同一个内容，对比四张图：</p>
+  <pre><span class="g">python</span> src/app.py --generate <span class="y">"HELLO-ROBOT-001"</span> --save qr_L.png</pre>
+
+  <div class="lab2">
+    <div class="lh">⚡ 参数实验台 · 纠错等级 vs 抗遮挡能力</div>
+    <div class="lr">
+      <label>纠错等级</label>
+      <input id="ec" type="range" min="0" max="3" step="1" value="1">
+      <output id="ec_o">M</output>
+    </div>
+    <div class="vis">
+      <svg viewBox="0 0 420 140" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="不同纠错等级下二维码可承受的遮挡面积示意">
+        <rect x="0" y="0" width="420" height="140" rx="8" fill="#0b1220"/>
+        <!-- 码示意 -->
+        <g transform="translate(24,18)">
+          <rect x="0" y="0" width="104" height="104" fill="#fff" rx="2"/>
+          <g fill="#111">
+            <rect x="4" y="4" width="26" height="26"/><rect x="10" y="10" width="14" height="14" fill="#fff"/><rect x="14" y="14" width="6" height="6"/>
+            <rect x="74" y="4" width="26" height="26"/><rect x="80" y="10" width="14" height="14" fill="#fff"/><rect x="84" y="14" width="6" height="6"/>
+            <rect x="4" y="74" width="26" height="26"/><rect x="10" y="80" width="14" height="14" fill="#fff"/><rect x="14" y="84" width="6" height="6"/>
+          </g>
+          <g id="dots"></g>
+          <rect id="dmg" x="30" y="30" width="0" height="70" fill="#f87171" opacity=".78"/>
+        </g>
+        <!-- 条形指标 -->
+        <text x="160" y="34" font-size="10.5" fill="#94a3b8" font-family="sans-serif">可修复面积：</text>
+        <rect x="160" y="44" width="220" height="14" rx="7" fill="#1e293b"/>
+        <rect id="bar" x="160" y="44" width="50" height="14" rx="7" fill="#4ade80"/>
+        <text id="pct" x="388" y="56" font-size="10.5" fill="#5eead4" font-family="monospace" text-anchor="end">15%</text>
+        <text x="160" y="84" font-size="10.5" fill="#94a3b8" font-family="sans-serif">格子密度：</text>
+        <rect x="160" y="94" width="220" height="14" rx="7" fill="#1e293b"/>
+        <rect id="bar2" x="160" y="94" width="60" height="14" rx="7" fill="#facc15"/>
+        <text id="pct2" x="388" y="106" font-size="10.5" fill="#fde68a" font-family="monospace" text-anchor="end">中</text>
+      </svg>
+    </div>
+    <div class="say" id="say"></div>
+  </div>
+
+  <p><b>动手做这个实验：</b>用同样的内容分别生成 L 和 H 两张码，把两张都拿剪刀剪掉相同大小的一块，再分别拿去识别。你会看到一张能读、一张读不出来。</p>
+
+  <div class="oneline"><span><b>取舍的智慧：</b>想要抗造就选高级别，但要付出"码更密、更难扫、存字更少"的代价。<b>没有最优参数，只有最合适的参数。</b></span></div>
+</section>
+
+<section class="blk" id="s8">
+  <h2><span class="no">08</span>踩坑速查</h2>
+
+  <table class="pit2">
+    <thead><tr><th>现象</th><th>原因</th><th>怎么办</th></tr></thead>
+    <tbody>
+      <tr><td>中文内容读出来是乱码 / 读不出</td><td>纠错等级设成了 H</td><td>改回 <b>M</b>（配置注释里已明确写了原因）</td></tr>
+      <tr><td>报错找不到 qrcode 模块</td><td>板上没装这个库</td><td><code>pip install qrcode pillow</code>；<code>--detect</code> 只用 OpenCV 不需要它</td></tr>
+      <tr><td>打印出来的码扫不出</td><td>格子太小（box_size 太小）或白边被裁了</td><td><code>box_size</code> 提到 8~10；<code>border</code> 保持 4 以上</td></tr>
+      <tr><td>远处的码认不出</td><td>检测前缩了 0.5 倍，远处小码信息不足</td><td><code>detect.scale</code> 改成 1.0（会慢一些）</td></tr>
+      <tr><td>同一个码每帧重复打印</td><td>正常行为，每帧都重新检测</td><td>正常。想只报一次就在代码里加去重逻辑</td></tr>
+      <tr><td>画面有码但检测为 0</td><td>反光、太暗、或码被手指挡住角标</td><td>调光照；确保三个角标都露出来</td></tr>
+      <tr><td>生成的图里有问号方块</td><td>内容含中文但字体/编码不匹配</td><td>先用纯英文数字测通，再加中文</td></tr>
+    </tbody>
+  </table>
+
+  <div class="tip amber"><span class="lab">💡 排查口诀</span><b>先生成、后图片、最后相机。</b>三步分开验：生成能出图 → 图片能读回 → 相机能读到。哪一步断了就修那一步，别一上来就怀疑相机。</div>
+</section>
+
+<section class="blk" id="s9">
+  <h2><span class="no">09</span>进阶（可选）</h2>
+
+  <details class="deep">
+    <summary>进阶 1 · 生成一张带颜色的码<em>约 15 分钟</em></summary>
+    <div class="deep-body">
+      <p>配置里 <code>fill_color</code> 和 <code>back_color</code> 是可以改的。试试深蓝前景 + 浅黄背景。</p>
+      <p><b>注意一个硬限制：</b>前景必须比背景<b>明显深</b>，因为检测器靠对比度找格子。前景比背景浅的话，很多扫码器会读不出来 —— 虽然它的算法理论上支持反色，但实际实现往往只做了常规情况。</p>
+    </div>
+  </details>
+
+  <details class="deep">
+    <summary>进阶 2 · 把二维码当成机器人的位置标记<em>约 40 分钟</em></summary>
+    <div class="deep-body">
+      <p>工业 AGV 常用二维码做定位：地上贴一排码，车底的相机扫到哪个码就知道自己在哪一格。</p>
+      <p><b>思路：</b>把内容编码成坐标（比如 <code>A3</code> 表示第 3 列第 2 行）。检测到码之后，不仅要读内容，还要读<b>框的中心位置</b> —— 中心偏左说明车靠右了，得往左微调。这和 EXP-01 的"色块中心偏移"是同一个思路，只是目标从色块换成了二维码。</p>
+    </div>
+  </details>
+
+  <details class="deep">
+    <summary>进阶 3 · 为什么有些码要加 logo<em>选读 40 秒</em></summary>
+    <div class="deep-body">
+      <p>因为纠错码的存在，二维码中间一小块区域被遮住也能读出来。所以很多品牌把 logo 放在正中间 —— 那一片区域的数据实际上被弃用了，但纠错机制能补回来。</p>
+      <p><b>能放多大？</b>粗略地讲：选 H 级（30%）时，中间可以遮挡约 20%~25% 的面积；选 L 级就只有 7%，随便挡一下就废了。<b>这就是为什么带 logo 的码大多选 H 级。</b></p>
+      <p>但注意本实验的板子读不了 H+中文的组合 —— 而上面这个技巧又恰恰需要 H。<b>这正好说明了工程的真实状态：规范上成立的方案，落到具体设备上未必跑得通。</b></p>
+    </div>
+  </details>
+</section>
+
+<section class="blk" id="s10">
+  <h2><span class="no">10</span>随堂小测</h2>
+
+  <div class="quiz2">
+    <div class="qq"><span class="qn">Q1</span>二维码上的三个"回"字角标是干什么用的？</div>
+    <div class="opt" data-right="0">装饰，让码好看一点</div>
+    <div class="opt" data-right="1">让机器快速找到码的位置、算清倾斜和旋转角度</div>
+    <div class="opt" data-right="0">存数据的，内容都在里面</div>
+    <div class="fb"><b>对。</b>三个点确定一个平面 —— 有了它们，机器才知道二维码在哪、歪了多少、转过多少度。真正的数据都存中间那些杂乱的格子里。</div>
+  </div>
+
+  <div class="quiz2">
+    <div class="qq"><span class="qn">Q2</span>把纠错等级从 M 改成 H，会发生什么？</div>
+    <div class="opt" data-right="0">码变小了，能存更多字</div>
+    <div class="opt" data-right="1">码变得更密、抗遮挡更强，但可存字数变少、也更难被扫出来</div>
+    <div class="opt" data-right="0">没有任何变化</div>
+    <div class="fb"><b>对。</b>纠错码本身也占格子。等级越高，用在"备份"上的格子越多 —— 抗造能力上去了，但同样的内容需要更大的版本，而且每个格子要切得更准。</div>
+  </div>
+
+  <div class="quiz2">
+    <div class="qq"><span class="qn">Q3</span>你自己生成的码，用手机扫能读出来，但用板子的 <code>--detect</code> 读不出。最可能的原因？</div>
+    <div class="opt" data-right="0">板子的相机坏了</div>
+    <div class="opt" data-right="1">检测前缩了 0.5 倍，小码信息不足；或码在画面里太小</div>
+    <div class="opt" data-right="0">二维码生成错了</div>
+    <div class="fb"><b>对。</b>手机用的是全分辨率，而这里 <code>detect.scale: 0.5</code> 会先把画面缩一半。把 scale 改成 1.0，或者用粗一点的码（box_size 调大），都能改善。</div>
+  </div>
+</section>
+
+<nav class="expnav">
+  <a href="../exp-01-color-hsv/index.html"><span class="lb">← 上一个</span>EXP-01 颜色识别</a>
+  <a class="next" href="../exp-03-contour-polygon/index.html"><span class="lb">下一个实验 →</span>EXP-03 多边形轮廓</a>
+</nav>
+
+<footer>
+  <span>机器人视觉入门 · EXP-02 二维码</span>
+  <span>4 学时 · 基于 vision/04_qrcode 源码</span>
+</footer>
+
+</main>
+</div>
+
+<script src="../shared/tutorial.js" defer></script>
+<script src="../shared/beginner.js" defer></script>
+<script>
+(function(){
+  var ec=document.getElementById('ec'); if(!ec) return;
+  var NAME=['L','M','Q','H'];
+  var FIX=[7,15,25,30];
+  var DENS=[52,68,84,100];
+  var say=document.getElementById('say');
+  var dmg=document.getElementById('dmg');
+  var dots=document.getElementById('dots');
+
+  /* 铺一层格子纹理 */
+  var s='';
+  for(var y=0;y<104;y+=8){
+    for(var x=0;x<104;x+=8){
+      if(x<34&&y<34) continue;
+      if(x>70&&y<34) continue;
+      if(x<34&&y>70) continue;
+      if((x/8+y/8)%3===0) s+='<rect x="'+x+'" y="'+y+'" width="7" height="7"/>';
+    }
+  }
+  dots.innerHTML='<g fill="#111" opacity=".85">'+s+'</g>';
+
+  function upd(){
+    var i=parseInt(ec.value,10);
+    document.getElementById('ec_o').textContent=NAME[i];
+    document.getElementById('bar').setAttribute('width',Math.round(FIX[i]/30*220));
+    document.getElementById('pct').textContent=FIX[i]+'%';
+    document.getElementById('bar2').setAttribute('width',Math.round(DENS[i]/100*220));
+    document.getElementById('pct2').textContent=['最疏','中等','较密','最密'][i];
+    dmg.setAttribute('width',Math.round(FIX[i]/100*70));
+    var m=['<b>L 级（7%）</b>：码最稀疏、存字最多，但几乎不抗遮挡。稍微挡一下就废。适合干净环境、要存大段文字。',
+           '<b>M 级（15%）</b>：默认选择。日常场景够用，也是本实验的推荐值（配置里写的就是 M）。',
+           '<b>Q 级（25%）</b>：较抗造。贴在可能被弄脏的户外或者机器表面时用它。',
+           '<b>H 级（30%）</b>：最抗造，可以在中间放 logo。代价是码最密、最难扫 —— 本板实测 H + 中文读不出。'][i];
+    say.innerHTML=m;
+  }
+  ec.addEventListener('input',upd); upd();
+})();
+</script>
+</body>
+</html>

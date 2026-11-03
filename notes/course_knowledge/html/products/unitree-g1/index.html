@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>人形导览机器人（宇树 G1 · 23 DOF Edu） · 产品介绍</title>
+<style>
+:root{
+  --bg-base:#f8fafc;--bg-card:#fff;--bg-soft:#f1f5f9;--bg-tint:#eef4ff;
+  --border:#e2e8f0;--border-hover:#94a3b8;
+  --accent-blue:#2563eb;--accent-cyan:#0891b2;--accent-teal:#0d9488;
+  --accent-amber:#d97706;--accent-rose:#e11d48;--accent-violet:#7c3aed;
+  --accent-indigo:#4f46e5;
+  --text-primary:#0f172a;--text-body:#334155;--text-secondary:#64748b;--text-muted:#94a3b8;
+  --shadow-glow:0 8px 24px rgba(37,99,235,.10);
+  --font-mono:'Cascadia Code','JetBrains Mono',Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg-base);color:var(--text-body);
+  font-family:"Noto Sans CJK SC","PingFang SC","Microsoft YaHei","Segoe UI",system-ui,sans-serif;
+  background-image:
+    radial-gradient(ellipse 60% 40% at 50% -5%,rgba(79,70,229,.05),transparent),
+    radial-gradient(ellipse 50% 35% at 100% 5%,rgba(8,145,178,.04),transparent);}
+/* Topbar */
+.topbar{position:sticky;top:0;z-index:50;height:60px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 40px;background:rgba(255,255,255,.85);backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;color:var(--text-primary);font-size:15px;text-decoration:none}
+.logo .dot{width:9px;height:9px;border-radius:50%;background:var(--accent-indigo);animation:pulse 2.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.top-actions{display:flex;align-items:center;gap:10px}
+.btn{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:600;text-decoration:none;
+  border-radius:9px;padding:8px 16px;transition:.28s;border:1px solid var(--border);color:var(--text-secondary);background:var(--bg-card)}
+.btn:hover{border-color:var(--border-hover);color:var(--accent-blue)}
+/* Hero */
+.hero{max-width:1080px;margin:0 auto;padding:40px 40px 6px;display:grid;grid-template-columns:1.12fr .88fr;gap:36px;align-items:center}
+.hero .eyebrow{display:inline-block;font-size:12.5px;letter-spacing:.14em;color:var(--accent-indigo);
+  background:#eef2ff;border:1px solid #e0e7ff;border-radius:100px;padding:5px 14px;font-family:var(--font-mono)}
+.hero h1{margin:14px 0 10px;font-size:30px;line-height:1.28;color:var(--text-primary);font-weight:800}
+.hero h1 .grad{background:linear-gradient(90deg,var(--accent-indigo),var(--accent-blue),var(--accent-cyan));
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.hero p{margin:0;font-size:14.5px;line-height:1.8;color:var(--text-secondary)}
+.sku{display:inline-block;margin-top:12px;font-family:var(--font-mono);font-size:12px;color:var(--accent-indigo);
+  background:#eef2ff;border:1px solid #e0e7ff;border-radius:7px;padding:4px 10px}
+.hero figure{margin:0;background:var(--bg-card);border:1px solid var(--border);border-radius:16px;padding:10px;
+  box-shadow:0 1px 3px rgba(0,0,0,.05);transition:.28s;text-align:center}
+.hero figure img{width:100%;height:auto;max-height:400px;object-fit:contain;display:block;border-radius:10px;
+  background:linear-gradient(160deg,#f5f3ff,#eef2ff)}
+.hero figure:hover{transform:translateY(-4px);box-shadow:var(--shadow-glow);border-color:var(--border-hover)}
+.hero figcaption{font-size:12px;color:var(--text-muted);text-align:center;padding-top:8px}
+/* highlight strip */
+.hl{max-width:1080px;margin:30px auto 0;padding:0 40px;display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.hl .item{background:var(--bg-card);border:1px solid var(--border);border-radius:13px;padding:16px 18px;transition:.28s}
+.hl .item:hover{transform:translateY(-3px);box-shadow:var(--shadow-glow);border-color:var(--border-hover)}
+.hl .num{font-size:26px;font-weight:800;color:var(--accent-indigo);font-family:var(--font-mono)}
+.hl .num small{font-size:14px;font-weight:700}
+.hl .num.c{color:var(--accent-cyan)}.hl .num.b{color:var(--accent-blue)}.hl .num.a{color:var(--accent-amber)}
+.hl .lbl{font-size:12.5px;color:var(--text-secondary);margin-top:4px;line-height:1.6}
+/* Section */
+.section{max-width:1080px;margin:0 auto;padding:50px 40px 6px}
+.section-head{display:flex;align-items:baseline;gap:14px;margin-bottom:6px;flex-wrap:wrap}
+.section-head h2{margin:0;font-size:22px;color:var(--text-primary);display:flex;align-items:center;gap:10px}
+.section-head h2 .idx{font-family:var(--font-mono);font-size:12px;font-weight:700;color:#fff;
+  background:linear-gradient(90deg,var(--accent-indigo),var(--accent-blue));border-radius:7px;padding:3px 9px}
+.section-head .sub{font-size:13.5px;color:var(--text-muted)}
+.section .desc{font-size:14px;color:var(--text-secondary);line-height:1.8;margin:8px 0 20px;max-width:900px}
+/* 感知配置卡 */
+.sensor{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.scard{background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:22px 24px;
+  position:relative;overflow:hidden;transition:.28s}
+.scard::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;
+  background:linear-gradient(90deg,var(--accent-indigo),var(--accent-cyan))}
+.scard:hover{transform:translateY(-4px);box-shadow:var(--shadow-glow);border-color:var(--border-hover)}
+.scard .badge{display:inline-block;font-family:var(--font-mono);font-size:11.5px;font-weight:700;
+  color:var(--accent-indigo);background:#eef2ff;border:1px solid #e0e7ff;border-radius:5px;padding:2px 8px;margin-bottom:10px}
+.scard h3{margin:0 0 4px;font-size:17px;color:var(--text-primary)}
+.scard .model{font-family:var(--font-mono);font-size:12.5px;color:var(--text-muted);margin-bottom:12px}
+.scard p{margin:0 0 12px;font-size:13px;line-height:1.8;color:var(--text-secondary)}
+.scard .kv{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;padding-top:12px;border-top:1px dashed var(--border)}
+.scard .kv div{font-size:12.5px;color:var(--text-secondary);display:flex;justify-content:space-between;gap:8px}
+.scard .kv span{color:var(--text-primary);font-weight:600;font-family:var(--font-mono);font-size:12px;text-align:right}
+/* 小节标题 */
+.sec-sub{margin:28px 0 14px}
+.sec-sub h3{margin:0 0 4px;font-size:17px;color:var(--text-primary);display:flex;align-items:center;gap:9px}
+.sec-sub h3::before{content:"";width:4px;height:17px;border-radius:2px;
+  background:linear-gradient(180deg,var(--accent-indigo),var(--accent-cyan))}
+.sec-sub p{margin:0;font-size:13px;color:var(--text-muted)}
+/* values */
+.vals{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.val{background:var(--bg-card);border:1px solid var(--border);border-radius:13px;padding:18px;transition:.28s;position:relative;overflow:hidden}
+.val::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;transform:scaleX(0);transform-origin:left;
+  background:linear-gradient(90deg,var(--accent-indigo),var(--accent-cyan));transition:transform .35s}
+.val:hover{transform:translateY(-4px);box-shadow:var(--shadow-glow);border-color:var(--border-hover)}
+.val:hover::before{transform:scaleX(1)}
+.val .ico{font-size:22px}
+.val h4{margin:10px 0 6px;font-size:15px;color:var(--text-primary)}
+.val p{margin:0;font-size:12.5px;line-height:1.75;color:var(--text-secondary)}
+/* spec table */
+.spec{background:var(--bg-card);border:1px solid var(--border);border-radius:14px;overflow:hidden;
+  display:grid;grid-template-columns:1fr 1fr;gap:0}
+.spec .row{display:flex;justify-content:space-between;gap:14px;padding:13px 20px;font-size:13.5px;border-bottom:1px solid var(--border)}
+.spec .row:nth-child(odd){background:#fbfdff}
+.spec .k{color:var(--text-muted);flex:none}
+.spec .v{color:var(--text-primary);font-weight:600;text-align:right;font-size:12.5px;font-family:var(--font-mono)}
+/* cards */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.card{background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:22px 24px;position:relative;overflow:hidden;transition:.28s}
+.card::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;transform:scaleX(0);transform-origin:left;
+  background:linear-gradient(90deg,var(--accent-indigo),var(--accent-cyan));transition:transform .35s cubic-bezier(.4,0,.2,1)}
+.card:hover{transform:translateY(-4px);box-shadow:var(--shadow-glow);border-color:var(--border-hover)}
+.card:hover::before{transform:scaleX(1)}
+.card h3{margin:0 0 8px;font-size:16.5px;color:var(--text-primary);display:flex;align-items:center;gap:9px}
+.card h3 .ico{width:30px;height:30px;border-radius:8px;flex:none;display:grid;place-items:center;font-size:15px;
+  background:#eef2ff;border:1px solid #e0e7ff}
+.card p{margin:0;font-size:13.5px;line-height:1.8;color:var(--text-secondary)}
+.card h4{margin:0 0 6px;font-size:15px;color:var(--text-primary)}
+/* 动作流 pipeline */
+.pipe{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:6px}
+.pstep{background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:18px 20px;position:relative;transition:.28s}
+.pstep:hover{transform:translateY(-3px);box-shadow:var(--shadow-glow);border-color:var(--border-hover)}
+.pstep .n{display:inline-block;font-family:var(--font-mono);font-size:11.5px;font-weight:700;color:#fff;
+  background:linear-gradient(90deg,var(--accent-indigo),var(--accent-blue));border-radius:5px;padding:2px 8px;margin-bottom:10px}
+.pstep h4{margin:0 0 6px;font-size:15px;color:var(--text-primary)}
+.pstep p{margin:0;font-size:12.5px;line-height:1.75;color:var(--text-secondary)}
+.pstep code{font-family:var(--font-mono);font-size:11.5px;background:var(--bg-soft);border-radius:4px;padding:1px 5px;color:var(--accent-blue)}
+/* flow chain */
+.chain{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center;
+  background:var(--bg-card);border:1px solid var(--border);border-radius:13px;padding:16px 18px;margin-top:18px}
+.chain .node{font-size:12.5px;font-weight:600;color:var(--text-primary);background:var(--bg-tint);
+  border:1px solid #dbeafe;border-radius:8px;padding:7px 13px;white-space:nowrap}
+.chain .arr{color:var(--accent-cyan);font-weight:700}
+/* scenes */
+.scenes{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.scene{background:linear-gradient(120deg,#eef2ff,#ecfeff);border:1px solid var(--border);border-radius:13px;padding:17px 19px;transition:.28s}
+.scene:hover{transform:translateY(-3px);box-shadow:var(--shadow-glow);border-color:var(--border-hover)}
+.scene h4{margin:0 0 6px;font-size:14.5px;color:var(--text-primary)}
+.scene p{margin:0;font-size:12.5px;line-height:1.75;color:var(--text-secondary)}
+/* video */
+.video-block{margin:0;max-width:820px}
+.video-frame{border:1px solid var(--border);border-radius:14px;overflow:hidden;
+  background:#0f172a;box-shadow:0 8px 30px rgba(15,23,42,.10)}
+.video-frame:hover{border-color:var(--border-hover);box-shadow:var(--shadow-glow)}
+.video-frame video{display:block;width:100%;height:auto}
+.video-block figcaption{margin-top:10px;font-size:13px;color:var(--text-muted);text-align:center}
+/* list */
+.list{background:var(--bg-card);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+.list .li{display:flex;justify-content:space-between;gap:14px;padding:13px 20px;font-size:13.5px;border-bottom:1px solid var(--border)}
+.list .li:last-child{border-bottom:none}
+.list .k{color:var(--text-primary);font-weight:600;flex:none}
+.list .d{color:var(--text-secondary);text-align:right;font-size:12.5px}
+/* info */
+.info{background:var(--bg-card);border:1px solid var(--border);border-radius:13px;padding:16px 20px;
+  font-size:13px;line-height:1.9;color:var(--text-secondary);margin-top:16px}
+.info b{color:var(--text-primary)}
+.info.notice{border-color:#e0e7ff;background:#eef2ff}
+.info.notice b{color:var(--accent-indigo)}
+.info a{color:var(--accent-blue)}
+/* cta */
+.cta{max-width:1080px;margin:44px auto 0;padding:0 40px;display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+footer{max-width:1080px;margin:40px auto 0;padding:24px 40px 40px;border-top:1px solid var(--border);
+  text-align:center;font-size:12.5px;color:var(--text-muted);line-height:1.9}
+.reveal{opacity:1;transform:none}
+@media (max-width:980px){
+  .hero{grid-template-columns:1fr}
+  .hl{grid-template-columns:repeat(2,1fr)}
+  .vals{grid-template-columns:repeat(2,1fr)}
+  .grid2,.grid3,.pipe,.spec,.scenes{grid-template-columns:1fr}
+}
+@media (max-width:760px){
+  .topbar,.hero,.hl,.section,.cta,footer{padding-left:20px;padding-right:20px}
+  .hero h1{font-size:26px}
+  .hl,.vals{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="logo" href="../../courses/index.html"><span class="dot"></span>具身智能课程</a>
+  <div class="top-actions">
+    <a class="btn" href="../../courses/index.html">← 返回课程首页</a>
+    <a class="btn" href="#pipeline">▶ 动作学习链路</a>
+  </div>
+</div>
+
+<header class="hero">
+  <div>
+    <span class="eyebrow">GUIDE ROBOT · G1 EDU + 智能语音背包</span>
+    <h1>人形<span class="grad">导览机器人</span></h1>
+    <p>以宇树 G1（23 DOF Edu 版）为本体，加装讯飞<strong>智能语音背包</strong>交互模组，组成一台能走、能说、能听、能讲解的接待型人形机器人。整机约 1.32 m 站高、35 kg，用于展厅导览、迎新接待与动作强化学习两类场景。</p>
+    <span class="sku">G1 23 DOF · 语音背包即插即用 · 端到端响应 &lt;2.5 s</span>
+  </div>
+  <figure>
+    <img src="./images/g1-hero.png" alt="人形导览机器人（宇树 G1）半身实拍" width="419" height="499">
+    <figcaption>人形导览机器人 · 宇树 G1（23 DOF Edu 版）</figcaption>
+  </figure>
+</header>
+
+<section class="hl reveal">
+  <div class="item"><div class="num">23<small> DOF</small></div><div class="lbl">总自由度<br>可扩展至 43 DOF</div></div>
+  <div class="item"><div class="num c">120<small> N·m</small></div><div class="lbl">膝关节最大扭矩<br>手臂负载约 3 kg</div></div>
+  <div class="item"><div class="num b">2<small> m/s</small></div><div class="lbl">最高行走速度<br>续航约 2 小时</div></div>
+  <div class="item"><div class="num a">35<small> kg</small></div><div class="lbl">带电池整机重量<br>站高约 1320 mm</div></div>
+</section>
+
+<!-- ============ 01 平台定位 ============ -->
+<section class="section" id="position">
+  <div class="section-head">
+    <h2><span class="idx">01</span>平台定位</h2>
+    <span class="sub">POSITIONING</span>
+  </div>
+  <p class="desc">导览机器人不是单买一台本体就能用。真正决定它能不能上岗的，是「<b>运动能力</b>」和「<b>交互能力</b>」两件事：G1 负责走、站、做动作；语音背包负责听清、听懂、说出来。本平台把两者组合成一套可交付的方案。</p>
+  <div class="grid2">
+    <div class="card reveal">
+      <h3><span class="ico">🎯</span>本体：为什么选 G1 23 DOF</h3>
+      <p>23 DOF 是 G1 的基础构型：双腿各 6 DOF、双臂各 5 DOF、腰部 1 DOF。没有手部自由度，换来的是<b>更低的动作学习难度</b>——策略只需专注于全身姿态跟踪，不必同时处理手指的精细操作。等你把全身动作跑通了，再按需加装 Dex3-1 灵巧手扩展到 43 DOF。</p>
+    </div>
+    <div class="card reveal">
+      <h3><span class="ico">🎒</span>交互：为什么加语音背包</h3>
+      <p>G1 出厂虽有麦克风阵列和扬声器，但在展馆这种高噪声、多回声的环境里，远场拾音和降噪仍不够用。讯飞智能语音背包是专为人形机器人设计的<b>外挂式交互套件</b>，不改变机器人主体硬件、无需做声学结构设计，即插即用就能让机器人开口说话，并通过网络与本体打通语音指令。</p>
+    </div>
+  </div>
+  <div class="info notice reveal">
+    <b>分工关系：</b>语音背包不是简单的蓝牙音箱。它自带麦克风阵列、摄像头和算力主板，独立完成「唤醒 → 降噪 → 识别 → 理解 → 合成」的全程，再把结构化指令通过网络发给 G1 的运动控制层。这样语音链路的迭代不会牵动机器人的运动和平衡系统，两者可以各自升级。
+  </div>
+</section>
+
+<!-- ============ 02 核心优势 ============ -->
+<section class="section" id="value">
+  <div class="section-head">
+    <h2><span class="idx">02</span>核心能力</h2>
+    <span class="sub">KEY CAPABILITIES</span>
+  </div>
+  <p class="desc">从关节、感知到算力，四个维度决定了它能不能承载你的算法。</p>
+  <div class="vals">
+    <div class="val reveal">
+      <div class="ico">⚙️</div>
+      <h4>超大关节空间</h4>
+      <p>髋关节 P±154°、R−30~+170°、Y±158°，膝关节 0~165°。这个范围比普通人体的活动度更大，给了动作策略足够的余量。</p>
+    </div>
+    <div class="val reveal">
+      <div class="ico">🔧</div>
+      <h4>工业级关节</h4>
+      <p>低惯量高速内转子永磁同步电机 + 交叉滚子轴承 + 双编码器。响应快、散热好、位置反馈精度高，这是动作能稳定复现的硬件基础。</p>
+    </div>
+    <div class="val reveal">
+      <div class="ico">👁️</div>
+      <h4>标配感知</h4>
+      <p>深度相机 + 3D 激光雷达 + 4 麦克风阵列 + 5W 扬声器。导览场景需要的“看见人、听见话、说得出”三件事，出厂就齐了。</p>
+    </div>
+    <div class="val reveal">
+      <div class="ico">🧠</div>
+      <h4>可扩展算力</h4>
+      <p>基础为 8 核 CPU，EDU 版可加装 Orin 等高性能模组。跑强化学习策略推理、跑视觉模型都不用外挂工控机。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 03 硬件规格 ============ -->
+<section class="section" id="spec">
+  <div class="section-head">
+    <h2><span class="idx">03</span>技术规格（G1 EDU · 23 DOF）</h2>
+    <span class="sub">SPECIFICATIONS</span>
+  </div>
+  <p class="desc">以下参数取自宇树官方规格表，G1 EDU 可通过选配扩展到 23~43 DOF。</p>
+  <div class="spec reveal">
+    <div class="row"><span class="k">站立尺寸（高×宽×厚）</span><span class="v">1320 × 450 × 200 mm</span></div>
+    <div class="row"><span class="k">折叠尺寸</span><span class="v">690 × 450 × 300 mm</span></div>
+    <div class="row"><span class="k">带电池重量</span><span class="v">约 35 kg</span></div>
+    <div class="row"><span class="k">总自由度</span><span class="v">23（可扩至 43）</span></div>
+    <div class="row"><span class="k">单腿 / 腰部自由度</span><span class="v">6 / 1</span></div>
+    <div class="row"><span class="k">单手臂自由度</span><span class="v">5</span></div>
+    <div class="row"><span class="k">膝关节最大扭矩</span><span class="v">120 N·m</span></div>
+    <div class="row"><span class="k">手臂最大负载</span><span class="v">约 3 kg</span></div>
+    <div class="row"><span class="k">小腿 + 大腿长度</span><span class="v">0.6 m</span></div>
+    <div class="row"><span class="k">手臂臂展</span><span class="v">约 0.45 m</span></div>
+    <div class="row"><span class="k">关节编码器</span><span class="v">双编码器</span></div>
+    <div class="row"><span class="k">走线方式</span><span class="v">全关节中空内走线</span></div>
+    <div class="row"><span class="k">供电</span><span class="v">13 串锂电池 9000 mAh（快拆）</span></div>
+    <div class="row"><span class="k">续航</span><span class="v">约 2 小时</span></div>
+    <div class="row"><span class="k">基础算力</span><span class="v">8 核高性能 CPU</span></div>
+    <div class="row"><span class="k">高算力模组</span><span class="v">可选 Orin 等多品牌型号</span></div>
+    <div class="row"><span class="k">感知传感器</span><span class="v">深度相机 + 3D 激光雷达</span></div>
+    <div class="row"><span class="k">音频</span><span class="v">4 麦克风阵列 + 5W 扬声器</span></div>
+    <div class="row"><span class="k">无线</span><span class="v">Wi-Fi 6 · 蓝牙 5.2</span></div>
+    <div class="row"><span class="k">保修期（EDU）</span><span class="v">18 个月</span></div>
+  </div>
+</section>
+
+<!-- ============ 04 智能语音背包 ============ -->
+<section class="section" id="voice">
+  <div class="section-head">
+    <h2><span class="idx">04</span>智能语音背包（讯飞交互模组）</h2>
+    <span class="sub">VOICE MODULE</span>
+  </div>
+  <p class="desc">专为人形机器人设计的<b>外挂式人机交互套件</b>，由讯飞提供。它的价值在于：不改变机器人主体硬件、不做复杂的声学结构设计，就能让机器人开口说话，并通过网络与本体打通语音指令——把「人-机器人语音交互」的开发难度直接降一个数量级。</p>
+
+  <div class="sensor">
+    <div class="scard reveal">
+      <span class="badge">组件 01</span>
+      <h3>多模态感知阵列</h3>
+      <div class="model">麦克风阵列 + 摄像头</div>
+      <p>可按需放置在合适位置，保证正确采集视频与音频（交互人在摄像头视野内、麦克风阵列正对交互人）。背面和底部有安装螺丝，背面带旋转支架固定件，可多种方式与机器人连接。</p>
+    </div>
+    <div class="scard reveal">
+      <span class="badge">组件 02</span>
+      <h3>多模态算力主机</h3>
+      <div class="model">交互主板 + 扬声器</div>
+      <p>一般安放在机器人背部，通过固定支架与机器人主体连接。承担唤醒、降噪、识别、理解、合成的全部算力，只把结构化指令通过网络下发给本体。</p>
+    </div>
+    <div class="scard reveal">
+      <span class="badge">组件 03</span>
+      <h3>安装支架</h3>
+      <div class="model">默认适配宇树 G1</div>
+      <p>产品默认搭载适配 G1 的支架。若要装到其他机器人，需先由讯飞技术人员评估安装条件；不具备条件时可能需要定制支架。</p>
+    </div>
+    <div class="scard reveal">
+      <span class="badge">响应指标</span>
+      <h3>交互性能</h3>
+      <div class="model">端到端 · 唤醒</div>
+      <p>端到端响应指用户说完最后一个字到机器人播出第一个音的全链路耗时（含录音、唤醒与降噪、交互链路、网络传输、板卡通信）。</p>
+      <div class="kv">
+        <div><span class="k">端到端响应</span><span>&lt; 2.5 s</span></div>
+        <div><span class="k">唤醒响应</span><span>500 ms</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec-sub">
+    <h3>核心能力与实测指标</h3>
+    <p>以下数据均取自讯飞《智能语音背包产品白皮书》。</p>
+  </div>
+  <div class="spec reveal">
+    <div class="row"><span class="k">语音唤醒</span><span class="v">命令词唤醒，返回唤醒信号</span></div>
+    <div class="row"><span class="k">声源定位</span><span class="v">唤醒同时返回唤醒角度</span></div>
+    <div class="row"><span class="k">波束形成</span><span class="v">增强目标方向、抑制其他方向噪声</span></div>
+    <div class="row"><span class="k">回声消除</span><span class="v">可消除 20 dB</span></div>
+    <div class="row"><span class="k">人脸检测</span><span class="v">检出率 ≥ 99%</span></div>
+    <div class="row"><span class="k">语音降噪</span><span class="v">0 dB 信噪比字正确率 ≥ 93%</span></div>
+    <div class="row"><span class="k">语音识别</span><span class="v">安静环境中文普通话 ≥ 97%</span></div>
+    <div class="row"><span class="k">识别能力</span><span class="v">中英混合 · 多语种 · 流式输出</span></div>
+    <div class="row"><span class="k">语义理解</span><span class="v">意图识别 ≥ 90% · 槽位 ≥ 95%</span></div>
+    <div class="row"><span class="k">大模型理解</span><span class="v">开放域 · 多轮对话 · RAG 文档问答</span></div>
+    <div class="row"><span class="k">语音合成</span><span class="v">100+ 音色 · 多语种 · 多方言</span></div>
+    <div class="row"><span class="k">合成自然度</span><span class="v">MOS ≥ 4.5（超拟人）</span></div>
+    <div class="row"><span class="k">声音复刻</span><span class="v">一句话复刻用户音色</span></div>
+    <div class="row"><span class="k">交互模式</span><span class="v">一次唤醒一次 / 一次唤醒连续</span></div>
+  </div>
+
+  <div class="info notice reveal">
+    <b>多模态语音增强：</b>融合视觉（唇部运动）与听觉（原始音频波形），在背景噪声、混响、多人交谈中分离并增强目标人声。官方数据：高噪环境与重叠语音的「鸡尾酒会」场景下，<b>目标语音信噪比可提升 15~25 dB</b>，并支持结合人脸跟踪的说话人跟随。这一条对展馆、迎新大厅这类开放空间尤其关键。
+  </div>
+</section>
+
+<!-- ============ 05 动作强化学习链路 ============ -->
+<section class="section" id="pipeline">
+  <div class="section-head">
+    <h2><span class="idx">05</span>动作强化学习链路</h2>
+    <span class="sub">MOTION PIPELINE</span>
+  </div>
+  <p class="desc">这是本平台的核心教学价值所在。一条完整的人体动作从视频到实机落地，要经过六道工序。我们把这条链路做成了可复现的实验流程，学生能亲手走完每一环。</p>
+
+  <div class="chain reveal">
+    <span class="node">① 人体动作视频</span><span class="arr">→</span>
+    <span class="node">② AMASS 动作数据集</span><span class="arr">→</span>
+    <span class="node">③ GMR 动作重定向</span><span class="arr">→</span>
+    <span class="node">④ BeyondMimic 策略训练</span><span class="arr">→</span>
+    <span class="node">⑤ MuJoCo Sim2Real</span><span class="arr">→</span>
+    <span class="node" style="background:#eef2ff;border-color:#e0e7ff;color:var(--accent-indigo)">⑥ G1 实机部署</span>
+  </div>
+
+  <div class="pipe" style="margin-top:20px">
+    <div class="pstep reveal">
+      <span class="n">STEP 1</span>
+      <h4>动作采集</h4>
+      <p>用手机或相机录制真人执行动作的视频，或直接调用 AMASS 数据集。AMASS 汇集了 SMPL 格式的人体动作捕捉数据，是动作模仿领域的事实标准输入。</p>
+    </div>
+    <div class="pstep reveal">
+      <span class="n">STEP 2</span>
+      <h4>GMR 重定向</h4>
+      <p>人体和机器人骨骼不同，动作不能直接播放。<code>GMR</code>（General Motion Retargeting）用两阶段微分 IK 把人体动作映射到 G1 的关节结构上，并处理穿地、自穿插等伪影。</p>
+    </div>
+    <div class="pstep reveal">
+      <span class="n">STEP 3</span>
+      <h4>Isaac Sim 策略训练</h4>
+      <p>在 NVIDIA Isaac Sim / Isaac Lab 中大规模并行训练。采用 <code>BeyondMimic</code> 的动作跟踪方案，用 DeepMimic 风格的奖励塑形让策略学会复现整段动作。</p>
+    </div>
+    <div class="pstep reveal">
+      <span class="n">STEP 4</span>
+      <h4>MuJoCo 验证</h4>
+      <p>把训练好的策略导入 MuJoCo，做 sim2sim 交叉验证。Step 3 和 Step 4 用两个不同物理引擎，能提前暴露“只在 Isaac 里能跑”的问题。</p>
+    </div>
+    <div class="pstep reveal">
+      <span class="n">STEP 5</span>
+      <h4>Sim2Real 迁移</h4>
+      <p>加入域随机化（质量、摩擦、延迟、电机特性），让策略对真实世界的偏差具备鲁棒性。这一步做不好，实机一定会摔。</p>
+    </div>
+    <div class="pstep reveal">
+      <span class="n">STEP 6</span>
+      <h4>G1 实机部署</h4>
+      <p>策略经 ONNX / TorchScript 导出，部署到 G1 的算力模组上，通过 DDS 接口下发关节指令。此时动作从“仿真里的动画”变成“机器人身上的运动”。</p>
+    </div>
+  </div>
+
+  <div class="info notice reveal">
+    <b>这条链路不是我们编的。</b>GMR 的原始论文《Retargeting Matters: General Motion Retargeting for Humanoid Motion Tracking》实验对象正是 Unitree G1，训练用 BeyondMimic 在 IsaacSim 中进行，并在 MuJoCo / ROS 环境下做 sim2sim 验证——与我们平台走的路径完全一致。论文还指出了几个关键工程细节：重定向伪影（穿地、自穿插、关节突跳）会直接导致策略失败，因此训练前必须做参考数据质检；首帧若处于不稳定姿态，策略也会失败，建议在动作前后各加 0.5~2 秒的过渡段。这些都会作为实验中的检查项。
+  </div>
+</section>
+
+<!-- ============ 05 应用场景 ============ -->
+<section class="section" id="scenes">
+  <div class="section-head">
+    <h2><span class="idx">06</span>应用场景</h2>
+    <span class="sub">APPLICATIONS</span>
+  </div>
+  <p class="desc">本平台已落地两类场景，一类偏科研，一类偏展示。</p>
+  <div class="scenes">
+    <div class="scene reveal"><h4>🕺 动作强化学习</h4><p>走完 AMASS → GMR → BeyondMimic → Sim2Real 全链路，让学生理解人形机器人如何“学会”一段人类动作。适合毕设、竞赛与算法课程。</p></div>
+    <div class="scene reveal"><h4>🗣️ 展厅导览</h4><p>G1 站在展厅入口做迎宾、讲解与引导，配合语音交互与预设动作，是最直观的具身智能展示形态。</p></div>
+    <div class="scene reveal"><h4>🎓 课程实验</h4><p>关节控制、步态生成、动作重定向、强化学习训练、sim2real 迁移——每一环都可以拆成一个独立实验。</p></div>
+  </div>
+</section>
+
+<!-- ============ 06 演示视频 ============ -->
+<section class="section" id="video">
+  <div class="section-head">
+    <h2><span class="idx">07</span>演示视频</h2>
+    <span class="sub">DEMO VIDEO</span>
+  </div>
+  <p class="desc">导览场景实拍：G1 在浙江传媒学院校门口担纲「迎新学长小飞」，全程机器人视角、无遥控，自主完成迎宾、引导与讲解。</p>
+  <figure class="video-block reveal">
+    <div class="video-frame">
+      <video controls preload="metadata" playsinline
+             poster="../../media/products/unitree-g1/videos/g1-guide-demo-poster.jpg" width="846" height="480">
+        <source src="../../media/products/unitree-g1/videos/g1-guide-demo.mp4" type="video/mp4">
+        你的浏览器不支持视频播放，请下载
+        <a href="../../media/products/unitree-g1/videos/g1-guide-demo.mp4">g1-guide-demo.mp4</a> 观看。
+      </video>
+    </div>
+    <figcaption>图 6-1｜展厅导览讲解机器人 · 迎新学长案例（G1 实机 · 约 2 分 28 秒）</figcaption>
+  </figure>
+</section>
+
+<!-- ============ 07 交付与说明 ============ -->
+<section class="section" id="delivery">
+  <div class="section-head">
+    <h2><span class="idx">08</span>交付内容</h2>
+    <span class="sub">DELIVERY</span>
+  </div>
+  <div class="list reveal">
+    <div class="li"><span class="k">宇树 G1 EDU 整机 × 1</span><span class="d">23 DOF · 含电池、充电器、手持遥控器</span></div>
+    <div class="li"><span class="k">高算力模组</span><span class="d">按选型配置（Orin 等）</span></div>
+    <div class="li"><span class="k">智能语音背包 × 1 套</span><span class="d">多模态感知阵列 + 算力主机 + G1 专用安装支架</span></div>
+    <div class="li"><span class="k">语音交互服务</span><span class="d">唤醒 · 识别 · 语义理解 · 合成 · 声音复刻</span></div>
+    <div class="li"><span class="k">导览应用方案</span><span class="d">迎宾话术、引导路径、知识库配置</span></div>
+    <div class="li"><span class="k">动作学习实验教程</span><span class="d">AMASS → GMR → BeyondMimic → MuJoCo → 实机部署全链路</span></div>
+    <div class="li"><span class="k">使用说明书 × 1 份</span><span class="d">开箱、充电、遥控、安全须知、二次开发指引</span></div>
+    <div class="li"><span class="k">产品培训 × 1 次</span><span class="d">整机操作 · 语音配置 · 开发环境 · 日常维护</span></div>
+  </div>
+  <div class="info notice reveal">
+    <b>安全提示：</b>人形机器人结构复杂、动力强劲（膝关节峰值扭矩 120 N·m，整机 35 kg），操作时请保持足够安全距离。首次运行动作策略前，务必在吊装保护或软垫环境下验证；建议先跑通 MuJoCo sim2sim，再上实机。语音背包安装在背部时，注意不要遮挡本体散热与急停按钮。
+  </div>
+  <div class="info reveal">
+    <b>产品信息：</b>产品名称：人形导览机器人　·　本体型号：宇树 G1 EDU（23 DOF）　·　交互模组：讯飞智能语音背包<br>
+    <b>本体厂商：</b>杭州宇树科技有限公司（Unitree Robotics）　·　<b>语音模组：</b>科大讯飞 机器人超脑平台<br>
+    <b>宇树资料：</b><a href="https://www.unitree.com/cn/g1" target="_blank" rel="noopener">unitree.com/cn/g1</a>　·　<a href="https://support.unitree.com/home/zh/G1_developer" target="_blank" rel="noopener">G1 开发者文档</a><br>
+    <b>讯飞资料：</b><a href="https://aiui-doc.xf-yun.com/project-2/doc-756/" target="_blank" rel="noopener">智能语音背包产品白皮书</a>
+  </div>
+</section>
+
+<div class="cta reveal">
+  <a class="btn" href="../../courses/index.html">← 返回课程首页</a>
+  <a class="btn" href="../unitree-go2/index.html">查看 Go2 机器狗 →</a>
+  <a class="btn" href="../xlerobot/index.html">查看 XLeRobot →</a>
+</div>
+
+<footer>
+  人形导览机器人（宇树 G1 23 DOF Edu + 讯飞智能语音背包） · 产品介绍页<br>
+  整机规格取自宇树官方文档，语音指标取自讯飞《智能语音背包产品白皮书》（截至 2026-10）· 图片与视频仅用于教学展示
+</footer>
+
+</body>
+</html>

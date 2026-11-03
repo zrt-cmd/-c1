@@ -1,0 +1,285 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/cases/exp006b-object-tracking/exp-03-config/index.html
+TITLE: EXP-03 · track_config.yaml 配置详解 — 通用目标追踪综合项目
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+EXP-03 · track_config.yaml 配置详解 — 通用目标追踪综合项目
+🎓 具身智能课程 ·
+通用目标追踪
+综合项目
+/
+通用目标追踪
+/ EXP-03
+本页目录
+01 问题引入：改坏一个键会发生什么
+02 原理通俗讲解：配置是"整车出厂设置单"
+03 关联知识点
+04 实验目标
+05 实验环境与准备
+06 动画讲解：CLI → merge → load_config 校验链
+07 互动讲解：配置改错诊断台
+08 实操步骤：三类故意改错与 class_filter 实验
+09 重点与易错点
+10 总结与思考
+CH1 · 需求与架构设计
+EXP-01 需求分析
+EXP-02 单状态机架构
+EXP-03 配置详解
+CH2 · 感知与交互核心
+EXP-04 DeepSORT 底座
+EXP-05 LLM 门控
+EXP-06 VLM 选目标
+CH3 · 语音、可靠性与验收
+EXP-07 语音打断
+EXP-08 事件降级
+EXP-09 全功能验证
+EXP-03 · 第 1 章 · 设计性 · 4 学时
+track_config.yaml 配置详解
+一个 YAML 文件管住整个项目的数值边界：13 个顶层配置段、REQUIRED 白名单强校验、CLI 参数只覆盖你显式传入的键。本实验的玩法是
+"故意改错"
+——类型改坏、键删掉、必填缺失，看三种真实 Traceback 如何在启动第一秒就把错误拦下来，再用 class_filter 实验感受第一级过滤的威力。
+难度 ⭐⭐ · 4 学时
+track_config.yaml
+config_schema
+_merge_args
+class_filter
+01
+问题引入：改坏一个键会发生什么
+配置文件是全项目最常被摸的文件，也是最容易"改坏于无形"的文件：把
+min_confidence: 0.3
+写成
+0.3x
+，追踪悄悄失灵；删掉
+tracking.pause_wait
+，看门狗逻辑整个失效……本项目用
+启动即校验
+把这类事故拦在第一秒：
+1
+启动时
+load_config('config/track_config.yaml', REQUIRED)
+按白名单逐键校验
+2
+类型不对 →
+ConfigError: expected float, got str
+，进程直接拒启
+3
+必填键缺失 →
+missing key: tracking.pause_wait
+，想省事都不行
+4
+CLI 参数经 _merge_args（L74-93）
+只覆盖显式传入的键
+，其余原样保留
+💡 为什么值得 4 学时
+后面每个实验都会改这个文件（调阈值、加清除词、开关 ReID）。
+先学会"怎么改错、错在哪被拦"，之后每一次正确修改才有底气。
+02
+原理通俗讲解：配置是"整车出厂设置单"
+把 track_config.yaml 想成汽车的
+出厂设置单
+：胎压、限速、空调温度都写在上面。4S 店接车（load_config）第一件事是
+对着必填清单逐项打勾
+——少一项（缺 REQUIRED 键）、格式不对（字符串当数字），直接拒收。你临时借车时说"这次把空调调到 22 度"（CLI 参数），只改这一项，其他设置原样生效 —— 这就是
+_merge_args 只覆盖显式键
+的语义：你没提的，绝不替你动。
+detect · 检测段
+第一级过滤
+score_thr=0.25、iou_thr=0.45、imgsz=640、class_filter=[car] —— 决定哪些框有资格进入追踪。
+tracker · 追踪段
+第二级过滤
+use_reid=true、min_confidence=0.3、min_box_w/h=32、max_stale=15 —— keep(b) 双红线所在。
+tracking · 引擎段
+暂停与看门狗
+pause_wait=true、pause_timeout=30.0 —— 指令挂起时"只读帧不处理"，30 秒自动恢复。
+interaction · 交互段
+四张词表
+clear_words [清除,解除,取消,停,不追,恢复全,不跟]、track_words、color_words、desc_words —— 门控预路由的原料。
+vlm · 描述选车段
+网格与假模式
+cell_cap=16 封顶；fake_result_id=3 是链路调试用的假模式，不改变真实能力。
+server / speech / …
+服务与语音
+server: port=8088、stream_name=track.mjpg；speech: wake_words、kws.threshold=0.25；另有 save、log、display、source、session、llm 段。
+改错了会被谁拦住
+谁负责
+触发时机
+类型错（0.3x）
+_validate（common/config.py L49 调用）
+启动 load_config 第一时间
+必填缺失
+REQUIRED 白名单（config_schema）
+启动校验，missing key 报错
+语义错（值合法但不对）
+没人拦你 —— 运行期才显形
+如 class_filter 扩空 → ID 爆炸
+03
+关联知识点
+知识点一
+Schema 校验与白名单
+REQUIRED 是"必填键白名单"，_validate 逐键核类型 —— 与数据库 CHECK 约束、API 请求校验同一思想：坏数据在入口就死。
+知识点二
+配置分层：文件 → CLI → 代码默认
+_merge_args L74-93 只改动命令行显式给出的键；例如传 --camera 不会重置 video_path，两者互不搭界。
+知识点三
+IoU 与余弦距离
+IoU=交集/并集，度量"框框重叠"；余弦距离度量"特征方向差异"。tracker 段的阈值一个管几何（IoU 匹配），一个管外观（ReID）。
+知识点四
+fake 模式 ≠ 关闭
+vlm.fake_result_id=3 是"假装 VLM 永远答 3"的测试桩；enabled=false 是"完全不启用"。一个造阳性结果，一个造空结果 —— 用途完全不同。
+04
+实验目标
+默写 13 个顶层配置段的职责，资产重组出"我要改 X 该进哪一段"的直觉
+独立复现
+三类故意改错
+：类型错、错键名、必填缺失，各背出对应报错关键字
+解释 _merge_args 的只覆盖显式键语义，说明 --camera 为什么不重置 video_path
+把 class_filter 扩成 []，观察"一辆车多个 ID、ID 急速增长"的现象并说清机理
+区分 vlm.fake_result_id=3 与 enabled=false 的用途差异
+养成改配置前
+cp
+备份、改完
+load_config
+自检的习惯
+05
+实验环境与准备
+配置文件
+config/track_config.yaml
+13 个顶层键：llm / vlm / detect / tracker / tracking / source / session / interaction / speech / server / display / save / log。
+校验模块
+common/config · config_schema
+load_config 负责读取与合并，config_schema 的 REQUIRED 负责白名单；报错文本出自 common/config.py 的 L37 / L49。
+工具准备
+sed / cp / python3
+sed 做精确文本替换改错与还原、cp 备份、python3 单行跑 schema 自检 —— 全部无需硬件。
+# ① 备份永远是第一步（改坏随时还原）
+cp
+config/track_config.yaml /tmp/tc.bak
+# ② 先跑一次正向校验，确认当前文件是好的
+python3
+-c "from common.config import load_config; from config.config_schema import REQUIRED; load_config('config/track_config.yaml', REQUIRED); print('OK')"
+# ③ 快速浏览顶层键
+grep
+-n "^[a-z_]*:" config/track_config.yaml
+06
+动画讲解：CLI → merge → load_config 校验链
+一条配置从磁盘到生效要过三道关：合并、白名单、类型核验 —— 动画里红色叉号就是三处会"拒启"的位置：
+配置生效链 · 三道关（6 秒循环）
+track_config.yaml
+13 个顶层键
+CLI 参数
+_merge_args L74-93
+只覆盖显式传入的键
+关卡1 · 合并
+file + CLI → dict
+没传的键保持原值
+关卡2 · REQUIRED 白名单
+missing key 拦截
+缺 tracking.pause_wait 即报错
+关卡3 · _validate 类型核
+expected float, got str
+RUN
+生效
+✕ ConfigError → 进程拒绝启动（common/config.py L37/L49）
+✕ 类型不符在 _validate 被当场打回
+改前先 cp 备份
+动画 3-1｜配置要连过三道关才生效；任何一道红叉都发生在启动瞬间 —— 错误不会潜伏到运行期
+07
+互动讲解：配置改错诊断台
+选一种改法，诊断台给出它触发的关卡、真实报错关键字与修复动作：
+配置改错诊断台 · Cfg Clinic
+① 0.3 改成 0.3x
+② imgsz 640 改成 640x
+③ 删掉 tracking.pause_wait
+④ class_filter 扩成 [空]
+↺ 复位
+// 点击一种改错方式，先自己预判关卡再揭晓
+① ② ③ 属于"启动即被拦"；④ 是语义错，运行期才显形 —— 区分这两类是本节重点。
+💡 快速自测
+"min_confidence 改成字符串 '0.3'" 会在哪一关被拦？报错里会看到哪两个类型词？（提示：expected float, got str——答不出就回到诊断台点一下 ①）
+08
+实操步骤：三类故意改错与 class_filter 实验
+1
+备份并跑正向校验，确认起点干净（第 05 节两条命令）
+2
+改错①：min_confidence 变字符串 → 复现 expected float, got str
+3
+改错②：imgsz 变 640x → 复现 expected int, got str；改错③：删必填键 → missing key
+4
+逐一
+cp /tmp/tc.bak
+还原，跑通 class_filter 扩空观察 ID 爆炸，再还原
+# 改错①：类型错 —— sed 精确替换（注意行尾空格，源讲义原文）
+sed
+-i 's/min_confidence: 0.3 /min_confidence: 0.3x /' config/track_config.yaml
+python3
+-c "from common.config import load_config; from config.config_schema import REQUIRED; load_config('config/track_config.yaml', REQUIRED)"
+# ConfigError: tracker.min_confidence: expected float, got str
+# Traceback: common/config.py L37 → L49 → _validate 逐键核对类型
+# 改错②：int 段类型错
+# detect.imgsz: 640 → 640x  →  ConfigError: expected int, got str
+# 改错③：删 REQUIRED 必填键 tracking.pause_wait（用编辑器删除该行）
+# →  ConfigError: missing key: tracking.pause_wait
+# 还原，再做语义实验：class_filter 扩成空（放行 COCO 全部 80 类）
+sed
+-i 's/class_filter: \[car\]/class_filter: []/' config/track_config.yaml
+python3
+apps/track_demo.py --video /home/iflytek/ros2_ws/src/xflz_eai_car1/vision/07_multi_object_tracking/test.mp4 --text
+# 现象：人/物全进追踪 → 一辆车被切成多个框竞争 → ID 急速增长
+# 收工必还原
+cp
+/tmp/tc.bak config/track_config.yaml
+🔍 class_filter 为什么这么灵
+它位于
+第一级过滤
+：YOLov8n 输出 COCO 80 类的一切框先在这里筛。留 [car] 时追踪器只跟车；清空后人、包、路牌全涌入 DeepSORT —— 匹配预算被稀释、误关联变多，ID 自然"遍地开花"。
+第一级放水，后面每一级都遭殃。
+09
+重点与易错点
+⚠️ 头号易错
+sed 的行尾空格陷阱：
+min_confidence: 0.3
+模式串里 0.3 后面那个空格是
+匹配的关键
+—— 不带空格可能误伤 0.30、0.35 等同前缀行。替换前先
+grep -n "min_confidence" config/track_config.yaml
+核对目标行的精确文本。
+⚠️ 常见坑
+现象 → 解法
+改前不备份
+改坏后凭记忆恢复 → 永远先
+cp config/track_config.yaml /tmp/tc.bak
+只测通过不测报错
+校验形同虚设 → REQUIRED 白名单必须用"删键/改错类型"反向验证过才可信
+以为 CLI 全量覆盖
+--camera 后 video_path 消失的错觉 → _merge_args 只覆盖显式键，video_path 原样保留
+fake 当 enabled 用
+想关 VLM 却设 fake_result_id → fake 是"永远答 n"的桩；关掉要用 enabled=false
+class_filter 扩空忘了还原
+测试完 ID 依旧爆炸 → 收工
+cp /tmp/tc.bak
+一步到位
+kws.threshold 乱调
+唤醒变迟钝/乱唤醒 → 保持 0.25 基线，调试语音时单变量动它（EXP-07 会用到 0.4 对比）
+三类改错的报错关键字能脱口而出：expected float, got str / expected int, got str / missing key
+背出 13 个顶层键，并能指出 keep(b) 双红线住在 detect 段还是 tracker 段
+class_filter 实验前后各截一次 ID 计数日志作对比
+工作区已还原：diff /tmp/tc.bak config/track_config.yaml 无差异
+10
+总结与思考
+✅ 完成成果
+三类报错复现 + ID 爆炸观察
+每类错误都有亲手敲出来的 Traceback 关键字，配置文件已还原干净。
+🧠 原理收获
+校验前置思想
+启动一秒拦住类型与缺失错；语义错才需要运行期观察 —— 两类错误分开治。
+🛠 技能收获
+sed 精确改与备份流
+cp 备份 → grep 核对 → sed 精确替换 → 校验 → 还原，五步肌肉记忆。
+➡ 承上启下
+阈值背后有算法
+score_thr、min_confidence、IoU 阈值都是谁定的？EXP-04 拆 DeepSORT 内部。
+📝 思考题 1
+vlm.fake_result_id=3 和 enabled=false 都能让"真实 VLM 不参与"，但一个会产生 ID=3 的锁定、一个什么也不锁。各自适合什么调试场景？把它们用错会引入什么假象？
+📝 思考题 2
+为什么 _merge_args 只覆盖"显式传入的键"而不是"与默认值不同的键"？设想你平时改 yaml 里 video_path 跑离线视频，另一种覆盖策略会怎样毁掉你的工作流？
+CASE-04 · 通用目标追踪综合项目 · EXP-03 track_config.yaml 配置详解
+4 学时 · 设计性 · 基于 object_tracking 实验讲义改编

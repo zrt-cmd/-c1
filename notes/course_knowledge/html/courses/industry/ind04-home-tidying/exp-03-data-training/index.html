@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-03 · 数据转换与模型训练 | IND-04 家庭整理应用场景</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+  :root{
+    --theme:#0284c7;
+    --theme-deep:#0369a1;
+    --theme-bg:#f0f9ff;
+    --theme-bd:#bae6fd;
+  }
+  figure.shot{margin:18px 0;border:1px solid var(--theme-bd);border-radius:12px;overflow:hidden;background:#fff}
+  figure.shot img{display:block;width:100%;height:auto}
+  figure.shot figcaption{padding:10px 14px;font-size:13px;color:#075985;background:var(--theme-bg);border-top:1px solid var(--theme-bd)}
+  .tag.hl{background:var(--theme-bg);border-color:var(--theme-bd);color:var(--theme-deep)}
+  /* ── 五星学习法 · 课程分段 ── */
+  .fivestar-note{font-size:13px;color:#5b6b78;margin-top:12px}
+  .fs-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:14px}
+  .fs-cell{border:1px solid var(--theme-bd);border-radius:12px;padding:10px 8px;text-align:center;background:var(--theme-bg)}
+  .fs-cell .st{font-size:12.5px;font-weight:800;color:var(--theme-deep)}
+  .fs-cell .tm{font-family:var(--font-mono,monospace);font-size:11px;color:#0f766e;margin-top:3px;font-weight:700}
+  .fs-cell .ds{font-size:11.5px;color:#5b6b78;margin-top:4px;line-height:1.5}
+  .seg{display:inline-block;font-size:11px;font-weight:700;font-family:var(--font-mono,monospace);background:var(--theme-bg);color:var(--theme-deep);border:1px solid var(--theme-bd);border-radius:99px;padding:2px 10px;margin-left:8px;vertical-align:middle;white-space:nowrap}
+  .tl{width:100%;border-collapse:collapse;font-size:13px;margin-top:14px;background:#fff}
+  .tl th,.tl td{border:1px solid #e2ece9;padding:7px 10px;text-align:left;vertical-align:top}
+  .tl th{background:var(--theme-bg);color:var(--theme-deep);font-size:12.5px;white-space:nowrap}
+  .tl .m{font-family:var(--font-mono,monospace);color:var(--theme-deep);font-weight:700;white-space:nowrap}
+  @media(max-width:900px){.fs-grid{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="bar-in">
+    <a class="logo" href="../../../index.html"><b>课程</b>家庭</a>
+    <nav class="crumb"><a href="../../../index.html#ind">总首页</a> / <a href="../index.html">IND-04 家庭整理</a> / EXP-03</nav>
+  </div>
+</header>
+
+<div class="wrap">
+  <aside class="side">
+    <h4>本页目录 · 五星学习法</h4>
+    <a href="#s0">00 课程节奏 · 8 段微课</a>
+    <a href="#s1" class="now">01 学习目标 ①聚焦问题</a>
+    <a href="#s2">02 原理 ①聚焦 ②激活</a>
+    <a href="#s3">03 硬件与环境 ③示证新知</a>
+    <a href="#s4">04 操作步骤 ④应用新知</a>
+    <a href="#s5">05 关键命令 ④应用新知</a>
+    <a href="#s6">06 源码解析 ③示证新知</a>
+    <a href="#s6a">07 动画 ③示证新知</a>
+    <a href="#s7">08 互动 ④应用新知</a>
+    <a href="#s8">09 常见问题 ⑤融会贯通</a>
+    <a href="#s9">10 拓展 ⑤融会贯通</a>
+    <a href="#s10">11 思考题 ⑤融会贯通</a>
+    <h4>兄弟实验</h4>
+    <a href="../exp-01-case-overview/index.html">EXP-01 案例总览</a>
+    <a href="../exp-02-teleop-collection/index.html">EXP-02 遥操作采集</a>
+    <a href="../exp-04-real-robot/index.html">EXP-04 真机与鲁棒性</a>
+  </aside>
+
+  <main class="content">
+    <div class="exp-head">
+      <div class="code">EXP-03 · 8 学时</div>
+      <h1>数据转换与模型训练</h1>
+      <p class="desc">把 save_data 里的编号目录转成 LeRobot v3.0 数据集，理解「帧-动作对」如何喂给 ACT 策略，再用 lerobot-train 训出家庭收纳的第一个 checkpoint。</p>
+      <div class="meta"><span class="tag hl">机房实训</span><span class="tag">v3.0 数据格式</span><span class="tag">ACT 训练</span></div>
+    </div>
+
+    <!-- 00 -->
+    <section class="blk" id="s0">
+      <h2><span class="no">00</span>课程节奏：五星学习法 · 8 段微课（每段 ≤ 15 min）</h2>
+      <p>本实验按<b>五星学习法</b>组织：先用"采集 200 组却报找不到 CSV"的真实故障<b>聚焦问题</b>，再用「字幕对齐视频」<b>激活旧知</b>，接着<b>示证新知</b>（本地/云端训练路线 + 帧动作对齐动画），然后动手<b>应用新知</b>完成五参数转换与 lerobot-train 训练，最后借排障与拓展<b>融会贯通</b>。全程切成 <b>8 段微课、每段不超过 15 分钟</b>，段间停顿 1~2 分钟消化；纯讲授合计约 100 分钟，其余课时用于动手实操与个别辅导。</p>
+      <div class="fs-grid">
+        <div class="fs-cell"><div class="st">① 聚焦问题</div><div class="tm">课段 1 · 12 min</div><div class="ds">"200 组数据却报找不到 CSV"故障引入</div></div>
+        <div class="fs-cell"><div class="st">② 激活旧知</div><div class="tm">课段 2 · 8 min</div><div class="ds">字幕对齐 · 帧动作配对 · ACT 听写</div></div>
+        <div class="fs-cell"><div class="st">③ 示证新知</div><div class="tm">课段 3~4 · 27 min</div><div class="ds">本地/云端环境 + 帧动作对齐动画</div></div>
+        <div class="fs-cell"><div class="st">④ 应用新知</div><div class="tm">课段 5~7 · 40 min</div><div class="ds">五参数转换 + 训练启动 + 超参选择题</div></div>
+        <div class="fs-cell"><div class="st">⑤ 融会贯通</div><div class="tm">课段 8 · 13 min</div><div class="ds">排障口诀 · 拓展 · 思考题</div></div>
+      </div>
+      <table class="tl">
+        <tr><th>课段</th><th>五星阶段</th><th>时长</th><th>对应章节</th><th>本段任务</th></tr>
+        <tr><td class="m">课段 1</td><td>聚焦问题</td><td class="m">12 min</td><td>§01 + §02 前半</td><td>抛出"200 组数据却报找不到 robot_data.csv"的故障</td></tr>
+        <tr><td class="m">课段 2</td><td>激活旧知</td><td class="m">8 min</td><td>§02 后半</td><td>用"字幕对齐视频"旧知解释帧-动作对与 ACT 学习</td></tr>
+        <tr><td class="m">课段 3</td><td>示证新知</td><td class="m">15 min</td><td>§03</td><td>认识本地 4060 Ti 与云端 L40S 两条训练路线及依赖</td></tr>
+        <tr><td class="m">课段 4</td><td>示证新知</td><td class="m">12 min</td><td>§06</td><td>看帧-动作对对齐与成批动画，理解转换本质</td></tr>
+        <tr><td class="m">课段 5</td><td>应用新知</td><td class="m">15 min</td><td>§04 + §05 前半</td><td>环境准备、五参数 convert 脚本跑通</td></tr>
+        <tr><td class="m">课段 6</td><td>应用新知</td><td class="m">15 min</td><td>§05 后半</td><td>lerobot-train 启动、日志判读、checkpoint 落盘核验</td></tr>
+        <tr><td class="m">课段 7</td><td>应用新知</td><td class="m">10 min</td><td>§07</td><td>ACT 超参选择题，练超参直觉与 OOM 排查</td></tr>
+        <tr><td class="m">课段 8</td><td>融会贯通</td><td class="m">13 min</td><td>§08~§10</td><td>排障口诀收口，拓展阅读与思考题拔高迁移</td></tr>
+      </table>
+      <p class="fivestar-note">讲课提示：课段 1/2 以讲授 + 提问为主；课段 3~4 用实物截图 + 动画；课段 5~6 边讲边演；课段 7 学员独立完成；课段 8 答疑拔高。段间停顿 1~2 分钟。</p>
+    </section>
+
+    <!-- 01 学习目标 -->
+    <section class="blk" id="s1">
+      <h2><span class="no">01</span>学习目标<span class="seg">课段 1 · 聚焦问题 · 12 min</span></h2>
+      <ul class="check">
+        <li>核验采集目录契约：纯数字编号目录、每组含 robot_data.csv 与三路视频。</li>
+        <li>会安装转换依赖（pandas/pyarrow/numpy/tqdm/Pillow + FFmpeg）并跑通五参数转换。</li>
+        <li>理解训练数据的本质是「帧-动作对」，说清 ACT 常用超参各自管什么。</li>
+        <li>完成 lerobot-train 启动、日志判读与 checkpoint 落盘确认，会用云端训练解 OOM。</li>
+      </ul>
+    </section>
+
+    <!-- 02 原理 -->
+    <section class="blk" id="s2">
+      <h2><span class="no">02</span>原理：帧-动作对与 ACT 学习<span class="seg">课段 1 收尾 + 课段 2 · 激活旧知 · 8 min</span></h2>
+      <div class="tip amber"><span class="lab">❓ 聚焦问题（课段 1）</span>采集了 200 组数据，训练却报"找不到 robot_data.csv"——一查发现某个编号目录里 CSV 缺列、目录名不是纯数字。问题出在哪？带着这个故障听完全课——到课段 5 你会亲手跑通转换。</div>
+      <p>转换这一步在干「对表」：采集时存下的是三路视频和一堆关节角 CSV，训练框架要的是<b>每一帧画面配同一时刻的动作</b>——第 t 帧图像 ↔ 第 t 拍关节角，帧帧对齐后写成 parquet + mp4 + meta 三件套，这就是 LeRobot v3.0 数据集。训练则是让 ACT 网络做题：<b>输入画面（和历史动作块），输出接下来一串动作</b>；对答案（loss）越对越准，权重就存成 checkpoint。</p>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">对齐粒度</div><div class="kt">视频帧率与 CSV 采样必须对得上（家庭案例 30fps），错位即全废。</div></div>
+        <div class="kcard"><div class="kd">ACT 特点</div><div class="kt">Action Chunking：一次预测一串后续动作，再分拍执行，动作更平滑不抖。</div></div>
+        <div class="kcard"><div class="kd">loss 怎么看</div><div class="kt">总体下降即在学；突然爆麦多半是 OOM 或学习率过大，回参数表排查。</div></div>
+        <div class="kcard"><div class="kd">checkpoint</div><div class="kt">按 save_freq 周期落盘，推理只认最终可用的那个目录（EXP-04 会用）。</div></div>
+      </div>
+      <div class="tip teal"><span class="lab">↺ 激活旧知（课段 2）</span>回忆看外语片配字幕：字幕和画面错位就看不懂。转换干的就是"重新对齐"——第 t 帧画面配第 t 拍动作，帧帧对齐写成 v3.0 数据集；训练则是让 ACT 反复"听写"这盘带子，直到能不看字幕跟读。</div>
+      <div class="tip amber"><b>生活化类比：</b>转换好比把「错位的字幕和视频」重新压制成强制对齐的版本——画面播到哪句，字幕正好是哪句；训练则是让学员听写这盘带子几十遍，直到能不看字幕跟读。</div>
+    </section>
+
+    <!-- 03 硬件与环境 -->
+    <section class="blk" id="s3">
+      <h2><span class="no">03</span>硬件与环境<span class="seg">课段 3 · 示证新知 · 15 min</span></h2>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">本地路线</div><div class="kt">LDT-01 一体机 RTX 4060 Ti 16GB + 64GB RAM，控制 batch_size 防 OOM。</div></div>
+        <div class="kcard"><div class="kd">云端路线</div><div class="kt">gpufree 算力市场租 L40S 48G（约 ¥2.78/时），选 lenovo0「具身机器人_lindenbot」镜像。</div></div>
+        <div class="kcard"><div class="kd">软件环境</div><div class="kt">LeRobot 0.4.1，python=3.10，conda 虚拟环境 + CUDA 可用（nvidia-smi 验证）。</div></div>
+        <div class="kcard"><div class="kd">转换依赖</div><div class="kt">pandas / pyarrow / numpy / tqdm / Pillow + 系统 FFmpeg（缺 Pillow 会用默认值失败）。</div></div>
+      </div>
+      <div class="tip teal"><span class="lab">🧩 转换契约（别再背原文档）</span>一份合格数据集只有三条硬约束：①目录名是<b>纯数字 episode ID</b>（家庭案例 180 起）；②每组必须带 <code>robot_data.csv</code>（表头 33 列 / 数据行 34 列的契约）；③三路视频缺多少路都不影响转换，但目录结构要符合 v3.0 约定。<b>反例</b>：手滑把目录改成「家庭180」或某组 CSV 少一列——转换直接报「找不到 robot_data.csv」。</div>
+      <div class="tip amber"><span class="lab">✅ 转换前自检三连</span>① <code>ffmpeg -version</code> 通；② <code>python -c "import pandas,pillow"</code> 无报错；③ 输入根目录里只有纯数字子目录。<b>Pillow 没装、靠别的包兜底是最大暗坑</b>——它会静默用默认值跑，等转换完才发现图全黑。</div>
+      <table>
+        <thead><tr><th>环节</th><th>关键参数</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td>输入目录</td><td>纯数字编号（家庭案例 180 起）</td><td>编号即 episode ID，缺 robot_data.csv 直接报错</td></tr>
+          <tr><td>视频封装</td><td>mp4 30fps（家庭案例）</td><td>某路相机可缺省，但目录结构要符合文档契约</td></tr>
+          <tr><td>训练主参数</td><td>batch_size=12 · steps=50000 · save_freq=4000</td><td>本地起步值；复盘口径建议练到 500000 步以上</td></tr>
+          <tr><td>日志参数</td><td>log_freq=100 · num_workers=8 · wandb.enable=false</td><td>无网环境关 wandb，loss 每 100 步打一行</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- 04 操作步骤 -->
+    <section class="blk" id="s4">
+      <h2><span class="no">04</span>操作步骤：转换 → 训练<span class="seg">课段 5~6 · 应用新知 · 2×15 min</span></h2>
+      <div class="flow">
+        <div class="step"><b class="n">1</b>装环境<br><small>conda 建 python3.10 + LeRobot 0.4.1 + nvidia-smi 验 CUDA</small></div>
+        <div class="arr">→</div>
+        <div class="step"><b class="n">2</b>转数据<br><small>跑 convert 脚本把编号目录转 v3.0，核 meta 三件套</small></div>
+        <div class="arr">→</div>
+        <div class="step"><b class="n">3</b>打包上传<br><small>zip 压缩 → 传云端 /root/gpufree-data → 解压</small></div>
+        <div class="arr">→</div>
+        <div class="step"><b class="n">4</b>云端训练<br><small>进训练路径执行 lerobot-train → 看 loss 曲线</small></div>
+        <div class="arr">→</div>
+        <div class="step"><b class="n">5</b>落盘核验<br><small>outputs/repo_id 出现 checkpoint → 记路径交 EXP-04</small></div>
+      </div>
+      <div class="tip teal"><span class="lab">☁️ 云端环境构建（跟着点）</span>打开 <code>gpufree.cn</code> 控制台 →「租用实例」→ 显卡选 <b>L40S</b> →「选择镜像」搜 <b>lerobot</b> →「立即创建」，等启动完成后：控制台 →「JupyterLab」→ 点「终端」进入设备，即可执行下面命令装环境。</div>
+      <div class="tip amber"><span class="lab">📦 在线训练正式命令（原文 3.2，云端顺序执行）</span>
+        <pre style="margin-top:8px"><span class="c"># ① 一键安装环境</span>
+cd /data/lerobot && pip install -e .
+<span class="c"># ② 解压上传到云服务器的数据压缩包</span>
+unzip converted_data.zip
+<span class="c"># ③ 进入训练路径，执行训练命令（完整参数见 §05④）</span>
+cd /data/lerobot && lerobot-train ...</pre>
+        <span style="display:block;margin-top:6px">训练产出按 save_freq 落 checkpoint，路径可从这里看日志定位；训完把 checkpoint 下载回本地供 EXP-04 使用。</span>
+      </div>
+       <ol style="margin:14px 0 6px;padding-left:22px;line-height:1.9">
+        <li><b>先验数据再训练：</b>转换后抽查 info/stats/tasks 三件套与样例 parquet，坏数据训练只是浪费卡时。</li>
+        <li><b>本地小步走：</b>4060 Ti 上从默认超参起步，遇 OOM 先降 batch_size。</li>
+        <li><b>云端大批量（原文 3.2 在线训练）：</b>先在本地打包 <code>zip -r converted_data.zip /home/lindenbot/converted_data</code> → 点云端「上传」按钮把压缩包传到云服务器 → 服务器上 <code>unzip converted_data.zip</code> 解压 → 进入训练路径执行 lerobot-train（见 §05④）。</li>
+        <li><b>留痕：</b>保存完整训练日志与 loss 曲线截图，写清最终 steps（案例建议 500000 步以上）与 checkpoint 路径。</li>
+      </ol>
+    </section>
+
+    <!-- 05 关键命令 -->
+    <section class="blk" id="s5">
+      <h2><span class="no">05</span>关键命令<span class="seg">随课段 5 / 6 对照使用</span></h2>
+      <pre><span class="c"># ① 依赖与校验</span>
+pip install pandas pyarrow numpy tqdm Pillow
+ffmpeg -version
+
+<span class="c"># ② 数据转换：编号目录 → LeRobot v3.0（家庭原文路径：save_data 下最新编号目录）</span>
+python convert_lerobot_v3_fixed_simple.py \
+  --input  /home/lindenbot/save_data/<span class="b">11</span> \
+  --output /home/lindenbot/converted_data \
+  --start <span class="b">180</span> --end <span class="b">209</span>
+<span class="c"># 若该段内存在采集失败的 episode，用 --skip 剔掉（场景2）</span>
+python convert_lerobot_v3_fixed_simple.py \
+  --input  /home/lindenbot/save_data/11 \
+  --output /home/lindenbot/converted_data \
+  --start 180 --end 209 \
+  --skip <span class="y">163,172,202</span>
+<span class="c"># 任务详情写错时，用 --task 覆盖任务名（场景3，写入 meta/tasks.parquet）</span>
+python convert_lerobot_v3_fixed_simple.py \
+  --input  /home/lindenbot/save_data/11 \
+  --output /home/lindenbot/converted_data \
+  --start 200 --end 250 \
+  --task <span class="g">"place fruits in the box"</span>
+
+<span class="c"># ③ 本地训练（家庭案例：放入 /home/lindenbot/lerobot-0.4.1）</span>
+lerobot-train --policy.type=act \
+  --dataset.repo_id=<span class="g">lindenbot/put_fruit_in_box</span> \
+  --dataset.root=/home/lindenbot/converted_data \
+  --output_dir=<span class="g">/home/lindenbot/lerobot-0.4.1/outputs/put_fruit_in_box</span> \
+  --job_name=<span class="g">"place fruits in the box"</span> \
+  --batch_size=12 --steps=50000 --save_freq=4000 \
+  --log_freq=100 --num_workers=8 \
+  --wandb.enable=false --policy.push_to_hub=false --policy.use_amp=true
+
+<span class="c"># ④ 在线训练（云端路径换为 /root/gpufree-data）</span>
+lerobot-train --policy.type=act \
+  --dataset.repo_id=<span class="g">lindenbot/put_fruit_in_box</span> \
+  --dataset.root=/root/gpufree-data/data/$input_data$ \
+  --output_dir=/root/gpufree-data/outputs/$output_data$ \
+  --job_name=<span class="g">"place fruits in the box"</span> --batch_size=12 --steps=50000 \
+  --save_freq=4000 --log_freq=100 --num_workers=8 --wandb.enable=false</pre>
+      <div class="tip tealb"><b>两个根目录别搞混：</b><code>--dataset.root</code> 指向转换产物（读数据），<code>--output_dir</code> 指向训练产物（写 checkpoint）；混用会「读不到数据」或把模型写丢。家庭案例复盘参照 <b>500000 步以上</b> 的经验值，课堂 50000 步先跑通全流程。</div>
+      <div class="tip amber"><span class="lab">💾 权限与显存</span>①当前用户对训练目录要有写权限，否则 checkpoint 落不了盘；②显存不足报 <code>torch.OutOfMemoryError: CUDA out of memory</code> 时，先降 <code>batch_size</code> 再试，别动 steps。</div>
+    </section>
+
+    <!-- 06 源码解析（新） -->
+    <section class="blk" id="s6a">
+      <h2><span class="no">06</span>源码解析：convert_lerobot_v3_fixed_simple.py<span class="seg">示证新知 · 读代码</span></h2>
+      <p>转换不是魔法，理解它最好直接读转换脚本。本实验用的 <code>convert_lerobot_v3_fixed_simple.py</code> 是一个标准 <b>四阶段流水线</b>：<b>读 CSV → 并 parquet → 并视频 → 写元数据</b>。下面先把最关键的 <b>CSV 读取函数</b>逐行拆开看，它藏着本实验最容易踩的坑。</p>
+      <pre><span class="c"># ---- 读取单个 episode：robot_data.csv ─────────────────────────────
+# ⚠️ CSV 格式坑：原始表头 33 个列名，但数据行末尾多一个逗号（共 34 列）
+#    pandas 默认 read_csv 会把第一列 timestamp 当成 index，
+#    导致 l_a_0..r_s_7 全部循环左移 1 位（df['l_a_0'] 拿到的是原始 l_a_1）。
+#    这里治本：显式给出 34 列名（含末尾哑列 '_trailing'），并 skiprows=1。</span>
+def read_episode_data(self, episode_dir):
+    csv_path = episode_dir / "robot_data.csv"
+    <span class="c"># 34 个字段：timestamp + l_a_0..7 + r_a_0..7 + l_s_0..7 + r_s_0..7 + 末尾空列</span>
+    col_names = (['timestamp']
+                 + [f'l_a_{i}' for i in range(8)] + [f'r_a_{i}' for i in range(8)]
+                 + [f'l_s_{i}' for i in range(8)] + [f'r_s_{i}' for i in range(8)]
+                 + ['_trailing'])
+    <span class="c"># skiprows=1 跳过原始 header；header=None + 显式列名，终结列偏移</span>
+    df = pd.read_csv(csv_path, header=None, names=col_names, skiprows=1, index_col=False)
+    df = df.drop(columns=['_trailing'])            <span class="c"># 末尾哑列丢弃</span>
+
+    <span class="c"># action = 主动臂命令（8 左 + 8 右 = 16 维）</span>
+    action_cols = [f'l_a_{i}' for i in range(8)] + [f'r_a_{i}' for i in range(8)]
+    action = df[action_cols].values.astype(np.float32)
+
+    <span class="c"># state  = 从臂状态（用 0 填充 NaN，主要 r_s_7 硬件无反馈）</span>
+    state_cols = [f'l_s_{i}' for i in range(8)] + [f'r_s_{i}' for i in range(8)]
+    state = np.nan_to_num(df[state_cols].values.astype(np.float32), nan=0.0)
+    return action, state, len(df)</pre>
+      <div class="tip amber"><span class="lab">🔑 这段代码解释了上文的"33 列 / 34 列"</span>表头只有 33 个名，数据行却 34 个字段——就是末尾那个多出来的逗号。<b>pandas 默认读会把 timestamp 当索引→所有列整体左移 1 位。</b>所以脚本才用 <code>skiprows=1 + 显式 34 列名 + '_trailing' 占位</code> 来对齐。你能看出，若不这样修，<code>action</code> 的 l_a_0 实际拿到的是什么吗？（答案是 l_a_1。）</div>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">阶段 1/4</div><div class="kt">读所有 episode 的 CSV，抽出 action(主臂) 与 state(从臂)，用 tqdm 显示进度。</div></div>
+        <div class="kcard"><div class="kd">阶段 2/4</div><div class="kt">把所有帧 concat 成一个 PyArrow 表，写 <code>data/chunk-000/file-000.parquet</code>。</div></div>
+        <div class="kcard"><div class="kd">阶段 3/4</div><div class="kt">三路相机分别用 <code>ffmpeg concat</code> 合并为 H.264 mp4 存入 videos/。</div></div>
+        <div class="kcard"><div class="kd">阶段 4/4</div><div class="kt">生成 meta 三件套：info.json / tasks.parquet / stats.json + episodes 元数据。</div></div>
+      </div>
+      <p style="margin-top:10px">其中 <b>阶段 4 最关键</b>：<code>info.json</code> 声明 <b>特征结构</b>（action/state 都是 16 维 float32、三路图 shape=720×1280×3），<code>tasks.parquet</code> 把任务文本（如 "place fruits in the box"）当作 task 索引，<code>stats.json</code> 提供每维 min/max/mean/std——这些<b>训练侧 <code>make_dataset</code> 启动时读取校验</b>。假如 stats.json 缺了 <code>observation.images.*</code> 三路图像统计，且开了 <code>use_imagenet_stats=True</code>，训练会直接 KeyError——这就是为什么脚本里用 <code>VISUAL: IDENTITY</code> 占位。</p>
+      <div class="tip violet"><span class="lab">思考</span>若把脚本 <code>fps=30</code> 改小到 10，你认为会影响 <code>info.json</code> 里的哪个字段？又会让视频「看起来」变快还是变慢？（提示：影响的是元数据声明 fps，还是实际视频流帧率？）</div>
+    </section>
+
+    <!-- 06 动画 -->
+    <section class="blk" id="s6">
+      <h2><span class="no">06</span>动画：帧-动作对的对齐与成批<span class="seg">课段 4 · 示证新知 · 12 min</span></h2>
+      <div class="anim-box">
+        <svg viewBox="0 0 720 250" width="100%" role="img" aria-label="帧动作对齐与批次动画">
+          <g font-size="14" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif">
+            <text x="150" y="34" fill="#7dd3fc" font-weight="bold">视频画面（三路）</text>
+            <g>
+              <rect x="60"  y="46" width="90" height="56" rx="8" fill="#0c4a6e" stroke="#38bdf8" stroke-width="1.5"/>
+              <rect x="158" y="46" width="90" height="56" rx="8" fill="#0c4a6e" stroke="#38bdf8" stroke-width="1.5"/>
+              <rect x="256" y="46" width="90" height="56" rx="8" fill="#0c4a6e" stroke="#38bdf8" stroke-width="1.5"/>
+              <rect x="354" y="46" width="90" height="56" rx="8" fill="#0c4a6e" stroke="#38bdf8" stroke-width="1.5"/>
+              <rect x="452" y="46" width="90" height="56" rx="8" fill="#0c4a6e" stroke="#38bdf8" stroke-width="1.5"/>
+            </g>
+            <text x="150" y="136" fill="#fcd34d" font-weight="bold">同拍关节动作（CSV 行）</text>
+            <g>
+              <rect x="60"  y="148" width="90" height="40" rx="8" fill="#3b2f0c" stroke="#fbbf24" stroke-width="1.5"/>
+              <rect x="158" y="148" width="90" height="40" rx="8" fill="#3b2f0c" stroke="#fbbf24" stroke-width="1.5"/>
+              <rect x="256" y="148" width="90" height="40" rx="8" fill="#3b2f0c" stroke="#fbbf24" stroke-width="1.5"/>
+              <rect x="354" y="148" width="90" height="40" rx="8" fill="#3b2f0c" stroke="#fbbf24" stroke-width="1.5"/>
+              <rect x="452" y="148" width="90" height="40" rx="8" fill="#3b2f0c" stroke="#fbbf24" stroke-width="1.5"/>
+            </g>
+            <!-- 对齐连接线 -->
+            <g stroke="#475569" stroke-width="1.5" stroke-dasharray="4 4">
+              <line x1="105" y1="102" x2="105" y2="148"/>
+              <line x1="203" y1="102" x2="203" y2="148"/>
+              <line x1="301" y1="102" x2="301" y2="148"/>
+              <line x1="399" y1="102" x2="399" y2="148"/>
+              <line x1="497" y1="102" x2="497" y2="148"/>
+            </g>
+            <!-- 扫描光标 -->
+            <rect y="42" width="98" height="150" rx="8" fill="none" stroke="#38bdf8" stroke-width="3" opacity="0.95">
+              <animate attributeName="x" values="56;154;252;350;448;56" dur="5s" repeatCount="indefinite"/>
+            </rect>
+            <!-- 输出 -->
+            <rect x="565" y="70" width="130" height="96" rx="12" fill="#064e3b" stroke="#34d399" stroke-width="2"/>
+            <text x="630" y="104" fill="#a7f3d0" font-weight="bold" font-size="13">v3.0 数据集</text>
+            <text x="630" y="126" fill="#6ee7b7" font-size="10">parquet + 三路 mp4</text>
+            <text x="630" y="144" fill="#6ee7b7" font-size="10">meta/info·tasks·stats</text>
+            <line x1="546" y1="118" x2="562" y2="118" stroke="#34d399" stroke-width="2.5" marker-end=""/>
+            <circle r="7" fill="#fbbf24">
+              <animateMotion dur="5s" repeatCount="indefinite"
+                path="M105,125 L203,125 L301,125 L399,125 L497,125 L546,118"/>
+            </circle>
+            <text x="360" y="226" fill="#94a3b8" font-size="12">光标扫到哪一拍，就把「这一帧画面」和「这一拍动作」配成一对写进数据集</text>
+          </g>
+        </svg>
+        <div class="anim-cap">动画：扫描框逐拍对齐上下两条轨道（画面帧 ↔ CSV 动作行），配好的对子沿轨道汇入右侧 v3.0 数据集容器——帧与动作错一格都不行。</div>
+      </div>
+      <div class="tip violet"><span class="lab">观察</span>如果视频是 30fps、CSV 却按 50Hz 存，两条轨道的「拍数」对不上——这就是转换脚本要按帧率重采样对齐的原因；对不齐时宁可重转，也别让模型学错位映射。</div>
+    </section>
+
+    <!-- 07 互动 -->
+    <section class="blk" id="s7">
+      <h2><span class="no">07</span>互动：ACT 超参选择题<span class="seg">课段 7 · 应用新知 · 10 min</span></h2>
+      <div class="ix-panel">
+        <div class="ix-title">情境选超参：三条实操情境，选择对应的关键旋钮</div>
+        <div class="ctl-row" style="gap:10px">
+          <div class="ctl" style="flex:1;min-width:200px">情境 1 · 本地 4060 Ti 报 CUDA OOM，先调哪个？
+            <select id="q1">
+              <option value="">请选择…</option>
+              <option value="a">加大 steps（练得更久）</option>
+              <option value="b">降小 batch_size</option>
+              <option value="c">删掉 save_freq</option>
+            </select>
+          </div>
+          <div class="ctl" style="flex:1;min-width:200px">情境 2 · 训练太慢，想每步更快出结果？
+            <select id="q2">
+              <option value="">请选择…</option>
+              <option value="a">减小 num_workers / log_freq</option>
+              <option value="b">增大 batch_size（显存允许时）</option>
+              <option value="c">关掉 wandb 就够了</option>
+            </select>
+          </div>
+          <div class="ctl" style="flex:1;min-width:200px">情境 3 · 把家庭任务和别的任务混着练？
+            <select id="q3">
+              <option value="">请选择…</option>
+              <option value="a">同 repo_id 覆盖写最省事</option>
+              <option value="b">应分任务名训练，job_name 标注清楚</option>
+              <option value="c">steps 加到一百万就行</option>
+            </select>
+          </div>
+        </div>
+        <div class="ctl-row">
+          <button class="btn" onclick="gradeQuiz()">提交答案</button>
+          <button class="btn ghost" onclick="resetQuiz()">重置</button>
+        </div>
+        <div class="io" id="quizIo"><span class="dim">三题都选好后点「提交答案」……</span></div>
+      </div>
+      <p style="margin-top:10px">要点复述：OOM 先砍 <b>batch_size</b>；提速优先提 batch_size（显存换吞吐），日志/加载参数别乱动当主力；<b>任务隔离</b>靠 repo_id + job_name，混数据会互相污染示范分布。</p>
+    </section>
+
+    <!-- 08 常见问题 -->
+    <section class="blk" id="s8">
+      <h2><span class="no">08</span>常见问题<span class="seg">课段 8 · 融会贯通 · 13 min</span></h2>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">Q 转换报「找不到 robot_data.csv」？</div><div class="kt">检查编号目录里是否完整，CSV 表头需 33 列、数据行 34 列的契约（02 文档）。</div></div>
+        <div class="kcard"><div class="kd">Q 转换报视频/FFmpeg 错？</div><div class="kt">ffmpeg -version 先验证；Pillow 未装会用默认值导致失败——依赖表逐项补齐。</div></div>
+        <div class="kcard"><div class="kd">Q 训练 loss 不降？</div><div class="kt">先验数据：抽查转换产物帧-动作是否对齐、任务名/描述是否写入 tasks；再回超参。</div></div>
+        <div class="kcard"><div class="kd">Q 本地还是云端？</div><div class="kt">数据量小选本地省事；大批量或反复调参上 gpufree L40S，训完把 checkpoint 拉回本地。</div></div>
+      </div>
+    </section>
+
+    <!-- 09 拓展 -->
+    <section class="blk" id="s9">
+      <h2><span class="no">09</span>拓展阅读<span class="seg">课段 8 · 融会贯通</span></h2>
+      <ul class="check">
+        <li>《02-聆动机器人数据转换》：三场景切法（指定范围/连续段/剔坏组）与输出目录详解。</li>
+        <li>《03-聆动机器人数据训练》：Conda/CUDA 环境搭建、OOM 排查清单与云端训练全流程。</li>
+        <li>LeRobot v3.0 数据集规范：data/videos/meta 目录布局与 info/tasks/stats 三件套字段。</li>
+        <li>ACT 论文精读：VAE 重构 + 动作块（chunk）预测为什么适合双臂长程任务。</li>
+      </ul>
+    </section>
+
+    <!-- 10 思考题 -->
+    <section class="blk" id="s10">
+      <h2><span class="no">10</span>思考题 · 自测<span class="seg">课段 8 · 融会贯通</span></h2>
+      <div class="kgrid">
+        <div class="kcard"><div class="kd">✅ 完成成果</div><div class="kt">产出一份转换通过的 v3.0 数据集 + 一段完整训练日志 + 至少一个 checkpoint。</div></div>
+        <div class="kcard"><div class="kd">🧠 原理收获</div><div class="kt">用自己的话解释「帧-动作对」，并说明帧率错位为什么是致命伤。</div></div>
+        <div class="kcard"><div class="kd">🛠 技能收获</div><div class="kt">独立完成五参数转换与 lerobot-train 启动，能读懂 loss 与 steps 打印。</div></div>
+        <div class="kcard"><div class="kd">📐 评分速览</div><div class="kt">转换产物 30% + 训练产物 40% + 超参/排错论述 30%。</div></div>
+      </div>
+      <div class="tip violet"><span class="lab">思考 1</span>为什么课堂只跑 50000 步、案例复盘却要求 500000 步以上？50000 步的模型预期能到什么水平（提示：动作像不像 vs 稳不稳）。</div>
+      <div class="tip violet"><span class="lab">思考 2</span>如果 200 组数据里混入 20 组打滑的坏组没剔，loss 曲线可能照样「好看」——这会在哪个实验阶段暴雷？（提示：EXP-04 的真机表现。）</div>
+    </section>
+
+    <nav class="expnav">
+      <a class="prev" href="../exp-02-teleop-collection/index.html">← 上一个：EXP-02 遥操作数据采集</a>
+      <a class="next" href="../exp-04-real-robot/index.html">下一个：EXP-04 真机推理与鲁棒性评估 →</a>
+    </nav>
+    <footer>
+      <div>IND-04 · 家庭整理应用场景 · EXP-03 数据转换与模型训练</div>
+      <div>8 学时 · 数据工程实验 · 基于 聆动课程指导文档《02-聆动机器人数据转换》《03-聆动机器人数据训练》改编</div>
+    </footer>
+  </main>
+</div>
+
+<script>
+function gradeQuiz(){
+  var ans = [
+    {el:'q1', ok:'b', why:'OOM 先降 batch_size（显存占用直降）'},
+    {el:'q2', ok:'b', why:'显存允许时增大 batch_size 提升吞吐'},
+    {el:'q3', ok:'b', why:'任务需按 repo_id/job_name 隔离，防数据串味'}
+  ];
+  var score = 0, lines = [];
+  ans.forEach(function(q,i){
+    var v = document.getElementById(q.el).value;
+    if(!v){
+      lines.push('<span class="warn">情境 ' + (i+1) + '：还没选择</span>');
+      return;
+    }
+    if(v === q.ok){ score++; lines.push('<span class="ok">情境 ' + (i+1) + ' 正确</span> — ' + q.why); }
+    else { lines.push('<span class="bad">情境 ' + (i+1) + ' 再想想</span> — ' + q.why); }
+  });
+  document.getElementById('quizIo').innerHTML =
+    '得分：' + score + ' / 3\n' + lines.join('\n') +
+    (score === 3 ? '\n<span class="ok">三题全对：超参直觉已建立，去 EXP-04 用起来。</span>' : '');
+}
+function resetQuiz(){
+  ['q1','q2','q3'].forEach(function(id){ document.getElementById(id).value = ''; });
+  document.getElementById('quizIo').innerHTML = '<span class="dim">三题都选好后点「提交答案」……</span>';
+}
+</script>
+<script src="../shared/tutorial.js" defer></script>
+</body>
+</html>

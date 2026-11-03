@@ -1,0 +1,35 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp003-ros2-application/exp-18-metapackage/diagrams/fig-18-4-create-flow.html
+TITLE: 图 18-4 · 自建元包流程
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+图 18-4 · 自建元包流程
+图 18-4 · 打造 car1_meta 的四步流程
+本图回答的问题：从零建一个元包，每一步动什么文件、用什么命令、看什么输出？
+ros2 pkg create
+--build-type ament_cmake
+①
+改 package.xml
+删 build_depend/test
+留 exec_depend + export
+②
+改 CMakeLists.txt
+只留四行有效内容
+ament_package() 收尾
+③
+colcon build
+--packages-select
+0.5s 注册完成
+④
+source + pkg xml
+能看到全部 exec_depend
+回读清单
+聚合关系生效
+rosdep 可解析整棵树
+两处常见失败
+选了 ament_python
+元包里写了 build_depend
+①建包 → ②清 XML → ③精简 CMake → ④构建并回读验证；②③ 是"元包身份"的两处硬约束
+✅ 结论：四步即可得到可安装、可回读的元包
+⚠️ 风险：build-type 选错或混入 build_depend 都会让身份失真
+🔍 验证：04 节步骤 ④ ros2 pkg xml car1_meta 的输出
+EXP-18 · 元功能包与依赖聚合

@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-05 · 人体检测与姿态估计 — 老人跌倒监护综合项目</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+:root{--theme:#059669;--theme-deep:#047857;--theme-bg:#d1fae5;--theme-bd:#a7f3d0}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="logo" href="../../../index.html" style="text-decoration:none;color:inherit" title="返回课程首页">🧠 具身智能课程 · <i>教程首页</i></a>
+  <div class="crumb"><a href="../../../index.html#case">综合项目</a> / <a href="../index.html">老人跌倒监护</a> / EXP-05</div>
+</div>
+
+<div class="wrap">
+
+<aside class="side">
+  <h4>本页目录</h4>
+  <a href="#s1" class="now">01 问题引入：检测框总会"缩水"的真相</a>
+  <a href="#s2">02 原理通俗讲解：letterbox 像"拍证件照垫纸"</a>
+  <a href="#s3">03 关联知识点：检测链路与双姿态引擎</a>
+  <a href="#s4">04 实验目标</a>
+  <a href="#s5">05 实验环境与准备</a>
+  <a href="#s6">06 动画讲解：letterbox→RKNN→NMS→逆映射</a>
+  <a href="#s7">07 互动讲解：置信度阈值实验台</a>
+  <a href="#s8">08 实操步骤：单图 → 双后端 → 视频集成</a>
+  <a href="#s9">09 重点与易错点</a>
+  <a href="#s10">10 总结与思考</a>
+  <h4>CH1 · 需求与配置</h4>
+  <a href="../exp-01-requirements/index.html">EXP-01 需求分析</a>
+  <a href="../exp-02-architecture/index.html">EXP-02 分层架构</a>
+  <a href="../exp-03-config/index.html">EXP-03 配置详解</a>
+  <h4>CH2 · 感知与交互</h4>
+  <a href="../exp-04-voice/index.html">EXP-04 语音交互</a>
+  <a href="../exp-05-pose-detection/index.html">EXP-05 检测与姿态</a>
+  <a href="../exp-06-fall-judgment/index.html">EXP-06 跌倒状态机</a>
+  <h4>CH3 · 告警与验证</h4>
+  <a href="../exp-07-alert-evidence/index.html">EXP-07 告警证据链</a>
+  <a href="../exp-08-llm-vlm/index.html">EXP-08 LLM·VLM</a>
+  <a href="../exp-09-full-verification/index.html">EXP-09 全功能验证</a>
+</aside>
+
+<main class="content">
+
+<div class="exp-head">
+  <span class="code">EXP-05 · 第 2 章 · 综合性 · 8 学时</span>
+  <h1>人体检测与姿态估计：让系统"看见"老人</h1>
+  <p class="desc">视觉是跌倒监护的第一入口：<b>YOLOv8（RKNN，640×640，仅 person 类）</b>先框出人，<b>BlazePose 33 点（整图 256×256）</b>或 <b>RTMPose 17 点（top-down 192×256，工厂按 pose_type 切换）</b>再摆好骨架，后面的躯干角、宽高比判定才有依据。本实验走通 <b>letterbox → RGB 4D → NPU 推理 → DFL 解码 → classwise NMS → unletterbox 逆映射</b> 全链路，理解补边/缩放对坐标的影响，按"逐层单跑 → 集成联调 → 参数调优"完成 T8-1~T8-6。</p>
+  <div class="meta">
+    <span class="tag hl">难度 ⭐⭐⭐ · 8 学时</span>
+    <span class="tag">YOLOv8 RKNN</span><span class="tag">BlazePose 33pt</span>
+    <span class="tag">RTMPose SimCC</span><span class="tag">MJPEG :8088</span>
+  </div>
+</div>
+
+<!-- 01 -->
+<section class="blk" id="s1">
+  <h2><span class="no">01</span>问题引入：检测框总会"缩水"的真相</h2>
+  <p>第一次跑 detect_demo 的同学常惊呼："框明明画在人的身上，怎么总往左上偏一点、像没对准？" 真相是：<b>模型看到的图不是你拍的那张图</b> —— 送进 NPU 前原图被等比缩放并居中补了黑边（letterbox）。解码出的框在"补边后的空间"里，必须用 scale 和 pad 两个参数把坐标搬回原图，少一个都会整体偏移。</p>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>原图 → letterbox：等比缩放至 640×640 + 居中补黑边（scale、pad 两个产物）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>NPU 推理后得到 DFL logits → softmax 加权解码出框 → NMS 去重</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>unletterbox：x_orig = (x − pad) / scale —— 少减 pad，框就整体偏一个固定量</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span>姿态同理：BlazePose/RTMPose 的关键点也要 scale+pad 逆映射回原图才算数</div>
+  </div>
+  <div class="tip amber"><span class="lab">💡 一个类比</span>letterbox 像<b>拍证件照时把人缩放后垫在一张固定尺寸的纸中央</b>：你在"纸面坐标"里指出的鼻子位置，想换算回"真人身高坐标"，就得先扣掉四周垫纸的宽度（pad），再除以缩小倍数（scale）。顺序错了，人就像平移了。</div>
+</section>
+
+<!-- 02 -->
+<section class="blk" id="s2">
+  <h2><span class="no">02</span>原理通俗讲解：检测与姿态的"两步舞"</h2>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">检测 · YOLOv8n</div><div class="kt">一眼圈出"哪里有人"</div><p>anchor-free 单阶段：网格直接预测，每条边回归 16-bin 分布（DFL）softmax 加权成亚像素偏移；NMS（IoU 0.45）去重后只留 person（class_id=0）。nano 版约 320 万参数，INT8 量化后 30–50ms/帧，正好塞进 6TOPS NPU。</p></div>
+    <div class="kcard"><div class="kd">NMS 去重</div><div class="kt">像"合影只点一次名"</div><p>同一人可能被多个网格同时报框：按分数从高到低保留，凡与保留框 IoU > 0.45 的全部压掉。阈值太高（0.9）同人多框、ID 乱跳；太低（0.2）挨得近的两个人被误删一个 —— 漏检比误检更危险。</p></div>
+    <div class="kcard"><div class="kd">姿态 · BlazePose 33pt</div><div class="kt">"整图直出全骨架"</div><p>256×256 整图一次推理，33 点含面部/手部细节；vis &lt; 0.5 的点不画。优势是不依赖检测框，输输出 195=39×5 交错布局。</p></div>
+    <div class="kcard"><div class="kd">姿态 · RTMPose 17pt</div><div class="kt">"先框人再精扫"（top-down）</div><p>单人裁剪 192×256 竖版输入，SimCC 双头输出 simcc_x(1,17,384) + simcc_y(1,17,512)，argmax ÷ 2 得像素坐标；vis = 双头峰值均值（FP32 实测有人 0.75~1.2）。躺姿裁剪稳定，是默认后端。</p></div>
+  </div>
+  <div class="tip tealb"><span class="lab">🔒 隐私底线</span>视觉层全程端侧处理：<b>帧只在内存流转</b>，除非主动 --save / --mjpeg，不落盘、不上传。testdata 为教学素材，真实部署时摄像头画面涉及老人起居隐私 —— 默认不开推流、开也要限定局域网，这是给家属的"看得见的承诺"。</div>
+</section>
+
+<!-- 03 -->
+<section class="blk" id="s3">
+  <h2><span class="no">03</span>关联知识点：六个知识块对号入座</h2>
+  <table>
+    <thead><tr><th>编号</th><th>知识点</th><th>关键机制 / 位置</th></tr></thead>
+    <tbody>
+      <tr><td>4.1.1</td><td>YOLOv8 行人检测（COCO person）</td><td>640×640 RGB；3 层 × 3 张量输出；vision/yolo/detector.py L13-L41</td></tr>
+      <tr><td>4.1.2</td><td>letterbox 预处理与 NMS 解码</td><td>scale=min(640/h,640/w)、pad=0 黑边；DFL 16-bin；classwise_nms IoU 0.45；preprocess.py L18-L53</td></tr>
+      <tr><td>4.1.3</td><td>RKNN NPU 推理与 core_mask</td><td>rknnlite2.3.2；core_mask 0=AUTO（None 会报不支持）；双模型共 NPU 排队；backend.py L34-L65</td></tr>
+      <tr><td>4.2.1</td><td>BlazePose 33 关键点</td><td>整图 256×256；195=39×5 交错；VIS_THRESHOLD=0.5；vision/pose/pose.py L42-L80</td></tr>
+      <tr><td>4.2.2</td><td>RTMPose 17 点 SimCC 双头</td><td>384=192×2、512=256×2、SPLIT_RATIO=2.0；vis=双头峰值均值；vision/pose_rtm/simcc.py L17-L63</td></tr>
+      <tr><td>4.2.3</td><td>双后端切换与 MJPEG 推流</td><td>model.pose_type；工厂 build_pose_engine（fall/monitor.py L41-L61）；MjpegServer :8088/fall.mjpg</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 04 -->
+<section class="blk" id="s4">
+  <h2><span class="no">04</span>实验目标</h2>
+  <ul class="check">
+    <li><span class="ok">理解</span>检测六段链路 letterbox → RGB 4D → RKNN → DFL → NMS → unletterbox，能说出每段的<b>数据形状变化</b></li>
+    <li><span class="ok">掌握</span>BlazePose 与 RTMPose 的四维差异（整图 vs top-down、33pt vs 17pt、vis 计算、耗时），能独立切后端对比</li>
+    <li><span class="ok">理解</span>letterbox 补边对关键点逆映射的影响（scale+pad 双参数）与 NMS IoU 阈值的漏检/误检权衡</li>
+    <li><span class="ok">独立完成</span>detect_demo / pose_demo / fall_video_demo 三层验证，能定位漏检、姿态不跟帧、推流卡顿</li>
+    <li><span class="ok">掌握</span>MJPEG 推流与 --text 文本叠加观察，理解"视觉层可独立于语音层验证"的设计意图</li>
+    <li><span class="ok">迁移</span>把"逐层单跑→集成联调→参数调优"方法论用到其他检测场景</li>
+  </ul>
+</section>
+
+<!-- 05 -->
+<section class="blk" id="s5">
+  <h2><span class="no">05</span>实验环境与准备</h2>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>硬件：实验箱 B2 / 小车 C1（RK3576，6TOPS NPU）；Ubuntu 22.04 + Python 3.10</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>核心库：rknnlite2.3.2、opencv-python、numpy；MJPEG 可选 pip install mjpeg_streamer</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>模型就位：yolov8n.rknn、blazepose pose_landmark_full.rknn、rtmpose_s_256x192_int8.rknn（已打包 models/rtmpose/）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span>素材齐备（离线可用）：testdata/stand_up.jpg、testdata/fall_1.png、testdata/fall_slow_x264.mp4</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">5</span>基线体检：<code>python3 common/env_check.py --config config/fall_config.yaml</code> 确认 EXIT 0</div>
+  </div>
+</section>
+
+<!-- 06 -->
+<section class="blk" id="s6">
+  <h2><span class="no">06</span>动画讲解：letterbox → NPU → NMS → 逆映射</h2>
+  <p class="lead">左侧一张竖图被缩放补边送进模型、再"拆框去重"搬回原图；右侧 SimCC 双头解码的 argmax 扫描：</p>
+  <div class="anim-box">
+    <svg viewBox="0 0 720 330" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="检测链路与SimCC解码动画">
+      <rect x="8" y="8" width="470" height="314" rx="12" fill="#111827" stroke="#334155"/>
+      <text x="243" y="32" text-anchor="middle" font-size="13.5" font-weight="700" fill="#6ee7b7">YOLOv8 检测链路 · 六段</text>
+      <g font-family="sans-serif" font-size="11" text-anchor="middle" fill="#cbd5e1">
+        <rect x="26" y="52" width="84" height="96" rx="8" fill="#1e293b" stroke="#38bdf8" stroke-width="1.6"/>
+        <text x="68" y="72" fill="#7dd3fc" font-weight="700">原图</text>
+        <rect x="38" y="86" width="60" height="52" fill="#0f172a" stroke="#475569"/>
+        <rect x="38" y="86" width="60" height="14" fill="#020617"/>
+        <rect x="38" y="124" width="60" height="14" fill="#020617"/>
+        <text x="68" y="160" fill="#64748b" font-size="9.5">竖图 384×640</text>
+
+        <path id="d1" d="M112 100 H 138" stroke="#38bdf8" stroke-width="2" stroke-dasharray="6 5" fill="none"/>
+        <circle r="4" fill="#38bdf8"><animateMotion dur="1.8s" repeatCount="indefinite"><mpath href="#d1"/></animateMotion></circle>
+
+        <rect x="140" y="52" width="92" height="96" rx="8" fill="#1e293b" stroke="#38bdf8" stroke-width="1.6"/>
+        <text x="186" y="72" fill="#7dd3fc" font-weight="700">letterbox</text>
+        <rect x="152" y="84" width="68" height="68" fill="#020617" stroke="#475569"/>
+        <rect x="166" y="84" width="40" height="68" fill="#0f172a" stroke="#38bdf8"/>
+        <text x="186" y="160" fill="#64748b" font-size="9.5">640² + pad 黑边</text>
+
+        <path id="d2" d="M234 100 H 260" stroke="#38bdf8" stroke-width="2" stroke-dasharray="6 5" fill="none"/>
+        <circle r="4" fill="#38bdf8"><animateMotion dur="1.8s" begin="0.6s" repeatCount="indefinite"><mpath href="#d2"/></animateMotion></circle>
+
+        <rect x="262" y="52" width="92" height="96" rx="8" fill="#1e293b" stroke="#a78bfa" stroke-width="1.6"/>
+        <text x="308" y="72" fill="#c4b5fd" font-weight="700">RKNN NPU</text>
+        <text x="308" y="92" fill="#94a3b8" font-size="9.5">int8 30–50ms</text>
+        <text x="308" y="108" fill="#94a3b8" font-size="9.5">box+cls 3×3 张量</text>
+        <text x="308" y="124" fill="#94a3b8" font-size="9.5">DFL 16-bin logits</text>
+        <rect x="272" y="132" width="72" height="10" rx="3" fill="#312e81"/>
+        <rect x="272" y="132" width="10" height="10" rx="3" fill="#818cf8"><animate attributeName="width" values="10;64;10" dur="2.2s" repeatCount="indefinite"/></rect>
+
+        <path id="d3" d="M356 100 H 382" stroke="#38bdf8" stroke-width="2" stroke-dasharray="6 5" fill="none"/>
+        <circle r="4" fill="#38bdf8"><animateMotion dur="1.8s" begin="1.2s" repeatCount="indefinite"><mpath href="#d3"/></animateMotion></circle>
+
+        <rect x="384" y="52" width="74" height="96" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="1.6"/>
+        <text x="421" y="72" fill="#fde68a" font-weight="700">NMS + 反算</text>
+        <rect x="396" y="86" width="50" height="20" fill="none" stroke="#4ade80" stroke-width="1.6"><animate attributeName="opacity" values="1;1;.2;1" keyTimes="0;.5;.7;1" dur="2.4s" repeatCount="indefinite"/></rect>
+        <rect x="404" y="94" width="50" height="20" fill="none" stroke="#f87171" stroke-width="1.6"><animate attributeName="opacity" values=".2;.2;1;1;.2" keyTimes="0;.4;.55;.9;1" dur="2.4s" repeatCount="indefinite"/></rect>
+        <text x="421" y="128" fill="#94a3b8" font-size="9.5">IoU 0.45 去重</text>
+        <text x="421" y="160" fill="#64748b" font-size="9.5">(xyxy−pad)/scale</text>
+      </g>
+      <line x1="26" y1="178" x2="458" y2="178" stroke="#334155"/>
+      <g font-family="sans-serif" font-size="11" fill="#cbd5e1">
+        <text x="40" y="202" fill="#94a3b8">三个易错坐标环节：</text>
+        <rect x="26" y="214" width="136" height="84" rx="8" fill="#1e293b" stroke="#38bdf8"/>
+        <text x="94" y="236" text-anchor="middle" fill="#7dd3fc" font-weight="700">① 补边要减</text>
+        <text x="94" y="256" text-anchor="middle" font-size="10" fill="#94a3b8">x−pad 再 ÷scale</text>
+        <text x="94" y="272" text-anchor="middle" font-size="10" fill="#94a3b8">漏 pad → 整体偏移</text>
+        <text x="94" y="288" text-anchor="middle" font-size="10" fill="#64748b">宽高只除 scale</text>
+        <rect x="170" y="214" width="136" height="84" rx="8" fill="#1e293b" stroke="#f59e0b"/>
+        <text x="238" y="236" text-anchor="middle" fill="#fde68a" font-weight="700">② NMS 时机</text>
+        <text x="238" y="256" text-anchor="middle" font-size="10" fill="#94a3b8">score_thr 先筛候选</text>
+        <text x="238" y="272" text-anchor="middle" font-size="10" fill="#94a3b8">iou_thr 再去重</text>
+        <text x="238" y="288" text-anchor="middle" font-size="10" fill="#64748b">两个阈值作用不同段</text>
+        <rect x="314" y="214" width="144" height="84" rx="8" fill="#1e293b" stroke="#4ade80"/>
+        <text x="386" y="236" text-anchor="middle" fill="#86efac" font-weight="700">③ NPU 排队</text>
+        <text x="386" y="256" text-anchor="middle" font-size="10" fill="#94a3b8">YOLO + 姿态共 NPU</text>
+        <text x="386" y="272" text-anchor="middle" font-size="10" fill="#94a3b8">帧率掉 → 关 LLM</text>
+        <text x="386" y="288" text-anchor="middle" font-size="10" fill="#64748b">core_mask 默认 0 AUTO</text>
+      </g>
+
+      <rect x="490" y="8" width="222" height="314" rx="12" fill="#111827" stroke="#334155"/>
+      <text x="601" y="32" text-anchor="middle" font-size="13.5" font-weight="700" fill="#93c5fd">SimCC 双头解码</text>
+      <g font-family="sans-serif" font-size="10.5">
+        <text x="508" y="58" fill="#94a3b8">simcc_x (1,17,384)：34 根柱</text>
+        <g fill="#1e293b">
+          <rect x="508" y="66" width="5" height="40"/><rect x="516" y="76" width="5" height="30"/><rect x="524" y="84" width="5" height="22"/><rect x="532" y="90" width="5" height="16"/>
+          <rect x="540" y="80" width="5" height="26"/><rect x="548" y="92" width="5" height="14"/><rect x="556" y="86" width="5" height="20"/><rect x="564" y="78" width="5" height="28"/>
+          <rect x="572" y="88" width="5" height="18"/><rect x="580" y="94" width="5" height="12"/><rect x="588" y="84" width="5" height="22"/><rect x="596" y="90" width="5" height="16"/>
+          <rect x="604" y="74" width="5" height="32"/><rect x="612" y="88" width="5" height="18"/><rect x="620" y="94" width="5" height="12"/><rect x="628" y="86" width="5" height="20"/>
+          <rect x="636" y="92" width="5" height="14"/><rect x="644" y="96" width="5" height="10"/><rect x="652" y="88" width="5" height="18"/><rect x="660" y="94" width="5" height="12"/>
+          <rect x="668" y="97" width="5" height="9"/><rect x="676" y="92" width="5" height="14"/><rect x="684" y="96" width="5" height="10"/><rect x="692" y="98" width="5" height="8"/>
+        </g>
+        <rect x="508" y="66" width="5" height="40" fill="#fbbf24"><animate attributeName="fill" values="#fbbf24;#fde68a;#fbbf24" dur="1.6s" repeatCount="indefinite"/></rect>
+        <text x="508" y="134" fill="#94a3b8">simcc_y (1,17,512)：竖向 argmax</text>
+        <rect x="508" y="144" width="180" height="8" fill="#1e293b"/><rect x="508" y="156" width="180" height="8" fill="#1e293b"/><rect x="508" y="168" width="180" height="8" fill="#1e293b"/>
+        <rect x="556" y="144" width="6" height="8" fill="#fbbf24"><animate attributeName="x" values="508;660;508" dur="3s" repeatCount="indefinite"/></rect>
+        <rect x="628" y="156" width="6" height="8" fill="#fbbf24"><animate attributeName="x" values="672;540;672" dur="3s" begin="0.5s" repeatCount="indefinite"/></rect>
+        <rect x="530" y="168" width="6" height="8" fill="#fbbf24"><animate attributeName="x" values="560;520;560" dur="3s" begin="1s" repeatCount="indefinite"/></rect>
+        <text x="508" y="204" fill="#cbd5e1">公式：</text>
+        <text x="508" y="224" fill="#93c5fd">x = (argmax/2 − pad_w)/scale</text>
+        <text x="508" y="244" fill="#93c5fd">y = (argmax/2 − pad_h)/scale</text>
+        <text x="508" y="268" fill="#94a3b8">vis = 双头峰值均值</text>
+        <text x="508" y="286" fill="#64748b">FP32: 有人 0.75~1.2</text>
+        <text x="508" y="304" fill="#64748b">阈值默认 0.3（INT8 漂移再调）</text>
+      </g>
+    </svg>
+  </div>
+  <div class="anim-cap">动画 5-1｜左：原图 → letterbox 补边 → NPU 柱状激活 → NMS 双框眨闪去重 + 反算，下方三个坐标易错环节；右：SimCC 双头扫描线游走 + argmax 公式与 vis 说明</div>
+</section>
+
+<!-- 07 -->
+<section class="blk" id="s7">
+  <h2><span class="no">07</span>互动讲解：置信度阈值实验台</h2>
+  <p class="lead">拖动等价于 CLI 的 --score-thr / yaml 的 iou_thr 预设，观察检出数与风险的跷跷板：</p>
+  <div class="ix-panel">
+    <div class="ix-title">阈值实验台 · Threshold Bench</div>
+    <div class="ctl-row">
+      <button class="btn" onclick="tLow()">宽松 --score-thr 0.3</button>
+      <button class="btn ghost" onclick="tMid()">默认 0.5 / IoU 0.45</button>
+      <button class="btn ghost" onclick="tHigh()">保守 --score-thr 0.7</button>
+      <button class="btn ghost" onclick="tIou09()">IoU 0.9 同人多框</button>
+      <button class="btn ghost" onclick="tIou02()">IoU 0.2 误删邻人</button>
+      <button class="btn ghost" onclick="tReset()">↺ 复位</button>
+    </div>
+    <div class="io" id="thrIo"><span class="dim">// 跌倒监护是召回优先场景：漏检（人倒了没看见）代价远高于误检</span>
+<span class="ok">当前：score_thr=0.5、iou_thr=0.45 → 实测建议区间内，检出 1 框 score≈0.837</span></div>
+  </div>
+  <div class="tip violet"><span class="lab">🙋 为什么宁可"多看一眼"</span>误报多画一个框，顶多让姿态引擎白算一次；漏检却是<strong>真正摔倒的老人被判定"没人"</strong>，后面状态机、告警全部无从谈起。所以 score_thr 宜偏宽容（0.4~0.6），代价（噪声框）用 person 类过滤和 IoU 去重来兜住 —— 这是守护生命场景的取舍逻辑。</div>
+</section>
+
+<!-- 08 -->
+<section class="blk" id="s8">
+  <h2><span class="no">08</span>实操步骤：单图 → 双后端 → 视频集成 → 调参</h2>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>单图检测（90min）：detect_demo 跑 stand_up.jpg，记录框/score/耗时</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>单图姿态（90min）：pose_demo 跑 fall_1.png，默认 rtmpose 出 17 点</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>双后端对比（60min）：sed 切 blazepose → 33 点对比 → <b>务必恢复 rtmpose</b></div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span>视频集成（90min）：fall_video_demo --text [--mjpeg] 逐帧看 person_id/骨架/状态流转</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">5</span>T8-1~T8-6（60min）：单图/连续性/切换/状态迁移/判据调节/输入源等价</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">6</span>score_thr 调参（60min）：0.3 / 0.5 / 0.7 各记录检出·漏检·误检数并总结</div>
+  </div>
+  <pre><span class="c"># ① 单图行人检测（预期: 76ms / 13.1fps / score 0.837）</span>
+<span class="g">cd</span> ~/ros2_ws/src/xflz_eai_car1/app/elderly_companion
+<span class="g">python3</span> apps/detect_demo.py --input testdata/stand_up.jpg --save
+<span class="c"># OK: 1 detections in 76 ms → cls=0(person) box=(31.2,7.8,183.2,393.5)</span>
+<span class="c"># 标注图存 runs/out/detect_image.jpg；无人图返回 0 框不崩溃</span>
+
+<span class="c"># ② 单图姿态（默认 model.pose_type: rtmpose → 17 keypoints）</span>
+<span class="g">python3</span> apps/pose_demo.py --input testdata/fall_1.png --save
+<span class="g">grep</span> -A2 "pose_type" config/fall_config.yaml   <span class="c"># 确认当前后端</span>
+
+<span class="c"># ③ 切 blazepose 对比 33 点，完成后必须改回 rtmpose</span>
+<span class="g">sed</span> -i 's/pose_type: rtmpose/pose_type: blazepose/' config/fall_config.yaml
+<span class="g">python3</span> apps/pose_demo.py --input testdata/fall_1.png --save
+<span class="g">sed</span> -i 's/pose_type: blazepose/pose_type: rtmpose/' config/fall_config.yaml
+
+<span class="c"># ④ 视频集成 + 文本叠加 + 可选 MJPEG 预览（浏览器 :8088/fall.mjpg）</span>
+<span class="g">python3</span> apps/fall_video_demo.py --video testdata/fall_slow_x264.mp4 --text --mjpeg
+<span class="c"># 逐帧: [frame N] person_id=1 box=... pose: 17 keypoints → IDLE→FALLING→LYING</span>
+
+<span class="c"># ⑤ 阈值调参（CLI 覆盖不落盘，记录三档检出数）</span>
+<span class="g">python3</span> apps/detect_demo.py --input testdata/stand_up.jpg --save --score-thr 0.3
+<span class="g">python3</span> apps/detect_demo.py --input testdata/stand_up.jpg --save --score-thr 0.7
+<span class="c"># 图片模式等价性: python3 apps/fall_app.py --mode image --input testdata/fall_1.png --save</span></pre>
+</section>
+
+<!-- 09 -->
+<section class="blk" id="s9">
+  <h2><span class="no">09</span>重点与易错点</h2>
+  <ul class="check">
+    <li>六段链路每段的<span class="ok">形状与坐标空间</span>：原图 → 640² letterbox → 张量 → letterbox 空间框 → 原图框</li>
+    <li>双后端切换是<span class="ok">纯配置行为</span>：工厂 build_pose_engine 按 pose_type 创建，接口同为 process() → PoseResult</li>
+    <li>NPU 是<span class="ok">共享资源</span>：YOLO+姿态共 2 核，双模型串行排队是帧率下降主因</li>
+    <li>验证方法论：<span class="ok">单点 → 集成 → 调参</span>；单点挂是模块问题，单点过集成挂是接口/参数问题</li>
+  </ul>
+  <table>
+    <thead><tr><th>⚠️ 常见坑</th><th>现象 → 解法</th></tr></thead>
+    <tbody>
+      <tr><td>RKNN 加载失败</td><td>load_rknn failed → 核对 detect.model_path；跑 env_check 校验模型文件</td></tr>
+      <tr><td>need 4dims input</td><td>板端 static_shape 要求 4D NHWC → 确认 to_rgb 已补批维</td></tr>
+      <tr><td>检测框整体偏移</td><td>unletterbox 漏传 pad → 检查 letterbox 返回的 (r,(dw,dh)) 链路</td></tr>
+      <tr><td>报"未检测到人体关键点"</td><td>遮挡/模糊/vis 阈值过高 → 换图或调低 model.rtmpose.vis_threshold（默认 0.3）</td></tr>
+      <tr><td>RTMPose score 异常漂移</td><td>INT8 量级漂移属已知现象 → 调 vis_threshold，别急着怀疑解码</td></tr>
+      <tr><td>切完 blazepose 忘恢复</td><td>污染 EXP-06 判定基线 → 实验结束固定改回 rtmpose</td></tr>
+      <tr><td>MJPEG 404</td><td>8088 被占 → lsof -i :8088 找占用进程；start 前有端口预检</td></tr>
+      <tr><td>帧率低/推理堆积</td><td>双模型抢 NPU → pkill llm_server 等释放资源，关非必要服务</td></tr>
+      <tr><td>core None 报错</td><td>"The core mode None is not supported" → core_mask 用 0（AUTO），不是 None</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 10 -->
+<section class="blk" id="s10">
+  <h2><span class="no">10</span>总结与思考</h2>
+  <div class="kgrid">
+    <div class="kcard"><div class="kd">✅ 完成成果</div><div class="kt">四份记录 + 测试报告</div><p>检测结果、姿态结果、双后端对比表、--text 运行日志、T8 用例与调参记录。</p></div>
+    <div class="kcard"><div class="kd">🧠 原理收获</div><div class="kt">坐标空间的一致性</div><p>scale+pad 贯穿预处理与后处理；任何一步空间不一致，画面上就是"整体偏移"。</p></div>
+    <div class="kcard"><div class="kd">🛠 技能收获</div><div class="kt">三层验证与调参</div><p>detect/pose/fall_video 逐层单跑，再用 CLI 临时覆盖扫阈值区间。</p></div>
+    <div class="kcard"><div class="kd">❓ 排障思路</div><div class="kt">先看形状再看数值</div><p>报错先确认 tensor 维度（4D？195？384/512？），形状对了再查坐标与阈值。</p></div>
+  </div>
+  <div class="tip violet"><span class="lab">📝 思考题 1</span>unletterbox 逆映射 px=(lm−pad)/scale 中 scale 与 pad 各管什么？如果只除 scale 忘了减 pad，关键点会朝哪个方向偏、偏多少像素？用一张具体尺寸的图（如宽明显小于 640）推演一遍。</div>
+  <div class="tip violet"><span class="lab">📝 思考题 2</span>从输入方式、关键点数、躺姿稳定性、推理耗时四个维度对比 BlazePose 与 RTMPose，并解释：跌倒监护场景为什么默认选 top-down 的 RTMPose？（提示：与 crop_margin 1.5、双模型 NPU 排队一起想。）</div>
+</section>
+
+<nav class="expnav">
+  <a href="../exp-04-voice/index.html"><span class="lb">← 上一个实验</span>EXP-04 语音交互子系统</a>
+  <a class="next" href="../exp-06-fall-judgment/index.html"><span class="lb">下一个实验 →</span>EXP-06 跌倒判定状态机</a>
+</nav>
+
+<footer>
+  <span>CASE-03 · 老人跌倒监护 · EXP-05 人体检测与姿态估计</span>
+  <span>8 学时 · 综合性 · 基于 elderly_companion 实验讲义改编</span>
+</footer>
+
+</main>
+</div>
+
+<script>
+// 阈值实验台
+var tBase='<span class="dim">// 跌倒监护是召回优先场景：漏检（人倒了没看见）代价远高于误检</span>\n'+
+'<span class="ok">当前：score_thr=0.5、iou_thr=0.45 → 实测建议区间内，检出 1 框 score≈0.837</span>';
+function setT(t){document.getElementById('thrIo').innerHTML=t;}
+function tLow(){
+  setT('<span class="dim">// CLI: --score-thr 0.3（宽松档）</span>\n'+
+'<span class="ok">检出变多: 远处/遮挡的低置信度框也被保留 → 召回↑</span>\n'+
+'<span class="warn">代价: 树叶晃动、模糊残影可能混入 → 姿态引擎拿到噪声裁剪图</span>\n'+
+'<span class="ok">缓解: filter_classes=person 已滤非人框；再靠 NMS 去重</span>\n'+
+'<span class="dim">适配场景: 老人常处角落/被家具遮挡的客厅</span>');
+}
+function tMid(){
+  setT('<span class="dim">// 默认: score_thr=0.5、iou_thr=0.45</span>\n'+
+'<span class="ok">基准: stand_up.jpg → 1 框 cls=0 score=0.837，76ms/13.1fps</span>\n'+
+'<span class="ok">0.45 通用良好默认: 同人重复框被压掉，相邻两人各自保留</span>\n'+
+'<span class="dim">先跑基准记录，再动任何一个阈值，才有对照</span>');
+}
+function tHigh(){
+  setT('<span class="dim">// CLI: --score-thr 0.7（保守档）</span>\n'+
+'<span class="warn">误报变少、画面"干净"了</span>\n'+
+'<span class="bad">风险: 遮挡/小目标人框跌破 0.7 → 漏检！人倒了系统却说"没人"</span>\n'+
+'<span class="warn">本场景红线: 漏检代价 >> 误检，0.7 一般只用于对比记录，不建议上线</span>\n'+
+'<span class="dim">CLI 只本次生效; 持久化必须改 yaml 并写理由</span>');
+}
+function tIou09(){
+  setT('<span class="dim">// iou_thr=0.9：几乎不抑制</span>\n'+
+'<span class="warn">同一人多个高分框残留 → person_id 可能重复计数</span>\n'+
+'<span class="bad">连带风险: 状态机把"一个人"当"两个人"，每人一实例的 FSM 被污染</span>\n'+
+'<span class="dim">IoU 只影响同类框合并，不动坐标数值</span>');
+}
+function tIou02(){
+  setT('<span class="dim">// iou_thr=0.2：去重过激</span>\n'+
+'<span class="warn">老人弯腰扶物时与家具旁人重叠 &gt;0.2 → 相邻人的框被误删</span>\n'+
+'<span class="bad">后果: 漏检 —— 被删的恰可能是真正跌倒的人</span>\n'+
+'<span class="dim">工程结论: 0.4~0.5 为通用良好区间；调参需三档计数记录</span>');
+}
+function tReset(){setT(tBase);}
+</script>
+<script src="../shared/tutorial.js" defer></script>
+</body>
+</html>

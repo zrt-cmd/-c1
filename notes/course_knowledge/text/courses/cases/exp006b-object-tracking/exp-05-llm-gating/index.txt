@@ -1,0 +1,327 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/cases/exp006b-object-tracking/exp-05-llm-gating/index.html
+TITLE: EXP-05 · LLM 指令门控（FunctionCall） — 通用目标追踪综合项目
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+EXP-05 · LLM 指令门控（FunctionCall） — 通用目标追踪综合项目
+🎓 具身智能课程 ·
+通用目标追踪
+综合项目
+/
+通用目标追踪
+/ EXP-05
+本页目录
+01 问题引入 · LLM 的嘴，门控的手
+02 原理通俗讲解 · 拿不准就不放行
+03 关联知识点
+04 实验目标
+05 实验环境与准备
+06 动画讲解 · 门控路由与 fail-closed 出口
+07 互动讲解 · 门控判定输入实验台
+08 实操步骤 · 追踪/清除/闲聊三连
+09 重点与易错点
+10 总结与思考
+CH1 · 需求与架构设计
+EXP-01 需求分析（R1-R13）
+EXP-02 TrackEngine 单状态机
+EXP-03 track_config.yaml 详解
+CH2 · 感知与交互核心
+EXP-04 DeepSORT 追踪底座
+EXP-05 LLM 指令门控
+EXP-06 VLM 描述选目标
+CH3 · 语音、可靠性与验收
+EXP-07 语音交互（流式 TTS 打断）
+EXP-08 事件日志与故障降级
+EXP-09 全功能验证
+EXP-05 · 第 2 章 · 综合性 · 4 学时
+LLM 指令门控（FunctionCall）：结构化解析 + fail-closed 拦截
+大模型负责"听懂人话"，但绝不能让它直接指挥追踪器。本项目让 LLM 只输出结构化 FunctionCall（track_ids / clear_track / save_snapshot 或闲聊文本），再由 CommandWorker._native_gate 按固定顺序核验：清除词短路、非指令回落、ID 数值对齐、描述转 VLM、确知工具才执行——所有"不确定锁谁"的分支一律不动作（fail-closed），最后还有 parse_instruction 规则兜底防 LLM 彻底宕机。
+🎯 产出：门控三连验证记录
+📦 NATIVE_TOOLS + _native_gate
+⏱ 4 学时
+01
+问题引入：LLM 的嘴，门控的手
+如果没有门控，用户随口一句"把那个红色的追一下"，0.8B 的小模型可能幻觉出一个根本不存在的 id99；一句"你好"也可能被误吐成
+track_ids
+而当成追踪指令执行。需求 R7 要求指令理解可控、可拦截，R5 要求误触发为零。所以架构把职责劈成两半——嘴与手分开：
+LLM（FunctionCall 模式）
+：把自然语言翻译成 4 种受控输出之一——
+track_ids(ids)
+、
+clear_track()
+、
+save_snapshot()
+，或普通闲聊文本。它只"吐"工具调用（原生 rkllm 标签串或 JSON），自己不执行任何动作。
+CommandWorker._handle（L253-318）
+：
+_native_chat
+带 NATIVE_TOOLS（L29-41 三个函数 schema）请求 →
+parse_native
+解析。
+_native_gate 门控（L320-366）
+：按固定顺序核验——清除词、指令语义、ID 是否存在、描述是否转 VLM，通过才
+registry.call
+。
+规则兜底 parse_instruction
+：LLM 不可用/超时/输出畸形时接棒（tools.py L45-68），追踪/清除照常、绝不产生空 submit；TrackEngine 只消费放行后的最终指令。
+💡 信任模型
+模型可幻觉、代码可兜底
+——安全边界在 Python 侧：模型误吐 track_ids 不代表会锁车，门控不点头就执行不了。这正是"LLM 的嘴，门控的手"。
+02
+原理通俗讲解：机场安检的"拿不准就不放行"
+把 LLM 想成
+热心的前台接待
+：语法再好也只是复述请求；放行进闸机的是安检员（_native_gate），前台说的不算数。安检员按
+固定顺序
+核验（对应讲义 5.6 路由图）：
+① 清除词短路 = 绿色通道
+话语命中 clear_words（清除/解除/取消/停/不追/恢复全/不跟，track_config.yaml L76）→ 强制
+clear_track
+解除全部锁定，
+即使模型吐的是 track_ids 也忽略
+。实测记录在 L325-335 注释：0.8B 对「清除」误吐过 track_ids——清除是安全操作，宁可多解也不锁错。
+② 非指令回落 = 不是找我们的
+"你好""今天天气"这类纯闲聊（is_instruction=false）→ 回落对话、
+不执行工具
+，日志 [LLM] 开头，且用
+干净请求
+（不写 llm_chat.history），避免工具轮串进闲聊上下文。
+③ ID 数值对齐 = 查身份证
+FunctionCall 给了 id，门控拿出来跟当前检测一一对：数值不对齐 → 回「未找到该 ID 目标」，不 submit_effect。LLM 说有不算有，画面里真有才算有。
+④ 无 id 但含描述 = 转 VLM
+"追踪红色小轿车"没有 id 却命中 color_words/desc_words → 转 track_vlm 视觉选车（EXP-06 接力）；
+无 id 又无描述
+→ 回引导"请提供目标 id"。VLM 无果由 _vlm_none（L402-405）产出话术。
+⑤ 确知工具才执行
+路由图的其余出口：track_vlm → VLM 视觉选车；save_snapshot 等其它工具 → 放行 registry 执行。只有解析与门控双确认的动作才会抵达引擎。
+默认出口 = 拒绝
+"不确定锁谁"（id 不存在 / 数值不对齐 / 闲聊 / VLM 无果）的分支
+都不调用 submit_effect
+，只回引导语——这就是 fail-closed：宁可不动作，也不动作错。
+类比消防门——正常状态锁着（默认关闭），只有确认是自己人才推开；绝不会因为"识别不出"就敞开门。锁车是危险副作用（锁定后即便目标消失也不跟别的车），
+误锁成本远高于不动作
+，这是 fail-closed 成为安全核心的原因。
+🛡 三层防线
+第一层 FunctionCall 结构解析（畸形输出进不来）→ 第二层 _native_gate 门控路由（语义与存在性核验）→ 第三层 parse_instruction 规则兜底（LLM 挂了追踪/清除照用）。任一层失败都向更保守层退，三层都失败才回"没听懂"，且任何一层都不产生空 submit。
+03
+关联知识点
+NATIVE_TOOLS（L29-41）
+只注册三个工具：track_ids（数组 id）、clear_track（无参）、save_snapshot（落盘快照）。工具面收窄 = 攻击面与幻觉面收窄。
+双路径解析
+原生 rkllm FunctionCall 标签串与结构化 JSON 双路径（4.1.2），都汇到同一道门控——路径可变，闸口不变。
+生产者-消费者线程
+CommandWorker.run（L248-251）死循环从队列 get 再 _handle；_handle 入口
+engine.pending.set()
+（L254）暂停读帧等，LLM 推理秒级也不卡主循环。副作用统一经
+engine.submit_effect()
+回主循环单线程消费，避免并发改 session。
+server_manager 常驻
+ensure_running（L55-111）：端口预检（默认 8080，0=自动）→ 已就绪则复用外部服务 → 否则按 auto_start 拉起 Flask 子进程并轮询 GET /v1/models（超 120s 抛错）；stop（L113-117）只杀自己拉起的子进程。同项目多实验共享 8080。
+规则兜底 parse_instruction
+L45-68 固定顺序：①颜色词+车类词 → track_vlm；②阿拉伯/中文数字 → track_ids（_zh_to_num L13-37，"六十九"→69，只认万/亿以下层级）；③清除词 → clear_track；返回 None = 非指令。
+L67 特判：追踪但 id 解析不出也返回 None——绝不产空 submit 误清当前锁
+（评审 P0-2）。
+interaction 词表
+关卡判断的依据全在词表里（track_config.yaml），改话术先改词表再改代码。
+# config/track_config.yaml L76 起（interaction 词表，讲义 5.6 JSON）
+interaction:
+  clear_words:   [清除, 解除, 取消, 停, 不追, 恢复全, 不跟]
+  track_words:   [追踪, 追, 锁定, 识别, 找, 看, 跟, 停]
+  instruct_words:[追踪, 追, 停, 取消, 解除, 不追, 恢复全, 不跟, 清除]
+  color_words:   [红, 蓝, 白, 黑, 绿, 黄, 灰, 粉, 紫]
+  desc_words:    [红, 黄, 蓝, 白, 黑, 绿, 灰, 粉, 紫, 卡车, 轿车, suv, 大, 小, 新, 旧]
+_rule_fallback（track_app.py L618-626）：LLM 失败 → parse_instruction → 执行或回"没听懂"；
+只支持追踪/清除/列目标，不支持闲聊
+（test_chat_reply_clean.py L206-217 断言闲聊无规则可匹配）。
+行为基线：tests/test_native_wiring.py L18-113 覆盖门控 id 对齐/不对齐/清除强制/描述走 VLM/闲聊回落五类断言。
+安全依据：rkllm 原生工具调用（llm_server.py set_function_tools）与 OpenAI function calling 同构——但执行权始终在本地 registry。
+04
+实验目标
+掌握
+CommandWorker 门控路由（_native_gate L320-366 顺序）与 fail-closed 语义。
+理解
+清除语义强制 clear_track（分支①短路）与闲聊回落（分支②不执行工具）的本质差异。
+掌握
+LLM 子进程常驻管理（server_manager，端口 8080）与 parse_instruction 规则兜底。
+独立完成
+文本全链路验证：
+track_app.py --text --mjpeg
+交互，先输入「小飞小飞」唤醒，再「追踪 id3 的车」锁定，然后清除、闲聊。
+会读日志分岔
+：[cmd] = 门控放行指令、[LLM] = 闲聊回落、[track_vlm] = 转视觉选目标——三种前缀对应三条路由。
+迁移
+：理解大模型 FunctionCall 在机器人指令场景的门控安全设计（模型可幻觉、代码可兜底）。
+📦 完成成果
+pytest 门控用例全绿证明 + 一张 _native_gate 路由顺序图（标注 fail-closed 出口）+ 文本全链路验证日志（追踪/清除/闲聊三例）+ rules 兜底测试记录。
+05
+实验环境与准备
+硬件与系统
+具身智能实验箱 B2 / 机器人小车 C1；Ubuntu 22.04 + ROS 2 Humble，Python 3.10。
+文本模式 --text 不需要语音硬件
+，但 LLM 服务需板端（自动起 8080）。
+核心库
+RKLLM；非 native 路径用 ask_stream 走 HTTP 访问 RKLLM 服务 8080 端口。
+服务
+本地 llm_server 常驻 8080，GET /v1/models 轮询就绪（120s 窗口）。实验结束
+pkill -f llm_server
+清理（track_app main 的 finally 也会调 llm_mgr.stop()）。
+代码锚点
+apps/track_app.py：NATIVE_TOOLS L29-41、run L248-251、_handle L253-318、_native_gate L320-366（L325-335 清除短路注释）、_vlm_none L402-405、_rule_fallback L618-626；tools/tools.py parse_instruction L45-68、_zh_to_num L13-37。
+测试
+python3 -m pytest tests/ -q -k "not test_real"
+——跳过需真实板端模型的用例，纯逻辑 x86 可跑；覆盖 test_native_wiring / test_native_client / test_native_parser / test_chat_reply_*。
+入口命令
+文本全链路入口是 track_app.py（先唤醒词再对话），视频用 test.mp4 离线素材即可，另配 --mjpeg 可在浏览器看画面。
+# ① 快速回归（跳过真模型用例，x86 可跑）
+cd
+~/ros2_ws/src/xflz_eai_car1/app/object_tracking
+python3 -m pytest tests/ -q -k "not test_real"
+# ② 查看门控与兜底的源码锚点
+grep
+-n "NATIVE_TOOLS\|_native_gate\|_rule_fallback" apps/track_app.py
+grep
+-n "clear_words" config/track_config.yaml
+# L76 词表
+06
+动画讲解：门控路由与 fail-closed 出口
+一条 FunctionCall 进门后按路由图顺序核验。看三条彩带走哪条路——青色合法指令五步放行；琥珀话语含清除词在①短路强制 clear_track；红色幻觉 ID 在③"数值不对齐"被拦下坠入⑤拒绝口。
+FunctionCall
+_handle 解析
+① 含清除词?
+短路检查
+② 是指令?
+否→闲聊回落
+③ ID 对齐?
+查当前检测
+放行 → 引擎
+track_ids 执行
+强制 clear_track
+④ 描述→VLM
+⑤ else 回引导
+青色：合法 track_ids 依序过四闸抵达放行；琥珀：话语含 clear_words 在①短路、强制 clear_track 解锁（模型即使吐了 track_ids 也忽略——L325-335 注释的实测场景）；红色：0.8B 幻觉出不存在的 ID，在③"数值不对齐"被拦下坠入⑤回引导——不确定锁谁，默认动作就是不动作。
+07
+互动讲解：门控判定输入实验台
+点预设句或自由输入，模拟它经 FunctionCall 解析后落在门控哪条路由（判定逻辑按 L320-366 路由顺序的讲义语义推演；示例检测池：
+id2、id3、id7
+）。
+🎛 门控判定输入实验台 · Gate Lab
+追踪 id3（对齐）
+追踪 id99（幻觉 ID）
+清除锁定
+追踪红色小轿车
+追踪目标
+你好呀
+复位
+门控判定 →
+就绪
+：选择或输入一句话语，观察五条路由走向。
+试着输入「停」「不追了」——它们都在 clear_words 里，会走分支①短路；再输入「追高架」——有追踪词却解不出数字与描述，应停在"请提供目标 id"的引导，绝不空 submit。这就是 L67 特判在替你把关。
+08
+实操步骤：追踪 / 清除 / 闲聊三连
+0
+pytest 门控用例（约 60min）
+：
+python3 -m pytest tests/ -q -k "not test_real"
+验证 gate/thread 用例；关键文件 test_native_wiring.py（id 对齐/不对齐/清除强制/描述走 VLM/闲聊回落，L18-113）、test_chat_reply_clean.py——理解断言：闲聊回落干净请求、无工具残留。
+1
+读路由顺序（约 100min）
+：通读 apps/track_app.py CommandWorker._native_gate L320-366，按下书顺序画路由图——清除词短路 → 非指令回落 → ID 无且含描述转 VLM → ID 数值不对齐回引导 → track_vlm → VLM → else 执行；标注每个 fail-closed 出口"不 submit_effect"。
+2
+文本全链路（约 90min）
+：起 track_app.py --text --mjpeg，先输入「小飞小飞」唤醒，再输入「追踪 id3 的车」——观察
+[cmd] track_ids {3}
+→ 播报"好的，只追踪 id3"。
+3
+清除与闲聊
+：输入「清除」→
+[cmd] 清除语义指令，执行 clear_track
+（验证 clear_words 短路，R9）；输入「你好」→
+[LLM] 自然回复
+且 [cmd] 不存在——闲聊回落不执行工具、不写 llm_chat.history。
+4
+server_manager 与规则兜底（约 50min）
+：读 llm/server_manager.py 确认 8080 常驻逻辑；
+pkill -f llm_server
+（或配置 llm.enabled=false）后重跑，再发「追踪 id3」→ 走 parse_instruction 规则兜底照常锁定，发「你好」→ _rule_fallback 回"没听懂"——不崩线程。
+5
+fail-closed 用例 E1-E3（讲义步骤5）
+：逐一对照路由图打"不确定锁谁"分支——①幻觉/不对齐 ID 被拒、②无 id 无描述回引导、③闲聊误吐 track_ids 被回落，核对回引导话术与"锁定集保持不变"。
+# 工作目录（object_tracking 模块）
+cd
+~/ros2_ws/src/xflz_eai_car1/app/object_tracking
+# 1. 纯逻辑门控用例（x86，无真实 LLM）
+python3 -m pytest tests/ -q -k "not test_real"
+# 覆盖 _native_gate/test_native_wiring/闲聊
+# 2. 文本全链路（LLM FunctionCall + 门控）——依次在提示符输入三句
+python3 apps/track_app.py --video /home/iflytek/ros2_ws/src/xflz_eai_car1/vision/07_multi_object_tracking/test.mp4 --text --mjpeg
+小飞小飞
+追踪id3
+# 期望：[cmd] track_ids {3} → 播报「好的，只追踪 id3」
+清除
+# 期望：[cmd] 清除语义指令，执行 clear_track → 播报「好的，已解除全部锁定」
+你好
+# 期望：[LLM] 自然回复，[cmd] 不存在——闲聊回落干净请求，无工具执行
+# 3. 规则兜底演练：杀 LLM 后重跑第 2 条命令
+pkill -f llm_server
+# 「追踪 id3」→ parse_instruction L45-68 接管照常锁定；「你好」→ _rule_fallback 回「没听懂」（设计预期）
+# 4. 实验收尾：清理常驻子进程
+pkill -f llm_server
+09
+重点与易错点
+路由顺序即安全
+：清除 > 非指令回落 > ID 对齐 > 描述转 VLM > 执行。清除必须放最前——它是安全操作且模型可能误吐，短路保证"说了解就一定解"。
+验证顺序：pytest（-k "not test_real"）→ 三连文本 → 宕机演练，三步都要留日志证据。
+实验后
+pkill -f llm_server
+清理常驻子进程（track_app finally 也会调 stop，但手工跑测试时容易漏）。
+不要自行放宽门控
+：fail-closed 是安全核心，任何"不确定锁谁"都不执行工具。
+⚠️ 常见坑
+现象 → 解法
+模型把闲聊误吐成 track_ids
+0.8B 对非指令误吐工具调用 → 门控分支②回落对话、不执行工具，这正是 fail-closed 的关键安全
+「清除」了却仍锁定
+clear_words 未命中 → 补词表；模型误导时一律以 clear_words 短路强制 clear_track（L325-335）
+幻觉 ID 直接锁车
+没做数值对齐 → 分支③查检测池，不对齐回「未找到该 ID 目标」，绝不 submit
+「追踪」后不带 id 产空 submit
+空集会清掉当前锁定 → L67 特判返回 None：追踪但解析不出 id ≠ 可放行指令
+关掉 LLM 后闲聊没了
+规则兜底只支持追踪/清除/列目标，闲聊无规则匹配回"没听懂"——是设计取舍非 bug
+8080 被残留子进程占住
+server_manager 常驻复用 →
+pkill -f llm_server
+；enabled=false 重启也要清
+闲聊污染指令上下文
+闲聊回落必须用干净请求（不写 llm_chat.history），否则工具轮串进对话历史
+等 LLM 卡死画面
+_handle 入口已 engine.pending.set() 暂停读帧（L254），副作用走 submit_effect 单线程回主循环——慢在预期，卡死才查线程
+10
+总结与思考
+工具面收窄
+NATIVE_TOOLS 只暴露 track_ids / clear_track / save_snapshot 三个函数，模型再能说会道也越不了权。
+门控五条路由
+清除短路、非指令回落、ID 对齐、描述转 VLM、确知执行——每条路径有明确出口，默认出口是拒绝。
+fail-closed
+"不确定锁谁"就不动作、只回引导：误锁成本远高于不动作，这是机器人场景的底线设计。
+常驻与清理
+server_manager 复用 8080 提速，stop 只杀自己拉起的子进程；pkill -f llm_server 是标准收尾动作。
+三层防线
+FunctionCall 解析 → 门控 → parse_instruction 规则兜底，任一层失败向更保守层退，追踪/清除永不失联。
+技能收获
+FunctionCall 解析（JSON+原生标签）、门控路由与 fail-closed 设计、LLM 子进程生命周期管理——三件可迁移的机器人技能。
+评分项
+分值
+pytest 门控用例（全绿）
+20 分
+_native_gate 门控路由图（顺序正确 + fail-closed 标注）
+25 分
+文本全链路验证（追踪 / 清除 / 闲聊三例日志）
+35 分
+LLM 进程管理与规则兜底语义
+20 分
+🤔 思考题 1
+_native_gate 路由顺序为什么是"清除 > 非指令回落 > id > 描述 VLM > 放行"？如果把 ID 对齐挪到清除短路之前，「清除」在模型误吐 track_ids 时会发生什么？结合 L325-335 的实测注记想一想。
+🤔 思考题 2
+"闲聊回落"为什么要用干净请求（不写 history）？若每个闲聊轮都写进 llm_chat.history，追踪指令的上下文会被怎样污染，门控误判率又会朝哪个方向漂移？
+CASE-04 · 通用目标追踪综合项目 · EXP-05 LLM 指令门控（FunctionCall）
+4 学时 · 综合性 · 基于 object_tracking 实验讲义改编

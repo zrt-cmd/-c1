@@ -1,0 +1,19 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/cases/exp007-intelligent-factory/exp-01-slam-nav/interactive/ix-grid-astar.html
+TITLE: 栅格寻路交互演示
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+栅格寻路交互演示
+①
+点击/拖动
+格子切换障碍 → ② 调权重 → ③ 点
+运行
+观察路径变化
+绕行代价
+1.0
+▶ 运行 A*
+重置
+路径: — | 展开节点: —
+起点/终点
+障碍
+最优路径
+探索节点

@@ -1,0 +1,454 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/industry/ind04-home-tidying/exp-03-data-training/index.html
+TITLE: EXP-03 · 数据转换与模型训练 | IND-04 家庭整理应用场景
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+EXP-03 · 数据转换与模型训练 | IND-04 家庭整理应用场景
+课程
+家庭
+本页目录 · 五星学习法
+00 课程节奏 · 8 段微课
+01 学习目标 ①聚焦问题
+02 原理 ①聚焦 ②激活
+03 硬件与环境 ③示证新知
+04 操作步骤 ④应用新知
+05 关键命令 ④应用新知
+06 源码解析 ③示证新知
+07 动画 ③示证新知
+08 互动 ④应用新知
+09 常见问题 ⑤融会贯通
+10 拓展 ⑤融会贯通
+11 思考题 ⑤融会贯通
+兄弟实验
+EXP-01 案例总览
+EXP-02 遥操作采集
+EXP-04 真机与鲁棒性
+EXP-03 · 8 学时
+数据转换与模型训练
+把 save_data 里的编号目录转成 LeRobot v3.0 数据集，理解「帧-动作对」如何喂给 ACT 策略，再用 lerobot-train 训出家庭收纳的第一个 checkpoint。
+机房实训
+v3.0 数据格式
+ACT 训练
+00
+课程节奏：五星学习法 · 8 段微课（每段 ≤ 15 min）
+本实验按
+五星学习法
+组织：先用"采集 200 组却报找不到 CSV"的真实故障
+聚焦问题
+，再用「字幕对齐视频」
+激活旧知
+，接着
+示证新知
+（本地/云端训练路线 + 帧动作对齐动画），然后动手
+应用新知
+完成五参数转换与 lerobot-train 训练，最后借排障与拓展
+融会贯通
+。全程切成
+8 段微课、每段不超过 15 分钟
+，段间停顿 1~2 分钟消化；纯讲授合计约 100 分钟，其余课时用于动手实操与个别辅导。
+① 聚焦问题
+课段 1 · 12 min
+"200 组数据却报找不到 CSV"故障引入
+② 激活旧知
+课段 2 · 8 min
+字幕对齐 · 帧动作配对 · ACT 听写
+③ 示证新知
+课段 3~4 · 27 min
+本地/云端环境 + 帧动作对齐动画
+④ 应用新知
+课段 5~7 · 40 min
+五参数转换 + 训练启动 + 超参选择题
+⑤ 融会贯通
+课段 8 · 13 min
+排障口诀 · 拓展 · 思考题
+课段
+五星阶段
+时长
+对应章节
+本段任务
+课段 1
+聚焦问题
+12 min
+§01 + §02 前半
+抛出"200 组数据却报找不到 robot_data.csv"的故障
+课段 2
+激活旧知
+8 min
+§02 后半
+用"字幕对齐视频"旧知解释帧-动作对与 ACT 学习
+课段 3
+示证新知
+15 min
+§03
+认识本地 4060 Ti 与云端 L40S 两条训练路线及依赖
+课段 4
+示证新知
+12 min
+§06
+看帧-动作对对齐与成批动画，理解转换本质
+课段 5
+应用新知
+15 min
+§04 + §05 前半
+环境准备、五参数 convert 脚本跑通
+课段 6
+应用新知
+15 min
+§05 后半
+lerobot-train 启动、日志判读、checkpoint 落盘核验
+课段 7
+应用新知
+10 min
+§07
+ACT 超参选择题，练超参直觉与 OOM 排查
+课段 8
+融会贯通
+13 min
+§08~§10
+排障口诀收口，拓展阅读与思考题拔高迁移
+讲课提示：课段 1/2 以讲授 + 提问为主；课段 3~4 用实物截图 + 动画；课段 5~6 边讲边演；课段 7 学员独立完成；课段 8 答疑拔高。段间停顿 1~2 分钟。
+01
+学习目标
+课段 1 · 聚焦问题 · 12 min
+核验采集目录契约：纯数字编号目录、每组含 robot_data.csv 与三路视频。
+会安装转换依赖（pandas/pyarrow/numpy/tqdm/Pillow + FFmpeg）并跑通五参数转换。
+理解训练数据的本质是「帧-动作对」，说清 ACT 常用超参各自管什么。
+完成 lerobot-train 启动、日志判读与 checkpoint 落盘确认，会用云端训练解 OOM。
+02
+原理：帧-动作对与 ACT 学习
+课段 1 收尾 + 课段 2 · 激活旧知 · 8 min
+❓ 聚焦问题（课段 1）
+采集了 200 组数据，训练却报"找不到 robot_data.csv"——一查发现某个编号目录里 CSV 缺列、目录名不是纯数字。问题出在哪？带着这个故障听完全课——到课段 5 你会亲手跑通转换。
+转换这一步在干「对表」：采集时存下的是三路视频和一堆关节角 CSV，训练框架要的是
+每一帧画面配同一时刻的动作
+——第 t 帧图像 ↔ 第 t 拍关节角，帧帧对齐后写成 parquet + mp4 + meta 三件套，这就是 LeRobot v3.0 数据集。训练则是让 ACT 网络做题：
+输入画面（和历史动作块），输出接下来一串动作
+；对答案（loss）越对越准，权重就存成 checkpoint。
+对齐粒度
+视频帧率与 CSV 采样必须对得上（家庭案例 30fps），错位即全废。
+ACT 特点
+Action Chunking：一次预测一串后续动作，再分拍执行，动作更平滑不抖。
+loss 怎么看
+总体下降即在学；突然爆麦多半是 OOM 或学习率过大，回参数表排查。
+checkpoint
+按 save_freq 周期落盘，推理只认最终可用的那个目录（EXP-04 会用）。
+↺ 激活旧知（课段 2）
+回忆看外语片配字幕：字幕和画面错位就看不懂。转换干的就是"重新对齐"——第 t 帧画面配第 t 拍动作，帧帧对齐写成 v3.0 数据集；训练则是让 ACT 反复"听写"这盘带子，直到能不看字幕跟读。
+生活化类比：
+转换好比把「错位的字幕和视频」重新压制成强制对齐的版本——画面播到哪句，字幕正好是哪句；训练则是让学员听写这盘带子几十遍，直到能不看字幕跟读。
+03
+硬件与环境
+课段 3 · 示证新知 · 15 min
+本地路线
+LDT-01 一体机 RTX 4060 Ti 16GB + 64GB RAM，控制 batch_size 防 OOM。
+云端路线
+gpufree 算力市场租 L40S 48G（约 ¥2.78/时），选 lenovo0「具身机器人_lindenbot」镜像。
+软件环境
+LeRobot 0.4.1，python=3.10，conda 虚拟环境 + CUDA 可用（nvidia-smi 验证）。
+转换依赖
+pandas / pyarrow / numpy / tqdm / Pillow + 系统 FFmpeg（缺 Pillow 会用默认值失败）。
+🧩 转换契约（别再背原文档）
+一份合格数据集只有三条硬约束：①目录名是
+纯数字 episode ID
+（家庭案例 180 起）；②每组必须带
+robot_data.csv
+（表头 33 列 / 数据行 34 列的契约）；③三路视频缺多少路都不影响转换，但目录结构要符合 v3.0 约定。
+反例
+：手滑把目录改成「家庭180」或某组 CSV 少一列——转换直接报「找不到 robot_data.csv」。
+✅ 转换前自检三连
+①
+ffmpeg -version
+通；②
+python -c "import pandas,pillow"
+无报错；③ 输入根目录里只有纯数字子目录。
+Pillow 没装、靠别的包兜底是最大暗坑
+——它会静默用默认值跑，等转换完才发现图全黑。
+环节
+关键参数
+说明
+输入目录
+纯数字编号（家庭案例 180 起）
+编号即 episode ID，缺 robot_data.csv 直接报错
+视频封装
+mp4 30fps（家庭案例）
+某路相机可缺省，但目录结构要符合文档契约
+训练主参数
+batch_size=12 · steps=50000 · save_freq=4000
+本地起步值；复盘口径建议练到 500000 步以上
+日志参数
+log_freq=100 · num_workers=8 · wandb.enable=false
+无网环境关 wandb，loss 每 100 步打一行
+04
+操作步骤：转换 → 训练
+课段 5~6 · 应用新知 · 2×15 min
+1
+装环境
+conda 建 python3.10 + LeRobot 0.4.1 + nvidia-smi 验 CUDA
+→
+2
+转数据
+跑 convert 脚本把编号目录转 v3.0，核 meta 三件套
+→
+3
+打包上传
+zip 压缩 → 传云端 /root/gpufree-data → 解压
+→
+4
+云端训练
+进训练路径执行 lerobot-train → 看 loss 曲线
+→
+5
+落盘核验
+outputs/repo_id 出现 checkpoint → 记路径交 EXP-04
+☁️ 云端环境构建（跟着点）
+打开
+gpufree.cn
+控制台 →「租用实例」→ 显卡选
+L40S
+→「选择镜像」搜
+lerobot
+→「立即创建」，等启动完成后：控制台 →「JupyterLab」→ 点「终端」进入设备，即可执行下面命令装环境。
+📦 在线训练正式命令（原文 3.2，云端顺序执行）
+# ① 一键安装环境
+cd /data/lerobot && pip install -e .
+# ② 解压上传到云服务器的数据压缩包
+unzip converted_data.zip
+# ③ 进入训练路径，执行训练命令（完整参数见 §05④）
+cd /data/lerobot && lerobot-train ...
+训练产出按 save_freq 落 checkpoint，路径可从这里看日志定位；训完把 checkpoint 下载回本地供 EXP-04 使用。
+先验数据再训练：
+转换后抽查 info/stats/tasks 三件套与样例 parquet，坏数据训练只是浪费卡时。
+本地小步走：
+4060 Ti 上从默认超参起步，遇 OOM 先降 batch_size。
+云端大批量（原文 3.2 在线训练）：
+先在本地打包
+zip -r converted_data.zip /home/lindenbot/converted_data
+→ 点云端「上传」按钮把压缩包传到云服务器 → 服务器上
+unzip converted_data.zip
+解压 → 进入训练路径执行 lerobot-train（见 §05④）。
+留痕：
+保存完整训练日志与 loss 曲线截图，写清最终 steps（案例建议 500000 步以上）与 checkpoint 路径。
+05
+关键命令
+随课段 5 / 6 对照使用
+# ① 依赖与校验
+pip install pandas pyarrow numpy tqdm Pillow
+ffmpeg -version
+# ② 数据转换：编号目录 → LeRobot v3.0（家庭原文路径：save_data 下最新编号目录）
+python convert_lerobot_v3_fixed_simple.py \
+  --input  /home/lindenbot/save_data/
+11
+\
+  --output /home/lindenbot/converted_data \
+  --start
+180
+--end
+209
+# 若该段内存在采集失败的 episode，用 --skip 剔掉（场景2）
+python convert_lerobot_v3_fixed_simple.py \
+  --input  /home/lindenbot/save_data/11 \
+  --output /home/lindenbot/converted_data \
+  --start 180 --end 209 \
+  --skip
+163,172,202
+# 任务详情写错时，用 --task 覆盖任务名（场景3，写入 meta/tasks.parquet）
+python convert_lerobot_v3_fixed_simple.py \
+  --input  /home/lindenbot/save_data/11 \
+  --output /home/lindenbot/converted_data \
+  --start 200 --end 250 \
+  --task
+"place fruits in the box"
+# ③ 本地训练（家庭案例：放入 /home/lindenbot/lerobot-0.4.1）
+lerobot-train --policy.type=act \
+  --dataset.repo_id=
+lindenbot/put_fruit_in_box
+\
+  --dataset.root=/home/lindenbot/converted_data \
+  --output_dir=
+/home/lindenbot/lerobot-0.4.1/outputs/put_fruit_in_box
+\
+  --job_name=
+"place fruits in the box"
+\
+  --batch_size=12 --steps=50000 --save_freq=4000 \
+  --log_freq=100 --num_workers=8 \
+  --wandb.enable=false --policy.push_to_hub=false --policy.use_amp=true
+# ④ 在线训练（云端路径换为 /root/gpufree-data）
+lerobot-train --policy.type=act \
+  --dataset.repo_id=
+lindenbot/put_fruit_in_box
+\
+  --dataset.root=/root/gpufree-data/data/$input_data$ \
+  --output_dir=/root/gpufree-data/outputs/$output_data$ \
+  --job_name=
+"place fruits in the box"
+--batch_size=12 --steps=50000 \
+  --save_freq=4000 --log_freq=100 --num_workers=8 --wandb.enable=false
+两个根目录别搞混：
+--dataset.root
+指向转换产物（读数据），
+--output_dir
+指向训练产物（写 checkpoint）；混用会「读不到数据」或把模型写丢。家庭案例复盘参照
+500000 步以上
+的经验值，课堂 50000 步先跑通全流程。
+💾 权限与显存
+①当前用户对训练目录要有写权限，否则 checkpoint 落不了盘；②显存不足报
+torch.OutOfMemoryError: CUDA out of memory
+时，先降
+batch_size
+再试，别动 steps。
+06
+源码解析：convert_lerobot_v3_fixed_simple.py
+示证新知 · 读代码
+转换不是魔法，理解它最好直接读转换脚本。本实验用的
+convert_lerobot_v3_fixed_simple.py
+是一个标准
+四阶段流水线
+：
+读 CSV → 并 parquet → 并视频 → 写元数据
+。下面先把最关键的
+CSV 读取函数
+逐行拆开看，它藏着本实验最容易踩的坑。
+# ---- 读取单个 episode：robot_data.csv ─────────────────────────────
+# ⚠️ CSV 格式坑：原始表头 33 个列名，但数据行末尾多一个逗号（共 34 列）
+#    pandas 默认 read_csv 会把第一列 timestamp 当成 index，
+#    导致 l_a_0..r_s_7 全部循环左移 1 位（df['l_a_0'] 拿到的是原始 l_a_1）。
+#    这里治本：显式给出 34 列名（含末尾哑列 '_trailing'），并 skiprows=1。
+def read_episode_data(self, episode_dir):
+    csv_path = episode_dir / "robot_data.csv"
+# 34 个字段：timestamp + l_a_0..7 + r_a_0..7 + l_s_0..7 + r_s_0..7 + 末尾空列
+col_names = (['timestamp']
+                 + [f'l_a_{i}' for i in range(8)] + [f'r_a_{i}' for i in range(8)]
+                 + [f'l_s_{i}' for i in range(8)] + [f'r_s_{i}' for i in range(8)]
+                 + ['_trailing'])
+# skiprows=1 跳过原始 header；header=None + 显式列名，终结列偏移
+df = pd.read_csv(csv_path, header=None, names=col_names, skiprows=1, index_col=False)
+    df = df.drop(columns=['_trailing'])
+# 末尾哑列丢弃
+# action = 主动臂命令（8 左 + 8 右 = 16 维）
+action_cols = [f'l_a_{i}' for i in range(8)] + [f'r_a_{i}' for i in range(8)]
+    action = df[action_cols].values.astype(np.float32)
+# state  = 从臂状态（用 0 填充 NaN，主要 r_s_7 硬件无反馈）
+state_cols = [f'l_s_{i}' for i in range(8)] + [f'r_s_{i}' for i in range(8)]
+    state = np.nan_to_num(df[state_cols].values.astype(np.float32), nan=0.0)
+    return action, state, len(df)
+🔑 这段代码解释了上文的"33 列 / 34 列"
+表头只有 33 个名，数据行却 34 个字段——就是末尾那个多出来的逗号。
+pandas 默认读会把 timestamp 当索引→所有列整体左移 1 位。
+所以脚本才用
+skiprows=1 + 显式 34 列名 + '_trailing' 占位
+来对齐。你能看出，若不这样修，
+action
+的 l_a_0 实际拿到的是什么吗？（答案是 l_a_1。）
+阶段 1/4
+读所有 episode 的 CSV，抽出 action(主臂) 与 state(从臂)，用 tqdm 显示进度。
+阶段 2/4
+把所有帧 concat 成一个 PyArrow 表，写
+data/chunk-000/file-000.parquet
+。
+阶段 3/4
+三路相机分别用
+ffmpeg concat
+合并为 H.264 mp4 存入 videos/。
+阶段 4/4
+生成 meta 三件套：info.json / tasks.parquet / stats.json + episodes 元数据。
+其中
+阶段 4 最关键
+：
+info.json
+声明
+特征结构
+（action/state 都是 16 维 float32、三路图 shape=720×1280×3），
+tasks.parquet
+把任务文本（如 "place fruits in the box"）当作 task 索引，
+stats.json
+提供每维 min/max/mean/std——这些
+训练侧
+make_dataset
+启动时读取校验
+。假如 stats.json 缺了
+observation.images.*
+三路图像统计，且开了
+use_imagenet_stats=True
+，训练会直接 KeyError——这就是为什么脚本里用
+VISUAL: IDENTITY
+占位。
+思考
+若把脚本
+fps=30
+改小到 10，你认为会影响
+info.json
+里的哪个字段？又会让视频「看起来」变快还是变慢？（提示：影响的是元数据声明 fps，还是实际视频流帧率？）
+06
+动画：帧-动作对的对齐与成批
+课段 4 · 示证新知 · 12 min
+视频画面（三路）
+同拍关节动作（CSV 行）
+v3.0 数据集
+parquet + 三路 mp4
+meta/info·tasks·stats
+光标扫到哪一拍，就把「这一帧画面」和「这一拍动作」配成一对写进数据集
+动画：扫描框逐拍对齐上下两条轨道（画面帧 ↔ CSV 动作行），配好的对子沿轨道汇入右侧 v3.0 数据集容器——帧与动作错一格都不行。
+观察
+如果视频是 30fps、CSV 却按 50Hz 存，两条轨道的「拍数」对不上——这就是转换脚本要按帧率重采样对齐的原因；对不齐时宁可重转，也别让模型学错位映射。
+07
+互动：ACT 超参选择题
+课段 7 · 应用新知 · 10 min
+情境选超参：三条实操情境，选择对应的关键旋钮
+情境 1 · 本地 4060 Ti 报 CUDA OOM，先调哪个？
+请选择…
+加大 steps（练得更久）
+降小 batch_size
+删掉 save_freq
+情境 2 · 训练太慢，想每步更快出结果？
+请选择…
+减小 num_workers / log_freq
+增大 batch_size（显存允许时）
+关掉 wandb 就够了
+情境 3 · 把家庭任务和别的任务混着练？
+请选择…
+同 repo_id 覆盖写最省事
+应分任务名训练，job_name 标注清楚
+steps 加到一百万就行
+提交答案
+重置
+三题都选好后点「提交答案」……
+要点复述：OOM 先砍
+batch_size
+；提速优先提 batch_size（显存换吞吐），日志/加载参数别乱动当主力；
+任务隔离
+靠 repo_id + job_name，混数据会互相污染示范分布。
+08
+常见问题
+课段 8 · 融会贯通 · 13 min
+Q 转换报「找不到 robot_data.csv」？
+检查编号目录里是否完整，CSV 表头需 33 列、数据行 34 列的契约（02 文档）。
+Q 转换报视频/FFmpeg 错？
+ffmpeg -version 先验证；Pillow 未装会用默认值导致失败——依赖表逐项补齐。
+Q 训练 loss 不降？
+先验数据：抽查转换产物帧-动作是否对齐、任务名/描述是否写入 tasks；再回超参。
+Q 本地还是云端？
+数据量小选本地省事；大批量或反复调参上 gpufree L40S，训完把 checkpoint 拉回本地。
+09
+拓展阅读
+课段 8 · 融会贯通
+《02-聆动机器人数据转换》：三场景切法（指定范围/连续段/剔坏组）与输出目录详解。
+《03-聆动机器人数据训练》：Conda/CUDA 环境搭建、OOM 排查清单与云端训练全流程。
+LeRobot v3.0 数据集规范：data/videos/meta 目录布局与 info/tasks/stats 三件套字段。
+ACT 论文精读：VAE 重构 + 动作块（chunk）预测为什么适合双臂长程任务。
+10
+思考题 · 自测
+课段 8 · 融会贯通
+✅ 完成成果
+产出一份转换通过的 v3.0 数据集 + 一段完整训练日志 + 至少一个 checkpoint。
+🧠 原理收获
+用自己的话解释「帧-动作对」，并说明帧率错位为什么是致命伤。
+🛠 技能收获
+独立完成五参数转换与 lerobot-train 启动，能读懂 loss 与 steps 打印。
+📐 评分速览
+转换产物 30% + 训练产物 40% + 超参/排错论述 30%。
+思考 1
+为什么课堂只跑 50000 步、案例复盘却要求 500000 步以上？50000 步的模型预期能到什么水平（提示：动作像不像 vs 稳不稳）。
+思考 2
+如果 200 组数据里混入 20 组打滑的坏组没剔，loss 曲线可能照样「好看」——这会在哪个实验阶段暴雷？（提示：EXP-04 的真机表现。）
+IND-04 · 家庭整理应用场景 · EXP-03 数据转换与模型训练
+8 学时 · 数据工程实验 · 基于 聆动课程指导文档《02-聆动机器人数据转换》《03-聆动机器人数据训练》改编

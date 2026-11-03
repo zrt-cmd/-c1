@@ -1,0 +1,36 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/core/exp003-ros2-application/exp-18-metapackage/diagrams/fig-18-1-apt-aggregate.html
+TITLE: 图 18-1 · 一条 apt 命令拉起全家桶
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+图 18-1 · 一条 apt 命令拉起全家桶
+图 18-1 · 一条 apt 命令如何拉起整棵子包树
+本图回答的问题：
+sudo apt install ros-humble-navigation2
+执行后，包管理器按什么顺序装了谁？
+sudo apt install ...-navigation2
+安装入口 · 终端命令
+navigation2 · 元功能包
+package.xml：20 余行 exec_depend
+定位元包
+nav2_planner
+路径规划
+nav2_controller
+轨迹跟踪
+nav2_amcl
+粒子滤波定位
+nav2_map_server
+地图服务
+exec_depend × 20+
+apt / dpkg 递归解析
+外部系统 · 解依赖树
+提交清单
+整棵子包树安装完成
+ros2 run 全部可用
+递归拉起
+漏装子包 → ModuleNotFoundError
+手敲 apt 才会触发的风险分支
+绕过元包手敲
+✅ 结论：元包只提供清单，安装展开由包管理器递归完成
+⚠️ 风险：绕过元包手敲子包名，漏一个就运行期报错
+🔍 验证：04 节步骤 ④ ros2 pkg xml 的回读输出
+EXP-18 · 元功能包与依赖聚合

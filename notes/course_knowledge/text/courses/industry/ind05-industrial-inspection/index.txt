@@ -1,0 +1,291 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/industry/ind05-industrial-inspection/index.html
+TITLE: IND-05 工业巡检应用场景 · 行业应用课程
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+IND-05 工业巡检应用场景 · 行业应用课程
+总首页
+CAT 3 行业应用
+INDUSTRY · CAT 3 /
+IND-05
+工业巡检
+应用场景
+32 学时
+4 实验
+宇树 Go2 Edu 四足机器狗
+SLAM · Nav2 · YOLOv8
+从运动控制开始
+课程结构
+工具栈
+源材料
+课时
+学习路径
+先走通一圈巡检闭环，再拆开建图—定位—识别
+本课程以
+宇树 Unitree Go2 Edu 四足机器狗
+的
+工业巡检
+真实链路贯穿：3D 激光雷达扫描厂区生成点云地图、AMCL 粒子滤波实时定位、Nav2 规划路径依序到达多个巡检点、相机拍照并用 YOLOv8/ONNX 识别表计读数与异常目标、汇总生成巡检报告，最后自主走回充电桩——完整跑通「
+建图 - 定位 - 巡检 - 识别 - 报告 - 回充
+」六环闭环。
+开源全栈底座
+go2_ros2_sdk
+· 一条 launch 拉起点云、SLAM、Nav2、RViz、Foxglove 与视觉检测
+32
+总学时
+04
+实验项目
+08
+开源素材源
+核心理念：
+移动机器人巡检的本质是「先认识地方，再知道自己在哪，然后按路线办事」。四足只是腿，
+SLAM 给它地图、AMCL 给它位置、Nav2 给它路线、YOLO 给它眼睛
+——四样凑齐，机器狗才从遥控玩具变成巡检员工。
+STRUCTURE
+课程结构
+四步能力阶梯：会动 → 会画 → 会走 → 会看
+SDK 运动控制
+安装 Unitree SDK 与 ROS2 Go2 驱动，速度指令遥控前进转向、站立趴下、读取状态，打牢巡检的「腿」。
+3D 激光建图
+启动 3D 激光与 slam_toolbox 建图节点，遥控遍历场地，生成 3D 点云与 2D 栅格地图并保存，得到巡检的「地图」。
+定位与多点导航
+配置 AMCL 初始位姿与 Nav2 参数，编排多个巡检点，让 Go2 依序自主到达并避障——巡检的「路线」。
+视觉闭环与报告
+巡检点拍照，YOLOv8/ONNX 识别表计读数或异常目标，汇总生成巡检日报并自主回充——巡检的「眼睛和交付」。
+TASK
+建图-定位-巡检-识别-报告
+六环闭环：多点巡检、表计读数、异常检测、自主回充一口气跑完。
+STACK
+ROS2 Humble + Nav2
+slam_toolbox、AMCL、nav2_waypoint_follower 多点巡逻标配组合。
+ROBOT
+Go2 Edu 40 TOPS
+3D 激光雷达 + 深度相机 + 高清相机 + Jetson Orin 机载算力。
+VISION
+YOLOv8 / ONNX
+看图圈目标：表计数字检测、异常目标识别、置信度阈值标定。
+LAB
+实验项目
+每实验 8 学时 · 理论融入实验原理章
+01
+SDK 运动控制与巡检准备
+SDK MOTION
+融合「四足运动与巡检概述」理论：认识 Go2 Edu 硬件与巡检任务，安装 Unitree SDK 与 ROS2 驱动，速度指令与站立趴下遥控，验收指令驱动四足运动正常。
+unitree_sdk2py
+unitree_ros2
+速度指令
+低速起步
+进入实验
+8 学时
+02
+3D 激光建图
+LIDAR SLAM
+启动 3D 激光与建图节点（Mid-360/XT16 多线激光），遥控遍历场地生成 3D 点云与栅格地图，Save/Serialize 保存地图文件，验收生成可用巡检地图。
+slam_toolbox
+点云建图
+闭合回路
+map.yaml/pgm
+进入实验
+8 学时
+03
+定位与多点导航巡检
+AMCL & NAV2
+融合「SLAM/定位/导航原理」理论：AMCL 粒子滤波如何猜位置、Nav2 如何像高德一样规划避障，配置初始位姿与参数，编排巡检点依序自主到达。
+AMCL 粒子滤波
+Nav2
+Waypoint Follower
+定位收敛
+进入实验
+8 学时
+04
+视觉巡检闭环与报告
+VISION LOOP
+巡检点拍照/录像，YOLOv8/ONNX 识别表计读数或异常目标，脚本汇总生成巡检日报，最后自主回充，完成「建图-定位-巡检-识别-报告」全闭环验收。
+YOLOv8/ONNX
+表计读数
+巡检报告
+自主回充
+进入实验
+8 学时
+STACK
+工具与平台
+全部来自真实开源项目与官方文档
+宇树 Go2 Edu（40 TOPS Jetson Orin）
+3D 激光雷达 Mid-360 / XT16
+unitree_sdk2py · unitree_ros2
+Ubuntu 22.04 + ROS2 Humble
+slam_toolbox · AMCL · Nav2
+YOLOv8 · ONNX Runtime
+RViz2 · Foxglove Studio
+go2_ros2_sdk 全栈 launch
+DOMAIN
+工业厂区巡检
+配电房、管廊、厂区通道的表计读数与异常巡线，替代人工重复劳动。
+GAIT
+四足足式运动
+对角小跑 trot 步态，站立/趴下/速度指令由运动服务统一调度。
+SENSE
+3D 激光 + 相机
+多线激光雷达建图定位，高清相机识别表计与异常，光照不足配补光。
+OPS
+多点巡逻 + 回充
+waypoint 依序到达、每点定位收敛后再出发，巡检完自主走回充电桩。
+SOURCE
+源材料清单
+培训方案「课程5」+ 8 个已核实开源仓库 · 命令均摘自 README
+#
+来源
+用于
+S1
+培训方案 xlsx「课程5」6 行（2 理论 + 4 实践）
+全课结构、学时、验收标准与注意事项的权威依据
+S2
+unitree_sdk2py（BSD-3）read_highstate / sportmode_test
+EXP-01：状态读取、StandUpDown/VelocityMove 速度与站立控制、前置相机拍照
+S3
+unitree_ros2 README · /api/sport/request · utlidar/cloud
+EXP-01/02：ROS2 话题与运动请求、RViz 查看点云、go2_stand_example
+S4
+go2_ros2_sdk（BSD-2）robot.launch.py · SlamToolboxPlugin
+EXP-02/03：一键拉起建图导航栈、Save/Serialize Map、controller_frequency=3.0
+S5
+Nav2 官方文档：AMCL / waypoint_follower / Docking
+EXP-03/04：粒子滤波参数、多点巡检 follow_waypoints、回充 SimpleChargingDock
+S6
+Ultralytics CLI · coco_detector（go2_ros2_sdk 内置）
+EXP-04：yolo detect predict、/detected_objects 话题与 detection_threshold
+S7
+smart-gas-meter（MIT）train_yolo.py / infer_yolo.py
+EXP-04：表计数字检测全流程参照、model_digit_yolo.onnx 部署方式
+S8
+unitree_rl_gym · unitree_ros go2_description · FAST-LIO
+EXP-03/04 拓展：强化学习、URDF/Gazebo 局限、激光里程图自行核验
+全部命令与参数均摘自上表开源仓库 README / 官方文档，未核实的 API 一律不写；宇树机载
+unitree_slam/mid360_driver
+为闭源服务，课堂只演示并对比开源方案。
+SCHEDULE
+32 学时分配
+每实验 8 学时 · 讲授 / 演示 / 实操 / 复盘
+实验
+主题（含融入理论）
+学时
+课堂节奏（8 学时拆分）
+EXP-01
+SDK 运动控制与巡检准备（融合理论1：硬件与巡检任务）
+8
+2h Go2 硬件与巡检任务 · 1h SDK/驱动安装 · 4h 指令遥控实操 · 1h 安全复盘
+EXP-02
+3D 激光建图
+8
+1h 点云与 SLAM 原理 · 1h 节点启动 · 5h 遍历建图实操 · 1h 地图质量点评
+EXP-03
+定位与多点导航巡检（融合理论2：SLAM/AMCL/Nav2 原理）
+8
+2h 粒子滤波与规划原理 · 1h 参数配置 · 4h 多点编排实操 · 1h 收敛判读
+EXP-04
+视觉巡检闭环与报告
+8
+1h YOLO 与报告链条 · 2h 检测阈值标定 · 3h 闭环串跑 · 2h 报告与回充验收
+TOT
+合计（2 理论融入 + 4 实践）
+32
+教学动线统一为：先跑通闭环演示 → 再讲原理 → 后分步动手操作
+OUTPUT
+结课成果物
+学生需提交的四项留痕材料
+巡检地图
+map.yaml / map/pgm 与 posegraph 序列化文件，RViz 复核无明显重影、走廊无扭曲。
+多点巡检录像
+Go2 依序到达全部巡检点的录屏，含每次到达后的位姿收敛截图与避障过程。
+识别结果集
+各巡检点照片 + YOLO 检测框/置信度输出，表读数或异常目标与现场实拍对照。
+巡检日报
+脚本自动生成的巡检报告文本 + 四实验思考题作答与失败归因复盘表。
+CLASS
+课堂组织建议
+面向真机 + 机房双场景教学
+分组：
+2 人 1 组对标真机作业的「操作手 + 安全员」——一人发指令、一人盯狗避障，角色每轮互换。
+场地固定：
+巡检场地用胶带标出充电桩 dock 矩形，桌椅陈设中途不挪动，换组时按照片复原。
+低速铁律：
+所有速度指令从最低档起步，机器人抬腿异常立即趴下断控，避免跌落与碰撞。
+地图版本：
+每组地图按「组号-日期」命名，Save Map 与 Serialize Map 双落盘，当天归档不留口头。
+演示前置：
+每实验开场 10 分钟回放上一实验录像或闭环演示，保持「先看再做」动线。
+验收关口：
+EXP-01 查运动、EXP-02 查地图、EXP-03 查依序到达、EXP-04 查报告与回充，四关不过不进下一实验。
+安全底线：机器狗运动范围内不站人，任何异常先发 Stop/趴下指令再排查；狭窄与临边区域禁入，回充桩周围保持净空。
+RUBRIC
+考核权重建议
+过程留痕 70% + 闭环成果 30%
+15%
+运动控制分
+SDK 安装、站立趴下与速度指令遥控动作到位、安全操作规范（EXP-01）。
+25%
+地图质量分
+点云完整、栅格地图闭合良好无重影、地图文件双格式落盘（EXP-02）。
+30%
+导航执行分
+多点依序到达率、定位收敛后再出发、避障过程无碰撞（EXP-03）。
+30%
+识别与报告分
+检出率与阈值标定记录、巡检日报要素齐全、自主回充成功（EXP-04）。
+PIPELINE
+巡检闭环数据流
+每一环的输出是下一环的输入契约
+S1 · 建图
+点云 → 栅格地图
+3D 激光 utlidar/cloud 经 slam_toolbox 融合成 /map，Save 出 yaml+pgm、Serialize 出 posegraph。
+S2 · 定位
+地图 + 传感器 → 位姿
+AMCL 一簇粒子不断淘汰修正，输出 odom→map 短正，初始位姿用 2D Pose Estimate 给定。
+S3 · 导航
+位姿 + 巡检点 → 速度
+Nav2 全局规划 + 局部避障，waypoint_follower 按序下发目标，每点到达等收敛再走。
+S4 · 识别与报告
+图像 → 检测 → 日报
+巡检点触发拍照，YOLOv8/ONNX 输出框+置信度，脚本汇总成巡检日报并规划回充。
+REVIEW
+验收速览与常见疑问
+结课前对照打钩
+EXP-01 验收
+指令驱动四足运动正常：前进转向随令而动、站起趴下到位、状态话题持续刷新。
+EXP-02 验收
+生成可用巡检地图：栅格完整、闭合回路后无明显重影，yaml/pgm/posegraph 齐全。
+EXP-03 验收
+Go2 依序自主到达巡检点：全程不撞、每点出发前定位已收敛、顺序与编排一致。
+EXP-04 验收
+完成「建图-定位-巡检-识别-报告」闭环：日报要素齐全、识别有据、自主回充成功。
+FAQ 1
+没有真机也能学吗？
+能。本课全部基于开源栈，无真机时用 setup_local.sh 回环接口与仿真/录包完成大部分流程。
+FAQ 2
+为什么要先建图再导航？
+AMCL 定位的本质是「拿当前观测去已知地图里比对」，没有地图就没有可比对的参照物。
+FAQ 3
+Gazebo 里四足能走吗？
+unitree_ros 的 go2_description 在 Gazebo 只支持底层关节仿真、不支持完整行走——这是明确局限，课上讲清。
+FAQ 4
+检测漏检误检怎么办？
+两头治理：光照不足先补光，再标定 confidence 阈值——阈值调低多检也多误，调高少误也漏检。
+PATH
+学习路径
+32 学时建议节奏：动 → 图 → 路 → 眼
+STEP 01
+让狗动起来
+认识 Go2 硬件与巡检任务，装好 SDK 与驱动，速度指令与站立趴下全部走通。
+STEP 02
+给厂区画地图
+3D 激光点云逐帧拼接成栅格地图，闭合回路消除重影，双格式保存地图。
+STEP 03
+按路线巡逻
+AMCL 粒子收敛锁定位置，Nav2 规划+避障，多巡检点依序自主到达。
+STEP 04
+识读并交报告
+到点拍照、YOLO 圈出表计与异常，生成巡检日报，最后自主回充收工。
+IND-05 · 工业巡检应用场景
+32 学时 · 4 实验 · 基于 培训方案「课程5」与 unitree_sdk2py / unitree_ros2 / go2_ros2_sdk / Nav2 等开源项目改编
+开始 EXP-01
+回到顶部
+CAT 3 行业应用课程 · IND-05 工业巡检应用场景 · 教学用途

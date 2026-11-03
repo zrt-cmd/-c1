@@ -1,0 +1,285 @@
+SOURCE: https://aibittek.github.io/course_generate_agent/courses/cases/exp006a-elderly-companion/exp-09-full-verification/index.html
+TITLE: EXP-09 · 全功能验证 — 老人跌倒监护综合项目
+FETCHED: 2026-11-02T13:29:19.152537+00:00
+
+EXP-09 · 全功能验证 — 老人跌倒监护综合项目
+🧠 具身智能课程 ·
+教程首页
+综合项目
+/
+老人跌倒监护
+/ EXP-09
+本页目录
+01 问题引入：零件都好了，整机怎么验收
+02 原理通俗讲解：三级路考与体检清单
+03 关联知识点：三模式 · 五步手册 · 证据完整性
+04 实验目标
+05 实验环境与准备
+06 动画讲解：五步验收阶梯与内存预算
+07 互动讲解：三模式选型与验收沙盘
+08 实操步骤：Step 1～5 快速验证流程
+09 重点与易错点
+10 总结与思考
+CH1 · 需求与配置
+EXP-01 需求分析
+EXP-02 分层架构
+EXP-03 配置详解
+CH2 · 感知与交互
+EXP-04 语音交互
+EXP-05 检测与姿态
+EXP-06 跌倒状态机
+CH3 · 告警与验证
+EXP-07 告警证据链
+EXP-08 LLM·VLM
+EXP-09 全功能验证
+EXP-09 · 第 3 章 · 综合性 · 6 学时
+全功能验证：把 9 个实验拼成一台"能交付"的机器
+课程收官实验：用
+fall_app.py --mode camera/image/video
+三模式入口 + docs/03
+五步验证手册
+，完成 唤醒→对话→跌倒→询问→应答→告警→存档 全链路闭环。跑通
+env_check 环境自检 → --text 文本 → --mjpeg 音频 → camera 实时
+逐级路考，最后核验 runs/evidence 三件套（截图/.avi/events.jsonl）并做 pkill 四层资源清理 —— 这是课程所有实验的"集成验收标准"。
+难度 ⭐⭐⭐ · 6 学时
+--mode 三入口
+五步验证手册
+内存预算 2.7G
+证据三件套
+01
+问题引入：零件都好了，整机怎么验收
+前 8 个实验各自跑通了语音、检测、状态机、告警、LLM……但单测全绿 ≠ 整机能用：换个输入源就崩、拔了硬件不降级、跑完一晚磁盘满了。工程上最后一公里叫
+集成验收
+——不是"哪里坏了修哪里"，而是拿一份权威清单逐项打勾，直到能回答："这条链路，从唤醒到存档，
+完整走通过几次
+？"
+1
+Step 1 环境自检：依赖 7 库 + 模型 + 串口，全 OK 才准开机
+2
+Step 2 文本链路：--text 喂词，纯软件验证状态机
+3
+Step 3 音频链路：--mjpeg 真说话，验证唤醒/ASR/TTS
+4
+Step 4 故障画像 + Step 5 摄像头整机实时验收
+5
+Step 6 证据三件套 + pkill 四层清理收尾
+💡 一个类比
+这就是
+驾校路考
+：科目一先查体检报告（env_check），科目二在封闭场练基础动作（--text），科目三上真路（--mjpeg），最后路考官拿着评分表逐项打勾（五步手册）—— 顺序不能跳，跳了挂科（运行时崩溃）都不知道挂在哪。
+02
+原理通俗讲解：三级路考与体检清单
+三模式入口
+同一个司机，换三种"路况"
+fall_app.py 的 --mode camera/image/video 经
+FrameSource 统一抽象
+（read/isOpened/release）走同一主循环：image=cv2.imread 单张即退、video=VideoCapture 离线、camera=惰性导入 rclpy 订阅 ROS 话题。换模式只改一个参数 ——
+不是三份代码，是三种输入源插头
+。
+三级开发模式
+先自行车场，再上路
+文本→音频→摄像头是"最弱假设先跑通"：--text 只把
+text_mode
+置 True，输入源从 ALSA 换成 stdin 线程，
+状态机与回调链一字不改
+（docs/03 L5-L8）—— 所以文本模式验证过的逻辑在音频模式必然成立，音频只新增录音/识别/播放三个硬件变量，故障好定位。
+五步验证手册
+医生的"望闻问切"顺序
+docs/03 把验收拆成 Step1 自检→Step2 文本→Step3 音频→Step4 故障排查表（按概率排五类）→Step5 摄像头，每步都有"预期日志+判定标准"。
+级间有依赖
+：跳过 Step1 直接 Step3，模型缺失会 mid-stream 崩溃 —— 体检没过不能跑马拉松。
+证据完整性
+法庭上的"三件套"
+判定一次告警成功的充要条件：
+截图+视频+事件日志齐，且事件覆盖 FALLING→ASK→ALERT（或 CANCELLED）
+。前帧证明"跌倒前站着"、后帧证明"确实倒下了"，单帧会被"本来就躺着"骗过 —— 前后帧是最小可验证对，events.jsonl 则是可审计的推理轨迹。
+🔔 人文关怀与隐私底线
+验收同样克制：证据只在告警前后 5s、runs/ 全部 gitignore、testdata 视频不入库、可随时
+rm -rf runs/evidence/*.avi
+释放磁盘 —— 系统越"全能"，越要用数据最小化守住老人的居家隐私。
+03
+关联知识点：三模式 · 五步手册 · 证据完整性
+知识点
+内容
+源码锚点
+6.2.3 全链路闭环验证
+六阶段：唤醒（小飞小飞/文字）→对话（LLM）→跌倒（FALLING→LYING 1.5s+3s）→询问 ASK 12s 窗→应答 救命/没事→告警存档；每条迁移都要在证据里留下事件
+docs/03_开发模式与验证.md L22-L95；前置 5.1.2 六状态机
+2.2.1 三级开发模式
+--text 置 cfg["speech"]["text_mode"]=True → VoiceLoop 启动 stdin 喂词线程（daemon=True，Ctrl+C 随主进程退）；同一 feed_text 路由，文本/音频状态机完全一致
+apps/fall_video_demo.py L84-L87、L91、L132、L258-L266
+2.2.2 环境自检 env_check
+三类检查：7 依赖库动态 import（numpy/cv2/scipy/rknnlite/sherpa_onnx/serial/yaml）、模型/资源存在且非空（含 VLM 开关项与串口节点）、config_schema REQUIRED 键；绝不自动安装，缺失 exit 2
+common/env_check.py L30-L43、L45-L120、L115-L141；入口调用 fall_video_demo L60、fall_app L162
+三模式入口 & camera 时序
+--mode choices（fall_app L80-L81）+ _merge_args CLI 覆盖；camera 需先 ros2 launch depth_camera.launch.py，rclpy 惰性导入订阅 /ascamera_hp60c/camera_publisher/rgb0/image；wake_seen.wait() 唤醒后才检测（仅 camera+非 text）；读帧失败退避 0.2s 重试
+apps/fall_app.py L54-L70（atexit 兜底）、L80-L81、L230-L242、L354-L358、L370-L398；common/source.py L19-L88、common/ros2_camera.py L29/L64
+证据完整性与清理
+三件套（jpg 前后帧 /.avi 5s / events.jsonl）+ 覆盖 FALLING/ASK/ALERT(或/CANCELLED)；max_files=100 轮转；pkill 四层 aplay→llm_server→fall_video_demo→fall_app + pgrep 复核；stop_sig.wait_grace(1.0) 防 librknnrt 析构 abort
+fall_video_demo.py L267-L317（finally）、fall_app.py L409-L413（VideoWriter）；README L98-L101；docs/06 L77
+04
+实验目标
+能按硬件条件选择正确模式（无硬件 --text / 有声学件 --mjpeg / 有相机 camera），说清 FrameSource 如何统一三者
+能独立完成 唤醒→对话→跌倒→询问→应答→告警→存档 六阶段闭环，各留一份日志记录
+能排障三类高频问题：串口占用（log_server 抢 ACM0）、音频冲突（aplay 残留）、端口/内存（8088 vs 8080、VLM 同开 OOM）
+能按 docs/03 五步手册逐项打勾，输出通过/未通过/问题的验收表
+能核验证据三件套完整性并执行 pkill 四层清理，pgrep 复核零残留
+05
+实验环境与准备
+1
+硬件（实时）：小车 C1（RK3576+STM32F407）、HP60C 深度相机、XFM 六麦 /dev/ttyACM0、扬声器 plughw:3,0、告警串口 /dev/ttyUSB0；离线模式可只用板端
+2
+软件：Ubuntu 22.04 + ROS 2 Humble · venv
+/home/iflytek/ros2_venv/bin/python3
+（rknnlite 2.3.2 / sherpa-onnx 1.13.4 / opencv 4.11.0 / flask / pyserial）
+3
+模型齐套：yolov8n.rknn · pose_landmark_full.rknn · KWS/ASR/TTS 三组 onnx · RKLLM Qwen3.5；配置/脚本在 ros2_ws/src/xflz_eai_car1/app/elderly_companion/
+4
+测试素材：testdata/fall_slow_x264.mp4 拷入（不入库）；实时模式先准备两个终端与 source ROS 环境
+5
+开工前清场：pkill -9 aplay; pkill -f log_server; 检查 8080/8088 空闲、内存 ≥2.7G 空闲（vlm 默认关）
+06
+动画讲解：五步验收阶梯与内存预算
+五步验证手册（docs/03 L22-L95，级间依赖不可跳）
+Step1 env_check
+Step2 --text 文本
+Step3 --mjpeg 音频
+Step4 故障五类
+Step5 camera 整机
+每级"预期日志+判定标准"双确认；跳 Step1 → 模型缺失 mid-stream 崩（exit 2 本应拦住）
+内存预算（~2.7G 基线，oversize 即 OOM）
+ASR 128M
+LLM ~1.5G
+YOLO+姿态 500M
+TTS 600M
+VLM +1.3G → 3.8G 超限（默认 vlm.enabled:false 关掉这段虚线）
+证据三件套 + 四层清理（Step 6）
+pre.jpg + _post.jpg
+前帧证"站着"后帧证"倒了"
+annotated .avi
+前3s+后2s 时序证据
+events.jsonl
+须含 FALLING→ASK→ALERT/CANCELLED
+pkill ×4
+aplay→llm_server→demo→app
+判定充要: 三件套齐 + 事件覆盖 + pgrep -af "aplay|llm_server|fall_video_demo|fall_app" 无输出
+动画 9-1：左——五步手册的上行阶梯，绿色光点按 Step1→5 逐级爬升，Step4 故障画像用橙色标出（按概率排的五类问题）；右上——内存拼条：ASR+TTS+LLM+检测 ≈2.7G 打底，VLM 那段红色虚线一旦补上就冲破 3.8G，所以默认 vlm.enabled:false；右下——验收终点：证据三件套缺一不可，收尾 pkill 四层清场。
+07
+互动讲解：三模式选型与验收沙盘
+🕹️ 五步验收沙盘 · Accept Bench —— 逐个 Shift 跑 Step，故意跳步/开 VLM 看翻车现场
+▶ 执行下一步
+⏭ 跳过 Step1 直奔 Step3
+🧠 开 VLM 同跑
+🔌 模拟串口被占
+✅ 补齐证据+清理
+↺ 重置
+🔔 试试「跳步」再「开 VLM」
+跳步会在 Step3 以 exit 2 或 mid-stream 崩溃收场（自检本该拦住）；开 VLM 则内存拼条冲到 3.8G+ 触发 OOM —— 两个红灯都是讲义里的真实事故现场，对应"级间依赖"与"内存预算"两条注意事项。
+08
+实操步骤：Step 1～5 快速验证流程
+1
+Step 1 env_check 全 OK，无 MISSING/FAIL
+2
+Step 2 --text：小飞小飞→你好→视频跌倒→救命/没事逐项过
+3
+Step 3 清场后 --mjpeg：真语音唤醒，[diag] 录音 ≈50 帧/5s
+4
+Step 4 camera：先 ros2 launch 相机节点，再 fall_app 三模式整机跑
+5
+对照 docs/03 五步手册打勾，记录每步 Pass/Fail
+6
+Step 6 核验 runs/evidence 三件套 + pkill 四层 + pgrep 复核
+# 快速验证流程（docs/03 分步验证手册的落地命令）
+cd ~/ros2_ws/src/xflz_eai_car1/app/elderly_companion
+# Step 1: 环境自检（7 依赖库 + 模型文件 + 串口 + config 键）
+python3 common/env_check.py --config config/fall_config.yaml
+# 预期全部 [env] OK，末行 [env] 自检通过；任何 MISSING 先修再前进
+# Step 2: 离线视频全链路（--text 文本模式，无需硬件）
+python3 apps/fall_video_demo.py --video testdata/fall_slow_x264.mp4 --text
+# stdin: 小飞小飞 →[文本] 唤醒 → 你好 →[LLM 回复] → 视频跌倒 →ASK
+# stdin: 救命 →ASR 应答 x ALERT（多人也只应出现【一条】）／没事 →CANCELLED
+# Step 3: 音频全链路（先清残留！aplay 占 plughw:3,0、llm_server 占 ACM0/8080）
+pkill -9 aplay; pkill -f llm_server
+python3 apps/fall_video_demo.py --video testdata/fall_slow_x264.mp4 --mjpeg
+# 说「小飞小飞」→ 录音线程 plughw:4,0 → [diag] 录音 ~50帧/5s → 叮 → ASR/LLM/TTS
+# 浏览器 http://<板端IP>:8088/fall.mjpg 确认推流
+# Step 4: 实时摄像头（终端1 先起 ROS2 相机节点）
+source /opt/ros/humble/setup.bash && source ~/ros2_ws/install/setup.bash
+ros2 launch car1_peripherals depth_camera.launch.py
+# 终端2：
+python3 apps/fall_app.py --mode camera --mjpeg --save
+# 预期 === 老人跌倒监护启动（mode=camera）=== → wake_seen.wait() 等唤醒
+# 话题排查: ros2 topic hz /ascamera_hp60c/camera_publisher/rgb0/image
+# Step 6: 证据完整性 + 资源清理
+ls -la runs/evidence/
+# .jpg 截图 + .avi 视频 + events.jsonl 三件套
+grep -o '"to": *"[A-Z_]*"' runs/evidence/events.jsonl | sort -u
+# 覆盖 FALLING/ASK/ALERT 或 CANCELLED
+pkill -9 aplay; pkill -f llm_server; pkill -f fall_video_demo; pkill -f fall_app
+pgrep -af
+"aplay|llm_server|fall_video_demo|fall_app"
+# 预期无输出
+rm -rf runs/evidence/*.avi runs/evidence/*.jpg
+# 可选，释放磁盘
+💡 记录要点
+报告按 6 份证据交：env_check 截图、--text stdin 交互日志、--mjpeg 唤醒/ASR/TTS 流程日志、camera 实时推流+告警记录、五步手册 Pass/Fail 表、证据三件套+清理确认。评分占比里"全链路闭环记录"一项就值 40 分。
+09
+重点与易错点
+严格 Step1→5 顺序
+：每级用"上一步已通过"当前提，跳步等于在未知地基上盖楼
+离线也能完整验收
+：无相机/麦克风时 --text 把全链路跑通，camera 只是最后换插头
+单一开关切三模式
+：text_mode 一个布尔位换掉整个输入源，逻辑零分叉 —— 排查先查开关
+退出要温柔
+：Ctrl+C 后 stop_sig.wait_grace(1.0) 给 NPU 1 秒收尾，别抢在这 1 秒里 pkill -9
+现象
+原因
+解决
+env_check 报大片 MISSING 依赖库
+用了系统 python3 而非板端 venv
+/home/iflytek/ros2_venv/bin/python3 运行，或先激活 venv
+camera 模式无画面/输入源打开失败
+ROS2 相机节点没起，或 HP60C 未连接
+终端1 ros2 launch depth_camera.launch.py；ros2 topic hz 查话题
+唤醒后没有"录音线程"日志
+log_server 占着 /dev/ttyACM0，XFM 唤醒事件到不了
+pkill -f log_server 再重试；确认「XFM 硬件唤醒就绪」日志
+[diag] 录音只有 ~10 帧/5s
+设备停在监听态，流稀疏（XFM 固件/接线层，与代码无关）
+确认已唤醒（应 ~50 帧/5s）；仍稀疏则查 XFM 固件与接线
+播报无声
+aplay 残留独占 plughw:3,0
+pkill -9 aplay 后重启程序（ALSA 句柄排他）
+启动报端口冲突退出
+MJPEG 8088 与 LLM 8080/自定义配了同一端口
+改 config 的 server.port 或 llm.server.port，启动时会自动检测
+VLM+LLM 同开后 OOM
+2.7G 基线 + VLM 1.3G > 3.8G
+保持 model.vlm.enabled: false（默认）；4G 板先 free -h 预算
+多人时 ASR 应答出现多条
+monitor.on_asr 单次应答的 break 失效
+检查 fall/monitor.py on_asr 循环保证收敛（对应 EXP-06 窄表）
+runs/evidence/ 为空
+告警链路没走完整（没进 ALERT）
+补一遍 跌倒→ASK→救命→ALERT；确认目录可写
+10
+总结与思考
+✅ 完成成果
+六件交付
+env_check 通过报告、--text 交互日志、--mjpeg 语音流程日志、camera 实时+告警记录、五步手册验收表、证据三件套与四层清理确认。
+🧠 原理收获
+分层验收方法论
+"最弱假设先跑通"的三级开发模式为何能保证逐级不崩；证据判定为何要前后帧+事件日志三件套；单开关切模式背后的 FrameSource 抽象。
+🛠 技能收获
+整机排障四板斧
+venv 归因（伪 MISSING）、串口/音频设备占用排查（ACM0/ plughw:3,0）、端口与内存预算体检、pgrep/pkill 分层清理与磁盘回收。
+❓ 排障思路
+按层下钻
+先环境（env_check exit code）→ 再输入源（source.read/话题）→ 再时序（wake_seen/ask 窗口）→ 再进程残留（pgrep）—— 与五步手册同构，从下往上排查必然绕路。
+🟣 思考题 1
+为什么三级开发模式能保证"逐级升级不出错"？结合 docs/03 L7-L9（文本与音频走完全相同的状态机与回调链）解释文本模式验证过的逻辑为何在音频模式必然成立，再分析音频模式新增的 录音/识别/播放 三个硬件环节各自可能引入哪些新故障模式。
+🟣 思考题 2
+camera 模式启动后为什么要 loop.wake_seen.wait() 等硬件唤醒才开始检测（fall_app L354-L358），而 image/video 模式却自动开跑？结合 XFM 监听态不上送音频流的特性说明：若跳过等待直接检测，跌倒→ASK→应答这条链会错位在哪里？再想：一次完整告警该留"前帧+后帧"而非只存跌倒瞬间，为什么？
+CASE-03 · 老人跌倒监护 · EXP-09 全功能验证
+6 学时 · 综合性 · 基于 elderly_companion 实验讲义改编

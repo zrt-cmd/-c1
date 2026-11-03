@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP-03 · 摄像头配置与主从臂校准 — IND-01 具身智能端到端平台与基础</title>
+<link rel="stylesheet" href="../shared/tutorial.css">
+<style>
+:root{--theme:#0d9488;--theme-deep:#0f766e;--theme-bg:#f0fdfa;--theme-bd:#99f6e4}
+.vgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:15px;margin-top:14px}
+.vitem{background:#fff;border:1px solid #e2ece9;border-radius:14px;padding:13px}
+.vitem video{width:100%;border-radius:9px;background:#000;aspect-ratio:16/9}
+.vitem h4{font-size:14.5px;font-weight:800;margin:9px 0 5px;color:var(--theme-deep)}
+.vitem p{font-size:12.5px;color:#5b6b78;line-height:1.6}
+.sld{-webkit-appearance:none;appearance:none;width:100%;max-width:420px;height:7px;border-radius:6px;background:#d7e6e3;outline:none;margin:10px 0}
+.sld::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:20px;height:20px;border-radius:50%;background:var(--theme);border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.25);cursor:pointer}
+.sld::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:var(--theme);border:3px solid #fff;cursor:pointer}
+.img-pair{display:grid;gap:16px}
+.img-block{margin:14px 0;text-align:center}
+.img-block img{max-width:100%;height:auto;border:1px solid var(--border,#e2e8f0);border-radius:10px;background:#fff;box-shadow:0 4px 14px rgba(15,23,42,.07)}
+.img-block figcaption{margin-top:8px;font-size:12.5px;color:#5b6b78}
+@media (max-width:900px){.img-pair{grid-template-columns:1fr !important}}
+/* ── 五星学习法 · 课程分段 ── */
+.fivestar-note{font-size:13px;color:#5b6b78;margin-top:12px}
+.fs-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:14px}
+.fs-cell{border:1px solid var(--theme-bd);border-radius:12px;padding:10px 8px;text-align:center;background:var(--theme-bg)}
+.fs-cell .st{font-size:12.5px;font-weight:800;color:var(--theme-deep)}
+.fs-cell .tm{font-family:var(--font-mono,monospace);font-size:11px;color:#0f766e;margin-top:3px;font-weight:700}
+.fs-cell .ds{font-size:11.5px;color:#5b6b78;margin-top:4px;line-height:1.5}
+.seg{display:inline-block;font-size:11px;font-weight:700;font-family:var(--font-mono,monospace);background:var(--theme-bg);color:var(--theme-deep);border:1px solid var(--theme-bd);border-radius:99px;padding:2px 10px;margin-left:8px;vertical-align:middle;white-space:nowrap}
+.tl{width:100%;border-collapse:collapse;font-size:13px;margin-top:14px;background:#fff}
+.tl th,.tl td{border:1px solid #e2ece9;padding:7px 10px;text-align:left;vertical-align:top}
+.tl th{background:var(--theme-bg);color:var(--theme-deep);font-size:12.5px;white-space:nowrap}
+.tl .m{font-family:var(--font-mono,monospace);color:var(--theme-deep);font-weight:700;white-space:nowrap}
+@media(max-width:900px){.fs-grid{grid-template-columns:repeat(2,1fr)}}
+.anim3d-block{margin:30px 0;text-align:center}
+.anim3d-canvas{width:100%;border:1px solid var(--theme-bd,#e2e8f0);border-radius:14px;overflow:hidden;background:#111827;box-shadow:0 8px 28px rgba(15,23,42,.12);position:relative}
+.anim3d-hint{font-size:12.5px;color:#5b6b78;margin-top:8px}
+.anim3d-caption{font-size:13.5px;color:#5b6b78;margin-top:4px}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">🦾 IND-01 · <i>端到端平台与基础</i></div>
+  <div class="crumb"><a href="../../../index.html">总首页</a> / <a href="../../../index.html#ind">行业应用</a> / <a href="../index.html">IND-01</a> / EXP-03</div>
+</div>
+
+<div class="wrap">
+
+<aside class="side">
+  <h4>本页目录 · 五星学习法</h4>
+  <a href="#s0">00 课程节奏 · 8 段微课</a>
+  <a href="#s1" class="now">01 学习目标 ①聚焦问题</a>
+  <a href="#s2">02 原理讲解 ①聚焦 ②激活</a>
+  <a href="#s3">03 硬件与材料 ③示证新知</a>
+  <a href="#s4">04 步骤实践 ④应用新知</a>
+  <a href="#s5">05 关键命令 ④应用新知</a>
+  <a href="#s6">06 动画讲解 ③示证新知</a>
+  <a href="#s7">07 互动练习 ④应用新知</a>
+  <a href="#s8">08 常见问题 ⑤融会贯通</a>
+  <a href="#s9">09 拓展挑战 ⑤融会贯通</a>
+  <a href="#s10">10 思考题 ⑤融会贯通</a>
+  <h4>IND-01 · 四个实验</h4>
+  <a href="../exp-01-platform-setup/index.html">EXP-01 平台搭建</a>
+  <a href="../exp-02-arm-assembly/index.html">EXP-02 硬件组装</a>
+  <a href="../exp-03-arm-calibration/index.html">EXP-03 摄像头校准</a>
+  <a href="../exp-04-teleop-checkout/index.html">EXP-04 遥操作排查</a>
+</aside>
+
+<main class="content">
+
+<div class="exp-head">
+  <span class="code">EXP-03 · 第 04/05 章 · 验证性 · 8 学时</span>
+  <h1>摄像头配置与主从臂校准</h1>
+  <p class="desc">端到端的"感知端"和"执行端"要能互通语言，靠的都是<b>标定</b>：三路摄像头锁定插口别名，让画面永远知道自己来自哪个位置；四条臂逐一执行 <code>lerobot-calibrate</code>，录下 2047 中位基准与全行程 MIN/POS/MAX，把手感差异抹平。本课配 3 段校准讲解视频，做完后你的主从臂才能"指哪打哪"。</p>
+  <div class="meta">
+    <span class="tag hl">难度 ⭐⭐ · 8 学时</span>
+    <span class="tag">3 段校准视频</span><span class="tag">2047 中位基准</span>
+    <span class="tag">MIN/POS/MAX</span><span class="tag">JSON 校准文件</span>
+  </div>
+</div>
+
+<!-- 00 -->
+<section class="blk" id="s0">
+  <h2><span class="no">00</span>课程节奏：五星学习法 · 8 段微课（每段 ≤ 15 min）</h2>
+  <p>本实验按<b>五星学习法</b>组织：先用两个真实故障<b>聚焦问题</b>（摄像头换口致 cam_* 丢失、校准值偏差致遥操作动作变形），再<b>激活旧知</b>（EXP-01 udev 别名 + EXP-02 串口 + 编码器 0~4095），接着<b>示证新知</b>（硬件材料 + 坐标对应标定动画），然后动手<b>应用新知</b>锁摄像头口、校四条臂，最后借偏差判读与排障<b>融会贯通</b>。全程切成 <b>8 段微课、每段不超过 15 分钟</b>，段间停顿 1~2 分钟消化；纯讲授合计约 100 分钟，其余课时用于动手实操校准与个别辅导。</p>
+  <div class="fs-grid">
+    <div class="fs-cell"><div class="st">① 聚焦问题</div><div class="tm">课段 1 · 12 min</div><div class="ds">"摄像头换口致 cam_* 丢失"与"校准偏差致动作变形"两个故障引入</div></div>
+    <div class="fs-cell"><div class="st">② 激活旧知</div><div class="tm">课段 2 · 8 min</div><div class="ds">EXP-01 udev · EXP-02 串口 · 编码器 0~4095 三条旧知</div></div>
+    <div class="fs-cell"><div class="st">③ 示证新知</div><div class="tm">课段 3~4 · 27 min</div><div class="ds">硬件材料清单 + 主从臂坐标对应标定动画</div></div>
+    <div class="fs-cell"><div class="st">④ 应用新知</div><div class="tm">课段 5~7 · 40 min</div><div class="ds">锁摄像头口 + 校四条臂 + 偏差滑杆判读自测</div></div>
+    <div class="fs-cell"><div class="st">⑤ 融会贯通</div><div class="tm">课段 8 · 13 min</div><div class="ds">排障口诀 · 拓展挑战 · 思考题</div></div>
+  </div>
+  <table class="tl">
+    <tr><th>课段</th><th>五星阶段</th><th>时长</th><th>对应章节</th><th>本段任务</th></tr>
+    <tr><td class="m">课段 1</td><td>聚焦问题</td><td class="m">12 min</td><td>§01 + §02 前半</td><td>抛出"摄像头换口致 cam_* 丢失"与"校准偏差致遥操作动作变形"两个现场故障</td></tr>
+    <tr><td class="m">课段 2</td><td>激活旧知</td><td class="m">8 min</td><td>§02 后半</td><td>EXP-01 udev 别名·EXP-02 串口插拔·编码器 0~4095 三条旧知衔接</td></tr>
+    <tr><td class="m">课段 3</td><td>示证新知</td><td class="m">15 min</td><td>§03</td><td>对照实物清单确认三摄像头、四臂别名、校准 JSON 路径</td></tr>
+    <tr><td class="m">课段 4</td><td>示证新知</td><td class="m">12 min</td><td>§06</td><td>坐标对应标定动画，理解 POS 中位 + MIN/MAX 录程 + JSON 落盘</td></tr>
+    <tr><td class="m">课段 5</td><td>应用新知</td><td class="m">15 min</td><td>§04 步骤1~3 + §05 ①</td><td>三摄像头直连 + find-cameras + 写 udev 规则三条 cam_* 别名</td></tr>
+    <tr><td class="m">课段 6</td><td>应用新知</td><td class="m">15 min</td><td>§04 步骤4~6 + §05 ②</td><td>四条臂两阶段校准（基准→录程），异常输 c 重校</td></tr>
+    <tr><td class="m">课段 7</td><td>应用新知</td><td class="m">10 min</td><td>§07</td><td>标定偏差滑杆判读自测，全对方可进入下一实验</td></tr>
+    <tr><td class="m">课段 8</td><td>融会贯通</td><td class="m">13 min</td><td>§08~§10</td><td>排障口诀收口，挑战题与思考题拔高迁移</td></tr>
+  </table>
+  <p class="fivestar-note">讲课提示：课段 1/2 以讲授 + 提问为主；课段 3~4 用实物 + 动画；课段 5~6 边看视频边动手（校准视频后暂停让学员试掰臂）；课段 7 学员独立完成；课段 8 答疑拔高。段间停顿 1~2 分钟。</p>
+</section>
+
+<!-- 01 -->
+<section class="blk" id="s1">
+  <h2><span class="no">01</span>学习目标<span class="seg">课段 1 · 聚焦问题 · 12 min</span></h2>
+  <ul class="check">
+    <li>能按第 04 章完成三摄像头接入：<span class="ok">直连不走拓展坞</span>，用抓拍图分辨哪路是左/右/头</li>
+    <li>能读懂 <code>lerobot-find-cameras opencv</code> 输出并<span class="ok">核对 /dev/cam_left·right·head 三个别名</span></li>
+    <li>理解校准的两阶段流程：<span class="ok">2047 中位基准姿态 → 全行程录 MIN/POS/MAX</span></li>
+    <li>能独立校准四条臂（左/右从臂用 --robot，左/右主臂用 --teleop），参数不串</li>
+    <li>能查 JSON 校准文件，并判断<span class="ok">"细微差异正常、较大差异必须重校"</span>与输 'c' 重校的方法</li>
+  </ul>
+</section>
+
+<!-- 02 -->
+<section class="blk" id="s2">
+  <h2><span class="no">02</span>原理讲解：标定就是"主从对表"<span class="seg">课段 1 收尾 + 课段 2 · 激活旧知 · 8 min</span></h2>
+  <div class="tip amber"><span class="lab">❓ 聚焦问题（课段 1）</span>学员做校准时最常踩的两个坑：<b>① 摄像头换了 USB 口——cam_left/cam_right/cam_head 别名全丢</b>（ID_PATH 变了，udev 规则匹配不上）；<b>② 校准值偏差几十个点——遥操作时从臂动作就变形</b>（基准姿态没摆好、行程没掰到极限）。带着这两个故障看完全课——到课段 6 你会亲手让别名稳定、校准值精确。</div>
+  <p>标定（calibration）好比<b>两块对表</b>：主厨（主臂）和帮厨（从臂）各自站位不同、手长短有微差，开做前两人把"中在哪、两端到哪"对一遍，之后才谈得上跟随。电机角度没有出厂绝对刻度——它只知道"编码器读数 0~4095"，<b>哪个读数是中位、哪个是物理极限，只能靠你亲手掰一遍录下来</b>：</p>
+  <div class="flow">
+    <div class="step"><span class="n">1</span><b>定中位（POS）</b>：把臂摆到行程中间的标准姿态回车——此时全关节基准读数 ≈ <b>2047</b>（电机位置中间值）</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span><b>录全程（MIN/MAX）</b>：逐关节缓缓掰到最大最小，脚本边动边记 → 生成每关节的行程表</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span><b>落盘（JSON）</b>：id / drive_mode / homing_offset / range_min / range_max 写进校准文件，之后每次启动自动加载</div>
+  </div>
+  <p>摄像头侧的"标定"则是<b>身份绑定</b>：video0/3/5 是插拔顺序给的临时名，第 04 章要求<b>摄像头直连、不可用拓展坞、不可变动插口</b>——只有插口固定，ID_PATH 才稳定，udev 才能把"端口 7"永久翻译成 <code>/dev/cam_left</code>。至此感知端（cam_*）与执行端（arm_*）都有了稳定坐标，遥操作才有意义。</p>
+  <div class="tip teal"><span class="lab">↺ 激活旧知（课段 2）</span>回忆前两实验的三条旧知：① EXP-01 的 udev 规则用 <code>ATTRS{serial}</code> 匹配臂、用 <code>ENV{ID_PATH}</code> 匹配摄像头；② EXP-02 的"先电源后 USB"插拔顺序；③ 电机编码器读数范围 0~4095，中位约 2047。本课把这些<b>从装配层落到标定层</b>——你亲手把 0~4095 翻译成"中在哪、两端到哪"，落盘成 JSON。</div>
+  <p style="margin:14px 0 0;font-size:13px;color:#5b6b78">▍实物对照：校准手法与摄像头端口分配</p>
+  <div class="img-pair" style="grid-template-columns:repeat(2,1fr)">
+    <figure class="img-block" style="margin:10px 0 0">
+      <img src="./images/photo-calibration-hand1.jpeg" alt="手动掰臂校准实物图" loading="lazy" decoding="async">
+      <figcaption>(a) 校准手法 · 人手握住臂末端，逐关节掰到 MIN/MAX 录程——2047 中位基准对齐后落盘 JSON</figcaption>
+    </figure>
+    <figure class="img-block" style="margin:10px 0 0">
+      <img src="./images/photo-rear-panel-ports.png" alt="主机背面摄像头端口分配标注图" loading="lazy" decoding="async">
+      <figcaption>(b) 主机背面端口分配 · <b>左手相机 / 右手相机 / 头部相机</b>各占固定 USB 口——插口固定才能让 ID_PATH 稳定</figcaption>
+    </figure>
+  </div>
+  <div style="margin-top:20px">
+    <h3 style="font-size:15px;color:var(--theme-deep);font-weight:800;margin:0 0 8px">▍命令与日志输出（摘自 05-LZ-XL01主从臂校准）</h3>
+    <p style="margin:0 0 10px;font-size:13px;color:#5b6b78">先按《03-LZ-XL01机械臂串口》拿到四条臂的稳定串口别名，再按下述命令逐一校准。⚠️ 下以 <b>左从臂</b> 为例展开日志，其余三条臂仅 <code>--port</code> 与 <code>--id</code> 不同。</p>
+
+    <h4 style="font-size:13.5px;color:var(--theme-deep);margin:12px 0 4px">① 环境与权限（每次校准前先执行）</h4>
+    <pre><span class="c"># 四条臂的稳定串口（见 03-LZ-XL01机械臂串口）</span>
+/dev/arm_slave_left   <span class="c"># 从臂左</span>
+/dev/arm_slave_right  <span class="c"># 从臂右</span>
+/dev/arm_master_left  <span class="c"># 主臂左</span>
+/dev/arm_master_right <span class="c"># 主臂右</span>
+
+<span class="c"># 进入环境并放开权限（每终端执行一次）</span>
+conda activate lerobot
+sudo chmod 666 /dev/arm_*</pre>
+
+    <h4 style="font-size:13.5px;color:var(--theme-deep);margin:12px 0 4px">② 左从臂校准（so101_follower）</h4>
+    <pre>lerobot-calibrate \
+  --robot.type=so101_follower  \
+  --robot.port=/dev/arm_slave_left \
+  --robot.id=left_follower_arm</pre>
+    <p style="font-size:12.5px;color:#5b6b78;margin:4px 0 6px">执行后先出现连接日志，提示<b>将机械臂移动至基准姿态后按回车</b>；第二步把各关节缓缓掰到最大最小，再回车即写入 MIN/POS/MAX：</p>
+    <pre><span class="y">INFO ... calibrate.py:74 {'robot': {'calibration_dir': None, 'id': 'left_follower_arm',
+    'port': '/dev/arm_slave_left', 'use_degrees': False}, 'teleop': None}
+INFO ... follower.py:104 left_follower_arm SO101Follower connected.
+INFO ... follower.py:121 Running calibration of left_follower_arm SO101Follower
+Move left_follower_arm SO101Follower to the middle of its range of motion and press ENTER....
+Move all joints sequentially through their entire ranges of motion.
+Recording positions. Press ENTER to stop...
+-------------------------------------------
+NAME            |    MIN |    POS |    MAX
+shoulder_pan    |    859 |   1982 |   2740
+shoulder_lift   |    850 |    864 |   3189
+elbow_flex      |    947 |   3141 |   3142
+wrist_flex      |    940 |   2955 |   3216
+wrist_roll      |   1142 |   1987 |   2763
+gripper         |   2046 |   2082 |   3264</span></pre>
+    <p style="font-size:12.5px;color:#5b6b78;margin:4px 0 10px">其中 <b>2047 为电机位置中间值</b>（未校准被自动置中时全为 2047）。每次校准数值有细小波动属正常；<b>若出现较大数值差异，说明校准有问题，需重新执行</b>。</p>
+
+    <h4 style="font-size:13.5px;color:var(--theme-deep);margin:12px 0 4px">③ 右从臂 / 主臂校准（仅换 --port 与 --id）</h4>
+    <pre><span class="c"># 右从臂：follower -> --port=/dev/arm_slave_right --id=right_follower_arm</span>
+lerobot-calibrate \
+  --robot.type=so101_follower  \
+  --robot.port=/dev/arm_slave_right \
+  --robot.id=right_follower_arm
+
+<span class="c"># 左主臂：leader -> --teleop.type=so101_leader --teleop.port --teleop.id</span>
+lerobot-calibrate \
+  --teleop.type=so101_leader  \
+  --teleop.port=/dev/arm_master_left  \
+  --teleop.id=left_leader_arm
+
+<span class="c"># 右主臂：--teleop.port=/dev/arm_master_right --teleop.id=right_leader_arm</span>
+lerobot-calibrate \
+  --teleop.type=so101_leader  \
+  --teleop.port=/dev/arm_master_right  \
+  --teleop.id=right_leader_arm</pre>
+    <p style="font-size:12.5px;color:#5b6b78;margin:4px 0 8px">主臂用 <code>--teleop.type/--teleop.port/--teleop.id</code>（leader），从臂用 <code>--robot.type/--robot.port/--robot.id</code>（follower）——<b>参数前缀和类型不能串</b>。主臂连接日志会打 <code>left_leader_arm SO101Leader connected.</code>，日志内 <code>--calibrate</code>/`--partial rotate 参数表同上。</p>
+
+    <h4 style="font-size:13.5px;color:var(--theme-deep);margin:12px 0 4px">④ 校准数据异常：输 c 重新校准</h4>
+    <pre><span class="c">连接后若出现"use existing calibration file or type 'c' to rerun"}，输入大小写</span>
+lerobot-calibrate ... <span class="c">同上命令</span>
+<span class="y">INFO ... Press ENTER to use provided calibration file ... or type 'c' and press ENTER to run calibration:</span>
+<span class="g">c</span></pre>
+    <p style="font-size:12.5px;color:#5b6b78;margin:4px 0 8px">输入 <b>c</b> 回车后进入正常校准流程（先摆基准回车、再掰全程回车）。</p>
+
+    <h4 style="font-size:13.5px;color:var(--theme-deep);margin:12px 0 4px">⑤ 校准数据查看（JSON）</h4>
+    <pre><span class="c">主臂校准文件：</span>
+/home/lz-xl01/.cache/huggingface/lerobot/calibration/teleoperators/so101_leader/
+    left_leader_arm.json
+    right_leader_arm.json
+
+<span class="c">从臂校准文件：</span>
+/home/lz-xl01/.cache/huggingface/lerobot/calibration/teleoperators/so101_leader/
+    left_follower_arm.json
+    right_follower_arm.json
+
+<span class="c">示例 right_leader_arm.json：</span>
+{
+    "shoulder_pan" : { "id": 1, "drive_mode": 0, "homing_offset": -1499, "range_min": 972,  "range_max": 3363 },
+    "shoulder_lift": { "id": 2, "drive_mode": 0, "homing_offset": 1569,  "range_min": 818,  "range_max": 3192 },
+    "elbow_flex"   : { "id": 3, "drive_mode": 0, "homing_offset": -1817, "range_min": 827,  "range_max": 3033 },
+    "wrist_flex"   : { "id": 4, "drive_mode": 0, "homing_offset": -881,  "range_min": 1028, "range_max": 3350 },
+    "wrist_roll"   : { "id": 5, "drive_mode": 0, "homing_offset": -218,  "range_min": 1100, "range_max": 3183 },
+    "gripper"      : { "id": 6, "drive_mode": 0, "homing_offset": -1946, "range_min": 1999, "range_max": 3265 }
+}</pre>
+  </div>
+</section>
+
+<!-- 03 -->
+<section class="blk" id="s3">
+  <h2><span class="no">03</span>硬件与材料<span class="seg">课段 3 · 示证新知 · 15 min</span></h2>
+  <table>
+    <thead><tr><th>对象</th><th>数量</th><th>本课要求</th></tr></thead>
+    <tbody>
+      <tr><td>USB 摄像头（左/右/头）</td><td>3</td><td>插<b>主机背面</b>指定端口（7 / 6 / 1），直连不可用拓展坞，插后不再变动</td></tr>
+      <tr><td>从臂（follower）</td><td>2</td><td>/dev/arm_slave_left·right，so101_follower 校准</td></tr>
+      <tr><td>主臂（leader）</td><td>2</td><td>/dev/arm_master_left·right，so101_leader 校准</td></tr>
+      <tr><td>终端与权限</td><td>—</td><td>conda activate lerobot；sudo chmod 666 /dev/arm_* 后再校准</td></tr>
+      <tr><td>参考视频</td><td>3 段</td><td>主臂校准讲解版 / 从臂校准讲解版 / 从臂校准日志版</td></tr>
+    </tbody>
+  </table>
+  <div class="tip teal" style="margin-top:14px"><span class="lab">◆ 摄像头检测结果</span><code>lerobot-find-cameras opencv</code> 输出三路：<b>Camera #0</b> → /dev/video0（左手）、<b>#1</b> → /dev/video3（右手）、<b>#2</b> → /dev/video5（头部），格式 YUYV 640×480@30。打开 <code>outputs/captured_images</code> 看三张抓拍图即可分辨位置。</div>
+  <p style="margin:14px 0 0;font-size:13px;color:#5b6b78">▍实物对照：摄像头端口分配与校准现场</p>
+  <div class="img-pair" style="grid-template-columns:repeat(2,1fr)">
+    <figure class="img-block" style="margin:10px 0 0">
+      <img src="./images/photo-rear-panel-ports.png" alt="主机背面 USB 端口标注：左手/右手/头部相机" loading="lazy" decoding="async">
+      <figcaption>(a) 主机背面端口 · 三路摄像头各占固定 USB 口——不可走拓展坞、不可换口</figcaption>
+    </figure>
+    <figure class="img-block" style="margin:10px 0 0">
+      <img src="./images/photo-calibration-hand2.jpeg" alt="臂校准现场实物图" loading="lazy" decoding="async">
+      <figcaption>(b) 校准现场 · 人手握住臂末端逐关节掰全程，录下 MIN/POS/MAX 落盘 JSON</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- 04 -->
+<section class="blk" id="s4">
+  <h2><span class="no">04</span>步骤实践：先锁摄像头，再校四条臂<span class="seg">课段 5~6 · 应用新知 · 2×15 min</span></h2>
+  <div class="flow">
+    <div class="step"><span class="n">1</span>三摄像头直连主机背面指定端口；lerobot-find-cameras opencv 检出 video0/3/5</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">2</span>打开 outputs/captured_images 看三张抓拍图分辨左右头；udevadm info 查 ID_PATH</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">3</span>写 99-lerobot-cameras.rules 三条别名并重载 → cam_left / cam_right / cam_head 就位</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">4</span>从臂校准：左/右 so101_follower，摆基准（≈2047）回车 → 全行程录 MIN/POS/MAX</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">5</span>主臂校准：左/右 so101_leader（--teleop.* 参数），同两阶段流程</div>
+    <div class="arr"></div>
+    <div class="step"><span class="n">6</span>核对 JSON；异常时在提示处输 <b>c</b> 重新校准</div>
+  </div>
+  <div class="vgrid">
+    <div class="vitem">
+      <video controls preload="metadata" playsinline poster="../../../../media/industry/ind01-endtoend-platform/exp-03-arm-calibration/videos/主臂校准讲解版-poster.jpg" src="../../../../media/industry/ind01-endtoend-platform/exp-03-arm-calibration/videos/主臂校准讲解版.mp4"></video>
+      <h4>① 主臂校准讲解版</h4>
+      <p>主臂（leader）两阶段校准全程讲解：基准姿态怎么摆、行程怎么掰、日志怎么看。</p>
+    </div>
+    <div class="vitem">
+      <video controls preload="metadata" playsinline poster="../../../../media/industry/ind01-endtoend-platform/exp-03-arm-calibration/videos/从臂校准讲解版-poster.jpg" src="../../../../media/industry/ind01-endtoend-platform/exp-03-arm-calibration/videos/从臂校准讲解版.mp4"></video>
+      <h4>② 从臂校准讲解版</h4>
+      <p>从臂（follower）校准讲解：--robot.* 参数、中位 2047 确认与逐关节录程手法。</p>
+    </div>
+    <div class="vitem">
+      <video controls preload="metadata" playsinline poster="../../../../media/industry/ind01-endtoend-platform/exp-03-arm-calibration/videos/从臂校准日志版-poster.jpg" src="../../../../media/industry/ind01-endtoend-platform/exp-03-arm-calibration/videos/从臂校准日志版.mp4"></video>
+      <h4>③ 从臂校准日志版</h4>
+      <p>逐行对照校准日志：connected → 中位提示 → Recording positions → MIN/POS/MAX 表。</p>
+    </div>
+  </div>
+  <div class="img-pair" style="grid-template-columns:repeat(2,1fr);margin-top:14px">
+    <figure class="img-block" style="margin:0">
+      <img src="./images/photo-calibration-hand3.jpeg" alt="臂校准逐关节掰程实物图" loading="lazy" decoding="async">
+      <figcaption>(a) 校准实录 · 逐关节掰到极限位置录 MIN/MAX，红线为电机通信排线</figcaption>
+    </figure>
+    <figure class="img-block" style="margin:0">
+      <img src="./images/photo-calibration-hand4.jpeg" alt="主臂全臂校准定位实物图" loading="lazy" decoding="async">
+      <figcaption>(b) 主臂校准 · 人手定位臂末端摆基准姿态（≈2047），回车后进入录程</figcaption>
+    </figure>
+  </div>
+  <div class="tip amber"><span class="lab">⚠ 两别踩</span>① 摄像头<b>不能走拓展坞</b>、不能换口——换了 ID_PATH 就变，别名全失效；② 每次开机若提示已有校准文件，直接回车是沿用旧值，<b>要重校必须输 c 回车</b>。</div>
+</section>
+
+<!-- 05 -->
+<section class="blk" id="s5">
+  <h2><span class="no">05</span>关键命令：calibrate 四臂与重校<span class="seg">随课段 5 / 6 对照使用</span></h2>
+  <pre><span class="c"># ① 摄像头搜索与分辨（第 04 章）</span>
+<span class="g">conda</span> activate lerobot
+<span class="g">rm</span> -rf /home/lz-xl01/lerobot-0.4.1/outputs/captured_images
+<span class="g">lerobot-find-cameras</span> opencv
+<span class="c">#   Camera #0 → /dev/video0 · #1 → /dev/video3 · #2 → /dev/video5（YUYV 640×480@30）</span>
+<span class="g">udevadm</span> info --query=all --name=/dev/video0     <span class="c"># 查 ID_PATH，核对 cam_head 等别名</span>
+
+<span class="c"># ② 从臂校准（第 05 章 2）——左右各一次，只换 port/id</span>
+<span class="g">sudo</span> chmod 666 /dev/arm_*
+<span class="g">lerobot-calibrate</span> \
+  <span class="y">--robot.type=so101_follower</span> \
+  <span class="y">--robot.port=/dev/arm_slave_left</span> \
+  <span class="y">--robot.id=left_follower_arm</span>
+<span class="c">#   右从臂：--robot.port=/dev/arm_slave_right --robot.id=right_follower_arm</span>
+
+<span class="c"># ③ 主臂校准（第 05 章 3）——注意用 --teleop.* 参数</span>
+<span class="g">lerobot-calibrate</span> \
+  <span class="y">--teleop.type=so101_leader</span> \
+  <span class="y">--teleop.port=/dev/arm_master_left</span> \
+  <span class="y">--teleop.id=left_leader_arm</span>
+<span class="c">#   右主臂：--teleop.port=/dev/arm_master_right --teleop.id=right_leader_arm</span>
+
+<span class="c"># ④ 两阶段交互：摆基准回车 → 逐关节掰全程 → 回车出表</span>
+<span class="y">Move … to the middle of its range of motion and press ENTER....</span>
+<span class="y">Move all joints sequentially through their entire ranges of motion. Recording positions. Press ENTER to stop...</span>
+<span class="y">NAME | MIN | POS | MAX   ← 初始全 2047（电机位置中间值），录完如 859|1982|2740</span>
+
+<span class="c"># ⑤ 重新校准：提示处输 c 回车（直接回车=沿用旧文件）</span>
+<span class="y">Press ENTER to use provided calibration file associated with the id … or type 'c' and press ENTER to run calibration:</span>
+
+<span class="c"># ⑥ 校准数据位置（第 05 章 5）</span>
+<span class="c">#   主臂 …/calibration/teleoperators/so101_leader/*.json</span>
+<span class="c">#   从臂 …/calibration/robots/so101_follower/*.json</span>
+<span class="c">#   字段例：{"id":1,"drive_mode":0,"homing_offset":-517,"range_min":854,"range_max":3266}</span></pre>
+  <div class="tip teal" style="margin-top:14px"><span class="lab">◆ 两阶段交互</span>执行 <code>lerobot-calibrate</code> 后终端会提示：<b>"Move … to the middle of its range of motion and press ENTER"</b> → 摆好基准姿态回车 → <b>"Move all joints sequentially through their entire ranges…"</b> → 逐关节掰全程再回车 → 输出 <b>NAME | MIN | POS | MAX</b> 表。若需重校，在提示处输 <code>c</code> 回车（直接回车=沿用旧文件）。</div>
+</section>
+
+<!-- 06 -->
+<section class="blk" id="s6">
+  <h2><span class="no">06</span>动画讲解：主从臂坐标对应标定<span class="seg">课段 4 · 示证新知 · 12 min</span></h2>
+  <p class="lead">下图上半是主臂、下半是从臂：同一个关节在两块"表"上各自录 MIN/POS/MAX，中位对齐后，主臂掰多少、从臂就跟多少：</p>
+  <div class="anim-box">
+    <svg viewBox="0 0 720 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="主从臂标定坐标对应动画">
+      <rect x="8" y="8" width="704" height="324" rx="12" fill="#111827" stroke="#334155"/>
+      <text x="360" y="34" text-anchor="middle" font-size="13.5" font-weight="700" fill="#5eead4">主从两块"表"对齐 · 2047 中位 ↔ 2047 中位</text>
+
+      <!-- 主臂刻度条 -->
+      <text x="60" y="72" font-size="12" fill="#7dd3fc" font-weight="700">主臂 leader（记录侧）</text>
+      <rect x="60" y="84" width="600" height="26" rx="8" fill="#1e293b" stroke="#38bdf8" stroke-width="1.6"/>
+      <g font-size="9.5" fill="#64748b" text-anchor="middle">
+        <text x="60" y="126">MIN 919</text><text x="360" y="126">POS 2047（中位基准）</text><text x="660" y="126">MAX 3209</text>
+      </g>
+      <line x1="360" y1="84" x2="360" y2="110" stroke="#5eead4" stroke-width="2"/>
+      <!-- 主臂游标 -->
+      <circle cx="360" cy="97" r="7" fill="#38bdf8">
+        <animate attributeName="cx" values="80;360;640;360;80" dur="7s" repeatCount="indefinite"/>
+      </circle>
+
+      <!-- 对应光束 -->
+      <g stroke="#5eead4" stroke-width="2" stroke-dasharray="6 6">
+        <line x1="360" y1="118" x2="360" y2="212">
+          <animate attributeName="stroke-dashoffset" values="0;-24" dur="1.2s" repeatCount="indefinite"/>
+        </line>
+      </g>
+      <text x="470" y="170" font-size="10.5" fill="#5eead4">同一关节 · 同一物理角度</text>
+      <text x="470" y="186" font-size="10.5" fill="#64748b">中位对齐后，读数差异 = homing_offset</text>
+
+      <!-- 从臂刻度条 -->
+      <text x="60" y="226" font-size="12" fill="#fde68a" font-weight="700">从臂 follower（跟随侧）</text>
+      <rect x="60" y="238" width="600" height="26" rx="8" fill="#1e293b" stroke="#fbbf24" stroke-width="1.6"/>
+      <g font-size="9.5" fill="#64748b" text-anchor="middle">
+        <text x="60" y="280">MIN 859</text><text x="360" y="280">POS 1982 ≈ 2047</text><text x="660" y="280">MAX 2740</text>
+      </g>
+      <line x1="360" y1="238" x2="360" y2="264" stroke="#5eead4" stroke-width="2"/>
+      <!-- 从臂游标跟随（延迟） -->
+      <circle cx="360" cy="251" r="7" fill="#fbbf24">
+        <animate attributeName="cx" values="80;360;640;360;80" dur="7s" begin="0.35s" repeatCount="indefinite"/>
+      </circle>
+
+      <text x="360" y="312" text-anchor="middle" font-size="10.5" fill="#94a3b8">录程：逐关节掰到 MIN/MAX → JSON 落盘 range_min/range_max/homing_offset → 遥操作按表映射</text>
+    </svg>
+  </div>
+  <div class="anim-cap">动画 3-1｜上：主臂游标在 MIN–POS–MAX 表上扫动；下：从臂游标延迟 0.35s 跟随——两表中位（2047 基准）对齐后，读数差异由 homing_offset 补偿，这正是标定的数学本质</div>
+
+  <p class="lead" style="margin-top:24px">下面是<b>主从臂 3D 联动模型</b>：拖动滑杆控制主臂（左侧，蓝色）各关节角度，从臂（右侧，琥珀色）会实时跟随——模拟遥操作中 leader-follower 的映射关系：</p>
+  <div class="anim3d-block">
+    <div id="scene-master-slave" class="anim3d-canvas" style="height:400px"></div>
+    <p class="anim3d-hint">🖱 拖拽旋转视角 · 滑杆控制主臂 · 从臂自动跟随</p>
+    <p class="anim3d-caption">模型 3-2｜主臂（蓝）拖动 → 从臂（琥珀）跟随，模拟 SO100 遥操作 leader-follower 映射</p>
+  </div>
+</section>
+
+<!-- 07 -->
+<section class="blk" id="s7">
+  <h2><span class="no">07</span>互动练习：标定偏差滑杆判读<span class="seg">课段 7 · 应用新知 · 10 min</span></h2>
+  <p class="lead">文档说"每次校准可能会有细微数值变化，如出现较大数值差异，则说明校准有问题"。拖动滑杆设定本次与上次校准的偏差，看判读结果：</p>
+  <div class="ix-panel">
+    <div class="ix-title">偏差判读台 · 该不该重新校准？</div>
+    <div class="ctl-row">
+      <button class="btn ghost" onclick="setJoint('shoulder_pan')">shoulder_pan</button>
+      <button class="btn ghost" onclick="setJoint('elbow_flex')">elbow_flex</button>
+      <button class="btn ghost" onclick="setJoint('gripper')">gripper</button>
+    </div>
+    <div class="ctl-row" style="flex-direction:column;align-items:flex-start;gap:4px">
+      <label style="font-size:13px;color:#5b6b78">本次 Record MIN 与上次 JSON range_min 的偏差：<b id="devVal" style="color:var(--theme-deep)">40</b> counts（量程 0~4095）</label>
+      <input class="sld" type="range" min="0" max="400" value="40" step="10" id="devSlider" oninput="judgeDev()">
+    </div>
+    <div class="io" id="devIo"><span class="dim">// 调滑杆看判读；先选一个关节名</span>
+<span class="dim">基准参考（左从臂实测）：shoulder_pan 859|1982|2740 · elbow_flex 947|3141|3142 · gripper 2046|2082|3264</span></div>
+  </div>
+</section>
+
+<!-- 08 -->
+<section class="blk" id="s8">
+  <h2><span class="no">08</span>常见问题<span class="seg">课段 8 · 融会贯通 · 13 min</span></h2>
+  <ul class="check">
+    <li><span class="ok">find-cameras 只找到 1~2 个摄像头</span>：有相机走了拓展坞或没插指定端口；回第 04 章"直连 + 按接口插入"重插再来</li>
+    <li><span class="ok">起步表全是 2047 不动</span>：还没进录程阶段——中位回车后要"逐关节掰全程"，再按 ENTER 结束</li>
+    <li><span class="ok">校准提示 PermissionError</span>：先 <code>sudo chmod 666 /dev/arm_*</code> 再执行（第 05 章每条命令前都有这行）</li>
+    <li><span class="ok">想要重校却直接沿用旧值</span>：提示处必须输 <b>c</b> 回车；直接回车是使用已有校准文件</li>
+    <li><span class="ok">左右臂参数抄混</span>：从臂永远 <code>--robot.*</code> / so101_follower、主臂永远 <code>--teleop.*</code> / so101_leader，port/id 左右严格对应</li>
+    <li><span class="ok">两次校准数值差异很大</span>：基准姿态没摆到位或行程没掰满——文档明确"出现较大数值差异……重新执行操作"</li>
+  </ul>
+  <div class="tip amber"><span class="lab">💡 判读尺度</span>细微抖动（几十 counts 内）属于正常装配回差；一个关节的行程跨度（MAX−MIN）约一两千 counts，如果偏差大到"行程都变了"，基本是没掰满或基准没对准。</div>
+</section>
+
+<!-- 09 -->
+<section class="blk" id="s9">
+  <h2><span class="no">09</span>拓展挑战<span class="seg">课段 8 · 融会贯通</span></h2>
+  <div class="tip violet"><span class="lab">🚀 挑战一：建四臂校准档案</span>把四条臂的六关节 MIN/POS/MAX 表（左/右从臂、左/右主臂的文档实测值见第 05 章）抄录成一张 CSV，和你自己实测值做差分，画出"哪条臂哪关节回差最大"。</div>
+  <div class="tip violet"><span class="lab">🚀 挑战二：手改 JSON 观察后果</span>备份 left_leader_arm.json 后，把某个关节 range_min 人为改小 200，启动遥操作观察从臂越界行为，再还原文件——用实验理解 range_min/range_max 的限位保护意义。</div>
+</section>
+
+<!-- 10 -->
+<section class="blk" id="s10">
+  <h2><span class="no">10</span>思考题<span class="seg">课段 8 · 融会贯通</span></h2>
+  <div class="tip violet"><span class="lab">📝 思考题 1</span>为什么中位基准取 2047 而不是 0？（提示：12 位编码器量程 0~4095，中位留出两侧对称行程）如果把臂摆到极限位置再回车"定中位"，后续遥操作会发生什么？</div>
+  <div class="tip violet"><span class="lab">📝 思考题 2</span>第 04 章为什么禁止摄像头过拓展坞、且规定"不可变动摄像头插口"？如果实训室临时把头部相机换到别的口，哪些 udev 规则会失效、哪个实验环节最先报错？</div>
+</section>
+
+<nav class="expnav">
+  <a class="prev" href="../exp-02-arm-assembly/index.html"><span class="lb">← 上一个实验</span>EXP-02 机械臂硬件组装</a>
+  <a class="next" href="../exp-04-teleop-checkout/index.html"><span class="lb">下一个实验 →</span>EXP-04 遥操作自检与故障排查</a>
+</nav>
+
+<footer>
+  <span>IND-01 · 具身智能端到端平台与基础 · EXP-03 摄像头配置与主从臂校准</span>
+  <span>8 学时 · 验证性 · 基于 LZ-XL01 指导文档第 04 章《摄像头》、第 05 章《主从臂校准》改编</span>
+</footer>
+
+</main>
+</div>
+
+<script>
+// 标定偏差滑杆判读
+var curJoint='shoulder_pan';
+var baseMin={'shoulder_pan':859,'elbow_flex':947,'gripper':2046};
+function setJoint(j){
+  curJoint=j;
+  document.getElementById('devIo').innerHTML='<span class="dim">// 已选关节：'+j+'（上次 range_min='+baseMin[j]+'）</span>\n<span class="dim">拖动下方滑杆设定偏差，自动判读</span>';
+  judgeDev();
+}
+function judgeDev(){
+  var v=parseInt(document.getElementById('devSlider').value,10);
+  document.getElementById('devVal').textContent=v;
+  var io=document.getElementById('devIo');
+  var minNow=baseMin[curJoint]+v;
+  var head='<span class="dim">// '+curJoint+'：上次 range_min='+baseMin[curJoint]+'，本次 Record MIN='+minNow+'（偏差 '+v+'）</span>\n';
+  if(v<=60){
+    io.innerHTML=head+'<span class="ok">✔ 细微数值变化，属正常 —— 文档：每次校准可能会有细微数值变化</span>\n<span class="dim">可沿用本次校准结果，JSON 自动更新 range_min</span>';
+  }else if(v<=200){
+    io.innerHTML=head+'<span class="warn">⚠ 偏差中等：检查是否基准姿态没摆到位、录程没掰满</span>\n<span class="dim">建议复核一次该关节行程，再决定是否输 c 重校</span>';
+  }else{
+    io.innerHTML=head+'<span class="bad">✘ 较大数值差异 → 校准有问题，必须重新执行操作</span>\n<span class="dim">处置：重跑 lerobot-calibrate，在提示处输 c 回车进入重校流程</span>';
+  }
+}
+</script>
+<script src="../shared/tutorial.js" defer></script>
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.180.0/build/three.module.js",
+               "three/addons/": "https://unpkg.com/three@0.180.0/examples/jsm/" } }
+</script>
+<script type="module">
+  import * as THREE from 'three';
+  import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+  function buildArm(colorScheme) {
+    // 返回 { root, j1, j2, j3, j4, j5, fingerL, fingerR }
+    const mat = (c, m=.4, r=.5) => new THREE.MeshStandardMaterial({color:c,metalness:m,roughness:r});
+    const c = colorScheme;
+    const root = new THREE.Group();
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(.35,.42,.1,24), mat(0x1e293b,.6,.3));
+    base.position.y=.05; base.castShadow=true; root.add(base);
+    const j1=new THREE.Group(); j1.position.y=.1; root.add(j1);
+    const j1m=new THREE.Mesh(new THREE.CylinderGeometry(.16,.18,.22,20),mat(c.j1)); j1m.position.y=.11;j1m.castShadow=true;j1.add(j1m);
+    const j2=new THREE.Group(); j2.position.y=.22; j1.add(j2);
+    const j2m=new THREE.Mesh(new THREE.CylinderGeometry(.14,.15,.2,20),mat(c.j2)); j2m.rotation.z=Math.PI/2;j2m.castShadow=true;j2.add(j2m);
+    const ua=new THREE.Mesh(new THREE.BoxGeometry(.1,.9,.1),mat(c.link,.5,.4)); ua.position.y=.5;ua.castShadow=true;j2.add(ua);
+    const j3=new THREE.Group(); j3.position.y=1.0; j2.add(j3);
+    const j3m=new THREE.Mesh(new THREE.CylinderGeometry(.12,.14,.18,20),mat(c.j3)); j3m.rotation.z=Math.PI/2;j3m.castShadow=true;j3.add(j3m);
+    const fa=new THREE.Mesh(new THREE.BoxGeometry(.08,.75,.08),mat(c.link,.5,.4)); fa.position.y=.42;fa.castShadow=true;j3.add(fa);
+    const j4=new THREE.Group(); j4.position.y=.85; j3.add(j4);
+    const j4m=new THREE.Mesh(new THREE.CylinderGeometry(.1,.12,.16,20),mat(c.j4)); j4m.rotation.z=Math.PI/2;j4m.castShadow=true;j4.add(j4m);
+    const ws=new THREE.Mesh(new THREE.BoxGeometry(.07,.3,.07),mat(c.link,.5,.4)); ws.position.y=.18;ws.castShadow=true;j4.add(ws);
+    const j5=new THREE.Group(); j5.position.y=.38; j4.add(j5);
+    const j5m=new THREE.Mesh(new THREE.CylinderGeometry(.09,.1,.14,20),mat(c.j5)); j5m.castShadow=true;j5.add(j5m);
+    const gb=new THREE.Mesh(new THREE.BoxGeometry(.12,.04,.12),mat(c.grip)); gb.position.y=.1;gb.castShadow=true;j5.add(gb);
+    const fL=new THREE.Mesh(new THREE.BoxGeometry(.03,.15,.04),mat(c.grip)); fL.position.set(-.05,.2,0);fL.castShadow=true;j5.add(fL);
+    const fR=new THREE.Mesh(new THREE.BoxGeometry(.03,.15,.04),mat(c.grip)); fR.position.set(.05,.2,0);fR.castShadow=true;j5.add(fR);
+    return {root,j1,j2,j3,j4,j5,fingerL:fL,fingerR:fR};
+  }
+
+  function applyAngles(arm, a) {
+    arm.j1.rotation.y=a.j1*Math.PI/180;
+    arm.j2.rotation.z=a.j2*Math.PI/180;
+    arm.j3.rotation.z=a.j3*Math.PI/180;
+    arm.j4.rotation.z=a.j4*Math.PI/180;
+    arm.j5.rotation.y=a.j5*Math.PI/180;
+    arm.fingerL.position.x=-a.grip/100-.01;
+    arm.fingerR.position.x=a.grip/100+.01;
+  }
+
+  function initMasterSlave(container) {
+    const scene=new THREE.Scene();
+    scene.background=new THREE.Color(0x111827);
+    scene.fog=new THREE.Fog(0x111827,10,22);
+    const cam=new THREE.PerspectiveCamera(38,container.clientWidth/container.clientHeight,0.1,100);
+    cam.position.set(0,3,7);
+    const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
+    renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+    renderer.setSize(container.clientWidth,container.clientHeight);
+    renderer.shadowMap.enabled=true;
+    renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+    container.appendChild(renderer.domElement);
+    container.style.position='relative';
+    scene.add(new THREE.HemisphereLight(0xffffff,0x1e293b,.7));
+    const dir=new THREE.DirectionalLight(0xffffff,1.3); dir.position.set(5,8,4);
+    dir.castShadow=true; dir.shadow.mapSize.set(1024,1024);
+    dir.shadow.camera.left=-6;dir.shadow.camera.right=6;dir.shadow.camera.top=5;dir.shadow.camera.bottom=-5;
+    scene.add(dir);
+    const fill=new THREE.DirectionalLight(0x5eead4,.25); fill.position.set(-4,3,-3); scene.add(fill);
+    const ground=new THREE.Mesh(new THREE.CircleGeometry(6,48),new THREE.MeshStandardMaterial({color:0x1e293b,metalness:.2,roughness:.9}));
+    ground.rotation.x=-Math.PI/2; ground.position.y=-.01; ground.receiveShadow=true; scene.add(ground);
+    const grid=new THREE.GridHelper(10,20,0x334155,0x1e293b); grid.material.opacity=.35; grid.material.transparent=true; scene.add(grid);
+    // 主臂（蓝系）左侧
+    const master=buildArm({j1:0x38bdf8,j2:0x38bdf8,j3:0x7dd3fc,j4:0x38bdf8,j5:0x7dd3fc,grip:0x6ee7b7,link:0x475569});
+    master.root.position.x=-1.5; scene.add(master.root);
+    // 从臂（琥珀系）右侧
+    const slave=buildArm({j1:0xfbbf24,j2:0xfbbf24,j3:0xfde68a,j4:0xfbbf24,j5:0xfde68a,grip:0x6ee7b7,link:0x475569});
+    slave.root.position.x=1.5; scene.add(slave.root);
+    // 标签柱
+    const mLabel=new THREE.Mesh(new THREE.CylinderGeometry(.02,.02,.4,8),new THREE.MeshBasicMaterial({color:0x38bdf8}));
+    mLabel.position.set(-1.5,0,.5); scene.add(mLabel);
+    const sLabel=new THREE.Mesh(new THREE.CylinderGeometry(.02,.02,.4,8),new THREE.MeshBasicMaterial({color:0xfbbf24}));
+    sLabel.position.set(1.5,0,.5); scene.add(sLabel);
+    // OrbitControls
+    const controls=new OrbitControls(cam,renderer.domElement);
+    controls.enableDamping=true; controls.dampingFactor=.08;
+    controls.target.set(0,1.2,0); controls.minDistance=4; controls.maxDistance=14;
+    // 角度
+    const masterAngles={j1:0,j2:0,j3:0,j4:0,j5:0,grip:.05};
+    const slaveAngles={j1:0,j2:0,j3:0,j4:0,j5:0,grip:.05};
+    const ranges={
+      j1:{min:-120,max:120,label:'J1 底座'},
+      j2:{min:-70,max:70,label:'J2 肩'},
+      j3:{min:-100,max:100,label:'J3 肘'},
+      j4:{min:-70,max:70,label:'J4 腕俯仰'},
+      j5:{min:-120,max:120,label:'J5 腕滚转'},
+      grip:{min:0,max:12,label:'夹爪'}
+    };
+    function applyAll(){
+      applyAngles(master,masterAngles);
+      // 从臂跟随（lerp 0.15 模拟延迟跟随）
+      Object.keys(masterAngles).forEach(k=>{ slaveAngles[k]+=(masterAngles[k]-slaveAngles[k])*0.15; });
+      applyAngles(slave,slaveAngles);
+    }
+    // UI
+    const ui=document.createElement('div');
+    ui.style.cssText='display:flex;flex-direction:column;gap:6px;font-family:sans-serif;margin-top:10px;padding:12px 14px;background:#1e293b;border:1px solid #334155;border-radius:12px';
+    container.parentElement.insertBefore(ui,container.nextSibling);
+    const title=document.createElement('div');
+    title.innerHTML='<span style="color:#38bdf8;font-weight:700">主臂 Leader</span> <span style="color:#64748b">→</span> <span style="color:#fbbf24;font-weight:700">从臂 Follower</span> <span style="color:#64748b;font-size:11px">（从臂自动跟随主臂）</span>';
+    title.style.cssText='font-size:13px;margin-bottom:4px';
+    ui.appendChild(title);
+    const sliders={};
+    Object.keys(ranges).forEach(k=>{
+      const r=ranges[k];
+      const row=document.createElement('div');
+      row.style.cssText='display:flex;align-items:center;gap:8px;background:rgba(17,24,39,.82);border:1px solid #334155;border-radius:8px;padding:5px 10px';
+      const lab=document.createElement('span');
+      lab.textContent=r.label; lab.style.cssText='font-size:11px;color:#5eead4;font-weight:700;min-width:80px;white-space:nowrap';
+      const sl=document.createElement('input');
+      sl.type='range'; sl.min=r.min; sl.max=r.max; sl.value=masterAngles[k];
+      sl.step=k==='grip'?.5:1; sl.style.cssText='flex:1;accent-color:#38bdf8;width:120px';
+      const val=document.createElement('span');
+      val.textContent=masterAngles[k]+(k==='grip'?'mm':'°');
+      val.style.cssText='font-size:10px;color:#94a3b8;font-family:monospace;min-width:42px;text-align:right';
+      sl.addEventListener('input',()=>{
+        masterAngles[k]=parseFloat(sl.value);
+        val.textContent=sl.value+(k==='grip'?'mm':'°');
+      });
+      row.appendChild(lab); row.appendChild(sl); row.appendChild(val);
+      ui.appendChild(row); sliders[k]=sl;
+    });
+    const btnRow=document.createElement('div');
+    btnRow.style.cssText='display:flex;gap:6px;flex-wrap:wrap';
+    ui.appendChild(btnRow);
+    const btnWave=document.createElement('button');
+    btnWave.textContent='👋 自动挥手'; btnWave.style.cssText='padding:4px 12px;border:1px solid #a78bfa;border-radius:6px;background:rgba(167,139,250,.15);color:#c4b5fd;font-size:11px;cursor:pointer';
+    btnRow.appendChild(btnWave);
+    let waving=false,waveT=0;
+    btnWave.addEventListener('click',()=>{waving=!waving;btnWave.textContent=waving?'⏸ 停止':'👋 自动挥手';});
+    const btnReset=document.createElement('button');
+    btnReset.textContent='⟲ 归零'; btnReset.style.cssText='padding:4px 12px;border:1px solid #475569;border-radius:6px;background:rgba(71,85,105,.3);color:#94a3b8;font-size:11px;cursor:pointer';
+    btnReset.addEventListener('click',()=>{
+      waving=false; btnWave.textContent='👋 自动挥手';
+      Object.keys(masterAngles).forEach(k=>{masterAngles[k]=0;sliders[k].value=0;
+        const v=sliders[k].parentElement.querySelector('span:last-child'); if(v)v.textContent='0'+(k==='grip'?'mm':'°');});
+    });
+    btnRow.appendChild(btnReset);
+    // 离屏暂停
+    let visible=true;
+    new IntersectionObserver(([e])=>visible=e.isIntersecting,{threshold:.05}).observe(container);
+
+    // ── 拖拽手柄：在主臂每个关节处放可抓取球体 ──
+    const handleGeo=new THREE.SphereGeometry(.07,16,16);
+    const handles=[];
+    const handleData=[
+      {joint:'j1',label:'J1 底座',color:0x38bdf8},
+      {joint:'j2',label:'J2 肩',color:0x38bdf8},
+      {joint:'j3',label:'J3 肘',color:0x7dd3fc},
+      {joint:'j4',label:'J4 腕俯仰',color:0x38bdf8},
+      {joint:'j5',label:'J5 腕滚转',color:0x7dd3fc},
+      {joint:'grip',label:'夹爪',color:0x6ee7b7}
+    ];
+    // 在主臂各关节位置创建手柄
+    const jPoints=[master.j1,master.j2,master.j3,master.j4,master.j5,master.j5];
+    handleData.forEach((h,i)=>{
+      const sphere=new THREE.Mesh(handleGeo,new THREE.MeshStandardMaterial({color:h.color,emissive:h.color,emissiveIntensity:.4,transparent:true,opacity:.85}));
+      sphere.userData={...h,index:i,arm:master};
+      // 放在关节末端
+      const parent=jPoints[i];
+      parent.add(sphere);
+      sphere.position.set(0, i===5?.2 : (i===0?.11:(i===1?.5:(i===2?.42:(i===3?.18:.1)))), 0);
+      handles.push(sphere);
+    });
+    // 拖拽状态
+    const raycaster=new THREE.Raycaster();
+    const pointer=new THREE.Vector2();
+    let dragJoint=null,dragLastX=0;
+    const dragMode=document.createElement('button');
+    dragMode.textContent='✋ 拖拽主臂';
+    dragMode.style.cssText='padding:4px 12px;border:1px solid #5eead4;border-radius:6px;background:rgba(94,234,212,.15);color:#5eead4;font-size:11px;cursor:pointer';
+    btnRow.appendChild(dragMode);
+    let dragEnabled=false;
+    dragMode.addEventListener('click',()=>{
+      dragEnabled=!dragEnabled;
+      dragMode.textContent=dragEnabled?'✋ 拖拽中（关闭）':'✋ 拖拽主臂';
+      dragMode.style.background=dragEnabled?'rgba(94,234,212,.35)':'rgba(94,234,212,.15)';
+      controls.enabled=!dragEnabled;
+      renderer.domElement.style.cursor=dragEnabled?'crosshair':'grab';
+      handles.forEach(h=>h.visible=dragEnabled);
+    });
+    handles.forEach(h=>h.visible=false);
+
+    renderer.domElement.addEventListener('pointerdown',(e)=>{
+      if(!dragEnabled)return;
+      const rect=renderer.domElement.getBoundingClientRect();
+      pointer.x=((e.clientX-rect.left)/rect.width)*2-1;
+      pointer.y=-((e.clientY-rect.top)/rect.height)*2+1;
+      raycaster.setFromCamera(pointer,cam);
+      const hits=raycaster.intersectObjects(handles);
+      if(hits.length>0){
+        dragJoint=hits[0].object.userData.joint;
+        dragLastX=e.clientX;
+        controls.enabled=false;
+        renderer.domElement.style.cursor='grabbing';
+        e.preventDefault();
+      }
+    });
+    renderer.domElement.addEventListener('pointermove',(e)=>{
+      if(!dragJoint)return;
+      const dx=e.clientX-dragLastX;
+      dragLastX=e.clientX;
+      const r=ranges[dragJoint];
+      const speed=dragJoint==='grip'?0.08:0.5;
+      masterAngles[dragJoint]=Math.max(r.min,Math.min(r.max,masterAngles[dragJoint]+dx*speed));
+      sliders[dragJoint].value=masterAngles[dragJoint];
+      const v=sliders[dragJoint].parentElement.querySelector('span:last-child');
+      if(v)v.textContent=Math.round(masterAngles[dragJoint]*10)/10+(dragJoint==='grip'?'mm':'°');
+    });
+    renderer.domElement.addEventListener('pointerup',()=>{dragJoint=null;renderer.domElement.style.cursor=dragEnabled?'crosshair':'grab';});
+
+    // 关节标签 tooltip
+    const tooltip=document.createElement('div');
+    tooltip.style.cssText='position:absolute;display:none;background:rgba(30,41,59,.92);border:1px solid #334155;border-radius:6px;padding:4px 10px;font-size:11px;color:#5eead4;pointer-events:none;white-space:nowrap;z-index:10';
+    container.appendChild(tooltip);
+    renderer.domElement.addEventListener('pointermove',(e)=>{
+      if(dragJoint||!dragEnabled)return;
+      const rect=renderer.domElement.getBoundingClientRect();
+      pointer.x=((e.clientX-rect.left)/rect.width)*2-1;
+      pointer.y=-((e.clientY-rect.top)/rect.height)*2+1;
+      raycaster.setFromCamera(pointer,cam);
+      const hits=raycaster.intersectObjects(handles);
+      if(hits.length>0){
+        const h=hits[0].object.userData;
+        tooltip.textContent=h.label+'（拖动旋转）';
+        tooltip.style.display='block';
+        tooltip.style.left=(e.clientX-rect.left+12)+'px';
+        tooltip.style.top=(e.clientY-rect.top-30)+'px';
+        renderer.domElement.style.cursor='grab';
+      }else{tooltip.style.display='none';renderer.domElement.style.cursor='crosshair';}
+    });
+    function loop(){
+      requestAnimationFrame(loop);
+      if(!visible)return;
+      if(waving){
+        waveT+=0.035;
+        masterAngles.j1=Math.sin(waveT*.5)*35;
+        masterAngles.j2=-25+Math.sin(waveT*1.5)*12;
+        masterAngles.j3=-50+Math.sin(waveT*.8)*20;
+        masterAngles.j4=Math.sin(waveT*2)*20;
+        masterAngles.j5=Math.sin(waveT*1.5)*40;
+        masterAngles.grip=6+Math.sin(waveT*3)*4;
+        Object.keys(masterAngles).forEach(k=>sliders[k].value=masterAngles[k]);
+        const labels=ui.querySelectorAll('span:last-child');
+        Object.keys(ranges).forEach((k,i)=>{
+          if(labels[i+1])labels[i+1].textContent=Math.round(masterAngles[k]*10)/10+(k==='grip'?'mm':'°');
+        });
+      }
+      applyAll();
+      controls.update();
+      renderer.render(scene,cam);
+    }
+    applyAll(); loop();
+    addEventListener('resize',()=>{
+      cam.aspect=container.clientWidth/container.clientHeight;
+      cam.updateProjectionMatrix();
+      renderer.setSize(container.clientWidth,container.clientHeight);
+    });
+  }
+
+  const msContainer=document.getElementById('scene-master-slave');
+  if(msContainer){
+    try{initMasterSlave(msContainer);}
+    catch(e){msContainer.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#5eead4;font-size:14px;text-align:center;padding:20px">⚠ 3D 模型加载失败<br>需联网首次加载 Three.js 库</div>';console.error('3D init error:',e);}
+  }
+</script>
+</body>
+</html>

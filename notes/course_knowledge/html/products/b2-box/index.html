@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>具身智能实验箱B2旗舰版 · 产品介绍</title>
+<style>
+:root{
+  --bg-base:#f8fafc;--bg-card:#fff;--bg-soft:#f1f5f9;--bg-tint:#eef4ff;
+  --border:#e2e8f0;--border-hover:#94a3b8;
+  --accent-blue:#2563eb;--accent-cyan:#0891b2;--accent-teal:#0d9488;
+  --accent-amber:#d97706;--accent-violet:#7c3aed;
+  --text-primary:#0f172a;--text-body:#334155;--text-secondary:#64748b;--text-muted:#94a3b8;
+  --shadow-glow:0 8px 24px rgba(37,99,235,.10);
+  --font-mono:'Cascadia Code','JetBrains Mono',Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg-base);color:var(--text-body);
+  font-family:"Noto Sans CJK SC","PingFang SC","Microsoft YaHei","Segoe UI",system-ui,sans-serif;
+  background-image:
+    radial-gradient(ellipse 60% 40% at 50% -5%,rgba(37,99,235,.05),transparent),
+    radial-gradient(ellipse 50% 35% at 100% 5%,rgba(13,148,136,.04),transparent);}
+/* Topbar */
+.topbar{position:sticky;top:0;z-index:50;height:60px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 40px;background:rgba(255,255,255,.85);backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;color:var(--text-primary);font-size:15px;text-decoration:none}
+.logo .dot{width:9px;height:9px;border-radius:50%;background:var(--accent-blue);animation:pulse 2.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.top-actions{display:flex;align-items:center;gap:10px}
+.btn{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:600;text-decoration:none;
+  border-radius:9px;padding:8px 16px;transition:.28s;border:1px solid var(--border);color:var(--text-secondary);background:var(--bg-card)}
+.btn:hover{border-color:var(--border-hover);color:var(--accent-blue)}
+.btn.primary{background:linear-gradient(90deg,var(--accent-blue),var(--accent-cyan));color:#fff;border:none;box-shadow:var(--shadow-glow)}
+.btn.primary:hover{transform:translateY(-1px);color:#fff}
+/* Hero */
+.hero{max-width:1080px;margin:0 auto;padding:48px 40px 6px;display:grid;grid-template-columns:1.15fr .85fr;gap:34px;align-items:center}
+.hero .eyebrow{display:inline-block;font-size:12.5px;letter-spacing:.14em;color:var(--accent-blue);
+  background:var(--bg-tint);border:1px solid #dbeafe;border-radius:100px;padding:5px 14px;font-family:var(--font-mono)}
+.hero h1{margin:16px 0 12px;font-size:34px;line-height:1.25;color:var(--text-primary);font-weight:800}
+.hero h1 .grad{background:linear-gradient(90deg,var(--accent-blue),var(--accent-cyan),var(--accent-teal));
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.hero p{margin:0;font-size:15px;line-height:1.85;color:var(--text-secondary)}
+.sku{display:inline-block;margin-top:14px;font-family:var(--font-mono);font-size:12px;color:var(--accent-teal);
+  background:#f0fdfa;border:1px solid #ccfbf1;border-radius:7px;padding:4px 10px}
+.hero figure{margin:0;background:var(--bg-card);border:1px solid var(--border);border-radius:16px;padding:12px;
+  box-shadow:0 1px 3px rgba(0,0,0,.05);transition:.28s}
+.hero figure:hover{transform:translateY(-4px);box-shadow:var(--shadow-glow);border-color:var(--border-hover)}
+.hero figure img{width:100%;display:block;border-radius:10px}
+.hero figcaption{font-size:12px;color:var(--text-muted);text-align:center;padding-top:8px}
+/* feature strip */
+.hl{max-width:1080px;margin:30px auto 0;padding:0 40px;display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.hl .item{background:var(--bg-card);border:1px solid var(--border);border-radius:13px;padding:16px 18px;transition:.28s}
+.hl .item:hover{transform:translateY(-3px);box-shadow:var(--shadow-glow);border-color:var(--border-hover)}
+.hl .num{font-size:24px;font-weight:800;color:var(--accent-blue);font-family:var(--font-mono);line-height:1.2}
+.hl .num small{font-size:13px;font-weight:700}
+.hl .num.c{color:var(--accent-cyan)}.hl .num.t{color:var(--accent-teal)}.hl .num.a{color:var(--accent-amber)}
+.hl .ftitle{font-size:14px;font-weight:700;color:var(--text-primary);margin-top:7px}
+.hl .lbl{font-size:12.5px;color:var(--text-secondary);margin-top:5px;line-height:1.7;min-height:2.7em}
+/* Section */
+.section{max-width:1080px;margin:0 auto;padding:50px 40px 6px}
+.section-head{display:flex;align-items:baseline;gap:14px;margin-bottom:6px;flex-wrap:wrap}
+.section-head h2{margin:0;font-size:22px;color:var(--text-primary);display:flex;align-items:center;gap:10px}
+.section-head h2 .idx{font-family:var(--font-mono);font-size:12px;font-weight:700;color:#fff;
+  background:linear-gradient(90deg,var(--accent-blue),var(--accent-cyan));border-radius:7px;padding:3px 9px}
+.section-head .sub{font-size:13.5px;color:var(--text-muted)}
+.section .desc{font-size:14px;color:var(--text-secondary);line-height:1.8;margin:8px 0 20px;max-width:900px}
+/* spec table */
+.spec{background:var(--bg-card);border:1px solid var(--border);border-radius:14px;overflow:hidden;
+  display:grid;grid-template-columns:1fr 1fr;gap:0}
+.spec .row{display:flex;justify-content:space-between;gap:14px;padding:13px 20px;font-size:13.5px;border-bottom:1px solid var(--border)}
+.spec .row:nth-child(odd){background:#fbfdff}
+.spec .k{color:var(--text-muted);flex:none}
+.spec .v{color:var(--text-primary);font-weight:600;text-align:right;font-family:var(--font-mono);font-size:12.5px}
+/* cards 2-col */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.card{background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:22px 24px;position:relative;overflow:hidden;transition:.28s}
+.card::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;transform:scaleX(0);transform-origin:left;
+  background:linear-gradient(90deg,var(--accent-blue),var(--accent-cyan));transition:transform .35s cubic-bezier(.4,0,.2,1)}
+.card:hover{transform:translateY(-4px);box-shadow:var(--shadow-glow);border-color:var(--border-hover)}
+.card:hover::before{transform:scaleX(1)}
+.card h3{margin:0 0 8px;font-size:16.5px;color:var(--text-primary);display:flex;align-items:center;gap:9px}
+.card h3 .ico{width:30px;height:30px;border-radius:8px;flex:none;display:grid;place-items:center;font-size:15px;
+  background:var(--bg-tint);border:1px solid #dbeafe}
+.card p{margin:0;font-size:13.5px;line-height:1.8;color:var(--text-secondary)}
+.card ul{margin:10px 0 0;padding-left:18px;font-size:13px;line-height:1.9;color:var(--text-secondary)}
+.card ul b{color:var(--text-primary)}
+/* course modules */
+.mods{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.mod{background:var(--bg-card);border:1px solid var(--border);border-radius:13px;padding:18px 20px;transition:.28s}
+.mod:hover{transform:translateY(-4px);box-shadow:var(--shadow-glow);border-color:var(--border-hover)}
+.mod .head{display:flex;justify-content:space-between;align-items:center}
+.mod h4{margin:0;font-size:15px;color:var(--text-primary)}
+.mod .cnt{font-family:var(--font-mono);font-size:12px;font-weight:700;color:#fff;
+  background:linear-gradient(90deg,var(--accent-blue),var(--accent-cyan));border-radius:100px;padding:3px 10px}
+.mod ul{margin:10px 0 0;padding-left:17px;font-size:12.5px;line-height:1.85;color:var(--text-secondary)}
+.tags{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.tag{font-size:12px;padding:3px 10px;border-radius:100px;background:var(--bg-soft);border:1px solid var(--border);color:var(--text-secondary)}
+.tag.violet{color:var(--accent-violet);border-color:#ede9fe;background:#f5f3ff}
+.tag.teal{color:var(--accent-teal);border-color:#ccfbf1;background:#f0fdfa}
+.tag.amber{color:var(--accent-amber);border-color:#fef3c7;background:#fffbeb}
+/* video block */
+.video-block{margin:0}
+.video-frame{border:1px solid var(--border);border-radius:14px;overflow:hidden;
+  background:#0f172a;box-shadow:0 8px 30px rgba(15,23,42,.10);transition:.28s}
+.video-frame:hover{border-color:var(--border-hover);box-shadow:var(--shadow-glow)}
+.video-frame video{display:block;width:100%;height:auto}
+.video-block figcaption{margin-top:10px;font-size:13px;color:var(--text-muted);text-align:center}
+/* gallery */
+.gallery{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:stretch}
+.gallery figure{margin:0;display:flex;flex-direction:column;
+  background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:12px;transition:.28s}
+.gallery figure:hover{transform:translateY(-4px);box-shadow:var(--shadow-glow);border-color:var(--border-hover)}
+/* 画面区等高：同一行两张图统一高度，图注自然底部对齐 */
+.gallery .frame{flex:1;display:flex;align-items:center;justify-content:center;
+  min-height:0;overflow:hidden;border-radius:10px;background:rgba(11,18,32,.35)}
+.gallery img{width:100%;height:100%;display:block;border-radius:10px;
+  object-fit:cover;object-position:center}
+/* 数量为奇数时，最后一张横跨整行，避免右下留空 */
+.gallery figure.wide{grid-column:1 / -1}
+.gallery figure.wide img{max-height:520px;width:auto;max-width:100%;margin:0 auto;object-fit:contain}
+@media (max-width:720px){.gallery figure.wide img{max-height:360px}}
+.gallery figcaption{font-size:12.5px;color:var(--text-muted);text-align:center;padding-top:10px;
+  line-height:1.55;margin-top:auto}
+/* 灯箱 */
+.lb{position:fixed;inset:0;z-index:999;display:none;align-items:center;justify-content:center;
+  background:rgba(4,8,16,.92);backdrop-filter:blur(6px);cursor:zoom-out;padding:24px}
+.lb.on{display:flex}
+.lb img{max-width:92vw;max-height:92vh;width:auto;height:auto;border-radius:12px;
+  box-shadow:0 24px 80px rgba(0,0,0,.6)}
+.gallery .qr{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px}
+.gallery .qr img{width:180px;border-radius:12px;border:1px solid var(--border)}
+/* contact */
+.info{background:linear-gradient(120deg,#eef4ff,#ecfeff);border:1px solid var(--border);border-radius:14px;
+  padding:20px 24px;font-size:13.5px;line-height:2;color:var(--text-secondary)}
+.info b{color:var(--text-primary)}
+.info .ver{font-family:var(--font-mono);font-size:12px;color:var(--accent-teal)}
+.contact-qr{display:flex;align-items:center;gap:24px;flex-wrap:wrap;background:var(--bg-card);
+  border:1px solid var(--border);border-radius:14px;padding:18px 22px;margin-top:16px;transition:.28s}
+.contact-qr:hover{transform:translateY(-4px);box-shadow:var(--shadow-glow);border-color:var(--border-hover)}
+.contact-qr figure{margin:0;display:flex;flex-direction:column;align-items:center;gap:8px}
+.contact-qr img{width:150px;border-radius:12px;border:1px solid var(--border)}
+.contact-qr figcaption{font-size:12.5px;color:var(--text-muted);text-align:center}
+/* CTA */
+.cta{max-width:1080px;margin:46px auto 0;padding:0 40px;display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+footer{max-width:1080px;margin:52px auto 0;padding:24px 40px 44px;border-top:1px solid var(--border);
+  text-align:center;font-size:12.5px;color:var(--text-muted)}
+.reveal{opacity:0;transform:translateY(16px);transition:opacity .5s,transform .5s}
+.reveal.visible{opacity:1;transform:none}
+@media (max-width:1000px){.grid3{grid-template-columns:1fr 1fr}}
+@media (max-width:900px){
+  .hero{grid-template-columns:1fr}.hl{grid-template-columns:1fr 1fr}
+  .spec,.grid2,.grid3,.gallery,.mods{grid-template-columns:1fr}
+}
+@media (max-width:760px){
+  .topbar,.hero,.hl,.section,.cta,footer{padding-left:20px;padding-right:20px}
+}
+@media (prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="logo" href="../../courses/index.html"><span class="dot"></span>具身智能课程 · 产品介绍</a>
+  <div class="top-actions">
+    <a class="btn primary" href="quickstart/index.html">⚡ 快速上手</a>
+    <a class="btn" href="../../courses/index.html">← 返回总首页</a>
+  </div>
+</div>
+
+<header class="hero reveal">
+  <div>
+    <span class="eyebrow">PRODUCT · B2 FLAGSHIP BOX</span>
+    <h1>具身智能实验箱<br><span class="grad">B2 旗舰版</span></h1>
+    <p>面向高校人工智能、具身智能、机器人、电子信息、物联网相等专业实训教学的"一站式"具身智能教学平台：AI 计算平台 + 实时控制双核心，集成结构光深度相机、ToF 激光雷达、麦克风阵列、身份识别与传送带机构，配套 6 大类 65 项、256 学时课程实验，开箱即教。</p>
+    <span class="sku">型号 XFLZ_EAI_B2_PRO · 讯飞聆智</span>
+  </div>
+  <figure>
+    <img src="./images/fig-b2-cover.png" alt="具身智能实验箱B2旗舰版整机（含机械臂）">
+    <figcaption>具身智能实验箱B2旗舰版实拍</figcaption>
+  </figure>
+</header>
+
+<div class="hl">
+  <div class="item reveal">
+    <div class="num">6 TOPS <small>× 8 核</small></div>
+    <div class="ftitle">全离线 · 一站式智能交互</div>
+    <div class="lbl">支持全离线语音、视觉、LLM / VLM 智能交互的一站式解决方案</div>
+  </div>
+  <div class="item reveal">
+    <div class="num c">6 <small>轴机械臂</small></div>
+    <div class="ftitle">高精度智能执行</div>
+    <div class="lbl">视觉伺服抓取，识物即抓即放，<br>抓取分拣类实验开箱即做。</div>
+  </div>
+  <div class="item reveal">
+    <div class="num t">300 <small>mm 流水线</small></div>
+    <div class="ftitle">微型教学产线</div>
+    <div class="lbl">传送带与机械臂、视觉联动，<br>复现"识别 → 分拣 → 搬运"产线。</div>
+  </div>
+  <div class="item reveal">
+    <div class="num a">19″ <small>高清大屏</small></div>
+    <div class="ftitle">免电脑 · 一站式学习</div>
+    <div class="lbl">19 英寸显示屏 + 触摸键盘，<br>免配电脑，通电即学即教。</div>
+  </div>
+</div>
+
+<section class="section" id="spec">
+  <div class="section-head">
+    <h2><span class="idx">01</span>整机参数</h2>
+    <span class="sub">SPECIFICATIONS</span>
+  </div>
+  <p class="desc">箱体尺寸 610×430×270mm，铝合金防护箱体一体化设计，通电即可进入实训状态。</p>
+  <div class="spec reveal">
+    <div class="row"><span class="k">产品型号</span><span class="v">XFLZ_EAI_B2_PRO</span></div>
+    <div class="row"><span class="k">箱体尺寸</span><span class="v">610 × 430 × 270 mm</span></div>
+    <div class="row"><span class="k">AI 算力</span><span class="v">6 TOPS NPU</span></div>
+    <div class="row"><span class="k">内存 / 存储</span><span class="v">8GB + 64GB</span></div>
+    <div class="row"><span class="k">显示屏</span><span class="v">19 英寸 1440×900</span></div>
+    <div class="row"><span class="k">传送带</span><span class="v">300 × 60 mm</span></div>
+    <div class="row"><span class="k">主控核心</span><span class="v">8 核 ARM + 运动控制平台</span></div>
+    <div class="row"><span class="k">系统 / 中间件</span><span class="v">Ubuntu 22.04 · ROS2</span></div>
+    <div class="row"><span class="k">联网</span><span class="v">双频 WiFi</span></div>
+    <div class="row"><span class="k">标准清单</span><span class="v">整机 + 实训工具包 + 配套课程</span></div>
+  </div>
+</section>
+
+<section class="section" id="arch">
+  <div class="section-head">
+    <h2><span class="idx">02</span>双核架构</h2>
+    <span class="sub">DUAL-CORE ARCHITECTURE</span>
+  </div>
+  <p class="desc">"AI 计算平台（算）+ 运动控制平台（控）"双核心分工：上层跑视觉 / 语音 / 大模型推理，下层保证毫秒级确定性 IO 控制。</p>
+  <div class="grid2">
+    <div class="card reveal">
+      <h3><span class="ico">🧠</span>AI 计算平台</h3>
+      <p>8 核 ARM 处理器 + 6 TOPS NPU，面向边缘侧多模型并发推理。</p>
+      <ul>
+        <li><b>算力：</b>6 TOPS NPU，支持 INT4 / INT8 / INT16 / FP16 混合精度</li>
+        <li><b>系统：</b>Ubuntu 22.04 + ROS2，双频 WiFi 高速联网</li>
+        <li><b>任务：</b>视觉检测、语音唤醒与识别、RKLLM 本地大模型</li>
+      </ul>
+      <div class="tags"><span class="tag violet">边缘推理</span><span class="tag">ROS2</span></div>
+    </div>
+    <div class="card reveal">
+      <h3><span class="ico">⚙️</span>运动控制平台</h3>
+      <p>实时运动控制平台，负责确定性运动与电气控制。</p>
+      <ul>
+        <li><b>驱动：</b>4 路 PWM · 2 路总线舵机 · 4 路电机驱动</li>
+        <li><b>感知：</b>6 轴工业级 IMU</li>
+        <li><b>接口：</b>丰富工业接口，直连执行器与传感器</li>
+      </ul>
+      <div class="tags"><span class="tag teal">实时控制</span><span class="tag amber">毫秒级 IO</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="sense">
+  <div class="section-head">
+    <h2><span class="idx">03</span>多源传感与执行</h2>
+    <span class="sub">ACTUATION · SENSING · CONTROL</span>
+  </div>
+  <p class="desc">从执行机构、感知部件到双核控制板与多维传感器，一台箱体覆盖"动得了、听得到、认得出、看得见"的完整具身链路，共 <b>9 类核心部件 + 6 类传感器</b>。</p>
+  <div class="grid3">
+    <div class="card reveal">
+      <h3><span class="ico">🦾</span>六自由度机械臂</h3>
+      <p>6 自由度串联机械臂，支持正 / 逆运动学（FK/IK）、固定位与视觉动态抓取，对应机械臂课程 8 项实验。</p>
+      <div class="tags"><span class="tag violet">抓取分拣</span></div>
+    </div>
+    <div class="card reveal">
+      <h3><span class="ico">🏭</span>流水线（传送带）</h3>
+      <p>内置 300×60mm 传送带机构，与机械臂、视觉联动构成"识别 → 分拣 → 搬运"可视化产线。</p>
+      <div class="tags"><span class="tag teal">产线联动</span></div>
+    </div>
+    <div class="card reveal">
+      <h3><span class="ico">🖥️</span>19 英寸显示器</h3>
+      <p>19 英寸 1440×900 工业交互屏，实时展示模型推理、点云与业务界面，教学过程可视化。</p>
+      <div class="tags"><span class="tag">1440×900</span></div>
+    </div>
+    <div class="card reveal">
+      <h3><span class="ico">⌨️</span>触摸键盘</h3>
+      <p>触摸键盘输入单元，无需外接键鼠即可完成参数配置、指令输入与现场交互调试。</p>
+      <div class="tags"><span class="tag">触摸交互</span></div>
+    </div>
+    <div class="card reveal">
+      <h3><span class="ico">📡</span>ToF 激光雷达</h3>
+      <p>360° 扫描、10Hz、角分辨率 0.09°、量程 12m、Class1 人眼安全，为 SLAM 建图与导航提供密集点云。</p>
+      <div class="tags"><span class="tag">SLAM 建图</span></div>
+    </div>
+    <div class="card reveal">
+      <h3><span class="ico">🎙️</span>环形六麦克风阵列</h3>
+      <p>6 麦环形阵列支持<b>离线唤醒</b>，内置 AEC 回声消除与 AGC 自动增益，弱网环境下仍可完成语音识别与对话实训。</p>
+      <div class="tags"><span class="tag violet">语音交互</span></div>
+    </div>
+    <div class="card reveal">
+      <h3><span class="ico">📷</span>结构光深度相机</h3>
+      <p>测距 0.2~4m，精度 ≤2mm@1m；深度 640×480@20fps，彩色 1080p@30fps，支撑抓取、避障与三维感知实验。</p>
+      <div class="tags"><span class="tag teal">三维感知</span></div>
+    </div>
+    <div class="card reveal">
+      <h3><span class="ico">🧠</span>上位机端侧主板</h3>
+      <p>8 核 ARM + 6 TOPS NPU（INT4/8/16 · FP16），Ubuntu 22.04 + ROS2，承担视觉 / 语音 / 大模型边缘推理。</p>
+      <div class="tags"><span class="tag violet">边缘计算</span></div>
+    </div>
+    <div class="card reveal">
+      <h3><span class="ico">⚙️</span>下位机运动控制板</h3>
+      <p>运动控制平台，4 路 PWM、2 路总线舵机、4 路电机驱动、6 轴工业级 IMU，毫秒级确定性 IO。</p>
+      <div class="tags"><span class="tag amber">实时控制</span></div>
+    </div>
+    <div class="card reveal">
+      <h3><span class="ico">🌡️</span>环境与健康传感器</h3>
+      <ul>
+        <li><b>温湿度：</b>环境温湿度监测与联动</li>
+        <li><b>烟雾：</b>MQ5 气体 / 烟雾检测告警</li>
+        <li><b>心率血氧：</b>MAX30102 生理参数采集</li>
+      </ul>
+    </div>
+    <div class="card reveal">
+      <h3><span class="ico">🪪</span>身份识别传感器</h3>
+      <ul>
+        <li><b>RFID：</b>ISO14443A/B 射频识别，门禁 / 考勤</li>
+        <li><b>指纹：</b>500DPI 模块，可存 100 枚</li>
+        <li><b>光电 / 继电器：</b>3~77cm 测距 + 继电器输出联动</li>
+      </ul>
+    </div>
+    <div class="card reveal">
+      <h3><span class="ico">🔗</span>执行与联动</h3>
+      <p>继电器输出直连外部执行器，配合机械臂、传送带完成"感知 → 决策 → 执行"闭环，支撑监护告警、环境联动等综合场景。</p>
+      <div class="tags"><span class="tag teal">闭环控制</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="video">
+  <div class="section-head">
+    <h2><span class="idx">04</span>功能介绍视频</h2>
+    <span class="sub">PRODUCT VIDEO · 4 MIN</span>
+  </div>
+  <p class="desc">官方功能介绍短片：整机结构、双核架构与视觉 / 语音 / 机械臂 / 传送带等核心功能的实机演示。</p>
+  <figure class="video-block reveal">
+    <div class="video-frame">
+      <video controls preload="metadata" playsinline
+             poster="../../media/products/b2-box/videos/b2-feature-intro-poster.jpg"
+             width="1920" height="1080">
+        <source src="../../media/products/b2-box/videos/b2-feature-intro.mp4" type="video/mp4">
+        你的浏览器不支持视频播放，请下载
+        <a href="../../media/products/b2-box/videos/b2-feature-intro.mp4">b2-feature-intro.mp4</a> 观看。
+      </video>
+    </div>
+    <figcaption>图 4-1｜具身智能产品功能介绍（B2 实验箱 · 1080P · 约 4 分钟）</figcaption>
+  </figure>
+</section>
+
+<section class="section" id="courses">
+  <div class="section-head">
+    <h2><span class="idx">05</span>配套课程实验</h2>
+    <span class="sub">65 LABS · 6 COURSES · 256 学时</span>
+  </div>
+  <p class="desc">B2 专属配套课程共 <b>6 门、65 个实验、256 学时</b>，覆盖视觉、语音、ROS2、机械臂与两大模型综合项目，可直接用于实训排课。</p>
+  <div class="mods">
+    <div class="mod reveal">
+      <div class="head"><h4>机器人 ROS2 应用与开发</h4><span class="cnt">21 实验 · 48 学时</span></div>
+      <ul>
+        <li>简介 · 常用命令 · 工作空间 · 功能包 · 节点</li>
+        <li>话题（MQ5 气体）/ 服务（指纹）/ 动作（MFRC522）· 自定义接口</li>
+        <li>参数 · 时间 API · DDS · 分布式 · Rqt / RViz2 / bag</li>
+        <li>Launch · 元功能包 · TF2 · URDF · Gazebo 仿真</li>
+      </ul>
+    </div>
+    <div class="mod reveal">
+      <div class="head"><h4>机器人视觉应用与开发</h4><span class="cnt">12 实验 · 48 学时</span></div>
+      <ul>
+        <li>工业缺陷检测 · 垃圾分类 · 颜色识别</li>
+        <li>二维码生成识别 · 多边形轮廓拟合 · 背景分割</li>
+        <li>DeepSORT 多目标跟踪 · 3D 物体检测</li>
+        <li>人脸 / 肢体关键点 · 体感控制 · 手势交互</li>
+      </ul>
+    </div>
+    <div class="mod reveal">
+      <div class="head"><h4>机器人自然语言交互应用与开发</h4><span class="cnt">6 实验 · 32 学时</span></div>
+      <ul>
+        <li>六麦阵列串口通信与语音唤醒</li>
+        <li>sherpa-onnx 本地流式语音识别（ASR）</li>
+        <li>本地 TTS 语音合成与参数调控</li>
+        <li>状态机端到端语音对话（8 学时）</li>
+        <li>Function Calling 工具调用 · VLM 视觉语言理解（8 学时）</li>
+      </ul>
+    </div>
+    <div class="mod reveal">
+      <div class="head"><h4>机器人机械臂应用与开发</h4><span class="cnt">8 实验 · 32 学时</span></div>
+      <ul>
+        <li>URDF 建模与仿真认知</li>
+        <li>1Mbps 底层协议裸机控制 · ROS2 架构与动作回放</li>
+        <li>FK/IK 运动学与 Web 仿真 · IK 实机验证</li>
+        <li>固定位置 IK 抓取 · 视觉动态抓取 · 综合应用</li>
+      </ul>
+    </div>
+    <div class="mod reveal">
+      <div class="head"><h4>大模型综合 · 具身智能工厂项目</h4><span class="cnt">9 实验 · 48 学时</span></div>
+      <ul>
+        <li>项目需求分析 · 系统架构设计 · 接口功能设计</li>
+        <li>语音指挥 · 视觉自适应装货 · 分拣集成测试</li>
+        <li>码垛 · 危险急停安全联锁 · 全功能快速验证</li>
+      </ul>
+    </div>
+    <div class="mod reveal">
+      <div class="head"><h4>大模型综合 · 老人跌倒监护项目</h4><span class="cnt">9 实验 · 48 学时</span></div>
+      <ul>
+        <li>需求分析 · 系统架构 · 配置与接口设计</li>
+        <li>语音关怀 · 视觉检测与姿态估计 · 跌倒判定</li>
+        <li>告警与证据存档 · LLM 对话 + VLM 复核 · 全功能验证</li>
+      </ul>
+    </div>
+    <div class="mod reveal">
+      <div class="head"><h4>合计</h4><span class="cnt">65 实验 · 256 学时</span></div>
+      <ul>
+        <li>6 门课程 · B2 专属课程资源列表</li>
+        <li>覆盖 视觉 / 语音 / ROS2 / 机械臂 / 大模型两大综合项目</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="gallery">
+  <div class="section-head">
+    <h2><span class="idx">06</span>实物图集</h2>
+    <span class="sub">GALLERY</span>
+  </div>
+  <div class="gallery">
+    <figure class="reveal">
+      <div class="frame"><img src="./images/fig-b2-cover.png" alt="具身智能实验箱B2旗舰版整机斜侧实拍"></div>
+      <figcaption>整机实拍 · 机械臂 + 19 英寸屏</figcaption>
+    </figure>
+    <figure class="reveal">
+      <div class="frame"><img src="./images/fig-b2-front.png" alt="B2 箱体正面平放实拍"></div>
+      <figcaption>箱体展开状态 · 19 英寸屏 + 传送带工位</figcaption>
+    </figure>
+    <figure class="reveal">
+      <div class="frame"><img src="./images/fig-b2-console.jpg" alt="整机运行画面 · 机械臂与传感器区工位"></div>
+      <figcaption>整机运行实拍 · 机械臂与传感器工位</figcaption>
+    </figure>
+    <figure class="reveal">
+      <div class="frame"><img src="./images/fig-b2-sensors.jpg" alt="B2 实验箱传感器面板实拍：心率血氧、气敏、温湿度、RFID、指纹、继电器与激光雷达"></div>
+      <figcaption>传感器面板实拍 · 心率血氧 / 气敏 / 温湿度 / RFID / 指纹 / 激光雷达</figcaption>
+    </figure>
+    <figure class="reveal">
+      <div class="frame"><img src="./images/fig-b2-mainboard.jpg" alt="上位机端侧主板实拍：XFLZ ROBOT EDGE V1.0，瑞芯微 RK3576 核心板，含千兆网口、USB 3.0、HDMI、MIPI 与 40Pin GPIO"></div>
+      <figcaption>上位机端侧主板 · XFLZ ROBOT EDGE V1.0（瑞芯微 RK3576）</figcaption>
+    </figure>
+    <figure class="reveal">
+      <div class="frame"><img src="./images/fig-b2-mcu-board.jpg" alt="下位机控制板实拍：直流电机驱动、舵机接口、IMU 姿态传感器、蜂鸣器、12V 电源输入、编码器与 PWM 排针"></div>
+      <figcaption>下位机控制板 · 电机 / 舵机 / IMU / 蜂鸣器 / 12V 输入 / 编码器 / PWM</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="section" id="contact">
+  <div class="section-head">
+    <h2><span class="idx">07</span>联系方式</h2>
+    <span class="sub">CONTACT</span>
+  </div>
+  <div class="info reveal">
+    <b>地址：</b>安徽省合肥市望江西路 666 号　·　讯飞聆智产品<br>
+    <b>型号：</b>XFLZ_EAI_B2_PRO
+  </div>
+  <div class="contact-qr reveal">
+    <figure>
+      <img src="./images/fig-b2-qr.png" alt="官方联系方式二维码">
+      <figcaption>扫码获取官方产品资讯</figcaption>
+    </figure>
+  </div>
+</section>
+
+<div class="cta reveal">
+  <a class="btn" href="../../courses/index.html">← 返回课程总首页</a>
+  <a class="btn" href="../c1-car/index.html">查看 C1 机器人小车 →</a>
+</div>
+
+<footer>
+  具身智能实验箱B2旗舰版 · 产品介绍页　|　图片仅用于教学展示
+</footer>
+
+<script>
+(function(){
+  var io = new IntersectionObserver(function(es){
+    es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('visible'); io.unobserve(e.target); } });
+  },{threshold:.12});
+  document.querySelectorAll('.reveal').forEach(function(el){ io.observe(el); });
+})();
+
+/* 实物图集：点击放大 */
+(function(){
+  var lb = document.createElement('div');
+  lb.className = 'lb';
+  lb.innerHTML = '<img alt="">';
+  document.body.appendChild(lb);
+  lb.addEventListener('click', function(){ lb.classList.remove('on'); });
+
+  document.querySelectorAll('.gallery img').forEach(function(img){
+    img.addEventListener('click', function(e){
+      e.stopPropagation();
+      lb.querySelector('img').src = img.src;
+      lb.querySelector('img').alt = img.alt || '';
+      lb.classList.add('on');
+    });
+  });
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape') lb.classList.remove('on');
+  });
+})();
+</script>
+</body>
+</html>
