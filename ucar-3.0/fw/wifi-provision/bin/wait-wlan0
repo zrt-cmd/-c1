@@ -1,0 +1,28 @@
+#!/bin/bash
+# Block until wlan0 exists AND NetworkManager has taken it over.
+#
+# Why this exists: bin/wifi-provision resolves the AP SSID from wlan0's MAC at
+# startup and caches it (lib/ap_manager.py). If wlan0 has not been enumerated
+# yet, the MAC read fails and the SSID silently degrades to "<prefix>-000000"
+# for the entire run. At boot NM can still be enumerating the device, so wait.
+#
+# systemd runs this as ExecStartPre. A non-zero exit fails the start, and
+# Restart=always retries a few seconds later -- which is what we want at boot.
+set -u
+
+CONF="${WIFI_PROVISION_CONF:-/etc/xflz/wifi-provision.conf}"
+IFACE="$(sed -n 's/^[[:space:]]*wifi_interface[[:space:]]*=[[:space:]]*//p' \
+           "$CONF" 2>/dev/null | tail -1)"
+IFACE="${IFACE:-wlan0}"
+TIMEOUT="${WIFI_WAIT_TIMEOUT:-30}"
+
+for (( i = 0; i < TIMEOUT; i++ )); do
+  if [[ -e "/sys/class/net/$IFACE" ]] \
+     && nmcli -t -f DEVICE device 2>/dev/null | grep -qx "$IFACE"; then
+    exit 0
+  fi
+  sleep 1
+done
+
+echo "wait-wlan0: $IFACE not ready after ${TIMEOUT}s" >&2
+exit 1

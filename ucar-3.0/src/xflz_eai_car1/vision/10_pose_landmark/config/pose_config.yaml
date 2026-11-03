@@ -1,0 +1,19 @@
+# 实验 10 姿态关键点配置（schema: pose_landmark_core/config.py REQUIRED）
+model:
+  pose_model: models/pose_landmark_full.rknn   # mediapipe-rknn 转换产物（fp16/rk3576）
+  min_detection_confidence: 0.5                # pose presence 阈值（vendor 0.5）
+backend:
+  core_mask: 0                                 # 0=AUTO（默认；板上实测 2 核 NPU 用 auto 最稳）
+  verbose: false
+source:
+  mode: image                                  # image | ros | camera（板上标准 = ros）
+  rgb_path: images/pose_demo.jpg               # mode=image 时必填（可放任意全身照）
+  ros:
+    rgb_topic: /ascamera_hp60c/camera_publisher/rgb0/image   # 严禁 remap
+    timeout: 5.0
+display:
+  show: false                                  # SSH 无显示器默认关；--display 覆盖
+  window_name: "Pose Detection"                # vendor 10_姿态检测 窗口名
+server:
+  port: 8082                                   # MJPEG 端口（09=8081 之后，避免冲突）
+  stream_name: pose.mjpg                       # 已含 .mjpg，勿再追加

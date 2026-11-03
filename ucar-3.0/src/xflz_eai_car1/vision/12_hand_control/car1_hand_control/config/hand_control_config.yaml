@@ -1,0 +1,24 @@
+# 实验 12 手指控制配置（schema: hand_control_core/config.py REQUIRED）
+model:
+  detector_model: /home/iflytek/ros2_ws/src/xflz_eai_car1/vision/12_hand_control/models/hand_detector.rknn             # 手掌检测 192×192
+  landmark_model: /home/iflytek/ros2_ws/src/xflz_eai_car1/vision/12_hand_control/models/hand_landmarks_detector.rknn   # 21 点关键点 224×224
+  embedder_model: /home/iflytek/ros2_ws/src/xflz_eai_car1/vision/12_hand_control/models/gesture_embedder.rknn          # 21点→128维
+  classifier_model: /home/iflytek/ros2_ws/src/xflz_eai_car1/vision/12_hand_control/models/canned_gesture_classifier.rknn # 128维→8类手势
+  max_hands: 2                                   # 最多跟踪手数（1..2）
+  min_detection_confidence: 0.5                  # 手掌检测分数阈值
+  min_tracking_confidence: 0.5                   # 21 点 presence 阈值
+backend:
+  core_mask: 0                                   # 0=AUTO（默认；板上 2 核 NPU 用 auto 最稳）
+  verbose: false
+source:
+  mode: image                                    # image | ros | camera（板上标准 = ros）
+  rgb_path: images/hand_demo.jpg                 # mode=image 时必填（可放任意伸手照片）
+  ros:
+    rgb_topic: /ascamera_hp60c/camera_publisher/rgb0/image   # 严禁 remap
+    timeout: 5.0
+display:
+  show: false                                    # SSH 无显示器默认关；--display 覆盖
+  window_name: "Hand Control"                    # vendor 12 窗口名（'f' 切特效）
+server:
+  port: 8084                                     # MJPEG 端口（09..11 之后）
+  stream_name: hand.mjpg                         # 已含 .mjpg，勿再追加

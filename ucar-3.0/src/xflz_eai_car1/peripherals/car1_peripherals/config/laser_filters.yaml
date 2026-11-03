@@ -1,0 +1,23 @@
+/**:
+  ros__parameters:
+    # Filter out angular range where the lidar sees the robot body (arm, chassis edges).
+    # Angles are in radians. 0 = front, π/2 = left, -π/2 = right, ±π = back.
+    # Adjust lower_angle and upper_angle based on where your arm/body blocks the scan.
+
+    filter1:
+      name: angular_bounds_filter
+      type: laser_filters/LaserScanAngularBoundsFilterInPlace
+      params:
+        lower_angle: 2.8   # ~160° (back-left) - adjust if arm is in a different position
+        upper_angle: -2.8  # ~-160° (back-right)
+
+    # Optional: filter out very close points (< 10cm) that are likely the robot itself
+    filter2:
+      name: range_filter
+      type: laser_filters/LaserScanRangeFilter
+      params:
+        use_message_range_limits: false
+        lower_threshold: 0.10  # Ignore anything closer than 10cm
+        upper_threshold: 16.0
+        lower_replacement_value: .nan
+        upper_replacement_value: .inf

@@ -1,0 +1,7 @@
+# 实验 06 — 依赖说明（2026-08-06 更新）
+#
+# 板上（~/ros2_venv）：numpy、opencv-python 4.11、rknn-toolkit2 2.3.2 完整版（均已装）
+#   + mjpeg_streamer==2024.2.8（2026-08-06 用户决策：MJPEG 统一此库，入口 require() 检测）
+# 本地单测（WSL rknn23）：numpy、opencv-python、pyyaml、pytest、mjpeg_streamer（均已装）
+# 模型 yolov8n-seg.pt 由 ultralytics 下载（PC 导出侧）。
+# 安装：pip install -i https://pypi.tuna.tsinghua.edu.cn/simple mjpeg_streamer

@@ -1,0 +1,11 @@
+# 实验 01 — 依赖说明（全部已装，无新增）
+#
+# 部署侧（RK3576 板，~/ros2_venv，py3.10.12）：全部已核实安装，见 ../../runtime/board/requirements.txt
+#   rknn-toolkit2==2.3.2（转换+推理）、numpy、opencv-python 4.11、onnx、onnxruntime、pyyaml
+#
+# 训练侧（PC，环境自理）：需安装仓库内 RKNN 优化 fork：
+#   pip install -e /home/iflytek/Src/AIoT_B2/ultralytics_yolov8-main
+#   fork 约束：numpy<2.0, torch>=1.8（其 pyproject.toml 已声明）
+#   训练/导出命令见 scripts/train.sh、scripts/export_onnx.sh
+#
+# 本实验不引入任何新的第三方依赖。

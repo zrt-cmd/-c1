@@ -1,0 +1,35 @@
+# Local environments and generated files
+**/build/
+**/install/
+**/log/
+**/logs/
+**/venv/
+**/.venv/
+**/__pycache__/
+*.py[cod]
+*.egg-info/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+nul
+
+# Local credentials and agent state
+.env
+.env.*
+!.env.example
+auth.json
+*.pem
+id_rsa
+id_ed25519
+**/.claude/
+**/.codex/
+
+# Diagnostic checkpoints and new run outputs
+*.ready
+*.continue
+tune/results/
+tune/runs/
+*.log
+*.db-wal
+*.db-shm

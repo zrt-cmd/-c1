@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+    <!-- Gazebo 物理参数宏 -->
+    <xacro:macro name="gazebo_link" params="name">
+        <gazebo reference="${name}">
+            <kp>0</kp>
+            <kd>0</kd>
+            <mu1>1</mu1>
+            <mu2>1</mu2>
+            <minDepth>0.000</minDepth>
+            <material>Gazebo/White</material>
+        </gazebo>
+    </xacro:macro>
+
+    <!-- 夹爪物理参数（高摩擦力） -->
+    <xacro:macro name="gazebo_gripper" params="name">
+        <gazebo reference="${name}">
+            <kp>1e15</kp>           <!-- 高刚度确保抓取稳定 -->
+            <kd>1e13</kd>           <!-- 高阻尼减少震荡 -->
+            <mu1>1.0</mu1>          <!-- 摩擦系数 -->
+            <mu2>1.0</mu2>
+            <minDepth>0.0002</minDepth>
+            <material>Gazebo/Black</material>
+        </gazebo>
+    </xacro:macro>
+
+    <!-- 应用到所有连杆 -->
+    <xacro:macro name="car1_gazebo" params="prefix">
+        <!-- 机械臂连杆 -->
+        <xacro:gazebo_link name="${prefix}arm_base_link"/>
+        <xacro:gazebo_link name="${prefix}arm_link1"/>
+        <xacro:gazebo_link name="${prefix}arm_link2"/>
+        <xacro:gazebo_link name="${prefix}arm_link3"/>
+        <xacro:gazebo_link name="${prefix}arm_link4"/>
+        <xacro:gazebo_link name="${prefix}arm_link5"/>
+        <xacro:gazebo_link name="${prefix}arm_link6"/>
+
+        <!-- 夹爪连杆（高摩擦力） -->
+        <xacro:gazebo_gripper name="${prefix}r_link"/>
+        <xacro:gazebo_gripper name="${prefix}l_link"/>
+        <xacro:gazebo_gripper name="${prefix}r_in_link"/>
+        <xacro:gazebo_gripper name="${prefix}l_in_link"/>
+        <xacro:gazebo_gripper name="${prefix}r_out_link"/>
+        <xacro:gazebo_gripper name="${prefix}l_out_link"/>
+
+        <!-- 底盘连杆 -->
+        <xacro:gazebo_link name="${prefix}base_link"/>
+    </xacro:macro>
+</robot>

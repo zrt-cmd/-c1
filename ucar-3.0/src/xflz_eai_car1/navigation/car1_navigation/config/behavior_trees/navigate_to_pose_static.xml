@@ -1,0 +1,12 @@
+<!--
+  Static-path behavior tree for fixed-map parameter tuning.
+  Computes the global path once, then follows it without replanning.
+-->
+<root BTCPP_format="4">
+  <BehaviorTree ID="NavigateStatic">
+    <PipelineSequence name="NavigateStatic">
+      <ComputePathToPose goal="{goal}" path="{path}" planner_id="GridBased"/>
+      <FollowPath path="{path}" controller_id="FollowPath"/>
+    </PipelineSequence>
+  </BehaviorTree>
+</root>

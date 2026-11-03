@@ -1,0 +1,32 @@
+# car1_app default parameters
+line_following:
+  ros__parameters:
+    linear_speed: 0.1
+    kp: 0.8
+    ki: 0.0
+    kd: 0.2
+    target_color_lab: [0, 0, 0]
+
+object_tracking:
+  ros__parameters:
+    kp_yaw: 0.5
+    kd_yaw: 0.1
+    kp_dist: 0.3
+    target_color_lab: [0, 0, 0]
+    target_radius: 80
+
+hand_gesture:
+  ros__parameters:
+    linear_speed: 0.15
+    angular_speed: 0.3
+
+lidar_controller:
+  ros__parameters:
+    obstacle_threshold: 0.35
+    linear_speed: 0.15
+    angular_speed: 0.5
+
+track_and_grab:
+  ros__parameters:
+    target_color_lab: [0, 0, 0]
+    grab_height: 0.05

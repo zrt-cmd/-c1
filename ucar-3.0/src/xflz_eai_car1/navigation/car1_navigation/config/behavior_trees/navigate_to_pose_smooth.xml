@@ -1,0 +1,24 @@
+<!--
+  NavigateToPose with path smoothing: the smoothed arc lets the robot
+  round tight corners instead of pivoting in place.
+-->
+<root BTCPP_format="4">
+  <BehaviorTree ID="NavigateSmooth">
+    <PipelineSequence name="NavigateSmooth">
+      <RateController hz="1.0">
+        <RecoveryNode number_of_retries="1" name="ComputePathToPose">
+          <ComputePathToPose goal="{goal}" path="{path}" planner_id="GridBased"/>
+          <ClearEntireCostmap name="ClearGlobalCostmap-Context"
+            service_name="global_costmap/clear_entirely_global_costmap"/>
+        </RecoveryNode>
+      </RateController>
+      <SmoothPath unsmoothed_path="{path}" smoothed_path="{path}"
+        smoother_id="SimpleSmoother"/>
+      <RecoveryNode number_of_retries="1" name="FollowPath">
+        <FollowPath path="{path}" controller_id="FollowPath"/>
+        <ClearEntireCostmap name="ClearLocalCostmap-Context"
+          service_name="local_costmap/clear_entirely_local_costmap"/>
+      </RecoveryNode>
+    </PipelineSequence>
+  </BehaviorTree>
+</root>

@@ -1,0 +1,7 @@
+# 实验 08 — 依赖说明（2026-08-06 更新）
+#
+# 本地/板上：numpy、opencv-python、pyyaml、pytest（均已装）
+#   + mjpeg_streamer==2024.2.8（2026-08-06 用户决策：MJPEG 统一此库，入口 require() 检测）
+# 板上 ROS 模式：rclpy + cv_bridge + sensor_msgs（ROS 2 Humble 自带，不属新增依赖）
+# 无模型、无推理池。
+# 安装：pip install -i https://pypi.tuna.tsinghua.edu.cn/simple mjpeg_streamer

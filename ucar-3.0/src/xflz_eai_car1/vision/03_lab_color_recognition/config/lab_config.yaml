@@ -1,0 +1,44 @@
+# 实验 03 — HSV 颜色过滤 配置
+# 对应课程：OpenCV 应用——RGB 颜色过滤 / HSV 颜色追踪（vendor 03_lab/03_颜色追踪）
+# 注意：目录名 "lab" = 实验，不是 Lab 色彩空间；颜色阈值是 **HSV**（H∈0-179，S/V∈0-255）
+# 红色在 H=0/180 交界 → 用 h2 配第二段（车端 visual_grasp 同款取值）
+
+colors:
+  - name: 红色            # 显示名（窗口左下方打印）
+    h: [0, 15]            # H 通道 [min, max]
+    s: [100, 255]         # S 饱和度
+    v: [80, 255]          # V 明度
+    h2: [160, 180]        # H 环形第二段（红色专用；其他颜色省略该键）
+  - name: 绿色
+    h: [35, 85]
+    s: [80, 255]
+    v: [80, 255]
+  - name: 蓝色
+    h: [90, 130]
+    s: [80, 255]
+    v: [80, 255]
+
+morph:
+  open_kernel: 5          # 开运算核（去噪点），奇数
+  close_kernel: 9         # 闭运算核（填孔洞），奇数
+  open_iter: 1
+  close_iter: 1
+
+contour:
+  min_area: 500           # 最小轮廓面积（滤噪）
+  min_radius: 10          # 最小外接圆半径
+  max_radius: 400         # 最大外接圆半径
+
+camera:
+  index: 0                # cv2.VideoCapture 索引（无 ROS 的 UVC 回退用）
+  width: 640
+  height: 480
+
+source:
+  ros:
+    rgb_topic: /ascamera_hp60c/camera_publisher/rgb0/image   # ascamera HP60C 原生话题（勿 remap）
+    timeout: 5.0                                             # 首帧等待秒数
+
+display:
+  show: false             # 本地窗口（需显示器；板上置 false 走 MJPEG）
+  window_name: lab_color

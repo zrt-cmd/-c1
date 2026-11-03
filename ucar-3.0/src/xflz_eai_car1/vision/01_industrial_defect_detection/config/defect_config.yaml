@@ -1,0 +1,46 @@
+# 实验 01 — 工业表面缺陷检测 配置
+# 所有路径相对本文件所在项目根（01_industrial_defect_detection/）或绝对路径
+
+dataset:
+  # 训练数据（PC 端路径）；板上推理/评测不需要训练集
+  root: /home/iflytek/Src/AIoT_B2/NEU-DET.v1i.yolov8
+  data_yaml: data.yaml
+  splits: [train, valid, test]
+
+train:
+  # 训练侧（PC，环境自理）：fork 基线 ultralytics 8.3.229，numpy<2.0
+  fork: /home/iflytek/Src/AIoT_B2/ultralytics_yolov8-main
+  model: yolov8n.pt
+  imgsz: 640
+  epochs: 100
+  batch: 8
+  device: 0            # 无 CUDA 时改 cpu；GTX1060 6GB 建议 batch<=8
+  project: runs/train_neu_course
+  name: yolov8n_img640_e100
+  run_dir: train       # 已交付训练产物（weights/ + 曲线 + args.yaml），无需重训
+
+infer:
+  imgsz: 640
+  score_thr: 0.25
+  iou_thr: 0.45
+  pad_color: [0, 0, 0]   # 与 rknn_model_zoo 一致（RGA 填充为 0），勿改 114
+
+source:
+  ros:
+    rgb_topic: /ascamera_hp60c/camera_publisher/rgb0/image   # ascamera HP60C 原生话题（勿 remap）
+    timeout: 5.0                                             # 首帧等待秒数
+
+server:
+  port: 8080
+  stream_name: defect.mjpg
+
+rknn:
+  target_platform: rk3576
+  quantize: true          # int8 量化（convert_rknn.py 使用；schema 必填键）
+  calib_count: 200       # 校准图片数（val 集抽取）
+  onnx_model: train/weights/best.onnx
+  rknn_model: models/defect_yolov8n_int8.rknn
+
+eval:
+  split: valid           # mAP50 评测用验证集
+  iou_thr: 0.5

@@ -1,0 +1,6 @@
+name: home
+description: 所有关节回到中位（1500）
+actions:
+  - name: go_home
+    duration: 3.0
+    servos: {0: 1500, 1: 1500, 2: 1500, 3: 1500, 4: 1500, 5: 1500}

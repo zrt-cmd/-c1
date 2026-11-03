@@ -1,0 +1,25 @@
+# 实验 10 姿态关键点配置（schema: pose_control_core/config.py REQUIRED）
+model:
+  pose_model: /home/iflytek/ros2_ws/src/xflz_eai_car1/vision/11_pose_control/models/pose_landmark_full.rknn   # 绝对路径（免 install 部署）   # mediapipe-rknn 转换产物（fp16/rk3576）
+  min_detection_confidence: 0.5                # pose presence 阈值（vendor 0.5）
+backend:
+  core_mask: 0                                 # 0=AUTO（默认；板上实测 2 核 NPU 用 auto 最稳）
+  verbose: false
+source:
+  mode: image                                  # image | ros | camera（板上标准 = ros）
+  rgb_path: images/pose_demo.jpg               # mode=image 时必填（可放任意全身照）
+  ros:
+    rgb_topic: /ascamera_hp60c/camera_publisher/rgb0/image   # 严禁 remap
+    timeout: 5.0
+display:
+  show: false                                  # SSH 无显示器默认关；--display 覆盖
+  window_name: "Pose Detection"                # vendor 10_姿态检测 窗口名
+server:
+  port: 8083                                   # MJPEG 端口（09=8081、10=8082 之后）
+  stream_name: pose_control.mjpg              # 已含 .mjpg，勿再追加
+control:
+  publish_cmd_vel: false                      # 节点模式是否发布 /cmd_vel（默认关，避免误动）
+  linear: 0.2                                 # 前进/后退线速度 m/s（车 clamp ±0.3 内）
+  angular: 0.8                                # 转向角速度 rad/s（车 clamp ±1.0 内）
+  topic: /cmd_vel                             # 目标话题（车 /cmd_vel 经 clamp）
+  print_interval: 2.0                         # 终端打印当前动作间隔（秒，0 = 关闭）

@@ -1,0 +1,5 @@
+# car1 主控板 / 雷达串口固定别名
+# 绑定物理 USB 口(KERNELS), 不依赖 ttyUSB 枚举序号(会随插拔顺序变化)
+# 实测: 1-1.3 = STM32 主控(1M, AA55协议), 1-1.4 = COIN-D6 雷达(230400)
+SUBSYSTEM=="tty", KERNEL=="ttyUSB*", KERNELS=="1-1.3:1.0", MODE="0666", SYMLINK+="car1_stm32"
+SUBSYSTEM=="tty", KERNEL=="ttyUSB*", KERNELS=="1-1.4:1.0", MODE="0666", SYMLINK+="car1_lidar"

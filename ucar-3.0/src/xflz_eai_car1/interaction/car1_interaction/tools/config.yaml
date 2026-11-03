@@ -1,0 +1,63 @@
+# ============================================================================
+# 实时语音交互系统配置文件
+# ============================================================================
+
+# --- 音频设备 ---
+audio:
+  capture_device: "plughw:0,0"   # 录音 ALSA 设备
+  playback_device: "plughw:0,0"  # 播放 ALSA 设备
+  sample_rate: 16000             # 采样率 (Hz)
+  chunk_size: 4000               # 每帧采样数 (~250ms @16kHz)
+  capture_volume: 100            # 麦克风音量 0-100%
+  playback_volume: 100           # 扬声器音量 0-100%
+  mic_boost: true                # 启用 ALC + Mic 输入切换
+
+# --- 唤醒词检测 (KWS 持续运行，无 VAD 门控) ---
+kws:
+  model_dir: "/home/iflytek/models/zipformer_kws"
+  keywords_file: "keywords.txt"  # 相对于本脚本目录
+  threshold: 0.25                # 检测灵敏度 (越低越灵敏)
+  keywords_score: 1.0
+  provider: "cpu"
+
+# --- 语音识别 ---
+asr:
+  model_dir: "/home/iflytek/models/zipformer_onnx"
+  provider: "cpu"                  # cpu（ONNX 模型，原 rknn 效果差已弃用）
+  blank_penalty: 0.25            # blank 惩罚 (0.25 参考 asr_test.py 优化值)
+  rule1_silence: 4.5             # 无文本时端点静音 (s，避免噪音误触发)
+  rule2_silence: 1.5             # 有文本后端点静音 (s，说话停顿判定)
+  rule3_min_utt: 300.0           # 最小语音长度 (s，300=禁用此规则)
+
+# --- 大语言模型 ---
+llm:
+  server_url: "http://127.0.0.1:8080"  # LLM 服务地址（修改端口号避免冲突，如 :8081）
+  temperature: 0.8
+  top_p: 0.9
+  max_tokens: 4096
+  repeat_penalty: 1.1
+  timeout: 120
+  system_prompt: "你是小飞，一个智能语音助手。请用简洁口语化的中文回答问题，每次回答控制在2-3句话。重要：必须用中文回答。"
+
+# --- LLM 服务进程 (内嵌启动，无需手动运行 llm_server.py) ---
+# 注意：程序退出时会自动停止 LLM 服务，避免后台残留进程
+llm_server:
+  auto_start: true              # 是否自动启动 LLM 服务 (false = 手动启动外部服务)
+  auto_kill_conflict: true      # 端口被占用时自动清理旧进程 (false = 提示手动清理)
+  model: "/home/iflytek/models/rkllm/Qwen3.5-0.8B_w4a16_g128_rk3576.rkllm"
+  platform: "rk3576"
+  fix_freq: false               # 是否锁定 NPU/CPU/GPU 频率 (需要 sudo)
+  lib_path: "/usr/lib/librkllmrt.so"       # RKLLM 运行时库路径
+  venv_python: "/home/iflytek/ros2_venv/bin/python3"
+
+# --- 语音合成 ---
+tts:
+  model_dir: "/home/iflytek/models/tts"
+  speed: 1.0
+  gain: 1.0                      # 1.0=不放大 (ALSA已限幅到-12dB); >1.0会用tanh软裁剪
+  sid: 0
+  num_threads: 4
+
+# --- 交互参数 ---
+interaction:
+  resource_dir: "resource"       # 提示音目录 (相对于本脚本目录)

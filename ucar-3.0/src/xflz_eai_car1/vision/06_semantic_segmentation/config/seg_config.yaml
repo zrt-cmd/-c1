@@ -1,0 +1,38 @@
+# 实验 06 — 语义分割背景替换（课程名：语义分割背景分割）
+
+model:
+  rknn: models/yolov8n-seg.rknn    # 板上转换产物（13 输出，已随仓库交付；n=3.2M 参数）
+  onnx: models/yolov8n-seg.onnx    # model zoo 优化版（13 输出，已随仓库交付）
+  imgsz: 640
+  score_thr: 0.25
+  iou_thr: 0.45
+  mask_thr: 0.5                     # 掩码二值化阈值
+  classes: [0]                      # 保留类别（COCO id；0=person；空列表=全部）
+
+source:
+  ros:
+    rgb_topic: /ascamera_hp60c/camera_publisher/rgb0/image   # ascamera HP60C 原生话题（勿 remap）
+    timeout: 5.0                                             # 首帧等待秒数
+
+pool:
+  workers: 3                        # RK3576 三核 NPU
+  queue_size: 4
+  core_mask: auto                   # auto | round_robin（多线程按 tid%3 绑 NPU 核）
+
+background:
+  mode: black                       # black | solid | image
+  color: [0, 0, 0]                  # solid 模式的 BGR 填充色
+  image: ""                         # image 模式的自定义背景图（相对本项目根）
+
+camera:
+  index: 0
+  width: 640
+  height: 480
+
+display:
+  show: false
+  window_name: seg_background
+
+server:
+  port: 8080
+  stream_name: seg.mjpg

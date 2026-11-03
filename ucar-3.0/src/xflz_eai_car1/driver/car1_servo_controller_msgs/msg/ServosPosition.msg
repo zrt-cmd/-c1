@@ -1,0 +1,3 @@
+float64 duration
+string position_unit
+car1_servo_controller_msgs/ServoPosition[] position

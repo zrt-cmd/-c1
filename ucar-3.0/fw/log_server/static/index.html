@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>STM32 串口日志</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header class="toolbar">
+    <div class="tool-group">
+      <label>端口
+        <select id="port-select"></select>
+      </label>
+      <button id="port-refresh" title="刷新端口列表">⟳</button>
+      <label>波特率
+        <select id="baud-select">
+          <option>9600</option>
+          <option>19200</option>
+          <option>38400</option>
+          <option>57600</option>
+          <option selected>115200</option>
+          <option>230400</option>
+          <option>460800</option>
+          <option>921600</option>
+          <option>1000000</option>
+        </select>
+      </label>
+      <button id="apply-config" class="primary">应用</button>
+    </div>
+
+    <div class="tool-group">
+      <label>视图
+        <select id="view-mode">
+          <option value="text" selected>文本</option>
+          <option value="hex">Hex</option>
+        </select>
+      </label>
+      <label class="checkbox">
+        <input type="checkbox" id="show-ts" checked /> 时间戳
+      </label>
+      <label class="checkbox">
+        <input type="checkbox" id="autoscroll" checked /> 自动滚动
+      </label>
+    </div>
+
+    <div class="tool-group grow">
+      <label class="filter">过滤
+        <input type="text" id="filter-input" placeholder="正则表达式，留空显示全部" />
+      </label>
+      <label class="checkbox">
+        <input type="checkbox" id="filter-invert" /> 反选
+      </label>
+    </div>
+
+    <div class="tool-group">
+      <button id="clear-btn">清屏</button>
+      <button id="download-btn">下载</button>
+    </div>
+  </header>
+
+  <main id="log-view" class="log-view"></main>
+
+  <footer class="statusbar">
+    <span id="conn-indicator" class="dot dot-off"></span>
+    <span id="conn-text">未连接</span>
+    <span class="sep">|</span>
+    <span>端口 <b id="stat-port">-</b></span>
+    <span>波特率 <b id="stat-baud">-</b></span>
+    <span class="sep">|</span>
+    <span>字节 <b id="stat-bytes">0</b></span>
+    <span>行 <b id="stat-lines">0</b></span>
+    <span>丢弃 <b id="stat-dropped">0</b></span>
+    <span class="sep">|</span>
+    <span id="stat-error" class="error-text"></span>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

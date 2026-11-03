@@ -1,0 +1,26 @@
+/**:
+  ros__parameters:
+    # TTS 引擎
+    engine: "sherpa"  # sherpa = 离线 Matcha-TTS（本节点唯一实现）
+
+    # 合成参数
+    model_dir: "/home/iflytek/models/tts"   # Matcha-TTS 模型目录
+    speed: 1.0                              # 语速 (0.5-2.0)
+    gain: 3.0                               # 数字增益；>1.0 用 tanh 软裁剪防削波
+                                            #   1.5=正常音量，3.0=明显更大，3.5-4.0=很大(略失真)
+    sid: 0                                  # 音色 (0 = 默认女声)
+    num_threads: 4                          # 合成线程数
+
+    # 播放参数
+    playback_device: "plughw:0,0"           # 播放 ALSA 设备
+    sample_rate: 16000                      # 合成采样率
+    playback_volume: 100                    # 喇叭音量 0-100（越大越响，100=最大安全值）
+    audio_card: 0                           # 声卡号（amixer -c）
+
+    # 录音音量（仅调 ES8388 麦克风增益，供拾音参考；录音/降噪在 wake_word_node）
+    capture_volume: 88                      # 麦克风音量 0-100
+    mic_boost: true                         # 启用 ALC + Mic 输入切换
+
+    # 保留参数（兼容，sherpa 用 model_dir/sid/speed）
+    voice: "xiaoyan"                        # 音色名（仅记录，实际用 sid）
+    audio_device_index: -1

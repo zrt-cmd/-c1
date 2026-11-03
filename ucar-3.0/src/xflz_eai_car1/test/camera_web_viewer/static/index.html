@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HP60C RGBD 相机查看器</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- 侧边栏 -->
+    <aside id="sidebar">
+      <h1>RGBD 相机</h1>
+
+      <div class="panel">
+        <div class="panel-title">连接状态</div>
+        <div class="status-row">
+          <span class="dot" id="conn-dot"></span>
+          <span id="conn-text">连接中...</span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">帧率 (FPS)</div>
+        <div class="fps-row"><span>RGB</span><span id="fps-rgb">0.0</span></div>
+        <div class="fps-row"><span>Depth</span><span id="fps-depth">0.0</span></div>
+        <div class="fps-row"><span>点云</span><span id="fps-pc">0.0</span></div>
+        <div class="fps-row"><span>Web 接收</span><span id="fps-web">0.0</span></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">深度可视化</div>
+        <label class="ctl">
+          色彩映射
+          <select id="colormap-info" disabled>
+            <option>TURBO (后端固定)</option>
+          </select>
+        </label>
+        <div class="hint">深度范围: 0 - 5.0 m</div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">点击查询</div>
+        <div id="pick-info">在 RGB 或 Depth 画面点击查询坐标</div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">3D 视图</div>
+        <button id="reset-view" class="btn">重置视角</button>
+        <label class="ctl">
+          点大小
+          <input type="range" id="point-size" min="1" max="6" value="2" step="0.5">
+        </label>
+      </div>
+    </aside>
+
+    <!-- 主区域 -->
+    <main id="main">
+      <div id="tabs">
+        <button class="tab active" data-tab="2d">2D</button>
+        <button class="tab" data-tab="3d">3D</button>
+      </div>
+
+      <div id="view-2d" class="view active">
+        <div class="dual-wrap">
+          <div class="canvas-wrap">
+            <div class="cam-label">RGB</div>
+            <canvas id="canvas-rgb"></canvas>
+            <div class="overlay-fps" id="overlay-rgb">--</div>
+          </div>
+          <div class="canvas-wrap">
+            <div class="cam-label">Depth</div>
+            <canvas id="canvas-depth"></canvas>
+            <div class="overlay-fps" id="overlay-depth">--</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="view-3d" class="view">
+        <div class="canvas-wrap">
+          <div id="canvas-3d"></div>
+          <div class="overlay-fps" id="overlay-3d">--</div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="libs/socket.io.min.js"></script>
+  <script src="libs/pako.min.js"></script>
+  <script src="libs/three.min.js"></script>
+  <script src="libs/OrbitControls.js"></script>
+  <script src="pointcloud_viewer.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

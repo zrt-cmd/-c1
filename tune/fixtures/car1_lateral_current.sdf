@@ -1,0 +1,1535 @@
+<sdf version='1.11'>
+  <model name='car1'>
+    <link name='base_footprint'>
+      <inertial>
+        <pose>0.0063427188337600001 0.0017792937276129371 0.081607941896778377 0 0 0</pose>
+        <mass>2.1703932773546661</mass>
+        <inertia>
+          <ixx>0.0066221919422588026</ixx>
+          <ixy>2.182771395161143e-05</ixy>
+          <ixz>-0.0009434617982884844</ixz>
+          <iyy>0.011736619605195829</iyy>
+          <iyz>2.9093116774832589e-05</iyz>
+          <izz>0.013924691460469469</izz>
+        </inertia>
+      </inertial>
+      <collision name='base_footprint_fixed_joint_lump__base_link_collision'>
+        <pose>0 0 0.029000000000000001 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://car1_description/meshes/base_link.STL</uri>
+          </mesh>
+        </geometry>
+        <surface>
+          <contact>
+            <ode>
+              <kp>0</kp>
+              <kd>0</kd>
+              <min_depth>0</min_depth>
+            </ode>
+          </contact>
+          <friction>
+            <ode>
+              <mu>1</mu>
+              <mu2>1</mu2>
+            </ode>
+          </friction>
+        </surface>
+      </collision>
+      <collision name='base_footprint_fixed_joint_lump__arm_base_link_collision_1'>
+        <pose>0.046623684387001797 0 0.086000000000000701 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://car1_description/meshes/arm_base_link.STL</uri>
+          </mesh>
+        </geometry>
+        <surface>
+          <contact>
+            <ode>
+              <kp>0</kp>
+              <kd>0</kd>
+              <min_depth>0</min_depth>
+            </ode>
+          </contact>
+          <friction>
+            <ode>
+              <mu>1</mu>
+              <mu2>1</mu2>
+            </ode>
+          </friction>
+        </surface>
+      </collision>
+      <collision name='base_footprint_fixed_joint_lump__imu_link_collision_2'>
+        <pose>-0.071249999999999994 -0.0016100000000000001 0.0901 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://car1_description/meshes/imu_link.STL</uri>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name='base_footprint_fixed_joint_lump__laser_link_collision_3'>
+        <pose>0.146213088049965 0 0.3664000000000005 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://car1_description/meshes/laser_link.STL</uri>
+          </mesh>
+        </geometry>
+        <surface>
+          <contact>
+            <ode/>
+          </contact>
+          <friction>
+            <ode/>
+          </friction>
+        </surface>
+      </collision>
+      <visual name='base_footprint_fixed_joint_lump__base_link_visual'>
+        <pose>0 0 0.029000000000000001 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://car1_description/meshes/base_link.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <name>Gazebo/White</name>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+          </script>
+          <diffuse>1 1 1 1</diffuse>
+          <ambient>1 1 1 1</ambient>
+        </material>
+      </visual>
+      <visual name='base_footprint_fixed_joint_lump__arm_base_link_visual_1'>
+        <pose>0.046623684387001797 0 0.086000000000000701 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://car1_description/meshes/arm_base_link.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <name>Gazebo/White</name>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+          </script>
+          <diffuse>1 1 1 1</diffuse>
+          <ambient>1 1 1 1</ambient>
+        </material>
+      </visual>
+      <visual name='base_footprint_fixed_joint_lump__imu_link_visual_2'>
+        <pose>-0.071249999999999994 -0.0016100000000000001 0.0901 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://car1_description/meshes/imu_link.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>1 1 1 1</diffuse>
+          <ambient>1 1 1 1</ambient>
+        </material>
+      </visual>
+      <visual name='base_footprint_fixed_joint_lump__laser_link_visual_3'>
+        <pose>0.146213088049965 0 0.3664000000000005 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://car1_description/meshes/laser_link.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>0.225490198 0.240196079 0.264705896 1</diffuse>
+          <ambient>0.225490198 0.240196079 0.264705896 1</ambient>
+        </material>
+      </visual>
+      <sensor name='lidar' type='gpu_lidar'>
+        <topic>/scan</topic>
+        <update_rate>15</update_rate>
+        <always_on>true</always_on>
+        <visualize>true</visualize>
+        <lidar>
+          <scan>
+            <horizontal>
+              <samples>360</samples>
+              <resolution>1</resolution>
+              <min_angle>-2.0943950999999998</min_angle>
+              <max_angle>2.0943950999999998</max_angle>
+            </horizontal>
+          </scan>
+          <range>
+            <min>0.050000000000000003</min>
+            <max>8</max>
+            <resolution>0.01</resolution>
+          </range>
+          <noise>
+            <type>gaussian</type>
+            <mean>0</mean>
+            <stddev>0.01</stddev>
+          </noise>
+        </lidar>
+        <pose>0.14621300000000001 0 0.3664 0 0 0</pose>
+        <gz_frame_id>laser_link</gz_frame_id>
+      </sensor>
+    </link>
+    <joint name='arm_joint1' type='revolute'>
+      <pose relative_to='base_footprint'>0.056623684387002098 0 0.12950000000000059 0 0 0</pose>
+      <parent>base_footprint</parent>
+      <child>arm_link1</child>
+      <axis>
+        <xyz>0 0 1</xyz>
+        <limit>
+          <lower>-3.1400000000000001</lower>
+          <upper>3.1400000000000001</upper>
+          <effort>100</effort>
+          <velocity>1</velocity>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='arm_link1'>
+      <pose relative_to='arm_joint1'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>-0.000418251258374441 -0.00025786342913715002 0.0370385769336787 0 0 0</pose>
+        <mass>0.052144916665711603</mass>
+        <inertia>
+          <ixx>1.34157643595565e-05</ixx>
+          <ixy>-6.52850066286511e-09</ixy>
+          <ixz>-3.39315451025356e-10</ixz>
+          <iyy>8.3378395768632998e-06</iyy>
+          <iyz>-1.5832457078347399e-07</iyz>
+          <izz>1.21144507233708e-05</izz>
+        </inertia>
+      </inertial>
+      <collision name='arm_link1_collision'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://car1_description/meshes/arm_link1.STL</uri>
+          </mesh>
+        </geometry>
+        <surface>
+          <contact>
+            <ode>
+              <kp>0</kp>
+              <kd>0</kd>
+              <min_depth>0</min_depth>
+            </ode>
+          </contact>
+          <friction>
+            <ode>
+              <mu>1</mu>
+              <mu2>1</mu2>
+            </ode>
+          </friction>
+        </surface>
+      </collision>
+      <visual name='arm_link1_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://car1_description/meshes/arm_link1.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <name>Gazebo/White</name>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+          </script>
+          <diffuse>1 1 1 1</diffuse>
+          <ambient>1 1 1 1</ambient>
+        </material>
+      </visual>
+    </link>
+    <joint name='arm_joint2' type='revolute'>
+      <pose relative_to='arm_link1'>0.00018583109733894001 0.024999793338326401 0.059466659023922501 0 0 0</pose>
+      <parent>arm_link1</parent>
+      <child>arm_link2</child>
+      <axis>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-3.1400000000000001</lower>
+          <upper>3.1400000000000001</upper>
+          <effort>100</effort>
+          <velocity>1</velocity>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='arm_link2'>
+      <pose relative_to='arm_joint2'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>0.083009755091814005 -0.00056118184450021401 -0.0250648471873651 0 0 0</pose>
+        <mass>0.115019163400054</mass>
+        <inertia>
+          <ixx>3.70279262907048e-05</ixx>
+          <ixy>-3.6226253543452998e-08</ixy>
+          <ixz>-4.9609009986583502e-08</ixz>
+          <iyy>0.000103548728270041</iyy>
+          <iyz>2.3863319200737699e-09</iyz>
+          <izz>7.7757099817630704e-05</izz>
+        </inertia>
+      </inertial>
+      <collision name='arm_link2_collision'>
+        <pose>0 0 0 -1.570796326794897 -1.5707963267948966 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://car1_description/meshes/arm_link2.STL</uri>
+          </mesh>
+        </geometry>
+        <surface>
+          <contact>
+            <ode>
+              <kp>0</kp>
+              <kd>0</kd>
+              <min_depth>0</min_depth>
+            </ode>
+          </contact>
+          <friction>
+            <ode>
+              <mu>1</mu>
+              <mu2>1</mu2>
+            </ode>
+          </friction>
+        </surface>
+      </collision>
+      <visual name='arm_link2_visual'>
+        <pose>0 0 0 -1.570796326794897 -1.5707963267948966 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://car1_description/meshes/arm_link2.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <name>Gazebo/White</name>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+          </script>
+          <diffuse>1 1 1 1</diffuse>
+          <ambient>1 1 1 1</ambient>
+        </material>
+      </visual>
+    </link>
+    <joint name='arm_joint3' type='revolute'>
+      <pose relative_to='arm_link2'>-0.000899642463045913 0.00024858085911078802 0.12614119779033001 0 0 0</pose>
+      <parent>arm_link2</parent>
+      <child>arm_link3</child>
+      <axis>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-3.1400000000000001</lower>
+          <upper>3.1400000000000001</upper>
+          <effort>100</effort>
+          <velocity>1</velocity>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='arm_link3'>
+      <pose relative_to='arm_joint3'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>0.083007772555229897 -0.00080211425357684695 -0.025064847187419199 0 0 0</pose>
+        <mass>0.115019163399872</mass>
+        <inertia>
+          <ixx>3.70282763894561e-05</ixx>
+          <ixy>1.56847284096989e-07</ixy>
+          <ixz>-4.9601874802112e-08</ixz>
+          <iyy>0.00010354837817120899</iyy>
+          <iyz>2.5303098736854902e-09</iyz>
+          <izz>7.7757099817596701e-05</izz>
+        </inertia>
+      </inertial>
+      <collision name='arm_link3_collision'>
+        <pose>0 0 0 -1.570796326794897 -1.5707963267948966 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://car1_description/meshes/arm_link3.STL</uri>
+          </mesh>
+        </geometry>
+        <surface>
+          <contact>
+            <ode>
+              <kp>0</kp>
+              <kd>0</kd>
+              <min_depth>0</min_depth>
+            </ode>
+          </contact>
+          <friction>
+            <ode>
+              <mu>1</mu>
+              <mu2>1</mu2>
+            </ode>
+          </friction>
+        </surface>
+      </collision>
+      <visual name='arm_link3_visual'>
+        <pose>0 0 0 -1.570796326794897 -1.5707963267948966 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://car1_description/meshes/arm_link3.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <name>Gazebo/White</name>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+          </script>
+          <diffuse>1 1 1 1</diffuse>
+          <ambient>1 1 1 1</ambient>
+        </material>
+      </visual>
+    </link>
+    <joint name='arm_joint4' type='revolute'>
+      <pose relative_to='arm_link3'>-0.00126575802529785 0.000248580859076416 0.12613805529324801 0 0 0</pose>
+      <parent>arm_link3</parent>
+      <child>arm_link4</child>
+      <axis>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-3.1400000000000001</lower>
+          <upper>3.1400000000000001</upper>
+          <effort>100</effort>
+          <velocity>1</velocity>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='arm_link4'>
+      <pose relative_to='arm_joint4'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>0.042911884348778503 0.0063088682699357097 -0.025043893417564699 0 0 0</pose>
+        <mass>0.058992531975675999</mass>
+        <inertia>
+          <ixx>2.3346464551439701e-05</ixx>
+          <ixy>-3.92327703059711e-07</ixy>
+          <ixz>3.7935158308348902e-10</ixz>
+          <iyy>3.8613235234168303e-05</iyy>
+          <iyz>-1.51106955001369e-10</iyz>
+          <izz>2.9988699477860902e-05</izz>
+        </inertia>
+      </inertial>
+      <collision name='arm_link4_collision'>
+        <pose>0 0 0 -1.570796326794897 -1.5707963267948966 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://car1_description/meshes/arm_link4.STL</uri>
+          </mesh>
+        </geometry>
+        <surface>
+          <contact>
+            <ode>
+              <kp>0</kp>
+              <kd>0</kd>
+              <min_depth>0</min_depth>
+            </ode>
+          </contact>
+          <friction>
+            <ode>
+              <mu>1</mu>
+              <mu2>1</mu2>
+            </ode>
+          </friction>
+        </surface>
+      </collision>
+      <visual name='arm_link4_visual'>
+        <pose>0 0 0 -1.570796326794897 -1.5707963267948966 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://car1_description/meshes/arm_link4.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <name>Gazebo/White</name>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+          </script>
+          <diffuse>1 1 1 1</diffuse>
+          <ambient>1 1 1 1</ambient>
+        </material>
+      </visual>
+    </link>
+    <joint name='arm_joint5' type='revolute'>
+      <pose relative_to='arm_link4'>0.00091871681106242596 -0.025282786973945801 0.074394993270017903 -3.67e-06 3.6700000000000004e-06 -3.1403826499999998</pose>
+      <parent>arm_link4</parent>
+      <child>arm_link5</child>
+      <axis>
+        <xyz>0 0 1</xyz>
+        <limit>
+          <lower>-3.1400000000000001</lower>
+          <upper>3.1400000000000001</upper>
+          <effort>100</effort>
+          <velocity>1</velocity>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='arm_link5'>
+      <pose relative_to='arm_joint5'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>-0.019052788665515959 0.0039385002484819036 0.025370304416758881 0 0 0</pose>
+        <mass>0.037782682517169243</mass>
+        <inertia>
+          <ixx>7.2561516258617479e-06</ixx>
+          <ixy>-3.6289394855171923e-08</ixy>
+          <ixz>3.9792985943790172e-07</ixz>
+          <iyy>6.5798803149643426e-06</iyy>
+          <iyz>-7.6573680501852686e-08</iyz>
+          <izz>9.7637623601164715e-06</izz>
+        </inertia>
+      </inertial>
+      <collision name='arm_link5_collision'>
+        <pose>0 0 0 0 0 -3.1403846089441738</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://car1_description/meshes/arm_link5.STL</uri>
+          </mesh>
+        </geometry>
+        <surface>
+          <contact>
+            <ode>
+              <kp>0</kp>
+              <kd>0</kd>
+              <min_depth>0</min_depth>
+            </ode>
+          </contact>
+          <friction>
+            <ode>
+              <mu>1</mu>
+              <mu2>1</mu2>
+            </ode>
+          </friction>
+        </surface>
+      </collision>
+      <collision name='arm_link5_fixed_joint_lump__arm_link6_collision_1'>
+        <pose>0.0030658146427527699 -4.0906812379283897e-05 0.0072150624961981298 3.1290671053671408 0.018284874618431247 -0.01359996102887227</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://car1_description/meshes/arm_link6.STL</uri>
+          </mesh>
+        </geometry>
+        <surface>
+          <contact>
+            <ode>
+              <kp>0</kp>
+              <kd>0</kd>
+              <min_depth>0</min_depth>
+            </ode>
+          </contact>
+          <friction>
+            <ode>
+              <mu>1</mu>
+              <mu2>1</mu2>
+            </ode>
+          </friction>
+        </surface>
+      </collision>
+      <visual name='arm_link5_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://car1_description/meshes/arm_link5.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <name>Gazebo/White</name>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+          </script>
+          <diffuse>1 1 1 1</diffuse>
+          <ambient>1 1 1 1</ambient>
+        </material>
+      </visual>
+      <visual name='arm_link5_fixed_joint_lump__arm_link6_visual_1'>
+        <pose>0.0030658146427527699 -4.0906812379283897e-05 0.0072150624961981298 3.1279833524455598 -1.5616534634517507 9.4868947464994217e-17</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://car1_description/meshes/arm_link6.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <name>Gazebo/White</name>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+          </script>
+          <diffuse>0.254901975 0.254901975 0.254901975 1</diffuse>
+          <ambient>0.254901975 0.254901975 0.254901975 1</ambient>
+        </material>
+      </visual>
+    </link>
+    <joint name='l_in_joint' type='revolute'>
+      <pose relative_to='arm_link5'>0.0058676717145033867 -0.0040749885547328463 0.046198235185141642 3.1279833524455598 -1.5616534634517507 9.4868947464994217e-17</pose>
+      <parent>arm_link5</parent>
+      <child>l_in_link</child>
+      <axis>
+        <xyz>0 0 -1</xyz>
+        <mimic joint='r_joint'>
+          <multiplier>-1</multiplier>
+          <offset>0</offset>
+          <reference>0</reference>
+        </mimic>
+        <limit>
+          <lower>-3.1400000000000001</lower>
+          <upper>3.1400000000000001</upper>
+          <effort>100</effort>
+          <velocity>1</velocity>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='l_in_link'>
+      <pose relative_to='l_in_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>0.014995291014946 -0.00037582892309117 2.17603712826531e-14 0 0 0</pose>
+        <mass>0.00039748109853445901</mass>
+        <inertia>
+          <ixx>1.1717745510754299e-09</ixx>
+          <ixy>1.29359807014557e-09</ixy>
+          <ixz>-1.22029335190745e-22</ixz>
+          <iyy>5.2752941829425402e-08</iyy>
+          <iyz>1.6788853329275698e-24</iyz>
+          <izz>5.3328494732699101e-08</izz>
+        </inertia>
+      </inertial>
+      <collision name='l_in_link_collision'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://car1_description/meshes/l_in_link.STL</uri>
+          </mesh>
+        </geometry>
+        <surface>
+          <contact>
+            <ode>
+              <kp>1000000000000000</kp>
+              <kd>10000000000000</kd>
+              <min_depth>0.00020000000000000001</min_depth>
+            </ode>
+          </contact>
+          <friction>
+            <ode>
+              <mu>1</mu>
+              <mu2>1</mu2>
+            </ode>
+          </friction>
+        </surface>
+      </collision>
+      <visual name='l_in_link_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://car1_description/meshes/l_in_link.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <name>Gazebo/Black</name>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+          </script>
+          <diffuse>0.254901975 0.254901975 0.254901975 1</diffuse>
+          <ambient>0.254901975 0.254901975 0.254901975 1</ambient>
+        </material>
+      </visual>
+    </link>
+    <joint name='l_out_joint' type='revolute'>
+      <pose relative_to='l_in_link'>0.029990579999999999 -0.00075164999999999997 -0.0044999999999999997 0 0 0</pose>
+      <parent>l_in_link</parent>
+      <child>l_out_link</child>
+      <axis>
+        <xyz>0 0 -1</xyz>
+        <mimic joint='r_joint'>
+          <multiplier>1</multiplier>
+          <offset>0</offset>
+          <reference>0</reference>
+        </mimic>
+        <limit>
+          <lower>-3.1400000000000001</lower>
+          <upper>3.1400000000000001</upper>
+          <effort>100</effort>
+          <velocity>1</velocity>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='l_out_link'>
+      <pose relative_to='l_out_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>0.00086825043146321302 0.00309811754438047 3.6914915568786502e-15 0 0 0</pose>
+        <mass>0.0027236070248877402</mass>
+        <inertia>
+          <ixx>5.7453298576449603e-08</ixx>
+          <ixy>1.26485269163365e-07</ixy>
+          <ixz>-4.2393006393342698e-23</ixz>
+          <iyy>7.2210908286917296e-07</iyy>
+          <iyz>5.80254779879857e-23</iyz>
+          <izz>7.6322073929629605e-07</izz>
+        </inertia>
+      </inertial>
+      <collision name='l_out_link_collision'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://car1_description/meshes/l_out_link.STL</uri>
+          </mesh>
+        </geometry>
+        <surface>
+          <contact>
+            <ode>
+              <kp>1000000000000000</kp>
+              <kd>10000000000000</kd>
+              <min_depth>0.00020000000000000001</min_depth>
+            </ode>
+          </contact>
+          <friction>
+            <ode>
+              <mu>1</mu>
+              <mu2>1</mu2>
+            </ode>
+          </friction>
+        </surface>
+      </collision>
+      <visual name='l_out_link_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://car1_description/meshes/l_out_link.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <name>Gazebo/Black</name>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+          </script>
+          <diffuse>0.254901975 0.254901975 0.254901975 1</diffuse>
+          <ambient>0.254901975 0.254901975 0.254901975 1</ambient>
+        </material>
+      </visual>
+    </link>
+    <joint name='l_joint' type='revolute'>
+      <pose relative_to='arm_link5'>0.0055521380302910022 -0.01382386567528837 0.02620018419408662 3.1279833524455598 -1.5616534634517507 9.4868947464994217e-17</pose>
+      <parent>arm_link5</parent>
+      <child>l_link</child>
+      <axis>
+        <xyz>0 0 -1</xyz>
+        <mimic joint='r_joint'>
+          <multiplier>-1</multiplier>
+          <offset>0</offset>
+          <reference>0</reference>
+        </mimic>
+        <limit>
+          <lower>-3.1400000000000001</lower>
+          <upper>3.1400000000000001</upper>
+          <effort>100</effort>
+          <velocity>1</velocity>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='l_link'>
+      <pose relative_to='l_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>0.0065087397280478897 -0.00075480476621338005 1.86795023893183e-14 0 0 0</pose>
+        <mass>0.00210844275682401</mass>
+        <inertia>
+          <ixx>6.9436788522230196e-08</ixx>
+          <ixy>7.8023393992166101e-10</ixy>
+          <ixz>-1.5070196784950501e-22</ixz>
+          <iyy>3.2112646909119402e-07</iyy>
+          <iyz>-1.02237635494091e-23</iyz>
+          <izz>3.8740059347818803e-07</izz>
+        </inertia>
+      </inertial>
+      <collision name='l_link_collision'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://car1_description/meshes/l_link.STL</uri>
+          </mesh>
+        </geometry>
+        <surface>
+          <contact>
+            <ode>
+              <kp>1000000000000000</kp>
+              <kd>10000000000000</kd>
+              <min_depth>0.00020000000000000001</min_depth>
+            </ode>
+          </contact>
+          <friction>
+            <ode>
+              <mu>1</mu>
+              <mu2>1</mu2>
+            </ode>
+          </friction>
+        </surface>
+      </collision>
+      <visual name='l_link_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://car1_description/meshes/l_link.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <name>Gazebo/Black</name>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+          </script>
+          <diffuse>0.254901975 0.254901975 0.254901975 1</diffuse>
+          <ambient>0.254901975 0.254901975 0.254901975 1</ambient>
+        </material>
+      </visual>
+    </link>
+    <joint name='r_in_joint' type='revolute'>
+      <pose relative_to='arm_link5'>0.0059765390353672902 0.0039242706043911774 0.046197329802130607 3.1279833524455598 -1.5616534634517507 9.4868947464994217e-17</pose>
+      <parent>arm_link5</parent>
+      <child>r_in_link</child>
+      <axis>
+        <xyz>0 0 -1</xyz>
+        <mimic joint='r_joint'>
+          <multiplier>1</multiplier>
+          <offset>0</offset>
+          <reference>0</reference>
+        </mimic>
+        <limit>
+          <lower>-3.1400000000000001</lower>
+          <upper>3.1400000000000001</upper>
+          <effort>100</effort>
+          <velocity>1</velocity>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='r_in_link'>
+      <pose relative_to='r_in_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>0.014906931745301799 -0.00166834826701483 -5.6621374255882999e-15 0 0 0</pose>
+        <mass>0.00039748109853445901</mass>
+        <inertia>
+          <ixx>1.77824528840374e-09</ixx>
+          <ixy>5.7085950778983197e-09</ixy>
+          <ixz>-3.3205162362895299e-23</ixz>
+          <iyy>5.2146471092097301e-08</iyy>
+          <iyz>3.48441755102293e-24</iyz>
+          <izz>5.3328494732699399e-08</izz>
+        </inertia>
+      </inertial>
+      <collision name='r_in_link_collision'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://car1_description/meshes/r_in_link.STL</uri>
+          </mesh>
+        </geometry>
+        <surface>
+          <contact>
+            <ode>
+              <kp>1000000000000000</kp>
+              <kd>10000000000000</kd>
+              <min_depth>0.00020000000000000001</min_depth>
+            </ode>
+          </contact>
+          <friction>
+            <ode>
+              <mu>1</mu>
+              <mu2>1</mu2>
+            </ode>
+          </friction>
+        </surface>
+      </collision>
+      <visual name='r_in_link_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://car1_description/meshes/r_in_link.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <name>Gazebo/Black</name>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+          </script>
+          <diffuse>0.254901975 0.254901975 0.254901975 1</diffuse>
+          <ambient>0.254901975 0.254901975 0.254901975 1</ambient>
+        </material>
+      </visual>
+    </link>
+    <joint name='r_out_joint' type='revolute'>
+      <pose relative_to='r_in_link'>0.029813860000000001 -0.0033367000000000002 -0.0044999999999999997 0 0 0</pose>
+      <parent>r_in_link</parent>
+      <child>r_out_link</child>
+      <axis>
+        <xyz>0 0 -1</xyz>
+        <mimic joint='r_joint'>
+          <multiplier>-1</multiplier>
+          <offset>0</offset>
+          <reference>0</reference>
+        </mimic>
+        <limit>
+          <lower>-3.1400000000000001</lower>
+          <upper>3.1400000000000001</upper>
+          <effort>100</effort>
+          <velocity>1</velocity>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='r_out_link'>
+      <pose relative_to='r_out_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>0.00089262063760264798 -0.0030911884933469799 5.5511151231257802e-17 0 0 0</pose>
+        <mass>0.0027236070248877402</mass>
+        <inertia>
+          <ixx>5.9486540221450498e-08</ixx>
+          <ixy>-1.31703436037018e-07</ixy>
+          <ixz>-5.04580173657347e-23</ixz>
+          <iyy>7.2007584122417397e-07</iyy>
+          <iyz>9.5567027679542608e-25</iyz>
+          <izz>7.6322073929629796e-07</izz>
+        </inertia>
+      </inertial>
+      <collision name='r_out_link_collision'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://car1_description/meshes/r_out_link.STL</uri>
+          </mesh>
+        </geometry>
+        <surface>
+          <contact>
+            <ode>
+              <kp>1000000000000000</kp>
+              <kd>10000000000000</kd>
+              <min_depth>0.00020000000000000001</min_depth>
+            </ode>
+          </contact>
+          <friction>
+            <ode>
+              <mu>1</mu>
+              <mu2>1</mu2>
+            </ode>
+          </friction>
+        </surface>
+      </collision>
+      <visual name='r_out_link_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://car1_description/meshes/r_out_link.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <name>Gazebo/Black</name>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+          </script>
+          <diffuse>0.254901975 0.254901975 0.254901975 1</diffuse>
+          <ambient>0.254901975 0.254901975 0.254901975 1</ambient>
+        </material>
+      </visual>
+    </link>
+    <joint name='r_joint' type='revolute'>
+      <pose relative_to='arm_link5'>0.0059263693600475221 0.013673587684200451 0.02619706256537806 3.1279833524455598 -1.5616534634517507 9.4868947464994217e-17</pose>
+      <parent>arm_link5</parent>
+      <child>r_link</child>
+      <axis>
+        <xyz>0 0 -1</xyz>
+        <limit>
+          <lower>-3.1400000000000001</lower>
+          <upper>3.1400000000000001</upper>
+          <effort>100</effort>
+          <velocity>1</velocity>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='r_link'>
+      <pose relative_to='r_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>0.0069790602925584597 -0.000183027901682929 -1.6542323066914801e-14 0 0 0</pose>
+        <mass>0.0019788520598634099</mass>
+        <inertia>
+          <ixx>7.3544043226226801e-08</ixx>
+          <ixy>3.4277558510145897e-08</ixy>
+          <ixz>-3.3325038928230098e-22</ixz>
+          <iyy>3.0971418172794002e-07</iyy>
+          <iyz>1.8495607540262899e-22</iyz>
+          <izz>3.8028994686437202e-07</izz>
+        </inertia>
+      </inertial>
+      <collision name='r_link_collision'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://car1_description/meshes/r_link.STL</uri>
+          </mesh>
+        </geometry>
+        <surface>
+          <contact>
+            <ode>
+              <kp>1000000000000000</kp>
+              <kd>10000000000000</kd>
+              <min_depth>0.00020000000000000001</min_depth>
+            </ode>
+          </contact>
+          <friction>
+            <ode>
+              <mu>1</mu>
+              <mu2>1</mu2>
+            </ode>
+          </friction>
+        </surface>
+      </collision>
+      <visual name='r_link_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://car1_description/meshes/r_link.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <name>Gazebo/Black</name>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+          </script>
+          <diffuse>0.254901975 0.254901975 0.254901975 1</diffuse>
+          <ambient>0.254901975 0.254901975 0.254901975 1</ambient>
+        </material>
+      </visual>
+    </link>
+    <joint name='camera_mount_joint' type='fixed'>
+      <pose relative_to='arm_link4'>-0.043625999999999998 -0.025127 0.068237000000000006 0 0 -3.1403819500000001</pose>
+      <parent>arm_link4</parent>
+      <child>camera_mount_link</child>
+      <axis>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+        <xyz>0 0 1</xyz>
+        <limit>
+          <lower>-inf</lower>
+          <upper>inf</upper>
+        </limit>
+      </axis>
+      <physics>
+        <ode>
+          <limit>
+            <cfm>0</cfm>
+            <erp>0.20000000000000001</erp>
+          </limit>
+        </ode>
+      </physics>
+    </joint>
+    <link name='camera_mount_link'>
+      <pose relative_to='camera_mount_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>-0.0050730118282764601 6.1418429059484697e-06 -0.00070364889709428901 0 0 0</pose>
+        <mass>0.0052205801002715296</mass>
+        <inertia>
+          <ixx>1.06545185864845e-06</ixx>
+          <ixy>-7.6679010397098995e-10</ixy>
+          <ixz>3.93246654452396e-09</ixz>
+          <iyy>4.3210293959204102e-07</iyy>
+          <iyz>-4.7609965396474001e-12</iyz>
+          <izz>1.49552517177028e-06</izz>
+        </inertia>
+      </inertial>
+      <collision name='camera_mount_link_collision'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://car1_description/meshes/camera_mount_link.STL</uri>
+          </mesh>
+        </geometry>
+      </collision>
+      <visual name='camera_mount_link_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://car1_description/meshes/camera_mount_link.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>0.25 0.25 0.25 1</diffuse>
+          <ambient>0.25 0.25 0.25 1</ambient>
+        </material>
+      </visual>
+    </link>
+    <joint name='camera_depth_joint' type='fixed'>
+      <pose relative_to='camera_mount_link'>-0.00022570000000000001 0.00199994 0.024949010000000001 -1.5707970599744487 -1.5707926600190762 -1.5695848900186693</pose>
+      <parent>camera_mount_link</parent>
+      <child>camera_depth_link</child>
+      <axis>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+        <xyz>0 0 1</xyz>
+        <limit>
+          <lower>-inf</lower>
+          <upper>inf</upper>
+        </limit>
+      </axis>
+      <physics>
+        <ode>
+          <limit>
+            <cfm>0</cfm>
+            <erp>0.20000000000000001</erp>
+          </limit>
+        </ode>
+      </physics>
+    </joint>
+    <link name='camera_depth_link'>
+      <pose relative_to='camera_depth_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>0 0 0 0 0 0</pose>
+        <mass>0.070000000000000007</mass>
+        <inertia>
+          <ixx>1.0000000000000001e-05</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>1.0000000000000001e-05</iyy>
+          <iyz>0</iyz>
+          <izz>1.0000000000000001e-05</izz>
+        </inertia>
+      </inertial>
+      <collision name='camera_depth_link_collision'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://car1_description/meshes/camera_depth_link.STL</uri>
+          </mesh>
+        </geometry>
+        <surface>
+          <contact>
+            <ode/>
+          </contact>
+          <friction>
+            <ode/>
+          </friction>
+        </surface>
+      </collision>
+      <visual name='camera_depth_link_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://car1_description/meshes/camera_depth_link.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>1 1 1 1</diffuse>
+          <ambient>1 1 1 1</ambient>
+        </material>
+      </visual>
+      <sensor name='depth_camera' type='rgbd_camera'>
+        <topic>/camera</topic>
+        <update_rate>20</update_rate>
+        <camera>
+          <horizontal_fov>1.288</horizontal_fov>
+          <image>
+            <width>640</width>
+            <height>480</height>
+            <format>R8G8B8</format>
+          </image>
+          <clip>
+            <near>0.20000000000000001</near>
+            <far>4</far>
+          </clip>
+        </camera>
+        <always_on>true</always_on>
+        <visualize>true</visualize>
+      </sensor>
+    </link>
+    <joint name='wheel_lb_joint' type='revolute'>
+      <pose relative_to='base_footprint'>-0.097299999999999498 0.105834785017033 0.048499999999999897 0 0 0</pose>
+      <parent>base_footprint</parent>
+      <child>wheel_lb_link</child>
+      <axis>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <effort>20</effort>
+          <velocity>30</velocity>
+          <lower>-inf</lower>
+          <upper>inf</upper>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='wheel_lb_link'>
+      <pose relative_to='wheel_lb_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>5.4761806478342801e-08 -0.21060214482039399 9.6761215043900104e-08 0 0 0</pose>
+        <mass>1</mass>
+        <inertia>
+          <ixx>0.000179135789182942</ixx>
+          <ixy>1.2790438957193101e-09</ixy>
+          <ixz>-1.1883791496138699e-09</ixz>
+          <iyy>0.00028610789060258698</iyy>
+          <iyz>1.14165306684696e-10</iyz>
+          <izz>0.00017914236630223499</izz>
+        </inertia>
+      </inertial>
+      <collision name='wheel_lb_link_collision'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <sphere>
+            <radius>0.048800000000000003</radius>
+          </sphere>
+        </geometry>
+        <surface>
+          <contact>
+            <ode/>
+          </contact>
+          <friction>
+            <ode>
+              <mu>1</mu>
+              <mu2>0</mu2>
+              <fdir1>1 1 0</fdir1>
+            </ode>
+          </friction>
+        </surface>
+      </collision>
+      <visual name='wheel_lb_link_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://car1_description/meshes/wheel_lb_link.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>0.254901975 0.254901975 0.254901975 1</diffuse>
+          <ambient>0.254901975 0.254901975 0.254901975 1</ambient>
+        </material>
+      </visual>
+    </link>
+    <joint name='wheel_lf_joint' type='revolute'>
+      <pose relative_to='base_footprint'>0.097300000000000997 0.105834744636228 0.048500000000000897 0 0 0</pose>
+      <parent>base_footprint</parent>
+      <child>wheel_lf_link</child>
+      <axis>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <effort>20</effort>
+          <velocity>30</velocity>
+          <lower>-inf</lower>
+          <upper>inf</upper>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='wheel_lf_link'>
+      <pose relative_to='wheel_lf_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>-1.89908340719747e-08 0.00041076781724774802 1.68294290444487e-07 0 0 0</pose>
+        <mass>1</mass>
+        <inertia>
+          <ixx>0.00017913626516160899</ixx>
+          <ixy>-1.1663521893268899e-10</ixy>
+          <ixz>2.4909576411689101e-09</ixz>
+          <iyy>0.00028610783207543</iyy>
+          <iyz>5.5512509839065903e-10</iyz>
+          <izz>0.00017914181161563799</izz>
+        </inertia>
+      </inertial>
+      <collision name='wheel_lf_link_collision'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <sphere>
+            <radius>0.048800000000000003</radius>
+          </sphere>
+        </geometry>
+        <surface>
+          <contact>
+            <ode/>
+          </contact>
+          <friction>
+            <ode>
+              <mu>1</mu>
+              <mu2>0</mu2>
+              <fdir1>1 -1 0</fdir1>
+            </ode>
+          </friction>
+        </surface>
+      </collision>
+      <visual name='wheel_lf_link_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://car1_description/meshes/wheel_lf_link.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>0.254901975 0.254901975 0.254901975 1</diffuse>
+          <ambient>0.254901975 0.254901975 0.254901975 1</ambient>
+        </material>
+      </visual>
+    </link>
+    <joint name='wheel_rb_joint' type='revolute'>
+      <pose relative_to='base_footprint'>-0.097300000000000705 -0.105834744636236 0.048499999999999599 0 0 0</pose>
+      <parent>base_footprint</parent>
+      <child>wheel_rb_link</child>
+      <axis>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <effort>20</effort>
+          <velocity>30</velocity>
+          <lower>-inf</lower>
+          <upper>inf</upper>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='wheel_rb_link'>
+      <pose relative_to='wheel_rb_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>-1.8831219311676901e-07 0.21060188791172299 -3.1979688455002801e-07 0 0 0</pose>
+        <mass>1</mass>
+        <inertia>
+          <ixx>0.000179131977550561</ixx>
+          <ixy>7.9453508832679402e-10</ixy>
+          <ixz>3.28718138073184e-10</ixz>
+          <iyy>0.00028609279113671403</iyy>
+          <iyz>5.7629484112181101e-10</iyz>
+          <izz>0.00017913172653362001</izz>
+        </inertia>
+      </inertial>
+      <collision name='wheel_rb_link_collision'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <sphere>
+            <radius>0.048800000000000003</radius>
+          </sphere>
+        </geometry>
+        <surface>
+          <contact>
+            <ode/>
+          </contact>
+          <friction>
+            <ode>
+              <mu>1</mu>
+              <mu2>0</mu2>
+              <fdir1>1 -1 0</fdir1>
+            </ode>
+          </friction>
+        </surface>
+      </collision>
+      <visual name='wheel_rb_link_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://car1_description/meshes/wheel_rb_link.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>0.254901975 0.254901975 0.254901975 1</diffuse>
+          <ambient>0.254901975 0.254901975 0.254901975 1</ambient>
+        </material>
+      </visual>
+    </link>
+    <joint name='wheel_rf_joint' type='revolute'>
+      <pose relative_to='base_footprint'>0.097299999999999096 -0.10583478501704 0.048499999999999099 0 0 0</pose>
+      <parent>base_footprint</parent>
+      <child>wheel_rf_link</child>
+      <axis>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <effort>20</effort>
+          <velocity>30</velocity>
+          <lower>-inf</lower>
+          <upper>inf</upper>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='wheel_rf_link'>
+      <pose relative_to='wheel_rf_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>9.5359925095239704e-08 -0.00041055261211216099 1.05547444340104e-07 0 0 0</pose>
+        <mass>1</mass>
+        <inertia>
+          <ixx>0.00017913148974056401</ixx>
+          <ixy>1.7090314746448e-10</ixy>
+          <ixz>-1.05773399892102e-10</ixz>
+          <iyy>0.000286092794967385</iyy>
+          <iyz>-1.0063499744943401e-09</iyz>
+          <izz>0.00017913222316038501</izz>
+        </inertia>
+      </inertial>
+      <collision name='wheel_rf_link_collision'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <sphere>
+            <radius>0.048800000000000003</radius>
+          </sphere>
+        </geometry>
+        <surface>
+          <contact>
+            <ode/>
+          </contact>
+          <friction>
+            <ode>
+              <mu>1</mu>
+              <mu2>0</mu2>
+              <fdir1>1 1 0</fdir1>
+            </ode>
+          </friction>
+        </surface>
+      </collision>
+      <visual name='wheel_rf_link_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://car1_description/meshes/wheel_rf_link.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>0.254901975 0.254901975 0.254901975 1</diffuse>
+          <ambient>0.254901975 0.254901975 0.254901975 1</ambient>
+        </material>
+      </visual>
+    </link>
+    <plugin name='gz_ros2_control::GazeboSimROS2ControlPlugin' filename='libgz_ros2_control-system.so'>
+      <parameters>/home/zrtzrt/ros2_ws/install/car1_gazebo/share/car1_gazebo/config/ros2_controllers.yaml</parameters>
+    </plugin>
+    <plugin name='ignition::gazebo::systems::JointStatePublisher' filename='libignition-gazebo-joint-state-publisher-system.so'>
+      <topic>joint_states</topic>
+    </plugin>
+    <plugin name='gz::sim::systems::MecanumDrive' filename='gz-sim-mecanum-drive-system'>
+      <front_left_joint>wheel_lf_joint</front_left_joint>
+      <front_right_joint>wheel_rf_joint</front_right_joint>
+      <back_left_joint>wheel_lb_joint</back_left_joint>
+      <back_right_joint>wheel_rb_joint</back_right_joint>
+      <wheel_separation>0.216</wheel_separation>
+      <wheelbase>0.1946</wheelbase>
+      <wheel_radius>0.04675</wheel_radius>
+      <topic>/cmd_vel</topic>
+      <odom_topic>/odom</odom_topic>
+      <tf_topic>/tf</tf_topic>
+      <frame_id>odom</frame_id>
+      <child_frame_id>base_footprint</child_frame_id>
+      <odom_publish_frequency>50</odom_publish_frequency>
+    </plugin>
+    <frame name='arm_base_joint' attached_to='base_link'>
+      <pose>0.046623684387001797 0 0.057000000000000703 0 0 0</pose>
+    </frame>
+    <frame name='arm_base_link' attached_to='arm_base_joint'>
+      <pose>0 0 0 0 0 0</pose>
+    </frame>
+    <frame name='arm_joint6' attached_to='arm_link5'>
+      <pose>0.0030658146427527699 -4.0906812379283897e-05 0.0072150624961981298 3.1279833524455598 -1.5616534634517507 2.8460684239532479e-16</pose>
+    </frame>
+    <frame name='arm_link6' attached_to='arm_joint6'>
+      <pose>0 0 0 0 0 0</pose>
+    </frame>
+    <frame name='tcp_joint' attached_to='arm_link5'>
+      <pose>0.00069712213086198195 0 0.076246813179453504 0 0 0</pose>
+    </frame>
+    <frame name='tcp_link' attached_to='tcp_joint'>
+      <pose>0 0 0 0 0 0</pose>
+    </frame>
+    <frame name='camera_depth_optical_joint' attached_to='camera_depth_link'>
+      <pose>0 0.016549999999999999 0 -1.5707963300000001 -5.5511151231257827e-17 -1.5707963300000001</pose>
+    </frame>
+    <frame name='camera_depth_optical_frame' attached_to='camera_depth_optical_joint'>
+      <pose>0 0 0 0 0 0</pose>
+    </frame>
+    <frame name='imu_joint' attached_to='base_link'>
+      <pose>-0.071249999999999994 -0.0016100000000000001 0.061100000000000002 0 0 0</pose>
+    </frame>
+    <frame name='imu_link' attached_to='imu_joint'>
+      <pose>0 0 0 0 0 0</pose>
+    </frame>
+    <frame name='laser_joint' attached_to='base_link'>
+      <pose>0.146213088049965 0 0.33740000000000048 0 0 0</pose>
+    </frame>
+    <frame name='laser_link' attached_to='laser_joint'>
+      <pose>0 0 0 0 0 0</pose>
+    </frame>
+    <frame name='base_joint' attached_to='base_footprint'>
+      <pose>0 0 0.029000000000000001 0 0 0</pose>
+    </frame>
+    <frame name='base_link' attached_to='base_joint'>
+      <pose>0 0 0 0 0 0</pose>
+    </frame>
+  </model>
+</sdf>

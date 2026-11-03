@@ -1,0 +1,9 @@
+# 实验 04 — 依赖说明（2026-08-06 更新）
+#
+# 板上（~/ros2_venv）安装（清华镜像）：
+#   pip install -i https://pypi.tuna.tsinghua.edu.cn/simple qrcode
+#   pip install -i https://pypi.tuna.tsinghua.edu.cn/simple mjpeg_streamer
+#   （qrcode = 纯 Python + pypng，生成端必需；mjpeg_streamer = 2026-08-06 用户决策，
+#     MJPEG 统一此库，入口 require() 检测）
+# 其余全部已装：numpy、opencv-python（内置 QRCodeDetector，检测零新增）、pyyaml
+# 刻意不用：pyzbar（需系统库 libzbar0，apt 安装，跨架构麻烦）

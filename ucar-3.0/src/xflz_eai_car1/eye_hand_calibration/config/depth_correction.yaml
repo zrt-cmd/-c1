@@ -1,0 +1,21 @@
+# 深度校正参数（由 compute_hand_eye_transform.py 自动生成）
+# 此文件为模板，实际运行后会被覆盖
+
+depth_correction:
+  # 模型类型: linear / piecewise / radial
+  model: 'linear'
+
+  # 线性模型: depth_corrected = scale * depth_raw + offset
+  scale: 1.0        # 深度缩放系数（标定后更新）
+  offset: 0.0       # 深度偏移（米，标定后更新）
+
+  # 拟合质量指标
+  rmse: 0.0         # 均方根误差（米）
+  num_samples: 0    # 拟合使用的样本数
+
+  # 有效深度范围（米）
+  valid_range: [0.10, 1.50]
+
+  # 生成时间（由工具自动填写）
+  generated_at: ''
+  calibration_session: ''

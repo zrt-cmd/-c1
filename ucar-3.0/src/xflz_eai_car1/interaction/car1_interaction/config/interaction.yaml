@@ -1,0 +1,16 @@
+# Full interaction system configuration
+#
+# This file is optional - individual speech.yaml and llm.yaml
+# are used by default. Use this for overrides or integration settings.
+
+/**:
+  ros__parameters:
+    # Enable/disable components
+    enable_wake_word: true
+    enable_asr: true
+    enable_tts: true
+    enable_llm: true
+
+    # Interaction flow
+    auto_confirm: false  # If true, execute skills without confirmation
+    timeout_sec: 30.0    # Timeout for user response

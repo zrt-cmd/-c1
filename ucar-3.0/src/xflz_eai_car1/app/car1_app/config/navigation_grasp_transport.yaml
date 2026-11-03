@@ -1,0 +1,76 @@
+navigation_grasp_transport:
+  ros__parameters:
+    # ---- Poses (map frame): [x_m, y_m, yaw_rad] ----
+    # 起始点/放置点
+    initial_pose: [0.0, 0.0, 0.0]
+    # 抓取点 (实测 2026-07-08)
+    pick_pose: [0.625, 0.671, 0.076]
+    # 放置点 (与起始点相同)
+    place_pose: [0.0, 0.0, 0.0]
+
+    # ---- Rotation search ----
+    enable_search: true
+    # Angles are offsets from base yaw at NAV_TO_PICK completion.
+    # 左右15度、30度、45度搜索序列
+    search_angles_deg: [0.0, 15.0, -15.0, 30.0, -30.0, 45.0, -45.0]
+    search_angular_speed: 0.4         # rad/s max during rotation
+    search_yaw_tolerance: 0.05        # rad (~3°)
+    search_settle_sec: 1.5            # let image settle after rotation stops
+    red_pixel_threshold: 1000         # min red mask pixels to declare "seen"
+
+    # ---- Observation pose (arm position for camera to look down) ----
+    # [x, y, z, pitch] in base_link frame
+    # pitch: 0=up, pi/2=horizontal, pi=down (matches arm_controller convention)
+    observe_pose: [0.20, 0.0, 0.22, 3.14159]  # 与 visual_grasp 一致
+    # WAIT: visual_grasp uses 5.0s. 3s was too short — arm still moving,
+    # refresh_positions read a rear-biased pose, resulting in x-offset ~2cm.
+    observe_settle_sec: 5.0
+
+    # ---- Detection stability (mimics visual_grasp WAIT_CONFIRMATION behavior) ----
+    # Run detection this many times and use the LAST successful result. This
+    # mimics visual_grasp.py's WAIT_CONFIRMATION loop where a human keeps the
+    # node re-detecting until confirming, so the final coordinates reflect the
+    # settled arm pose (not the transient first-tick reading).
+    detection_repeat_count: 5           # detect this many times
+    detection_repeat_interval_sec: 0.3  # gap between detections
+
+    # ---- Timeouts (seconds) ----
+    localization_settle_sec: 3.0
+    detection_timeout_sec: 30.0
+    grasp_timeout_sec: 60.0
+    nav_timeout_sec: 300.0
+
+    # ---- Plane projection ----
+    # z of the object's top center in base_link frame. base_link is at wheel
+    # contact ≈ table height 0 by default; object top adds object_height.
+    object_height: 0.04
+    table_height: 0.0
+
+    # ---- Place target (in base_link frame) [x, y, z, pitch] ----
+    # 放置目标（相对机器人的位置）：正前方26cm、地面上8cm、夹爪朝下
+    # arm_controller.place service will:
+    #   1. Move to (x, y, z + pre_grasp_height) - hover above
+    #   2. Descend to (x, y, z)
+    #   3. Open gripper (release)
+    #   4. Retract upward
+    place_target_arm: [0.26, 0.0, 0.08, 3.14159]
+
+    # ---- HSV thresholds for red (two ranges OR'd, red wraps H=0/180) ----
+    # 与 visual_grasp 一致的阈值
+    target_color_hsv_lower: [0, 100, 80]
+    target_color_hsv_upper: [15, 255, 255]
+    target_color_hsv_lower2: [160, 100, 80]
+    target_color_hsv_upper2: [180, 255, 255]
+
+    # ---- Frames / topics (match the rest of the stack) ----
+    camera_optical_frame: 'camera_depth_optical_frame'
+    base_frame: 'base_link'
+    map_frame: 'map'
+    robot_frame: 'base_footprint'
+    rgb_topic: '/ascamera_hp60c/camera_publisher/rgb0/image'
+    depth_topic: '/ascamera_hp60c/camera_publisher/depth0/image_raw'
+    camera_info_topic: '/ascamera_hp60c/camera_publisher/depth0/camera_info'
+
+    # When true: detect + plane-project + log, but skip pick service and jump
+    # straight to NAV_TO_PLACE. Useful to validate projection safely.
+    dry_run: false

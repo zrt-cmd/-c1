@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>设备配网</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="container">
+    <h1>设备配网</h1>
+    <p class="hint">当前热点：<strong>{{ ap_ssid }}</strong></p>
+
+    {% if last_error %}
+    <div class="error">上次连接失败：{{ last_error }}</div>
+    {% endif %}
+
+    <form action="/connect" method="post" autocomplete="off">
+      <label>WiFi 名称 (SSID)</label>
+      <input type="text" name="ssid" placeholder="请输入 WiFi 名称" required
+             autocapitalize="none" autocorrect="off" spellcheck="false">
+
+      <label>密码 <span class="hint">(开放网络留空)</span></label>
+      <input type="password" name="password" placeholder="WiFi 密码">
+
+      <button type="submit" class="primary">连接</button>
+    </form>
+
+    <p class="footer">配网地址: http://192.168.100.1</p>
+  </div>
+</body>
+</html>

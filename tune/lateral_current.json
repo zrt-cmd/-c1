@@ -1,0 +1,34 @@
+[
+  {
+    "motion": "forward",
+    "body_x_m": 0.2104,
+    "body_y_m": -0.0,
+    "yaw_deg": -0.0,
+    "odom_distance_m": 0.2014,
+    "actual_distance_m": 0.2104
+  },
+  {
+    "motion": "left",
+    "body_x_m": -0.4476,
+    "body_y_m": 0.1187,
+    "yaw_deg": 17.92,
+    "odom_distance_m": 0.2011,
+    "actual_distance_m": 0.4631
+  },
+  {
+    "motion": "right",
+    "body_x_m": -0.1756,
+    "body_y_m": 0.2801,
+    "yaw_deg": -22.18,
+    "odom_distance_m": 0.2007,
+    "actual_distance_m": 0.3306
+  },
+  {
+    "motion": "rotate",
+    "body_x_m": -0.0807,
+    "body_y_m": -0.0056,
+    "yaw_deg": 22.35,
+    "odom_distance_m": 0.0,
+    "actual_distance_m": 0.0809
+  }
+]

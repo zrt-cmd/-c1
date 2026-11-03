@@ -1,0 +1,44 @@
+# 实验 07 — 多目标跟踪（DeepSORT 车辆/行人跟踪）
+
+model:
+  det_rknn: models/yolov8n.rknn        # 检测（COCO 80 类，用户自转 2026-08-05，9 输出）
+  det_onnx: models/yolov8n_coco.onnx  # 自导出流程产物（可选，fork 导出）
+  reid_rknn: models/deepsort.rknn      # 外观 ReID（用户重导 2026-08-05，[1,3,128,64]->[1,512]）
+  imgsz: 640
+
+detect:
+  score_thr: 0.25
+  iou_thr: 0.45
+  classes: [2]                   # 只追踪指定 COCO 类别（0=person，5=bus；空=全部；参考 exp06）
+
+tracker:
+  mode: deepsort                      # deepsort | sort（无 ReID 模型时自动回退 sort）
+  max_dist: 0.2                       # 外观余弦距离门限（deepsort 模式）
+  max_iou_distance: 0.8               # IoU 匹配门限（参考 Deepsort/main.py=0.8；0.7 移动中易丢轨迹）
+  max_age: 70                         # 丢失轨迹保留帧数
+  n_init: 3                           # 确认轨迹所需连续命中帧数
+  nn_budget: 100                      # 外观特征库容量（deepsort 模式）
+  min_confidence: 0.6                 # 参考 Deepsort/main.py=0.6；弱检测不进追踪（0.3 会乱飘/框变小）
+
+pool:
+  workers: 3                          # RK3576 三核 NPU
+  queue_size: 4
+  core_mask: auto                     # auto | round_robin（tid%3 绑核）
+
+camera:
+  index: 0
+  width: 640
+  height: 480
+
+display:
+  show: false
+  window_name: deepsort_track
+
+server:
+  port: 8080
+  stream_name: track.mjpg
+
+source:
+  ros:
+    rgb_topic: /ascamera_hp60c/camera_publisher/rgb0/image   # ascamera HP60C 原生话题（勿 remap）
+    timeout: 5.0                                             # 首帧等待秒数

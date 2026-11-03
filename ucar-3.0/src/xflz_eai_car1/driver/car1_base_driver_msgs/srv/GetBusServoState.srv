@@ -1,0 +1,4 @@
+car1_base_driver_msgs/GetBusServoCmd[] cmd
+---
+bool success
+car1_base_driver_msgs/BusServoState[] state

@@ -1,0 +1,26 @@
+# 实验 09 人脸关键点特征检测 — 配置模板（RKNN Blaze 双模型 + RKNNLite 板上推理）
+# 运行: python -m face_landmark_core.demo_image --config config/face_config.yaml [--display] [--save out.jpg]
+#       python -m face_landmark_core.camera_demo --config config/face_config.yaml [--display] [--port 8081]
+
+model:
+  detector_model: /home/iflytek/ros2_ws/src/xflz_eai_car1/vision/09_face_landmarks/models/face_detection_short_range.rknn  # 绝对路径（免 install 部署）  # BlazeFace 检测（128x128）
+  landmark_model: /home/iflytek/ros2_ws/src/xflz_eai_car1/vision/09_face_landmarks/models/face_landmark.rknn               # 绝对路径               # 468 点关键点（192x192）
+  num_faces: 2                              # 最多检测人脸数（vendor 默认 2）
+  min_detection_confidence: 0.5             # 检测分数阈值（mediapipe 默认）
+  min_tracking_confidence: 0.5              # 保留（vendor 语义；本实现未用）
+
+backend:
+  core_mask: 0                              # RKNNLite NPU 核: 0=AUTO, 1=CORE_0, 2=CORE_1, 4=CORE_2, 3=0_1, 7=0_1_2
+  verbose: false                            # RKNNLite 调试输出
+
+source:
+  mode: image                               # image = 本地图片; camera = USB 摄像头实时; ros = 板上相机话题
+  rgb_path: images/face_demo.jpg            # mode=image 时必填（可放任意含人脸图）
+
+display:
+  show: false                               # 弹窗显示（无显示器的 SSH 会话请用 MJPEG）
+  window_name: FaceLandmark Detection
+
+server:
+  port: 8081                                # MJPEG 端口（避免与 08 的 :8080 冲突）
+  stream_name: face.mjpg

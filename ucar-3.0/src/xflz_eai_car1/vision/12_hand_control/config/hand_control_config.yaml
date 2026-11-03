@@ -1,0 +1,25 @@
+# 实验 12 手指控制/手势识别配置（CSDN 方案 4 模型，schema: config.py REQUIRED）
+# 模型转换：mediapipe-rknn/models/gesture_recognizer/convert.py（--platform rk3576 --dtype fp）
+model:
+  detector_model: models/hand_detector.rknn             # 手掌检测 192×192（float32 RGB [0,1]，mean 0/std 1 转换）
+  landmark_model: models/hand_landmarks_detector.rknn   # 21 点关键点 224×224（float32 RGB [0,1]，mean 0/std 1）
+  embedder_model: models/gesture_embedder.rknn          # 21点→128维（float，单输入 norm_tensor，x/y/z 全部 /224）
+  classifier_model: models/canned_gesture_classifier.rknn # 128维→8类手势（float，无 mean/std）
+  max_hands: 2                                   # 最多跟踪手数（1..2）
+  min_detection_confidence: 0.5                  # 手掌检测分数阈值
+  min_tracking_confidence: 0.5                   # 21 点 presence 阈值
+backend:
+  core_mask: 0                                   # 0=AUTO（默认；板上 2 核 NPU 用 auto 最稳）
+  verbose: false
+source:
+  mode: image                                    # image | ros | camera（板上标准 = ros）
+  rgb_path: images/hand_demo.jpg                 # mode=image 时必填（可放任意伸手照片）
+  ros:
+    rgb_topic: /ascamera_hp60c/camera_publisher/rgb0/image   # 严禁 remap
+    timeout: 5.0
+display:
+  show: false                                    # SSH 无显示器默认关；--display 覆盖
+  window_name: "Hand Control"                    # vendor 12 窗口名（'f' 切特效）
+server:
+  port: 8084                                     # MJPEG 端口（09..11 之后）
+  stream_name: hand.mjpg                         # 已含 .mjpg，勿再追加

@@ -1,0 +1,218 @@
+:root {
+  --bg: #0e1116;
+  --bg-alt: #161b22;
+  --border: #30363d;
+  --fg: #d0d7de;
+  --fg-dim: #8b949e;
+  --accent: #4493f8;
+  --accent-hover: #388bfd;
+  --error: #f85149;
+  --warn: #d29922;
+  --ok: #3fb950;
+  --hl: #f2cc60;
+  --mono: ui-monospace, "SFMono-Regular", "Consolas", "Cascadia Mono",
+          "JetBrains Mono", "Menlo", "DejaVu Sans Mono", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+               "Hiragino Sans GB", "Microsoft YaHei", Helvetica, Arial, sans-serif;
+  font-size: 13px;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* --- 顶部工具栏 --- */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--bg-alt);
+  border-bottom: 1px solid var(--border);
+  align-items: center;
+}
+
+.tool-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tool-group.grow {
+  flex: 1;
+  min-width: 220px;
+}
+
+label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--fg-dim);
+  white-space: nowrap;
+}
+
+label.filter {
+  flex: 1;
+}
+
+label.checkbox {
+  color: var(--fg-dim);
+  cursor: pointer;
+}
+
+select, input[type="text"], button {
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 13px;
+  outline: none;
+}
+
+input[type="text"] {
+  font-family: var(--mono);
+  width: 100%;
+  min-width: 180px;
+}
+
+input[type="text"]:focus, select:focus {
+  border-color: var(--accent);
+}
+
+button {
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+button:hover {
+  border-color: var(--accent);
+}
+
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+button.primary:hover {
+  background: var(--accent-hover);
+}
+
+/* --- 日志视图 --- */
+.log-view {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: auto;
+  padding: 6px 12px;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.45;
+  white-space: pre;
+  background: var(--bg);
+}
+
+.log-view::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.log-view::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 5px;
+}
+
+.log-line {
+  display: block;
+  padding: 0 2px;
+}
+
+.log-line .ts {
+  color: var(--fg-dim);
+  margin-right: 8px;
+}
+
+.log-line.hit {
+  background: rgba(242, 204, 96, 0.12);
+}
+
+.log-line mark {
+  background: rgba(242, 204, 96, 0.35);
+  color: var(--hl);
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+.log-line.lvl-error { color: var(--error); }
+.log-line.lvl-warn  { color: var(--warn); }
+.log-line.lvl-info  { color: var(--fg); }
+.log-line.lvl-debug { color: var(--fg-dim); }
+.log-line.lvl-ok    { color: var(--ok); }
+
+/* 没有行首 [TAG] 的续行/断包半行，暗灰斜体，一眼可辨 */
+.log-line.lvl-frag {
+  color: var(--fg-dim);
+  font-style: italic;
+  opacity: 0.75;
+}
+
+.log-line.system {
+  color: var(--fg-dim);
+  font-style: italic;
+}
+
+/* --- 状态栏 --- */
+.statusbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 12px;
+  background: var(--bg-alt);
+  border-top: 1px solid var(--border);
+  color: var(--fg-dim);
+  font-size: 12px;
+}
+
+.statusbar b {
+  color: var(--fg);
+  font-weight: 500;
+  margin-left: 2px;
+}
+
+.sep {
+  color: var(--border);
+}
+
+.dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.dot-on  { background: var(--ok); box-shadow: 0 0 6px var(--ok); }
+.dot-off { background: var(--fg-dim); }
+.dot-err { background: var(--error); box-shadow: 0 0 6px var(--error); }
+
+.error-text {
+  color: var(--error);
+  font-family: var(--mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 400px;
+}

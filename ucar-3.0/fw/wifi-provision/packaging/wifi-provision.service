@@ -1,0 +1,23 @@
+[Unit]
+Description=XFLZ WiFi Provisioning Service
+# Manages wlan0 through NetworkManager, so NM must be up first.
+After=NetworkManager.service
+Wants=NetworkManager.service
+
+[Service]
+Type=simple
+# @PROJ@ is replaced by install.sh with the directory it is run from, so the
+# unit always points at whichever copy of the project is being installed.
+# wlan0 may not be enumerated yet when NM reports itself started; the SSID is
+# derived from its MAC at startup and cached, so wait for the device first.
+ExecStartPre=@PROJ@/bin/wait-wlan0
+ExecStart=/usr/bin/python3 -u @PROJ@/bin/wifi-provision
+Environment=WIFI_PROVISION_CONF=/etc/xflz/wifi-provision.conf
+Restart=always
+RestartSec=5
+# journald is not persistent on this board, so logs would be lost on reboot.
+StandardOutput=append:/var/log/wifi-provision.log
+StandardError=append:/var/log/wifi-provision.log
+
+[Install]
+WantedBy=multi-user.target

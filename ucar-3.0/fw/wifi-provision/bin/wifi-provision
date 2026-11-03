@@ -1,0 +1,55 @@
+#!/usr/bin/env python3
+"""XFLZ WiFi Provisioning service entry point."""
+
+import logging
+import os
+import signal
+import sys
+
+# Resolve project root from this script's location.
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(HERE)
+sys.path.insert(0, ROOT)
+
+from lib.config import Config
+from lib.ap_manager import ApManager
+from lib.monitor import Monitor
+from lib.web_server import create_app, WebServer
+
+
+def main():
+    cfg_path = os.environ.get(
+        "WIFI_PROVISION_CONF", "/etc/xflz/wifi-provision.conf")
+    cfg = Config(cfg_path)
+    cfg.setup_logging()
+    log = logging.getLogger("main")
+    log.info("wifi-provision starting (config=%s)", cfg_path)
+
+    ap = ApManager(cfg.wifi_interface, cfg.ap_ssid_prefix)
+    log.info("device AP SSID will be: %s", ap.ap_ssid)
+
+    monitor = Monitor(cfg, ap)
+    app = create_app(monitor, ap, ROOT)
+    web = WebServer(app, cfg.bind_host, cfg.bind_port)
+    monitor.web = web
+
+    def shutdown(signum, frame):
+        log.info("signal %d, shutting down", signum)
+        monitor.stop()
+        try:
+            web.stop()
+        except Exception:
+            pass
+        try:
+            ap.stop_ap()
+        except Exception:
+            pass
+
+    signal.signal(signal.SIGTERM, shutdown)
+    signal.signal(signal.SIGINT, shutdown)
+
+    monitor.run()
+
+
+if __name__ == "__main__":
+    main()

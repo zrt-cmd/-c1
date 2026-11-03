@@ -1,0 +1,10 @@
+moveit_setup_assistant_config:
+  URDF:
+    package: car1_description
+    relative_path: urdf/car1.urdf
+  SRDF:
+    relative_path: config/car1.srdf
+  CONFIG:
+    author_name: xflz
+    author_email: todo@todo.com
+    generated_timestamp: 1745223600

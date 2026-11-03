@@ -1,0 +1,17 @@
+# colcon 编译产物（aarch64 产物不跨平台）
+build/
+install/
+log/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+.DS_Store
+
+# Claude 本地配置
+.claude/

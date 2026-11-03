@@ -1,0 +1,29 @@
+# 实验 08 — 深度相机双栏显示 + 点击读深度
+# 规格：depth_viewer_guide.md（visual_grasp 最小子集；无检测）
+
+depth:
+  scale: 0.001                      # uint16 mm -> 米（/1000）
+  invalid_value: 0                  # 无效深度值（0 = 无效，平台事实）
+  colormap: jet                     # jet | gray（深度伪彩）
+  display_scale: 0.666              # 显示缩放（点击坐标 ÷ scale 还原 640x480）
+
+cam3d:
+  fx: 608.39958                     # HP60C 标定（ascam.yaml 来源；点击反投影用）
+  fy: 611.20714
+  cx: 328.30096
+  cy: 226.46483
+  width: 640
+  height: 480
+
+source:
+  mode: ros                         # image（文件对）| ros（板上 rclpy 订阅；板上标准）
+  rgb_path: ""                      # image 模式：RGB 图路径（BGR png/jpg）
+  depth_path: ""                    # image 模式：深度图路径（uint16 png）
+
+display:
+  show: false
+  window_name: "RGB | Depth"
+
+server:
+  port: 8080
+  stream_name: depth.mjpg

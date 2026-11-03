@@ -1,0 +1,52 @@
+/**:
+  ros__parameters:
+    # 唤醒词（KWS 热词，pinyin 见 keywords.txt）
+    wake_word: "小飞小飞"
+
+    # KWS 灵敏度（0-1，越低越灵敏/越多误触发）
+    sensitivity: 0.25
+
+    # KWS 模型（sherpa-onnx zipformer_kws）
+    kws_model_dir: "/home/iflytek/models/zipformer_kws"
+    # keywords 文件（默认用 car1_interaction/tools/keywords.txt，含 小飞小飞/小飞同学/你好小飞）
+    keywords_file: ""
+
+    # ASR 模型（sherpa-onnx zipformer_onnx，CPU/ONNX，greedy_search 无热词）
+    asr_model_dir: "/home/iflytek/models/zipformer_onnx"
+
+    # LLM 意图分类服务（内嵌启动 flask_server + Qwen3.5-0.8B）
+    llm:
+      server_url: "http://127.0.0.1:8080"
+      # 启动意图提示词（标准词 + ASR 常见误识别词），配置驱动
+      # 发现新的 ASR 误识别词直接在此补充，不用改代码
+      intent_hints:
+        - intent: "start"
+          hints: ["出发", "执行任务", "快速出发执行任务", "开始", "开始任务", "开始执行",
+                  "启动", "出 发", "执行", "出发吧", "开始干活"]
+
+    # LLM 服务进程（内嵌启动，端口被占则复用现有服务）
+    llm_server:
+      model: "/home/iflytek/models/rkllm/Qwen3.5-0.8B_w4a16_g128_rk3576.rkllm"
+      platform: "rk3576"
+      lib_path: "/usr/lib/librkllmrt.so"
+      venv_python: "/home/iflytek/ros2_venv/bin/python3"
+
+    # 启动服务（任务状态机；LLM 命中 start 后调用）
+    start_service: "/mission_orchestrator/start"
+    # 任务状态话题（订阅 running 字段：true 暂停唤醒，false 恢复）
+    mission_state_topic: "/car1_brics_task/state"
+
+    # 音频设备（-1=自动检测 ES8388）
+    audio_device_index: -1
+    capture_volume: 88
+    voice_preset: true
+
+    # 唤醒提示音（空=不播；TTS 合成"在呢"，stereo 16k，提示用户继续说指令）
+    prompt_wav: "/home/iflytek/ros2_ws/src/xflz_eai_car1/interaction/car1_speech/config/prompt_zainei.wav"
+
+    # GTCRN 神经网络降噪（流式语音增强，去稳态背景噪声风扇/电机/空调）
+    # 仅对 KWS 唤醒生效（降噪后唤醒更灵敏）；ASR 走原始音频不降噪（降噪会让 ASR 更难识别）。
+    # 实现：采集线程只收原始音频，_handle_idle(KWS) 内降噪后再喂 KWS。
+    onnx_denoise: false                  # 总开关（true=启用降噪，仅 KWS）
+    onnx_denoise_model: "/home/iflytek/models/ns/gtcrn_simple.onnx"
+    onnx_denoise_threads: 2

@@ -1,0 +1,21 @@
+# 实验 02 标签（20 细类，行号 = 模型输出类别 ID）
+bailuobo
+caiye
+chuangkotie
+cipian
+dianchi
+eluanshi
+fanqie
+huluobo
+jiaonang
+lajiao
+shuiping
+tizi
+tudo
+yaogao
+yaopian
+yaopianbaozhuang
+yaoping
+yilaguan
+zhibei
+zhuankuai

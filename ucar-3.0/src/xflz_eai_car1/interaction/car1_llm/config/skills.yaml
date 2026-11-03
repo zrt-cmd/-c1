@@ -1,0 +1,48 @@
+# Skills mapping: Natural language intents -> ROS actions/services
+#
+# Each skill defines:
+#   - type: service, action, or topic
+#   - service/action/topic: ROS interface name
+#   - parameters: How to map LLM parameters to ROS message fields
+
+skills:
+  navigate_to:
+    description: "Navigate to a named location"
+    type: "action"
+    action: "/navigate_to_pose"
+    action_type: "nav2_msgs/action/NavigateToPose"
+    parameters:
+      location:
+        type: "map"  # Map location name to coordinates
+        mapping:
+          kitchen: [1.0, 2.0, 0.0]
+          living_room: [0.0, 0.0, 0.0]
+          bedroom: [2.0, 0.0, 1.57]
+
+  grasp_object:
+    description: "Grasp an object by color"
+    type: "service"
+    service: "/visual_grasp/start"
+    service_type: "std_srvs/srv/Trigger"
+    parameters:
+      color:
+        type: "string"  # Color is handled by visual_grasp internally
+
+  go_home:
+    description: "Return robot to home position"
+    type: "service"
+    service: "/arm_controller/go_home"
+    service_type: "std_srvs/srv/Trigger"
+
+  stop:
+    description: "Stop all robot movement"
+    type: "topic"
+    topic: "/cmd_vel"
+    message_type: "geometry_msgs/msg/Twist"
+    value: {linear: {x: 0.0}, angular: {z: 0.0}}
+
+  transport:
+    description: "Full navigation + grasp + transport task"
+    type: "service"
+    service: "/navigation_grasp_transport/start"
+    service_type: "std_srvs/srv/Trigger"

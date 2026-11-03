@@ -1,0 +1,10 @@
+/**:
+  ros__parameters:
+    duration: 1.5  # 工作位置移动时间（秒），可修改为你想要的时间
+    positions:
+      arm_joint1: 1500  # id=0
+      arm_joint2: 1300  # id=1
+      arm_joint3: 2200  # id=2
+      arm_joint4: 2100  # id=3
+      arm_joint5: 1500  # id=4
+      r_joint: 1500     # id=5

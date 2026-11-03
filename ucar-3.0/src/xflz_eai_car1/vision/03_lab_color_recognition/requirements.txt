@@ -1,0 +1,6 @@
+# 实验 03 — 依赖说明（2026-08-06 更新）
+#
+# 板上（~/ros2_venv）：numpy、opencv-python 4.11（均已装，见 ../../runtime/board/requirements.txt）
+#   + mjpeg_streamer==2024.2.8（2026-08-06 用户决策：MJPEG 统一此库，入口 require() 检测）
+# 本地单测（WSL rknn23）：numpy、opencv-python、pyyaml、pytest、mjpeg_streamer（均已装）
+# 安装：pip install -i https://pypi.tuna.tsinghua.edu.cn/simple mjpeg_streamer

@@ -1,0 +1,11 @@
+# WCH-Link udev rules for pyocd flashing
+# Place this file in /etc/udev/rules.d/
+
+# WCH-Link in RV mode (RISC-V debugging)
+SUBSYSTEM=="usb", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="8011", MODE="0666", GROUP="plugdev", TAG+="uaccess"
+
+# WCH-Link in ARM/DAP mode (STM32 debugging via CMSIS-DAP)
+SUBSYSTEM=="usb", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="8012", MODE="0666", GROUP="plugdev", TAG+="uaccess"
+
+# Alternative: match by product string
+SUBSYSTEM=="usb", ATTRS{idVendor}=="1a86", ATTR{product}=="WCH-Link", MODE="0666", GROUP="plugdev", TAG+="uaccess"

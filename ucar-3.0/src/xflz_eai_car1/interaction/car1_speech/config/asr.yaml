@@ -1,0 +1,20 @@
+/**:
+  ros__parameters:
+    # ASR engine
+    engine: "iflytek"  # iflytek, baidu, google, whisper
+
+    # Language
+    language: "zh_cn"  # zh_cn, en_us, etc.
+
+    # Cloud API credentials (iFlytek)
+    app_id: ""
+    api_key: ""
+    api_secret: ""
+
+    # Audio capture settings
+    sample_rate: 16000
+    channels: 1
+    audio_device_index: -1
+
+    # VAD (Voice Activity Detection) settings
+    vad_timeout_sec: 3.0  # Stop listening after 3s of silence

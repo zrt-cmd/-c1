@@ -1,0 +1,74 @@
+# XFLZ WiFi Provisioning Service Configuration
+#
+# install.sh 在 /etc/xflz/wifi-provision.conf 不存在时复制本文件过去。
+# 已存在时不会被覆盖 —— 升级后请手工对照本文件里新增的键。
+
+[general]
+# WiFi interface to manage
+wifi_interface = wlan0
+
+# AP SSID prefix. Final SSID = "<prefix>-<last 6 hex chars of MAC>"
+# Example: XFLZ-Car1-3C93F9
+ap_ssid_prefix = XFLZ
+
+# Log level: DEBUG / INFO / WARNING / ERROR
+log_level = INFO
+
+[timing]
+# 开机后先让 NetworkManager 自己连已保存的网络, 最多等这么多秒。
+# NM 按扫描结果挑真正在范围内的网络, 比本服务按 profile 列表盲试准。
+# 等不到才由本服务主动重试, 再失败才开配网热点。
+boot_grace_seconds = 30
+
+# 开机等 NM 超时后, 本服务再亲自试一遍已保存网络的总窗口 (秒)。
+# 这是兜底: NM 已经把看得见的网络都试过了, 这里给太长时间只是拖慢
+# 进入 AP 模式的速度 (两者相加就是用户等热点出现的时间)。
+sta_retry_seconds = 15
+
+# 主动重试时每个已保存网络分到的时间片 (秒)。
+# 每个网络都留出机会, 避免排在前面但搜不到的网络把整个窗口占满,
+# 导致后面真正在范围内的网络一次都没被试过。
+per_profile_attempt_seconds = 5
+
+# 联网中途掉线后, 容忍多少秒才认为真的断了 (秒)
+disconnect_threshold_seconds = 10
+
+# 单次连接尝试的超时 (秒)
+connect_attempt_timeout = 20
+
+# AP 模式下每隔多少秒做一次"回扫"(短暂关热点, 让 NM 试连已保存的网络)。
+# 设 0 关闭回扫; 关闭后一旦进了 AP 模式就只能靠人工重新配网。
+# 注: 有手机连着热点、或最近有人访问配网页时会自动跳过本轮, 不会打断配网。
+scan_interval_seconds = 180
+
+# 回扫时留给 NM 自动连接的时间 (秒)。这段时间热点是关闭的, 不宜过长。
+scan_back_window_seconds = 10
+
+# 配网页最近多少秒内有访问就跳过本轮回扫 (秒), 避免打断正在配网的用户。
+scan_back_idle_seconds = 60
+
+[web]
+# Web server bind address and port
+bind_host = 0.0.0.0
+bind_port = 80
+
+# ─────────────────────────────────────────────────────────────
+# 以下配置项目前代码尚未读取（音频提示功能未实现）。
+# 保留在此处是为了不丢失既有板子上的设置，改动它们暂时不会有任何效果。
+# ─────────────────────────────────────────────────────────────
+[audio]
+# Directory containing prompt wav files
+sounds_dir = sounds
+
+# ALSA playback device (see `aplay -l`)
+alsa_device = plughw:0,0
+
+# Playback volume (0-100%). 100% = +4.5dB output (ES8388 hardware max)
+playback_volume = 100
+
+# Digital gain multiplier (0.5-4.0). 2.0 recommended for low-amplitude source material.
+# Uses tanh soft-clipping to prevent distortion.
+playback_gain = 2.0
+
+# Set to false to disable all voice prompts
+enabled = true

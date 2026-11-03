@@ -1,0 +1,10 @@
+/var/log/wifi-provision.log {
+    weekly
+    rotate 4
+    compress
+    missingok
+    notifempty
+    # systemd holds this file open in append mode and never reopens it, so the
+    # log must be truncated in place rather than moved out from under it.
+    copytruncate
+}

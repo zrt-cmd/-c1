@@ -1,0 +1,30 @@
+# 实验 05 — 多边形轮廓应用 配置（课程名：自主巡线，内容为多边形轮廓）
+
+preprocess:
+  threshold_mode: adaptive        # binary | adaptive
+  threshold_value: 50           # 原生 convex_hull 阈值≈10；50 兼顾漏检与噪点
+  invert: false                 # **亮物暗底用 false（板上实测暗底亮物场景）；暗物亮底改 true**
+  morph_kernel: 3               # 形态学核（去噪），奇数——核太大会侵蚀掉小轮廓
+
+contour:
+  min_area: 100                 # 最小轮廓面积（滤噪；用户实测 100 兼顾小物体与噪点）
+
+polygon:
+  approx_epsilon: 0.02          # approxPolyDP 精度（× 轮廓弧长）
+  use_hull: true                # 先凸包再近似（vendor convex_hull 语义）
+
+
+source:
+  ros:
+    rgb_topic: /ascamera_hp60c/camera_publisher/rgb0/image   # ascamera HP60C 原生话题（勿 remap）
+    timeout: 5.0                                             # 首帧等待秒数
+camera:
+  index: 0
+  width: 640
+  height: 480
+
+display:
+  show: false
+  window_name: polygon_contour
+  colored_mode: true            # true = 黑底彩色轮廓+质心（vendor convex_hull 效果）
+                                # false = 原图叠加红色轮廓（调试用）

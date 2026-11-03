@@ -1,0 +1,9 @@
+name: work_ready
+description: 工作准备姿态（机械臂前伸，夹爪张开）
+actions:
+  - name: ready_position
+    duration: 2.5
+    servos: {0: 1500, 1: 1100, 2: 2200, 3: 1850, 4: 1500}
+  - name: gripper_open
+    duration: 1.0
+    servos: {5: 1500}

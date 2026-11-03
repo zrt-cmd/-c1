@@ -1,0 +1,7 @@
+# 实验 07 — 依赖说明（2026-08-06 更新）
+#
+# 板上（~/ros2_venv）：numpy、opencv-python 4.11、scipy（Hungarian）、rknn-toolkit2 2.3.2（均已装）
+#   + mjpeg_streamer==2024.2.8（2026-08-06 用户决策：MJPEG 统一此库，入口 require() 检测）
+# 本地单测（WSL rknn23）：numpy、opencv-python、scipy、pyyaml、pytest、mjpeg_streamer（均已装）
+# 模型复用工作区 Deepsort/rknnModel/（yolov8.rknn 检测 + deepsort.rknn ReID），拷入 models/。
+# 安装：pip install -i https://pypi.tuna.tsinghua.edu.cn/simple mjpeg_streamer

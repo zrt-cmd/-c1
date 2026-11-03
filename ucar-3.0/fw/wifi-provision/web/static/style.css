@@ -1,0 +1,36 @@
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: #f5f6f8;
+  margin: 0; padding: 0; color: #222;
+}
+.container {
+  max-width: 480px; margin: 0 auto; padding: 24px 20px;
+}
+h1 { font-size: 22px; margin: 8px 0 16px; }
+label {
+  display: block; margin: 14px 0 6px; font-size: 14px; color: #555;
+}
+input {
+  width: 100%; padding: 12px; font-size: 16px;
+  border: 1px solid #ccc; border-radius: 8px;
+  background: #fff;
+}
+button {
+  width: 100%; padding: 14px; font-size: 16px;
+  border: none; border-radius: 8px; margin-top: 16px;
+  cursor: pointer;
+}
+button.primary { background: #2b7cff; color: #fff; }
+.hint { color: #888; font-size: 13px; }
+.footer { margin-top: 24px; color: #888; font-size: 13px; text-align: center; }
+.error {
+  background: #ffe9e9; color: #c0392b; padding: 12px;
+  border-radius: 8px; margin: 12px 0; font-size: 14px;
+}
+.spinner {
+  width: 36px; height: 36px; margin: 24px auto;
+  border: 4px solid #e0e5ee; border-top-color: #2b7cff;
+  border-radius: 50%; animation: spin 1s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }

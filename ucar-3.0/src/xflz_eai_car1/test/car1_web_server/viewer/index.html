@@ -1,0 +1,2416 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>URDF Robot Viewer - car1</title>
+<style>
+  :root {
+    --bg-primary: #0a0e17;
+    --bg-secondary: #111827;
+    --bg-panel: #1a2235;
+    --bg-card: #1e293b;
+    --border: #2d3a50;
+    --text-primary: #e2e8f0;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --accent: #3b82f6;
+    --accent-hover: #60a5fa;
+    --accent-glow: rgba(59, 130, 246, 0.3);
+    --success: #22c55e;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --slider-track: #334155;
+    --slider-thumb: #3b82f6;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+  }
+
+  #canvas-container {
+    flex: 1;
+    position: relative;
+    background: linear-gradient(135deg, #0a0e17 0%, #111827 50%, #0f172a 100%);
+  }
+
+  #canvas-container canvas { display: block; }
+
+  /* 顶部信息栏 */
+  #top-bar {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    z-index: 10;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+
+  .badge {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 14px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    backdrop-filter: blur(12px);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .badge .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--success);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* 3D视图工具栏 */
+  #view-toolbar {
+    position: absolute;
+    bottom: 16px;
+    left: 16px;
+    z-index: 10;
+    display: flex;
+    gap: 8px;
+  }
+
+  .view-btn {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 12px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.2s;
+    backdrop-filter: blur(12px);
+  }
+
+  .view-btn:hover {
+    background: var(--bg-card);
+    color: var(--text-primary);
+    border-color: var(--accent);
+  }
+
+  .view-btn.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+  }
+
+  /* 右侧面板 */
+  #side-panel {
+    width: 360px;
+    background: var(--bg-secondary);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .panel-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .panel-header h2 {
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: var(--text-primary);
+  }
+
+  .panel-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-panel);
+  }
+
+  .panel-tab {
+    flex: 1;
+    padding: 10px;
+    text-align: center;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+  }
+
+  .panel-tab:hover { color: var(--text-secondary); }
+
+  .panel-tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  .panel-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+  }
+
+  .panel-content::-webkit-scrollbar { width: 4px; }
+  .panel-content::-webkit-scrollbar-track { background: transparent; }
+  .panel-content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* 关节控制卡片 */
+  .joint-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 10px;
+    transition: border-color 0.2s;
+  }
+
+  .joint-card:hover { border-color: var(--accent); }
+
+  .joint-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+
+  .joint-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .joint-type {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 500;
+    text-transform: uppercase;
+  }
+
+  .joint-type.revolute { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
+  .joint-type.continuous { background: rgba(34, 197, 94, 0.15); color: #4ade80; }
+  .joint-type.mimic { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
+  .joint-type.active { background: rgba(99, 102, 241, 0.15); color: #818cf8; }
+
+  .joint-slider-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .joint-value {
+    font-size: 12px;
+    font-family: 'Consolas', 'Monaco', monospace;
+    color: var(--accent);
+    min-width: 55px;
+    text-align: right;
+  }
+
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    flex: 1;
+    height: 4px;
+    background: var(--slider-track);
+    border-radius: 2px;
+    outline: none;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--slider-thumb);
+    cursor: pointer;
+    box-shadow: 0 0 8px var(--accent-glow);
+    transition: transform 0.15s;
+  }
+
+  input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+  }
+
+  .joint-limits {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 4px;
+  }
+
+  /* 滑块容器：用于叠加软限位视觉标记 */
+  .slider-wrapper {
+    position: relative;
+    flex: 1;
+    display: flex;
+    align-items: center;
+  }
+
+  /* 软限位区域：在滑块轨道上叠加一个淡色高亮区，标识推荐操作范围 */
+  .soft-limit-marks {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    height: 6px;
+    background: rgba(34, 197, 94, 0.22);   /* 绿色淡背景 */
+    border-left: 1px dashed rgba(34, 197, 94, 0.7);
+    border-right: 1px dashed rgba(34, 197, 94, 0.7);
+    pointer-events: none;
+    z-index: 0;
+    border-radius: 2px;
+  }
+
+  /* 软限位区域外的滑块轨道：变暗 */
+  .slider-wrapper::before {
+    content: '';
+    position: absolute;
+    left: 0; right: 0; top: 50%;
+    transform: translateY(-50%);
+    height: 6px;
+    background: rgba(239, 68, 68, 0.10);    /* 红色淡背景，标识越界区 */
+    border-radius: 2px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* 把 input 滑块提到上层 */
+  .slider-wrapper input[type="range"] {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* 软限位提示文字 */
+  .soft-limit-info {
+    margin-top: 4px;
+    font-size: 10px;
+    color: #22c55e;        /* 绿色，与滑块上绿色限位区对应 */
+    text-align: center;
+    font-weight: 500;
+  }
+
+  .joint-reset-btn {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-muted);
+    font-size: 10px;
+    padding: 2px 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .joint-reset-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* FK/IK 面板 */
+  .fk-ik-section {
+    margin-bottom: 16px;
+  }
+
+  .section-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .section-hint {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+    line-height: 1.4;
+  }
+
+  .pose-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .pose-btn {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+    color: var(--text-secondary);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+  }
+
+  .pose-btn:hover {
+    border-color: var(--accent);
+    color: var(--text-primary);
+    background: var(--bg-panel);
+  }
+
+  .ik-target-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+  }
+
+  .ik-target-card h4 {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 10px;
+  }
+
+  .ik-input-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .ik-input-row label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    min-width: 16px;
+    font-weight: 600;
+  }
+
+  .ik-input-row input {
+    flex: 1;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 10px;
+    color: var(--text-primary);
+    font-size: 12px;
+    font-family: 'Consolas', monospace;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .ik-input-row input:focus { border-color: var(--accent); }
+
+  .ik-solve-btn {
+    width: 100%;
+    padding: 10px;
+    background: linear-gradient(135deg, var(--accent), #2563eb);
+    border: none;
+    border-radius: 8px;
+    color: white;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: 8px;
+  }
+
+  .ik-solve-btn:hover {
+    box-shadow: 0 4px 16px var(--accent-glow);
+    transform: translateY(-1px);
+  }
+
+  .ik-solve-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+
+  /* TCP 信息 */
+  .tcp-info {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 12px;
+  }
+
+  .tcp-info h4 {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+  }
+
+  .tcp-data {
+    font-family: 'Consolas', monospace;
+    font-size: 11px;
+    color: var(--text-secondary);
+    line-height: 1.8;
+  }
+
+  .tcp-data .label { color: var(--text-muted); }
+  .tcp-data .value { color: var(--accent); }
+
+  /* 底部状态栏 */
+  .panel-footer {
+    padding: 10px 16px;
+    border-top: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--text-muted);
+    display: flex;
+    justify-content: space-between;
+    background: var(--bg-panel);
+  }
+
+  /* 加载遮罩 */
+  #loading-overlay {
+    position: fixed;
+    inset: 0;
+    background: var(--bg-primary);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    transition: opacity 0.5s;
+  }
+
+  #loading-overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .loader {
+    width: 48px; height: 48px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-bottom: 20px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .loading-text {
+    font-size: 14px;
+    color: var(--text-secondary);
+  }
+
+  .loading-progress {
+    margin-top: 12px;
+    font-size: 12px;
+    color: var(--text-muted);
+    font-family: 'Consolas', monospace;
+  }
+
+  /* 关节高亮 */
+  .joint-card.highlighted {
+    border-color: var(--warning);
+    box-shadow: 0 0 12px rgba(245, 158, 11, 0.2);
+  }
+
+  /* ============================================================
+     移动端响应式适配（横屏 + 竖屏）
+     ============================================================ */
+
+  /* 平板和中等屏幕（横屏或宽度 ≤ 1024px） */
+  @media (max-width: 1024px) and (orientation: landscape),
+         (max-width: 926px) {
+    /* 侧边栏宽度缩小 */
+    #side-panel {
+      width: 280px;
+    }
+
+    /* 顶部信息栏缩小间距 */
+    #top-bar {
+      top: 8px;
+      left: 8px;
+      gap: 6px;
+    }
+
+    .badge {
+      padding: 4px 10px;
+      font-size: 10px;
+    }
+
+    /* 视图工具栏：允许换行 */
+    #view-toolbar {
+      bottom: 8px;
+      left: 8px;
+      gap: 4px;
+      max-width: calc(100vw - 280px - 24px);
+      flex-wrap: wrap;
+    }
+
+    .view-btn {
+      padding: 6px 10px;
+      font-size: 11px;
+    }
+
+    /* 面板头部缩小 */
+    .panel-header {
+      padding: 12px 16px;
+    }
+
+    .panel-header h2 {
+      font-size: 12px;
+    }
+
+    /* 关节卡片紧凑布局 */
+    .joint-card {
+      padding: 10px 12px;
+      margin-bottom: 8px;
+    }
+
+    .joint-header {
+      font-size: 11px;
+      margin-bottom: 6px;
+    }
+
+    .joint-slider {
+      gap: 8px;
+    }
+
+    .joint-value {
+      font-size: 10px;
+      min-width: 70px;
+    }
+
+    /* IK 输入缩小 */
+    .ik-input-row {
+      gap: 6px;
+    }
+
+    .ik-input-row label,
+    .ik-input-row input {
+      font-size: 11px;
+    }
+  }
+
+  /* 手机横屏（宽度 ≤ 926px 且高度 ≤ 500px） */
+  @media (max-width: 926px) and (max-height: 500px) and (orientation: landscape) {
+    body {
+      font-size: 12px;
+    }
+
+    /* 侧边栏进一步缩小 */
+    #side-panel {
+      width: 240px;
+    }
+
+    /* 顶部信息栏更紧凑 */
+    #top-bar {
+      top: 4px;
+      left: 4px;
+      gap: 4px;
+    }
+
+    .badge {
+      padding: 3px 8px;
+      font-size: 9px;
+    }
+
+    /* 视图工具栏：允许换行并缩小 */
+    #view-toolbar {
+      bottom: 4px;
+      left: 4px;
+      gap: 3px;
+      max-width: calc(100vw - 240px - 16px);
+    }
+
+    .view-btn {
+      padding: 5px 8px;
+      font-size: 10px;
+      border-radius: 6px;
+    }
+
+    /* 面板内容紧凑间距 */
+    .panel-content {
+      padding: 8px;
+    }
+
+    /* 关节卡片超紧凑 */
+    .joint-card {
+      padding: 8px 10px;
+      margin-bottom: 6px;
+    }
+
+    .joint-header {
+      font-size: 10px;
+      margin-bottom: 4px;
+    }
+
+    .joint-limits {
+      font-size: 9px;
+    }
+
+    /* IK 按钮缩小 */
+    .ik-solve-btn {
+      padding: 10px;
+      font-size: 12px;
+    }
+  }
+
+  /* 手机竖屏（宽度 ≤ 600px） */
+  @media (max-width: 600px) and (orientation: portrait) {
+    body {
+      flex-direction: column;
+    }
+
+    /* 侧边栏移到底部，占满宽度 */
+    #side-panel {
+      width: 100%;
+      max-height: 50vh;
+      border-left: none;
+      border-top: 1px solid var(--border);
+      order: 2;
+    }
+
+    /* 3D 视图在上方 */
+    #canvas-container {
+      height: 50vh;
+      order: 1;
+    }
+
+    /* 顶部信息栏缩小 */
+    #top-bar {
+      top: 4px;
+      left: 4px;
+      gap: 4px;
+      flex-wrap: wrap;
+      max-width: calc(100vw - 16px);
+    }
+
+    .badge {
+      padding: 3px 8px;
+      font-size: 9px;
+    }
+
+    /* 视图工具栏：换行显示 */
+    #view-toolbar {
+      bottom: 4px;
+      left: 4px;
+      gap: 3px;
+      max-width: calc(100vw - 16px);
+      flex-wrap: wrap;
+    }
+
+    .view-btn {
+      padding: 6px 10px;
+      font-size: 10px;
+    }
+
+    /* 面板内容调整 */
+    .panel-content {
+      padding: 10px;
+    }
+
+    .joint-card {
+      padding: 10px;
+      margin-bottom: 8px;
+    }
+  }
+
+  /* 触摸设备优化 */
+  @media (hover: none) and (pointer: coarse) {
+    /* 增大可点击区域 */
+    .panel-tab {
+      padding: 12px;
+    }
+
+    .view-btn {
+      min-width: 44px;
+      min-height: 44px;
+    }
+
+    /* 滑块拖动区域 */
+    input[type="range"]::-webkit-slider-thumb {
+      width: 20px;
+      height: 20px;
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 20px;
+      height: 20px;
+    }
+
+    /* 关闭按钮增大 */
+    .joint-reset-btn {
+      min-height: 36px;
+      padding: 6px 14px !important;
+    }
+  }
+</style>
+</head>
+<body>
+
+<!-- 加载遮罩 -->
+<div id="loading-overlay">
+  <div class="loader"></div>
+  <div class="loading-text">Loading Robot Model...</div>
+  <div class="loading-progress" id="loading-progress">Initializing...</div>
+</div>
+
+<!-- 3D视图 -->
+<div id="canvas-container">
+  <div id="top-bar">
+    <div class="badge"><div class="dot"></div> car1 URDF Viewer</div>
+    <div class="badge" id="fps-badge">FPS: --</div>
+  </div>
+  <div id="view-toolbar">
+    <button class="view-btn active" onclick="setView('perspective')" title="透视视图">Perspective</button>
+    <button class="view-btn" onclick="setView('front')" title="前视图">Front</button>
+    <button class="view-btn" onclick="setView('top')" title="俯视图">Top</button>
+    <button class="view-btn" onclick="setView('side')" title="侧视图">Side</button>
+    <button class="view-btn" onclick="toggleWireframe()" title="线框模式">Wireframe</button>
+    <button class="view-btn active" id="btn-axes" onclick="toggleAxes()" title="根坐标轴">Axes</button>
+    <button class="view-btn" id="btn-link-axes" onclick="toggleLinkAxes()" title="局部坐标系">Link Axes</button>
+  </div>
+</div>
+
+<!-- 右侧面板 -->
+<div id="side-panel">
+  <div class="panel-header">
+    <h2>Joint Control</h2>
+    <button class="joint-reset-btn" onclick="resetAllJoints()" style="font-size:12px;padding:4px 12px;">Reset All</button>
+  </div>
+
+  <div class="panel-tabs">
+    <div class="panel-tab active" onclick="switchTab('joints')">Joints</div>
+    <div class="panel-tab" onclick="switchTab('fk')">FK / IK</div>
+    <div class="panel-tab" onclick="switchTab('info')">Info</div>
+  </div>
+
+  <div class="panel-content" id="panel-content">
+    <!-- 动态填充 -->
+  </div>
+
+  <div class="panel-footer">
+    <span id="joint-count">0 joints</span>
+    <span id="tcp-pos">TCP: --</span>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "./lib/three.module.js",
+    "three/addons/": "./lib/",
+    "three/examples/jsm/": "./lib/",
+    "urdf-loader": "./lib/URDFLoader.min.js"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from './lib/controls/OrbitControls.js';
+import { STLLoader } from './lib/loaders/STLLoader.js';
+import URDFLoader from 'urdf-loader';
+
+// 导入运动学模块（使用别名避免冲突）
+import { ROBOT_CALIBRATION, GEOM, deriveGeometry } from './kinematics/config.js';
+import {
+  solveAnalyticalIK as solveAnalyticalIK_module,
+  solveAnalyticalIKAutoPitch as solveAnalyticalIKAutoPitch_module,
+  solveAnalyticalIKIgnorePitch as solveAnalyticalIKIgnorePitch_module
+} from './kinematics/ik-analytical.js';
+import { solveIK as solveIK_module } from './kinematics/ik-numerical.js';
+
+// ============================================================
+// 标定 API - 暴露到全局供运行时调整
+// ============================================================
+window.calibrate = function(path, value) {
+  const keys = path.split('.');
+  let obj = ROBOT_CALIBRATION;
+  for (let i = 0; i < keys.length - 1; i++) obj = obj[keys[i]];
+  obj[keys[keys.length - 1]] = value;
+
+  // 重新计算派生量
+  const newGeom = deriveGeometry(ROBOT_CALIBRATION);
+  Object.assign(GEOM, newGeom);
+
+  console.log(`✓ Calibrated ${path} = ${value}`);
+  console.log('  Derived:', { L1: GEOM.L1, L2: GEOM.L2, L_TCP: GEOM.L_TCP });
+};
+
+window.saveCalibration = function() {
+  localStorage.setItem('robot_calibration', JSON.stringify(ROBOT_CALIBRATION));
+  console.log('✓ Calibration saved to localStorage');
+};
+
+window.loadCalibration = function() {
+  const saved = localStorage.getItem('robot_calibration');
+  if (saved) {
+    Object.assign(ROBOT_CALIBRATION, JSON.parse(saved));
+    // 触发重新计算
+    window.calibrate('solver.reachTolerance', ROBOT_CALIBRATION.solver.reachTolerance);
+    console.log('✓ Calibration loaded from localStorage');
+  } else {
+    console.log('No saved calibration found');
+  }
+};
+
+window.exportCalibration = function() {
+  const json = JSON.stringify(ROBOT_CALIBRATION, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'robot_calibration.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  console.log('✓ Calibration exported as JSON');
+};
+
+window.resetCalibration = function() {
+  location.reload();  // 简单重载页面恢复默认值
+};
+
+// 启动时尝试加载保存的标定参数
+window.loadCalibration();
+
+// ============================================================
+// 全局变量
+// ============================================================
+let scene, camera, renderer, controls;
+let robot; // URDFLoader返回的机器人对象
+let jointMap = {}; // jointName -> { joint, limits, value, role: 'active' | 'mimic' }
+let linkMeshes = []; // 所有mesh
+let showWireframe = false;
+let showAxes = true;
+let showLinkAxes = false;
+let linkAxesHelpers = [];
+let axesHelper;
+let currentTab = 'joints';
+let frameCount = 0, lastTime = performance.now();
+
+// URDF数据 - 用于生成控制面板（关节信息）
+// 注：实际的3D模型通过 URDFLoader + STLLoader 加载，保证与ROS规范完全一致
+const URDF_DATA = {
+  robotName: "car1",
+  joints: [
+    { name: "wheel_lf_joint", type: "continuous" },
+    { name: "wheel_rf_joint", type: "continuous" },
+    { name: "wheel_lb_joint", type: "continuous" },
+    { name: "wheel_rb_joint", type: "continuous" },
+    { name: "arm_joint1", type: "revolute", lower: -3.14, upper: 3.14 },
+    { name: "arm_joint2", type: "revolute", lower: -3.14, upper: 3.14 },
+    { name: "arm_joint3", type: "revolute", lower: -3.14, upper: 3.14 },
+    { name: "arm_joint4", type: "revolute", lower: -3.14, upper: 3.14 },
+    { name: "arm_joint5", type: "revolute", lower: -3.14, upper: 3.14 },
+    { name: "r_joint", type: "revolute", lower: -3.14, upper: 3.14 },
+    { name: "l_joint", type: "revolute", lower: -3.14, upper: 3.14, mimic: { joint: "r_joint", multiplier: -1, offset: 0 } },
+    { name: "r_in_joint", type: "revolute", lower: -3.14, upper: 3.14, mimic: { joint: "r_joint", multiplier: 1, offset: 0 } },
+    { name: "r_out_joint", type: "revolute", lower: -3.14, upper: 3.14, mimic: { joint: "r_joint", multiplier: -1, offset: 0 } },
+    { name: "l_in_joint", type: "revolute", lower: -3.14, upper: 3.14, mimic: { joint: "r_joint", multiplier: -1, offset: 0 } },
+    { name: "l_out_joint", type: "revolute", lower: -3.14, upper: 3.14, mimic: { joint: "r_joint", multiplier: 1, offset: 0 } }
+  ]
+};
+
+// ============================================================
+// 初始化Three.js场景
+// ============================================================
+function initScene() {
+  const container = document.getElementById('canvas-container');
+
+  scene = new THREE.Scene();
+
+  // 相机（Z-up 约定下：X 前，Y 左，Z 上）
+  camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.01, 100);
+  camera.position.set(0.5, -0.4, 0.4); // 前-左-上 斜视
+  camera.up.set(0, 0, 1); // Z 轴朝上
+
+  // 渲染器
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setSize(container.clientWidth, container.clientHeight);
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.2;
+  container.appendChild(renderer.domElement);
+
+  // 控制器
+  controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.target.set(0, 0, 0.08); // 看向模型中心（base_link 上方一点）
+  controls.update();
+
+  // 灯光
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+  scene.add(ambientLight);
+
+  const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
+  dirLight1.position.set(1, 2, 1);
+  dirLight1.castShadow = true;
+  scene.add(dirLight1);
+
+  const dirLight2 = new THREE.DirectionalLight(0x88aaff, 0.3);
+  dirLight2.position.set(-1, 1, -1);
+  scene.add(dirLight2);
+
+  // 地面网格（Z=0 平面，符合 URDF 的 Z-up 约定）
+  const gridHelper = new THREE.GridHelper(1, 20, 0x2d3a50, 0x1a2235);
+  gridHelper.rotation.x = Math.PI / 2; // XZ 平面 → XY 平面
+  scene.add(gridHelper);
+
+  // 坐标轴
+  axesHelper = new THREE.AxesHelper(0.15);
+  scene.add(axesHelper);
+
+  // 窗口大小调整
+  window.addEventListener('resize', onResize);
+}
+
+function onResize() {
+  const container = document.getElementById('canvas-container');
+  camera.aspect = container.clientWidth / container.clientHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(container.clientWidth, container.clientHeight);
+}
+
+// ============================================================
+// RPY转旋转矩阵（URDF规范: R = Rz * Ry * Rx）
+// ============================================================
+function rpyToQuaternion(roll, pitch, yaw) {
+  const cr = Math.cos(roll), sr = Math.sin(roll);
+  const cp = Math.cos(pitch), sp = Math.sin(pitch);
+  const cy = Math.cos(yaw), sy = Math.sin(yaw);
+
+  const w = cr*cp*cy + sr*sp*sy;
+  const x = sr*cp*cy - cr*sp*sy;
+  const y = cr*sp*cy + sr*cp*sy;
+  const z = cr*cp*sy - sr*sp*cy;
+
+  return new THREE.Quaternion(x, y, z, w);
+}
+
+// ============================================================
+// 加载URDF模型（使用URDFLoader - 符合ROS规范）
+// ============================================================
+async function loadURDF() {
+  // 配置STLLoader加载meshes
+  const stlLoader = new STLLoader();
+
+  // 加载URDF
+  const urdfLoader = new URDFLoader();
+  urdfLoader.packages = {
+    'car1_description': '../meshes/'
+  };
+  // 兜底：使用全局mesh路径解析
+  // 限流：preview webview（如 Trae IDE 内置）有并发连接限制，
+  // 22 个并发 fetch 会触发 net::ERR_ABORTED。这里用串行队列限流到 3。
+  const meshLoadQueue = [];
+  let meshLoadActive = 0;
+  const MESH_MAX_CONCURRENT = 3;
+  function drainMeshQueue() {
+    while (meshLoadActive < MESH_MAX_CONCURRENT && meshLoadQueue.length > 0) {
+      const { path, manager, done } = meshLoadQueue.shift();
+      meshLoadActive++;
+      const filename = path.split('/').pop();
+      stlLoader.load('../meshes/' + filename, (geometry) => {
+        const material = new THREE.MeshPhongMaterial({
+          color: 0xcccccc,
+          shininess: 60,
+          specular: 0x222222
+        });
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        linkMeshes.push(mesh);
+        done(mesh);
+        meshLoadActive--;
+        drainMeshQueue();
+      }, undefined, (err) => {
+        console.warn('Failed to load mesh:', path, err);
+        done(null, err);
+        meshLoadActive--;
+        drainMeshQueue();
+      });
+    }
+  }
+  urdfLoader.loadMeshCb = (path, manager, done) => {
+    meshLoadQueue.push({ path, manager, done });
+    drainMeshQueue();
+  };
+
+  return new Promise((resolve, reject) => {
+    urdfLoader.load('../urdf/car1.urdf', (loadedRobot) => {
+      resolve(loadedRobot);
+    }, undefined, (err) => {
+      reject(err);
+    });
+  });
+}
+
+// ============================================================
+// 从URDFLoader返回的robot对象提取joint信息
+// ============================================================
+// 软限位（推荐操作范围）：滑块 HTML 范围保持 ±π，拖动时钳位到此范围
+// 注意：仅影响 UI 拖动和显示，不改动 URDF
+const DEG = Math.PI / 180;
+const SOFT_LIMITS = {
+  'arm_joint1': { lower: -135 * DEG, upper:  135 * DEG, label: '±135°' },
+  'arm_joint2': { lower:  -60 * DEG, upper:   90 * DEG, label: '-60°~90°' },
+  'arm_joint3': { lower: -120 * DEG, upper:  120 * DEG, label: '±120°' },
+  'arm_joint4': { lower: -100 * DEG, upper:  100 * DEG, label: '±100°' },
+  'arm_joint5': { lower:  -60 * DEG, upper:   60 * DEG, label: '±60°' },
+  'r_joint':    { lower:  -60 * DEG, upper:    0 * DEG, label: '-60°~0°' }
+};
+
+function extractJointInfo(robot) {
+  // URDFLoader 会为每个joint创建 URDFJoint 和 URDFLink 对象
+  // robot.joints 是一个字典 {jointName: URDFJoint}
+  const joints = robot.joints;
+  if (!joints) {
+    console.error('No joints found in robot object');
+    return;
+  }
+
+  Object.entries(joints).forEach(([name, joint]) => {
+    if (joint.jointType === 'fixed') return;
+
+    const info = {
+      joint: joint,
+      limits: {
+        lower: joint.limit?.lower ?? -Math.PI,
+        upper: joint.limit?.upper ?? Math.PI
+      },
+      value: 0,
+      type: joint.jointType,
+      role: 'active',   // 'active' | 'mimic'
+      parentJoint: null // 对 mimic 关节，指向主关节的 jointMap entry
+    };
+
+    // URDFLoader 内部：mimic 关节的 `joint.mimicJoint` 存储的是主关节的 name 字符串
+    // `joint.multiplier` 和 `joint.offset` 是 mimic 关节自己的参数
+    if (joint.mimicJoint && joints[joint.mimicJoint]) {
+      info.role = 'mimic';
+      info.multiplier = joint.multiplier ?? 1;
+      info.offset = joint.offset ?? 0;
+      info.parentJointName = joint.mimicJoint;
+    }
+
+    jointMap[name] = info;
+  });
+}
+
+function setJointValue(jointName, value) {
+  const info = jointMap[jointName];
+  if (!info) return;
+
+  // mimic (被动) 关节：不能直接控制，应通过主关节驱动
+  if (info.role === 'mimic') {
+    console.warn(`Joint "${jointName}" is a passive (mimic) joint, control its parent "${info.parentJointName}" instead.`);
+    return;
+  }
+
+  // 限制范围
+  if (info.type === 'revolute') {
+    value = Math.max(info.limits.lower, Math.min(info.limits.upper, value));
+  }
+  info.value = value;
+
+  // 设置主关节角度 — URDFLoader 内部会自动传播给所有 mimic 关节
+  info.joint.setJointValue(value);
+
+  // 同步主关节自身的 UI 滑块 / value 文本（避免 programmatic 写入后 UI 与状态不一致）
+  {
+    const slider = document.getElementById(`slider-${jointName}`);
+    const valueEl = document.getElementById(`value-${jointName}`);
+    // r_joint 的 URDF 值与显示值方向相反（URDF = -显示），滑块/文本需要用显示值
+    const displayVal = jointName === 'r_joint' ? -value : value;
+    if (slider) slider.value = displayVal;
+    if (valueEl) valueEl.textContent = displayVal.toFixed(3) + ' rad';
+  }
+
+  // 同步所有 mimic 关节的 UI 滑块（从 URDF 内部 jointValue[0] 读取实际值）
+  Object.entries(jointMap).forEach(([name, jInfo]) => {
+    if (jInfo.role !== 'mimic') return;
+    const actualVal = jInfo.joint.jointValue?.[0] ?? 0;
+    jInfo.value = actualVal;
+    const slider = document.getElementById(`slider-${name}`);
+    const valueEl = document.getElementById(`value-${name}`);
+    if (slider) slider.value = actualVal;
+    if (valueEl) valueEl.textContent = actualVal.toFixed(3) + ' rad';
+  });
+
+  // 更新TCP位置
+  updateTCPInfo();
+}
+
+// ============================================================
+// 获取TCP位姿（FK计算）
+// ============================================================
+function getTCPPose() {
+  if (!robot || !robot.links || !robot.links.tcp_link) return null;
+
+  const tcpLink = robot.links.tcp_link;
+  const position = new THREE.Vector3();
+  const quaternion = new THREE.Quaternion();
+  const scale = new THREE.Vector3();
+
+  tcpLink.getWorldPosition(position);
+  tcpLink.getWorldQuaternion(quaternion);
+  tcpLink.getWorldScale(scale);
+
+  const euler = new THREE.Euler().setFromQuaternion(quaternion, 'XYZ');
+
+  return {
+    position: { x: position.x, y: position.y, z: position.z },
+    orientation: { roll: euler.x, pitch: euler.y, yaw: euler.z },
+    quaternion: { x: quaternion.x, y: quaternion.y, z: quaternion.z, w: quaternion.w }
+  };
+}
+
+// ============================================================
+// 解析法 IK 求解器（几何法 - 基于 J2-J4 平行构型）
+// J1 控制方向，J2-J4 平面 2R + 1R 几何闭式解，J5 控制腕部旋转
+//
+// 坐标系约定：
+//   - targetPos 输入为 base_footprint (世界) 坐标系下的 TCP 目标位置
+//     （URDFLoader 将 base_footprint 放在场景原点，getTCPPose() 返回世界坐标）
+//   - 内部转换为 J1 子坐标系 (arm_link1 frame at q1=0) 后求解
+//   - 几何参数从 URDF 精确提取（使用 verify_ik_params.py 验证）
+//
+// 关节限位：revolute joints 限位 ±π (=3.14159)。如果几何解需要某个关节
+//   超过限位，则该解被丢弃，选择另一个 elbow 分支。
+//   若两解都不可行（目标点 + pitch 不可达），返回 error。
+// ============================================================
+// ============================================================
+// IK 适配器函数（连接导入的模块与 Three.js）
+// ============================================================
+// 这些函数是适配层，将纯函数式的 IK 模块适配到依赖 Three.js 的 UI 代码
+
+/**
+ * 解析法 IK 适配器（固定 Pitch）
+ * 调用导入的 kinematics/ik-analytical.js
+ */
+function solveAnalyticalIK(targetPos, targetPitchRad = 0) {
+  return solveAnalyticalIK_module(targetPos, targetPitchRad, ROBOT_CALIBRATION, GEOM);
+}
+
+/**
+ * 解析法 IK 适配器（Auto Pitch）
+ */
+function solveAnalyticalIKAutoPitch(targetPos, preferredPitchRad = 0) {
+  return solveAnalyticalIKAutoPitch_module(targetPos, preferredPitchRad, ROBOT_CALIBRATION, GEOM);
+}
+
+/**
+ * 解析法 IK 适配器（Ignore Pitch）
+ * 需要 FK 回调
+ */
+function solveAnalyticalIKIgnorePitch(targetPos) {
+  // FK 回调：将关节角转换为 TCP 位置
+  const fkCallback = (joints) => {
+    // 临时应用关节角
+    const backup = {};
+    ['arm_joint1', 'arm_joint2', 'arm_joint3', 'arm_joint4', 'arm_joint5'].forEach((n, i) => {
+      backup[n] = jointMap[n].value;
+      setJointValue(n, joints[`q${i+1}`]);
+    });
+
+    const tcp = getTCPPose();
+
+    // 恢复原值
+    ['arm_joint1', 'arm_joint2', 'arm_joint3', 'arm_joint4', 'arm_joint5'].forEach(n => {
+      setJointValue(n, backup[n]);
+    });
+
+    return tcp ? { x: tcp.position.x, y: tcp.position.y, z: tcp.position.z } : null;
+  };
+
+  return solveAnalyticalIKIgnorePitch_module(targetPos, ROBOT_CALIBRATION, GEOM, fkCallback);
+}
+
+/**
+ * 数值法 IK 适配器（DLS Jacobian）
+ */
+function solveIK(targetPos, maxIter = 200, tolerance = 0.001) {
+  // FK 回调
+  const fkCallback = (joints) => {
+    const tcp = getTCPPose();
+    return tcp ? { x: tcp.position.x, y: tcp.position.y, z: tcp.position.z } : null;
+  };
+
+  // 获取当前关节角
+  const getJointsCallback = () => {
+    return {
+      q1: jointMap['arm_joint1'].value,
+      q2: jointMap['arm_joint2'].value,
+      q3: jointMap['arm_joint3'].value,
+      q4: jointMap['arm_joint4'].value,
+      q5: jointMap['arm_joint5'].value
+    };
+  };
+
+  // 设置关节角
+  const setJointsCallback = (joints) => {
+    setJointValue('arm_joint1', joints.q1);
+    setJointValue('arm_joint2', joints.q2);
+    setJointValue('arm_joint3', joints.q3);
+    setJointValue('arm_joint4', joints.q4);
+    setJointValue('arm_joint5', joints.q5);
+  };
+
+  const result = solveIK_module(
+    targetPos,
+    { maxIter, tolerance },
+    fkCallback,
+    getJointsCallback,
+    setJointsCallback
+  );
+
+  return result.success;
+}
+
+// ============================================================
+// UI: 构建关节控制面板
+// ============================================================
+function buildJointPanel() {
+  const container = document.getElementById('panel-content');
+  container.innerHTML = '';
+
+  // 从 jointMap 生成分类
+  const armJoints = [];
+  const gripperActive = [];   // 主动关节（r_joint）
+  const gripperPassive = [];  // mimic 关节
+  const wheelJoints = [];
+
+  Object.entries(jointMap).forEach(([name, info]) => {
+    const joint = {
+      name, type: info.type,
+      lower: info.limits.lower, upper: info.limits.upper,
+      role: info.role,
+      parentJointName: info.parentJointName,
+      multiplier: info.multiplier,
+      offset: info.offset
+    };
+    if (name.startsWith('arm_joint')) armJoints.push(joint);
+    else if (name === 'r_joint' && info.role === 'active') gripperActive.push(joint);
+    else if (info.role === 'mimic' && (name.endsWith('_joint') && (name.includes('l_') || name.includes('r_in') || name.includes('r_out') || name.includes('l_in') || name.includes('l_out')))) {
+      gripperPassive.push(joint);
+    } else if (name.startsWith('wheel_')) wheelJoints.push(joint);
+  });
+
+  // 机械臂关节
+  if (armJoints.length > 0) {
+    const section = createSection('Arm Joints');
+    armJoints.forEach(j => section.appendChild(createJointCard(j)));
+    container.appendChild(section);
+  }
+
+  // 夹爪主动关节
+  if (gripperActive.length > 0) {
+    const section = createSection('Gripper (Active)');
+    gripperActive.forEach(j => section.appendChild(createJointCard(j)));
+    container.appendChild(section);
+  }
+
+  // 夹爪被动/联动关节
+  if (gripperPassive.length > 0) {
+    const section = createSection('Gripper (Passive / Mimic)', '联动关节由主动关节自动驱动，滑块禁用只读');
+    gripperPassive.forEach(j => section.appendChild(createJointCard(j)));
+    container.appendChild(section);
+  }
+
+  // 车轮关节
+  if (wheelJoints.length > 0) {
+    const section = createSection('Wheel Joints');
+    wheelJoints.forEach(j => section.appendChild(createJointCard(j)));
+    container.appendChild(section);
+  }
+
+  // 统计
+  const activeCount = Object.values(jointMap).filter(i => i.role === 'active').length;
+  const mimicCount = Object.values(jointMap).filter(i => i.role === 'mimic').length;
+  const countEl = document.getElementById('joint-count');
+  if (countEl) countEl.textContent = `${activeCount} active · ${mimicCount} mimic`;
+}
+
+function createSection(title, hint) {
+  const div = document.createElement('div');
+  div.className = 'fk-ik-section';
+  const hintHtml = hint ? `<div class="section-hint">${hint}</div>` : '';
+  div.innerHTML = `<div class="section-title">${title}</div>${hintHtml}`;
+  return div;
+}
+
+function createJointCard(joint) {
+  const card = document.createElement('div');
+  card.className = 'joint-card';
+  card.id = `card-${joint.name}`;
+
+  const isMimic = joint.role === 'mimic';
+  const typeClass = isMimic ? 'mimic' : 'active';
+  const typeLabel = isMimic
+    ? `mimic × ${joint.multiplier ?? 1}${joint.offset ? ` + ${joint.offset.toFixed(2)}` : ''}`
+    : 'active';
+  const typeTitle = isMimic
+    ? `联动自 ${joint.parentJointName}（value = ${joint.multiplier ?? 1} × ${joint.parentJointName} ${joint.offset ? `+ ${joint.offset.toFixed(2)}` : ''}）`
+    : '主动关节';
+
+  const lower = joint.lower !== undefined ? joint.lower : -3.14;
+  const upper = joint.upper !== undefined ? joint.upper : 3.14;
+  // 软限位（推荐操作范围）— 用于显示和拖动钳位
+  const soft = SOFT_LIMITS[joint.name];
+  const softInfo = soft
+    ? `推荐: ${(soft.lower * 180 / Math.PI).toFixed(0)}° ~ ${(soft.upper * 180 / Math.PI).toFixed(0)}°`
+    : '';
+  // 计算软限位在滑块上的相对位置（0-100%）用于 CSS 标记
+  const range = upper - lower;
+  const softLeftPct = soft ? ((soft.lower - lower) / range * 100).toFixed(2) : '0';
+  const softWidthPct = soft ? ((soft.upper - soft.lower) / range * 100).toFixed(2) : '100';
+  const limitMark = soft
+    ? `<div class="soft-limit-marks" style="left:${softLeftPct}%;width:${softWidthPct}%;"></div>`
+    : '';
+
+  card.innerHTML = `
+    <div class="joint-card-header">
+      <span class="joint-name">${joint.name}</span>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <span class="joint-type ${typeClass}" title="${typeTitle}">${typeLabel}</span>
+        ${!isMimic ? `<button class="joint-reset-btn" onclick="resetJoint('${joint.name}')">Reset</button>` : ''}
+      </div>
+    </div>
+    <div class="joint-slider-row">
+      <div class="slider-wrapper">
+        ${limitMark}
+        <input type="range" id="slider-${joint.name}"
+          min="${lower}" max="${upper}" step="0.01" value="0"
+          ${isMimic ? 'disabled title="被动/联动关节，不能直接控制"' : ''}
+          oninput="onJointSlider('${joint.name}', this.value)">
+      </div>
+      <span class="joint-value" id="value-${joint.name}">0.000 rad</span>
+    </div>
+    <div class="joint-limits">
+      <span>${lower.toFixed(2)} rad</span>
+      <span>${(lower * 180 / Math.PI).toFixed(1)}° ~ ${(upper * 180 / Math.PI).toFixed(1)}°</span>
+      <span>${upper.toFixed(2)} rad</span>
+    </div>
+    ${softInfo ? `<div class="soft-limit-info" title="软限位（推荐操作范围），拖动到此范围外会被钳位">${softInfo}</div>` : ''}
+  `;
+
+  return card;
+}
+
+// ============================================================
+// UI: FK/IK面板
+// ============================================================
+function buildFKIKPanel() {
+  const container = document.getElementById('panel-content');
+  container.innerHTML = '';
+
+  // TCP信息
+  const tcpCard = document.createElement('div');
+  tcpCard.className = 'tcp-info';
+  tcpCard.id = 'tcp-info-card';
+  tcpCard.innerHTML = `
+    <h4>TCP (Tool Center Point) Position</h4>
+    <div class="tcp-data" id="tcp-data">
+      <span class="label">Position:</span><br>
+      &nbsp;&nbsp;x: <span class="value" id="tcp-x">--</span><br>
+      &nbsp;&nbsp;y: <span class="value" id="tcp-y">--</span><br>
+      &nbsp;&nbsp;z: <span class="value" id="tcp-z">--</span><br>
+      <span class="label">Orientation (RPY):</span><br>
+      &nbsp;&nbsp;r: <span class="value" id="tcp-roll">--</span><br>
+      &nbsp;&nbsp;p: <span class="value" id="tcp-pitch">--</span><br>
+      &nbsp;&nbsp;y: <span class="value" id="tcp-yaw">--</span>
+    </div>
+  `;
+  container.appendChild(tcpCard);
+
+  // 预设姿态
+  const poseSection = createSection('Preset Poses');
+  const poseGrid = document.createElement('div');
+  poseGrid.className = 'pose-grid';
+  poseGrid.innerHTML = `
+    <button class="pose-btn" onclick="applyPose('home')">Home</button>
+    <button class="pose-btn" onclick="applyPose('work')">Work</button>
+    <button class="pose-btn" onclick="applyPose('find')">Find</button>
+    <button class="pose-btn" onclick="applyPose('reach')">Pick</button>
+  `;
+  poseSection.appendChild(poseGrid);
+  container.appendChild(poseSection);
+
+  // FK验证
+  const fkSection = createSection('Forward Kinematics');
+  const fkCard = document.createElement('div');
+  fkCard.className = 'ik-target-card';
+  fkCard.innerHTML = `
+    <h4>Input Type</h4>
+    <div class="ik-input-row">
+      <select id="fk-input-type" onchange="onFKInputTypeChange()" style="flex:1;background:var(--bg-panel);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text-primary);font-size:12px;outline:none;">
+        <option value="rad">Radian (弧度)</option>
+        <option value="deg" selected>Degree (角度)</option>
+        <option value="pwm">PWM (500-2500)</option>
+      </select>
+    </div>
+    <h4>Joint Angles Input</h4>
+    <div class="ik-input-row"><label>J1</label><input id="fk-j1" type="number" step="1" value="0" placeholder="-180 ~ 180" title="Degree (-180° ~ 180°)"></div>
+    <div class="ik-input-row"><label>J2</label><input id="fk-j2" type="number" step="1" value="0" placeholder="-180 ~ 180" title="Degree (-180° ~ 180°)"></div>
+    <div class="ik-input-row"><label>J3</label><input id="fk-j3" type="number" step="1" value="0" placeholder="-180 ~ 180" title="Degree (-180° ~ 180°)"></div>
+    <div class="ik-input-row"><label>J4</label><input id="fk-j4" type="number" step="1" value="0" placeholder="-180 ~ 180" title="Degree (-180° ~ 180°)"></div>
+    <div class="ik-input-row"><label>J5</label><input id="fk-j5" type="number" step="1" value="0" placeholder="-180 ~ 180" title="Degree (-180° ~ 180°)"></div>
+    <button class="ik-solve-btn" onclick="runFK()">Run Forward Kinematics</button>
+  `;
+  fkSection.appendChild(fkCard);
+  container.appendChild(fkSection);
+
+  // IK求解
+  const ikSection = createSection('Inverse Kinematics');
+  const ikCard = document.createElement('div');
+  ikCard.className = 'ik-target-card';
+  ikCard.innerHTML = `
+    <h4>Algorithm</h4>
+    <div class="ik-input-row">
+      <select id="ik-algorithm" style="flex:1;background:var(--bg-panel);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text-primary);font-size:12px;outline:none;">
+        <option value="numerical">数值法 (Numerical DLS)</option>
+        <option value="analytical">解析法 (Analytical Geometric)</option>
+        <option value="compare" selected>对比 (Compare Both)</option>
+      </select>
+    </div>
+    <h4>Target TCP Position</h4>
+    <div class="ik-input-row"><label>X</label><input id="ik-tx" type="number" step="0.001" value="0.15"></div>
+    <div class="ik-input-row"><label>Y</label><input id="ik-ty" type="number" step="0.001" value="0"></div>
+    <div class="ik-input-row"><label>Z</label><input id="ik-tz" type="number" step="0.001" value="0.20"></div>
+    <h4>Target Orientation (optional - only for Analytical)</h4>
+    <div class="ik-input-row">
+      <label style="display:flex;align-items:center;gap:6px;min-width:auto;">
+        <input type="checkbox" id="ik-use-pitch" checked style="width:auto;flex:0;">
+        <span style="font-size:11px;color:var(--text-muted);">Use Pitch</span>
+      </label>
+      <input id="ik-pitch" type="number" step="1" value="180" title="TCP 末端俯仰角 (°)，0=向上，90=水平向前，180=向下(抓取姿态)，-90=水平向后">
+    </div>
+    <div class="ik-input-row">
+      <label style="display:flex;align-items:center;gap:6px;min-width:auto;">
+        <input type="checkbox" id="ik-auto-pitch" style="width:auto;flex:0;">
+        <span style="font-size:11px;color:var(--text-muted);" title="启用后：若用户指定的 Pitch 不可达，自动搜索最接近的可行 Pitch（与数值法行为一致）">Auto Pitch <span style="color:var(--accent);">(推荐)</span></span>
+      </label>
+    </div>
+    <div style="font-size:10px;color:var(--text-muted);line-height:1.5;margin-top:4px;margin-bottom:8px;">
+      评估结论：5DOF 欠驱动，位置 (X/Y/Z) + Yaw (J1) + Pitch (J2+J3+J4) 可控；Roll 仅由 J5 控制<br>
+      因此 Pitch 是最有意义的姿态参数，Yaw/Roll 由 J1/J5 自动确定<br>
+      <b>Auto Pitch</b>：若指定 Pitch 不可达，自动找最接近的可达 Pitch（类似数值法）
+    </div>
+    <button class="ik-solve-btn" onclick="runIK()">Solve Inverse Kinematics</button>
+    <div id="ik-result" style="margin-top:8px;font-size:11px;color:var(--text-muted);text-align:left;line-height:1.6;"></div>
+    <div id="ik-compare" style="margin-top:6px;"></div>
+  `;
+  ikSection.appendChild(ikCard);
+  container.appendChild(ikSection);
+
+  // 初始化 FK 输入框的类型标记（默认角度）
+  ['fk-j1', 'fk-j2', 'fk-j3', 'fk-j4', 'fk-j5'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.dataset.prevType = 'deg';
+  });
+
+  updateTCPInfo();
+}
+
+// ============================================================
+// UI: Info面板
+// ============================================================
+function buildInfoPanel() {
+  const container = document.getElementById('panel-content');
+  container.innerHTML = '';
+
+  const infoSection = createSection('Robot Information');
+  const infoCard = document.createElement('div');
+  infoCard.className = 'ik-target-card';
+
+  const armJointsCount = Object.keys(jointMap).filter(k => k.startsWith('arm_joint') && jointMap[k].role === 'active').length;
+  const wheelJointsCount = Object.keys(jointMap).filter(k => k.startsWith('wheel_')).length;
+  const gripperJointsCount = Object.keys(jointMap).filter(k => k === 'r_joint' || jointMap[k].role === 'mimic').length;
+  const totalJoints = Object.keys(jointMap).length;
+  const totalLinks = robot && robot.links ? Object.keys(robot.links).length : 0;
+
+  infoCard.innerHTML = `
+    <h4>car1 Robot Model</h4>
+    <div class="tcp-data">
+      <span class="label">Name:</span> <span class="value">${URDF_DATA.robotName}</span><br>
+      <span class="label">Links:</span> <span class="value">${totalLinks}</span><br>
+      <span class="label">Total Joints (active):</span> <span class="value">${totalJoints}</span><br>
+      <span class="label">Arm Joints:</span> <span class="value">${armJointsCount}</span><br>
+      <span class="label">Wheel Joints:</span> <span class="value">${wheelJointsCount}</span><br>
+      <span class="label">Gripper Joints:</span> <span class="value">${gripperJointsCount}</span>
+    </div>
+  `;
+  infoSection.appendChild(infoCard);
+  container.appendChild(infoSection);
+
+  // 关节详情
+  const detailSection = createSection('Joint Details');
+  Object.entries(jointMap).forEach(([name, info]) => {
+    const card = document.createElement('div');
+    card.className = 'ik-target-card';
+    card.style.marginBottom = '8px';
+    const limitsText = info.type === 'continuous'
+      ? 'unlimited'
+      : `[${info.limits.lower.toFixed(2)}, ${info.limits.upper.toFixed(2)}] rad`;
+    const mimicText = info.role === 'mimic'
+      ? `<br>Mimic: <span class="value">${info.parentJointName} * ${info.multiplier} + ${info.offset}</span>`
+      : '';
+    card.innerHTML = `
+      <h4 style="font-size:11px;">${name}</h4>
+      <div class="tcp-data" style="font-size:10px;">
+        Type: <span class="value">${info.type}</span><br>
+        Limits: <span class="value">${limitsText}</span>
+        ${mimicText}
+      </div>
+    `;
+    detailSection.appendChild(card);
+  });
+  container.appendChild(detailSection);
+}
+
+// ============================================================
+// 交互函数
+// ============================================================
+function onJointSlider(jointName, value) {
+  let v = parseFloat(value);
+
+  // 软限位钳位：滑块 HTML 范围保持 ±π 不变（避免破坏 IK 求解器中的 Q_MIN/Q_MAX 假设），
+  // 但拖动到推荐限位之外时，停在限位上并视觉提示
+  const soft = SOFT_LIMITS[jointName];
+  if (soft) {
+    if (v < soft.lower) v = soft.lower;
+    if (v > soft.upper) v = soft.upper;
+    // 钳位后回写滑块实际位置（用户拖过时会"卡"在限位处）
+    const slider = document.getElementById(`slider-${jointName}`);
+    if (slider && parseFloat(slider.value) !== v) slider.value = v;
+  }
+
+  // r_joint：UI 与物理方向映射
+  //   UI 行为（不变）：
+  //     - 鼠标向左 → value 减小（变负）→ 滑块向左 → 显示负值
+  //     - 鼠标向右 → value 增大（接近 0）→ 滑块向右 → 显示接近 0
+  //   物理方向（用户要求）：
+  //     - 鼠标向左（v 负）→ r_joint 绕 Z 轴**顺时针**（从 +Y 方向看）
+  //   推导：
+  //     - URDF 轴 (0,0,-1)，关节值 q 物理转动方向 = q * (0,0,-1) = 绕 -Z 轴
+  //     - 绕 -Z 旋转按右手定则：从 +Z 方向看是顺时针，从 +Y 方向看也是顺时针
+  //     - 要让 v 负 → 顺时针，需要传 -v 给 URDF（这样 URDF 关节值为正，绕 -Z 顺时针）
+  let jointVal = v;
+  let displayVal = v;
+  if (jointName === 'r_joint') {
+    jointVal = -v;       // 负 v → 正 URDF 值 → 绕 -Z 顺时针
+    displayVal = v;      // 显示值 = 滑块原值
+  }
+
+  setJointValue(jointName, jointVal);
+  const valueEl = document.getElementById(`value-${jointName}`);
+  if (valueEl) valueEl.textContent = displayVal.toFixed(3) + ' rad';
+}
+
+function resetJoint(jointName) {
+  // setJointValue 内部已处理 r_joint 的显示值转换，无需再手动同步滑块/文本
+  setJointValue(jointName, 0);
+}
+
+function resetAllJoints() {
+  Object.keys(jointMap).forEach(name => {
+    if (jointMap[name].role === 'active') {
+      resetJoint(name);
+    }
+  });
+}
+
+function applyPose(poseName) {
+  const poses = {
+    home: { arm_joint1: 0, arm_joint2: 0, arm_joint3: 0, arm_joint4: 0, arm_joint5: 0, r_joint: 0 },
+    // Work 姿态 (PWM: J1=1500, J2=1100, J3=2200, J4=1850, J5=1500)
+    work: { arm_joint1: 0, arm_joint2: -0.942478, arm_joint3: 1.649336, arm_joint4: 0.824668, arm_joint5: 0, r_joint: 0 },
+    // Find 姿态 (PWM: J1=1500, J2=1200, J3=2200, J4=2150, J5=1500)
+    find: { arm_joint1: 0, arm_joint2: -0.706858, arm_joint3: 1.649336, arm_joint4: 1.531526, arm_joint5: 0, r_joint: 0 },
+    // Reach Forward 姿态 (PWM: J1=1500, J2=1870, J3=2095, J4=1868, J5=1500)
+    reach: { arm_joint1: 0, arm_joint2: 0.871792, arm_joint3: 1.401936, arm_joint4: 0.867080, arm_joint5: 0, r_joint: 0 }
+  };
+
+  const pose = poses[poseName];
+  if (!pose) return;
+
+  Object.entries(pose).forEach(([name, value]) => {
+    // setJointValue 内部已处理 r_joint 的显示值转换，无需再手动同步滑块/文本
+    setJointValue(name, value);
+  });
+}
+
+// ============================================================
+// FK 输入类型转换
+// ============================================================
+// PWM 映射：1500 = 0°, 1500-2500 = 0°-135°, 1500-500 = 0°-(-135°)
+// 即：PWM 500-2500 对应 -135° 到 +135°
+function pwmToRad(pwm) {
+  const PWM_CENTER = 1500;
+  const PWM_RANGE = 1000;  // ±1000 PWM
+  const ANGLE_RANGE = 135 * Math.PI / 180;  // ±135° = ±2.356 rad
+
+  // pwm - 1500 对应 -1000 到 +1000
+  // 映射到 -135° 到 +135°
+  return (pwm - PWM_CENTER) / PWM_RANGE * ANGLE_RANGE;
+}
+
+function radToPWM(rad) {
+  const PWM_CENTER = 1500;
+  const PWM_RANGE = 1000;
+  const ANGLE_RANGE = 135 * Math.PI / 180;
+
+  return PWM_CENTER + (rad / ANGLE_RANGE * PWM_RANGE);
+}
+
+function degToRad(deg) {
+  return deg * Math.PI / 180;
+}
+
+function radToDeg(rad) {
+  return rad * 180 / Math.PI;
+}
+
+// FK 输入类型切换处理
+function onFKInputTypeChange() {
+  const type = document.getElementById('fk-input-type').value;
+  const inputs = ['fk-j1', 'fk-j2', 'fk-j3', 'fk-j4', 'fk-j5'];
+
+  // 获取当前值（假设存储为弧度）
+  const currentRads = inputs.map(id => {
+    const el = document.getElementById(id);
+    const val = parseFloat(el.value) || 0;
+    const prevType = el.dataset.prevType || 'deg';
+
+    // 转回弧度
+    if (prevType === 'rad') return val;
+    if (prevType === 'deg') return degToRad(val);
+    if (prevType === 'pwm') return pwmToRad(val);
+    return val;
+  });
+
+  // 转换到新类型
+  inputs.forEach((id, i) => {
+    const el = document.getElementById(id);
+    const rad = currentRads[i];
+
+    if (type === 'rad') {
+      el.value = rad.toFixed(3);
+      el.step = '0.01';
+      el.placeholder = '-3.14 ~ 3.14';
+      el.title = 'Radian (-π ~ π)';
+    } else if (type === 'deg') {
+      el.value = radToDeg(rad).toFixed(1);
+      el.step = '1';
+      el.placeholder = '-180 ~ 180';
+      el.title = 'Degree (-180° ~ 180°)';
+    } else if (type === 'pwm') {
+      el.value = Math.round(radToPWM(rad));
+      el.step = '1';
+      el.min = '500';
+      el.max = '2500';
+      el.placeholder = '500 ~ 2500';
+      el.title = 'PWM (500-2500, 1500=0°, 2500=135°, 500=-135°)';
+    }
+
+    el.dataset.prevType = type;
+  });
+}
+
+function runFK() {
+  const type = document.getElementById('fk-input-type').value;
+
+  // 读取输入值并转换为弧度
+  const inputs = ['fk-j1', 'fk-j2', 'fk-j3', 'fk-j4', 'fk-j5'];
+  const rads = inputs.map(id => {
+    const val = parseFloat(document.getElementById(id).value) || 0;
+    if (type === 'rad') return val;
+    if (type === 'deg') return degToRad(val);
+    if (type === 'pwm') return pwmToRad(val);
+    return val;
+  });
+
+  const [j1, j2, j3, j4, j5] = rads;
+
+  const values = { arm_joint1: j1, arm_joint2: j2, arm_joint3: j3, arm_joint4: j4, arm_joint5: j5 };
+  Object.entries(values).forEach(([name, val]) => {
+    setJointValue(name, val);
+    const slider = document.getElementById(`slider-${name}`);
+    if (slider) slider.value = val;
+    const valueEl = document.getElementById(`value-${name}`);
+    if (valueEl) valueEl.textContent = val.toFixed(3) + ' rad';
+  });
+
+  updateTCPInfo();
+}
+
+function runIK() {
+  const tx = parseFloat(document.getElementById('ik-tx').value);
+  const ty = parseFloat(document.getElementById('ik-ty').value);
+  const tz = parseFloat(document.getElementById('ik-tz').value);
+  const algorithm = document.getElementById('ik-algorithm').value;
+  const usePitch = document.getElementById('ik-use-pitch').checked;
+  const pitchDeg = parseFloat(document.getElementById('ik-pitch').value) || 0;
+  const pitchRad = pitchDeg * Math.PI / 180;
+  const autoPitch = document.getElementById('ik-auto-pitch')?.checked || false;
+  const resultEl = document.getElementById('ik-result');
+  const compareEl = document.getElementById('ik-compare');
+
+  resultEl.innerHTML = '<span style="color:var(--warning);">⏳ Solving...</span>';
+  compareEl.innerHTML = '';
+
+  setTimeout(() => {
+    if (algorithm === 'compare') {
+      runIKCompare(tx, ty, tz, usePitch, pitchRad, resultEl, compareEl, autoPitch);
+    } else if (algorithm === 'analytical') {
+      runAnalyticalIKOnUI(tx, ty, tz, usePitch, pitchRad, resultEl, autoPitch);
+    } else {
+      runNumericalIKOnUI(tx, ty, tz, resultEl);
+    }
+    updateTCPInfo();
+  }, 30);
+}
+
+function runNumericalIKOnUI(tx, ty, tz, resultEl) {
+  const t0 = performance.now();
+  const success = solveIK({ x: tx, y: ty, z: tz });
+  const dt = performance.now() - t0;
+  const tcpPose = getTCPPose();
+  const err = tcpPose ? Math.sqrt(
+    Math.pow(tcpPose.position.x - tx, 2) +
+    Math.pow(tcpPose.position.y - ty, 2) +
+    Math.pow(tcpPose.position.z - tz, 2)
+  ) : -1;
+
+  if (success && err < 0.005) {
+    resultEl.innerHTML = `
+      <span style="color:var(--success);">✅ 数值法求解成功</span><br>
+      <span style="color:var(--text-muted);">耗时: <b style="color:var(--accent);">${dt.toFixed(1)} ms</b> | TCP误差: <b style="color:var(--accent);">${(err*1000).toFixed(2)} mm</b></span><br>
+      <span style="color:var(--text-muted);font-size:10px;">J1=${jointMap.arm_joint1.value.toFixed(3)} J2=${jointMap.arm_joint2.value.toFixed(3)} J3=${jointMap.arm_joint3.value.toFixed(3)} J4=${jointMap.arm_joint4.value.toFixed(3)} J5=${jointMap.arm_joint5.value.toFixed(3)}</span>
+    `;
+    // 更新所有滑块
+    ['arm_joint1','arm_joint2','arm_joint3','arm_joint4','arm_joint5'].forEach(name => {
+      const slider = document.getElementById(`slider-${name}`);
+      const valueEl = document.getElementById(`value-${name}`);
+      if (slider) slider.value = jointMap[name].value;
+      if (valueEl) valueEl.textContent = jointMap[name].value.toFixed(3) + ' rad';
+    });
+  } else {
+    resultEl.innerHTML = `<span style="color:var(--danger);">❌ 数值法求解失败 (${success ? '误差过大' : '迭代未收敛'})</span>`;
+  }
+}
+
+function runAnalyticalIKOnUI(tx, ty, tz, usePitch, pitchRad, resultEl, autoPitch = false) {
+  const t0 = performance.now();
+  // 保存当前状态以便回滚
+  const backup = {};
+  ['arm_joint1','arm_joint2','arm_joint3','arm_joint4','arm_joint5'].forEach(n => backup[n] = jointMap[n].value);
+
+  // 工具：把当前 arm 关节恢复回 backup，并同步刷新滑块 / value 文本
+  function restoreBackup() {
+    ['arm_joint1','arm_joint2','arm_joint3','arm_joint4','arm_joint5'].forEach((name, i) => {
+      const key = ['q1','q2','q3','q4','q5'][i];
+      setJointValue(name, backup[name]);
+      const slider = document.getElementById(`slider-${name}`);
+      const valueEl = document.getElementById(`value-${name}`);
+      if (slider) slider.value = backup[name];
+      if (valueEl) valueEl.textContent = backup[name].toFixed(3) + ' rad';
+    });
+  }
+
+  // 工具：施加解析解并同步滑块 / value 文本
+  function applyAnalyticalSolution(sol) {
+    const map = [['arm_joint1', sol.q1], ['arm_joint2', sol.q2], ['arm_joint3', sol.q3], ['arm_joint4', sol.q4], ['arm_joint5', sol.q5]];
+    map.forEach(([name, v]) => {
+      setJointValue(name, v);
+      const slider = document.getElementById(`slider-${name}`);
+      const valueEl = document.getElementById(`value-${name}`);
+      if (slider) slider.value = v;
+      if (valueEl) valueEl.textContent = v.toFixed(3) + ' rad';
+    });
+  }
+
+  // 用解析法求初始解
+  const preferredPitch = usePitch ? pitchRad : 0;
+  let sol;
+  if (!usePitch) {
+    // 用户不指定 pitch：扫描所有可达 pitch，选 FK 误差最小者 (对齐数值法行为)
+    sol = solveAnalyticalIKIgnorePitch({ x: tx, y: ty, z: tz });
+  } else if (autoPitch) {
+    // Auto Pitch 模式：用户指定 pitch 不可达时，自动找最近的可行 pitch
+    sol = solveAnalyticalIKAutoPitch({ x: tx, y: ty, z: tz }, preferredPitch);
+  } else {
+    sol = solveAnalyticalIK({ x: tx, y: ty, z: tz }, preferredPitch);
+  }
+  const dtInit = performance.now() - t0;
+
+  if (sol.error) {
+    // 解析法不可达：恢复原状态，避免 3D 模型出现残缺姿态
+    restoreBackup();
+    // 简化错误信息：分类显示（超限 / 不可达 / 不可解）
+    let errorType = '不可达';
+    if (sol.error.includes('关节超限')) errorType = '目标+Pitch 不可达（关节超限）';
+    else if (sol.error.includes('Out of reach')) errorType = '目标点超出工作空间';
+    else if (sol.error.includes('No 2R')) errorType = '几何无解';
+    resultEl.innerHTML = `
+      <span style="color:var(--danger);">❌ 解析法失败: ${errorType}</span><br>
+      <span style="color:var(--text-muted);font-size:10px;word-break:break-all;">${sol.error}</span><br>
+      <span style="color:var(--text-muted);font-size:10px;">已恢复原姿态。提示：可调整目标点、改用数值法、或修改 Pitch 值。</span>
+    `;
+    return;
+  }
+
+  // 施加解析解
+  applyAnalyticalSolution(sol);
+
+  // PHI 偏角补偿后，解析解精度已直接达到 <0.1mm，无需数值精炼
+
+  const dt = performance.now() - t0;
+  const tcpPose = getTCPPose();
+  const err = tcpPose ? Math.sqrt(
+    Math.pow(tcpPose.position.x - tx, 2) +
+    Math.pow(tcpPose.position.y - ty, 2) +
+    Math.pow(tcpPose.position.z - tz, 2)
+  ) : -1;
+
+  // 与数值法一致的判定阈值：5mm
+  const SUCCESS_THRESHOLD = 0.005;   // 5mm
+  const WARN_THRESHOLD    = 0.020;   // 20mm
+
+  if (err < 0 || !isFinite(err)) {
+    restoreBackup();
+    resultEl.innerHTML = `<span style="color:var(--danger);">❌ 解析法失败: 无法读取 TCP 位姿</span>`;
+    return;
+  }
+
+  if (err >= WARN_THRESHOLD) {
+    // 误差过大，视为失败，回滚到原状态
+    restoreBackup();
+    resultEl.innerHTML = `
+      <span style="color:var(--danger);">❌ 解析法失败: TCP 误差过大 (${(err*1000).toFixed(2)} mm &gt;= ${(WARN_THRESHOLD*1000).toFixed(0)} mm)</span><br>
+      <span style="color:var(--text-muted);font-size:10px;">已恢复原姿态。可尝试调整目标点或切换到数值法。</span>
+    `;
+    return;
+  }
+
+  // 成功（或可接受的警告）
+  const isPerfect = err < SUCCESS_THRESHOLD;
+  const icon  = isPerfect ? '✅' : '⚠️';
+  const color = isPerfect ? 'var(--success)' : 'var(--warning)';
+  let tag   = isPerfect ? '解析法求解成功' : '解析法求解成功（误差偏大）';
+
+  // Auto Pitch 信息
+  let autoPitchInfo = '';
+  if (!usePitch) {
+    const elbowZmm = (sol.elbowZ * 1000).toFixed(0);
+    autoPitchInfo = `<br><span style="color:var(--text-muted);font-size:10px;">📐 Ignore-Pitch: 实际 Pitch ${(sol.actualPitch*180/Math.PI).toFixed(1)}° (FK ${(sol.tcpError*1000).toFixed(2)} mm) | Elbow-Up: 肘高 ${elbowZmm} mm | 分支 ${sol.branch}</span>`;
+  } else if (autoPitch && sol.autoPitch) {
+    const devDeg = (sol.pitchDeviation * 180 / Math.PI).toFixed(1);
+    const actualDeg = (sol.actualPitch * 180 / Math.PI).toFixed(1);
+    autoPitchInfo = `<br><span style="color:var(--accent);font-size:10px;">🔄 Auto Pitch: 期望 ${(preferredPitch*180/Math.PI).toFixed(1)}° → 实际 ${actualDeg}° (偏差 ${devDeg}°)</span>`;
+  }
+
+  resultEl.innerHTML = `
+    <span style="color:${color};">${icon} ${tag}</span><br>
+    <span style="color:var(--text-muted);">耗时: <b style="color:var(--accent);">${dt.toFixed(2)} ms</b> | TCP误差: <b style="color:${color};">${(err*1000).toFixed(2)} mm</b></span><br>
+    <span style="color:var(--text-muted);font-size:10px;">J1=${sol.q1.toFixed(3)} J2=${sol.q2.toFixed(3)} J3=${sol.q3.toFixed(3)} J4=${sol.q4.toFixed(3)} J5=${sol.q5.toFixed(3)}</span><br>
+    <span style="color:var(--text-muted);font-size:9px;">Pitch=${usePitch ? pitchRad.toFixed(2)+' rad' : 'N/A'}</span>${autoPitchInfo}
+  `;
+}
+
+function runIKCompare(tx, ty, tz, usePitch, pitchRad, resultEl, compareEl, autoPitch = false) {
+  // 保存初始状态
+  const backup = {};
+  ['arm_joint1','arm_joint2','arm_joint3','arm_joint4','arm_joint5'].forEach(n => backup[n] = jointMap[n].value);
+
+  // 工具：恢复 backup（含 slider）
+  function restoreBackup() {
+    ['arm_joint1','arm_joint2','arm_joint3','arm_joint4','arm_joint5'].forEach(n => {
+      setJointValue(n, backup[n]);
+    });
+  }
+
+  // 统一阈值：与 runAnalyticalIKOnUI 保持一致
+  const A_SUCCESS = 0.005;   // 5mm：解析法
+  const A_WARN    = 0.020;   // 20mm：解析法警告
+  const N_SUCCESS = 0.005;   // 5mm：数值法
+
+  const results = {};
+
+  // === Analytical ===
+  const tA0 = performance.now();
+  const preferredPitch = usePitch ? pitchRad : 0;
+  let solA;
+  if (!usePitch) {
+    // 不指定 pitch：扫描所有可达 pitch，选 FK 误差最小者
+    solA = solveAnalyticalIKIgnorePitch({ x: tx, y: ty, z: tz });
+  } else if (autoPitch) {
+    solA = solveAnalyticalIKAutoPitch({ x: tx, y: ty, z: tz }, preferredPitch);
+  } else {
+    solA = solveAnalyticalIK({ x: tx, y: ty, z: tz }, preferredPitch);
+  }
+  const tA = performance.now() - tA0;
+  if (!solA.error) {
+    setJointValue('arm_joint1', solA.q1);
+    setJointValue('arm_joint2', solA.q2);
+    setJointValue('arm_joint3', solA.q3);
+    setJointValue('arm_joint4', solA.q4);
+    setJointValue('arm_joint5', solA.q5);
+    const tcpA = getTCPPose();
+    const errA = tcpA ? Math.sqrt(
+      Math.pow(tcpA.position.x - tx, 2) +
+      Math.pow(tcpA.position.y - ty, 2) +
+      Math.pow(tcpA.position.z - tz, 2)
+    ) : -1;
+    // 解析法三态：完美 / 警告 / 失败
+    let aState = 'fail';
+    if (errA < A_SUCCESS) aState = 'success';
+    else if (errA < A_WARN) aState = 'warn';
+    results.analytical = { sol: solA, time: tA, error: errA, success: aState === 'success', warn: aState === 'warn', state: aState, joints: { ...solA } };
+  } else {
+    results.analytical = { error: solA.error, time: tA, success: false, state: 'fail' };
+  }
+
+  // === Numerical ===
+  // 先恢复 backup 再跑数值法
+  restoreBackup();
+  const tN0 = performance.now();
+  const successN = solveIK({ x: tx, y: ty, z: tz });
+  const tN = performance.now() - tN0;
+  if (successN) {
+    const tcpN = getTCPPose();
+    const errN = tcpN ? Math.sqrt(
+      Math.pow(tcpN.position.x - tx, 2) +
+      Math.pow(tcpN.position.y - ty, 2) +
+      Math.pow(tcpN.position.z - tz, 2)
+    ) : -1;
+    results.numerical = { time: tN, error: errN, success: errN < N_SUCCESS, joints: {
+      q1: jointMap.arm_joint1.value, q2: jointMap.arm_joint2.value,
+      q3: jointMap.arm_joint3.value, q4: jointMap.arm_joint4.value, q5: jointMap.arm_joint5.value
+    }};
+  } else {
+    results.numerical = { error: '未收敛', time: tN, success: false };
+  }
+
+  // 决定最终姿态：成功状态优先 (解析成功 > 解析警告 > 数值成功 > 全部失败则回滚到 backup)
+  const aJ = results.analytical.joints;
+  const nJ = results.numerical.joints;
+
+  if (results.analytical.state === 'success' || results.analytical.state === 'warn') {
+    setJointValue('arm_joint1', aJ.q1);
+    setJointValue('arm_joint2', aJ.q2);
+    setJointValue('arm_joint3', aJ.q3);
+    setJointValue('arm_joint4', aJ.q4);
+    setJointValue('arm_joint5', aJ.q5);
+  } else if (results.numerical.success && nJ) {
+    setJointValue('arm_joint1', nJ.q1);
+    setJointValue('arm_joint2', nJ.q2);
+    setJointValue('arm_joint3', nJ.q3);
+    setJointValue('arm_joint4', nJ.q4);
+    setJointValue('arm_joint5', nJ.q5);
+  } else {
+    // 全部失败：回滚到 backup
+    restoreBackup();
+  }
+
+  // 渲染对比表
+  const a = results.analytical, n = results.numerical;
+  const fmt = (v, d=3) => v === undefined || v === null ? '—' : v.toFixed(d);
+  const fmtErr = (v) => v < 0 ? '—' : (v*1000).toFixed(2) + ' mm';
+  const fmtTime = (v) => v.toFixed(2) + ' ms';
+  const fmtJ = (j) => j ? `[${fmt(j.q1)}, ${fmt(j.q2)}, ${fmt(j.q3)}, ${fmt(j.q4)}, ${fmt(j.q5)}]` : '—';
+
+  // 解析法颜色：完美=success, 警告=warning, 失败=danger
+  const aColor = a.state === 'success' ? 'var(--success)' : a.state === 'warn' ? 'var(--warning)' : 'var(--danger)';
+  const nColor = n.success ? 'var(--success)' : 'var(--danger)';
+  const aBadge = a.state === 'success' ? '✅' : a.state === 'warn' ? '⚠️' : '❌';
+  const nBadge = n.success ? '✅' : '❌';
+  const aText  = a.state === 'success' ? '成功' : a.state === 'warn' ? '警告' : (a.error || '失败');
+  const aTitle = a.state === 'success' ? '解析法' : a.state === 'warn' ? '解析法(警告)' : '解析法';
+
+  // 决定最终应用的结果标签
+  const finalApplied = (a.state === 'success' || a.state === 'warn') ? '解析解' :
+                       (n.success ? '数值解' : '未应用(回滚)');
+
+  resultEl.innerHTML = `<span style="color:var(--text-secondary);">📊 对比完成，最终应用: <b style="color:var(--accent);">${finalApplied}</b></span>`;
+  compareEl.innerHTML = `
+    <div style="background:var(--bg-panel);border:1px solid var(--border);border-radius:8px;padding:10px;margin-top:6px;">
+      <table style="width:100%;font-size:10px;color:var(--text-secondary);border-collapse:collapse;">
+        <thead>
+          <tr style="border-bottom:1px solid var(--border);">
+            <th style="text-align:left;padding:4px;color:var(--text-muted);">指标</th>
+            <th style="text-align:center;padding:4px;color:#fbbf24;">${aBadge} ${aTitle}</th>
+            <th style="text-align:center;padding:4px;color:#60a5fa;">${nBadge} 数值法</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td style="padding:3px;">状态</td><td style="text-align:center;color:${aColor};">${aText}</td><td style="text-align:center;color:${nColor};">${n.success ? '成功' : n.error || '失败'}</td></tr>
+          <tr><td style="padding:3px;">耗时</td><td style="text-align:center;color:var(--accent);">${fmtTime(a.time)}</td><td style="text-align:center;color:var(--accent);">${fmtTime(n.time)}</td></tr>
+          <tr><td style="padding:3px;">TCP误差</td><td style="text-align:center;color:${aColor};">${fmtErr(a.error)}</td><td style="text-align:center;color:${nColor};">${fmtErr(n.error)}</td></tr>
+          <tr><td style="padding:3px;">J1 (rad)</td><td style="text-align:center;">${a.joints ? fmt(a.joints.q1) : '—'}</td><td style="text-align:center;">${n.joints ? fmt(n.joints.q1) : '—'}</td></tr>
+          <tr><td style="padding:3px;">J2 (rad)</td><td style="text-align:center;">${a.joints ? fmt(a.joints.q2) : '—'}</td><td style="text-align:center;">${n.joints ? fmt(n.joints.q2) : '—'}</td></tr>
+          <tr><td style="padding:3px;">J3 (rad)</td><td style="text-align:center;">${a.joints ? fmt(a.joints.q3) : '—'}</td><td style="text-align:center;">${n.joints ? fmt(n.joints.q3) : '—'}</td></tr>
+          <tr><td style="padding:3px;">J4 (rad)</td><td style="text-align:center;">${a.joints ? fmt(a.joints.q4) : '—'}</td><td style="text-align:center;">${n.joints ? fmt(n.joints.q4) : '—'}</td></tr>
+          <tr><td style="padding:3px;">J5 (rad)</td><td style="text-align:center;">${a.joints ? fmt(a.joints.q5) : '—'}</td><td style="text-align:center;">${n.joints ? fmt(n.joints.q5) : '—'}</td></tr>
+        </tbody>
+      </table>
+      <div style="font-size:9px;color:var(--text-muted);margin-top:6px;line-height:1.4;">
+        💡 解析法：基于 J1 方位 + J2-J4 平面 2R 余弦定理闭式解，单次计算 O(1)<br>
+        💡 数值法：阻尼最小二乘 DLS 雅可比伪逆迭代 O(n)，依赖初值
+      </div>
+    </div>
+  `;
+
+  // 更新所有滑块
+  ['arm_joint1','arm_joint2','arm_joint3','arm_joint4','arm_joint5'].forEach(name => {
+    const slider = document.getElementById(`slider-${name}`);
+    const valueEl = document.getElementById(`value-${name}`);
+    if (slider) slider.value = jointMap[name].value;
+    if (valueEl) valueEl.textContent = jointMap[name].value.toFixed(3) + ' rad';
+  });
+}
+
+function updateTCPInfo() {
+  const tcpPose = getTCPPose();
+  if (!tcpPose) return;
+
+  const p = tcpPose.position;
+  const o = tcpPose.orientation;
+
+  const tcpXEl = document.getElementById('tcp-x');
+  const tcpYEl = document.getElementById('tcp-y');
+  const tcpZEl = document.getElementById('tcp-z');
+  const tcpRollEl = document.getElementById('tcp-roll');
+  const tcpPitchEl = document.getElementById('tcp-pitch');
+  const tcpYawEl = document.getElementById('tcp-yaw');
+
+  if (tcpXEl) tcpXEl.textContent = p.x.toFixed(5) + ' m';
+  if (tcpYEl) tcpYEl.textContent = p.y.toFixed(5) + ' m';
+  if (tcpZEl) tcpZEl.textContent = p.z.toFixed(5) + ' m';
+  if (tcpRollEl) tcpRollEl.textContent = (o.roll * 180 / Math.PI).toFixed(2) + '°';
+  if (tcpPitchEl) tcpPitchEl.textContent = (o.pitch * 180 / Math.PI).toFixed(2) + '°';
+  if (tcpYawEl) tcpYawEl.textContent = (o.yaw * 180 / Math.PI).toFixed(2) + '°';
+
+  // 底部状态栏
+  const tcpPosEl = document.getElementById('tcp-pos');
+  if (tcpPosEl) tcpPosEl.textContent = `TCP: (${p.x.toFixed(3)}, ${p.y.toFixed(3)}, ${p.z.toFixed(3)})`;
+}
+
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.panel-tab').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.panel-tab').forEach(el => {
+    if (el.textContent.toLowerCase().includes(tab === 'fk' ? 'fk' : tab)) el.classList.add('active');
+  });
+
+  if (tab === 'joints') buildJointPanel();
+  else if (tab === 'fk') buildFKIKPanel();
+  else if (tab === 'info') buildInfoPanel();
+}
+
+// ============================================================
+// 视图控制
+// ============================================================
+function setView(view) {
+  document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+
+  const target = new THREE.Vector3(0, 0, 0.08);
+  switch(view) {
+    case 'front':
+      camera.position.set(0.6, 0, 0.12);
+      break;
+    case 'top':
+      camera.position.set(0, 0.01, 0.8);
+      break;
+    case 'side':
+      camera.position.set(0, -0.6, 0.12);
+      break;
+    case 'perspective':
+    default:
+      camera.position.set(0.5, -0.4, 0.5);
+      break;
+  }
+  controls.target.copy(target);
+  controls.update();
+}
+
+function toggleWireframe() {
+  showWireframe = !showWireframe;
+  linkMeshes.forEach(mesh => {
+    if (mesh.material) {
+      mesh.material.wireframe = showWireframe;
+    }
+  });
+  event.target.classList.toggle('active', showWireframe);
+}
+
+function toggleAxes() {
+  showAxes = !showAxes;
+  axesHelper.visible = showAxes;
+  const btn = document.getElementById('btn-axes');
+  if (btn) btn.classList.toggle('active', showAxes);
+}
+
+// ============================================================
+// 切换每个 link 的局部坐标系显示
+// ============================================================
+function createLinkAxes(size = 0.035, origin = new THREE.Vector3(0, 0, 0), opts = {}) {
+  // 使用 ArrowHelper 替代 AxesHelper，优点：
+  // 1) 只显示正方向（带箭头），不会让 Z 轴被误读为双向
+  // 2) toneMapped=false 避免 ACES 色调映射导致的颜色失真（红/绿/蓝偏青/偏黄）
+  // 3) 颜色三通道拉满：纯红 / 纯绿 / 纯蓝，最大化区分度
+  const { highlighted = false, label = null } = opts;
+  const group = new THREE.Group();
+  group.name = 'link-axes';
+
+  const axes = [
+    { dir: [1, 0, 0], color: 0xff2030 }, // X 轴 - 纯红
+    { dir: [0, 1, 0], color: 0x21d860 }, // Y 轴 - 鲜绿
+    { dir: [0, 0, 1], color: 0x3a7bff }  // Z 轴 - 鲜蓝
+  ];
+
+  axes.forEach(({ dir, color }) => {
+    const arrow = new THREE.ArrowHelper(
+      new THREE.Vector3(dir[0], dir[1], dir[2]),
+      origin,
+      size,
+      color,
+      size * 0.28, // headLength
+      size * 0.14  // headWidth
+    );
+    // 关键：禁用色调映射，保持 RGB 真实
+    if (arrow.line && arrow.line.material) arrow.line.material.toneMapped = false;
+    if (arrow.cone && arrow.cone.material) arrow.cone.material.toneMapped = false;
+    group.add(arrow);
+  });
+
+  // 光学坐标系高亮：加大的白色外壳 + 更长的轴线，视觉上与其它 link 的坐标系区分开
+  if (highlighted) {
+    const box = new THREE.Mesh(
+      new THREE.BoxGeometry(size * 0.5, size * 0.5, size * 0.5),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, toneMapped: false })
+    );
+    box.name = 'highlight-box';
+    group.add(box);
+  }
+
+  // 文本标签：用 CSS2D 或 sprite？这里用 CanvasTexture 生成始终面向相机的名字标签
+  if (label) {
+    const sprite = makeLabelSprite(label);
+    sprite.position.y = size * 0.6;
+    group.add(sprite);
+  }
+
+  return group;
+}
+
+// 生成始终面向相机的 Canvas 文字精灵 (用于坐标系名称标签)
+function makeLabelSprite(text) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  ctx.font = 'bold 30px Consolas, Monaco, monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  // 描边 + 填充，保证任何背景下可读
+  ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+  ctx.lineWidth = 6;
+  ctx.strokeText(text, 128, 32);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(text, 128, 32);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.minFilter = THREE.LinearFilter;
+  const spriteMat = new THREE.SpriteMaterial({
+    map: texture,
+    transparent: true,
+    depthTest: false,
+    toneMapped: false
+  });
+  const sprite = new THREE.Sprite(spriteMat);
+  sprite.scale.set(0.1, 0.025, 1);
+  sprite.name = 'axes-label';
+  return sprite;
+}
+
+// 给单个 link 创建并挂载 Link Axes 辅助 (供默认打开光学坐标系等场景复用)
+function addLinkAxesFor(name, defaultSize, opts) {
+  if (!robot || !robot.links) return;
+  const link = robot.links[name];
+  if (!link) return;
+  let size = defaultSize;
+  if (size === undefined) {
+    if (name.startsWith('wheel_')) size = 0.07;
+    else if (name === 'tcp_link' || name === 'arm_link5' || name === 'arm_link6') size = 0.05;
+    else size = 0.035;
+  }
+  const helper = createLinkAxes(size, new THREE.Vector3(0, 0, 0), opts);
+  helper.name = `axes-${name}`;
+  link.add(helper);
+  linkAxesHelpers.push(helper);
+}
+
+function opticalAxesVisible(bool) {
+  showLinkAxes = bool;
+  const btn = document.getElementById('btn-link-axes');
+  if (btn) btn.classList.toggle('active', showLinkAxes);
+}
+
+function toggleLinkAxes() {
+  showLinkAxes = !showLinkAxes;
+
+  if (showLinkAxes) {
+    if (robot && robot.links) {
+      Object.entries(robot.links).forEach(([name, link]) => {
+        // 跳过已默认打开的 link (避免重复创建)
+        if (linkAxesHelpers.some(h => h.parent === link && h.name === `axes-${name}`)) return;
+        // 根据链接类型调整箭头大小
+        let size;
+        if (name.startsWith('wheel_')) {
+          // 轮子：箭头更大，避免被轮子模型遮挡
+          size = 0.07;
+        } else if (name === 'tcp_link' || name === 'arm_link5' || name === 'arm_link6') {
+          // 末端小 link：稍大箭头
+          size = 0.05;
+        } else {
+          // 其他 link：默认尺寸
+          size = 0.035;
+        }
+        // 深度相机光学坐标系：单独高亮 + 名称标签，区别于其它 link
+        const isOptical = (name === 'camera_depth_optical_frame');
+        const helper = createLinkAxes(size, new THREE.Vector3(0, 0, 0), isOptical
+          ? { highlighted: true, label: name }
+          : undefined);
+        helper.name = `axes-${name}`;
+        link.add(helper);
+        linkAxesHelpers.push(helper);
+      });
+    }
+  } else {
+    linkAxesHelpers.forEach(helper => {
+      if (helper.parent) helper.parent.remove(helper);
+      helper.traverse(obj => {
+        if (obj.geometry) obj.geometry.dispose();
+        if (obj.material) obj.material.dispose();
+      });
+    });
+    linkAxesHelpers = [];
+  }
+
+  const btn = document.getElementById('btn-link-axes');
+  if (btn) btn.classList.toggle('active', showLinkAxes);
+}
+
+// ============================================================
+// 加载进度
+// ============================================================
+function updateLoadingProgress(text) {
+  const el = document.getElementById('loading-progress');
+  if (el) el.textContent = text;
+}
+
+// ============================================================
+// 动画循环
+// ============================================================
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+
+  // FPS计算
+  frameCount++;
+  const now = performance.now();
+  if (now - lastTime >= 1000) {
+    const fps = Math.round(frameCount * 1000 / (now - lastTime));
+    document.getElementById('fps-badge').textContent = `FPS: ${fps}`;
+    frameCount = 0;
+    lastTime = now;
+  }
+}
+
+// ============================================================
+// 主入口
+// ============================================================
+async function main() {
+  updateLoadingProgress('Initializing Three.js scene...');
+  initScene();
+
+  updateLoadingProgress('Loading URDF model...');
+  try {
+    robot = await loadURDF();
+
+    // 设置材质
+    robot.traverse(obj => {
+      if (obj.isMesh) {
+        obj.castShadow = true;
+        obj.receiveShadow = true;
+        if (obj.material) {
+          obj.material.shininess = 60;
+          if (!obj.material.specular) obj.material.specular = new THREE.Color(0x222222);
+        }
+      }
+    });
+
+    scene.add(robot);
+    updateLoadingProgress('Extracting joint info...');
+    extractJointInfo(robot);
+  } catch (err) {
+    console.error('Failed to load URDF:', err);
+    updateLoadingProgress('Error loading URDF: ' + err.message);
+    return;
+  }
+
+  updateLoadingProgress('Building UI...');
+  buildJointPanel();
+
+  // 初始TCP信息
+  updateTCPInfo();
+
+  // 默认单独打开深度相机光学坐标系 (方便核对光心位置，不依赖全局 Link Axes)
+  addLinkAxesFor('camera_depth_optical_frame', 0.045, { highlighted: true, label: 'camera_depth_optical_frame' });
+  opticalAxesVisible(true);
+
+  // 隐藏加载遮罩
+  document.getElementById('loading-overlay').classList.add('hidden');
+
+  // 开始动画
+  animate();
+}
+
+// 把模块里被 HTML 内联事件调用的函数挂到 window 上（type=module 作用域不暴露给内联）
+window.setView = setView;
+window.toggleWireframe = toggleWireframe;
+window.toggleAxes = toggleAxes;
+window.toggleLinkAxes = toggleLinkAxes;
+window.switchTab = switchTab;
+window.resetJoint = resetJoint;
+window.resetAllJoints = resetAllJoints;
+window.applyPose = applyPose;
+window.runFK = runFK;
+window.runIK = runIK;
+window.onJointSlider = onJointSlider;
+window.onFKInputTypeChange = onFKInputTypeChange;
+
+main();
+</script>
+</body>
+</html>

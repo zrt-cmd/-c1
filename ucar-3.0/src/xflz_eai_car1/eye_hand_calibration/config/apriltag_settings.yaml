@@ -1,0 +1,28 @@
+# AprilTag 检测参数
+apriltag_detector:
+  ros__parameters:
+    # 相机话题（与 visual_grasp.py 保持一致）
+    rgb_topic: '/ascamera_hp60c/camera_publisher/rgb0/image'
+    camera_info_topic: '/ascamera_hp60c/camera_publisher/depth0/camera_info'
+    depth_topic: '/ascamera_hp60c/camera_publisher/depth0/image_raw'
+
+    # AprilTag 参数
+    # tag_size = 编码区域实际边长（米）= 25mm
+    tag_family: 'tag36h11'
+    tag_size: 0.025
+    tag_id: 3                   # TAG36H11-3
+    max_hamming: 0              # 0=精确匹配，纠错容忍度
+
+    # 检测性能调节
+    decimate: 2.0               # 降采样倍数（越大越快但精度略低，2.0 是好的平衡点）
+    blur: 0.0                   # 高斯模糊 sigma（0=不模糊）
+    refine_edges: true          # 亚像素边缘优化（提升精度）
+    nthreads: 4                 # 检测线程数
+
+    # 发布调试图像（显示检测框和坐标）
+    publish_debug_image: true
+    debug_image_topic: '/eye_hand_calib/apriltag/debug_image'
+
+    # 发布话题
+    detection_topic: '/eye_hand_calib/apriltag/detection'
+    pose_topic: '/eye_hand_calib/apriltag/pose'

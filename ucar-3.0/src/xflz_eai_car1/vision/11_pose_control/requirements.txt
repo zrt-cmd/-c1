@@ -1,0 +1,10 @@
+# 实验 09 人脸关键点 — 运行依赖
+# 板上（ros2_venv，py3.10）：
+#   - rknn-toolkit-lite2==2.3.2（cp310 aarch64 wheel 见
+#     ../runtime/board/rknn_toolkit_lite2-2.3.2-cp310-*.whl；2026-08-06 起板上推理统一走 RKNNLite）
+#   - mjpeg_streamer==2024.2.8（2026-08-06 用户决策允许安装；dry-run 验证无冲突，
+#     依赖 aiohttp 族全为 cp310 aarch64 wheel；安装走清华镜像：
+#     pip install -i https://pypi.tuna.tsinghua.edu.cn/simple mjpeg_streamer；
+#     MJPEG 服务器优先用它，未安装自动回退 stdlib 实现）
+#   - numpy 1.26.4 / opencv-python 4.11.0.86（runtime/board/requirements.txt 全量清单）
+# 转换环境（x86，仅转模型用）：rknn-toolkit2 2.3.x + tensorflow-cpu<=2.14（load_tflite 解析依赖）

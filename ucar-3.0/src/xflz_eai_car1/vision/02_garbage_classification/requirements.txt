@@ -1,0 +1,7 @@
+# 实验 02 — 依赖说明（2026-08-06 更新）
+#
+# 板上（~/ros2_venv，RK3576）：
+#   - rknn-toolkit2==2.3.2 / rknn-toolkit-lite2==2.3.2（推理）、numpy、opencv-python 4.11、pyyaml
+#   - mjpeg_streamer==2024.2.8（2026-08-06 用户决策：所有实验 MJPEG 统一此库；
+#     入口 require() 检测，缺失提示安装并退出；清华镜像安装）
+# 本地单测（WSL rknn23）：numpy、opencv-python、pyyaml、pytest、mjpeg_streamer（均已装）

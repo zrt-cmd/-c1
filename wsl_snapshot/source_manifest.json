@@ -1,0 +1,14 @@
+[
+  {
+    "path": "simulations/car1_description/urdf/car1.urdf",
+    "bytes": 30073,
+    "status": "changed",
+    "sha256": "5f9879c06f64e2e3cc7ca8dca053a1c5ee11027203cc52b33bd9940bee2f3b5b"
+  },
+  {
+    "path": "simulations/car1_gazebo/urdf/car1.gazebo.xacro",
+    "bytes": 5006,
+    "status": "changed",
+    "sha256": "c078e496e9764cde2642633872acfd8ced3d4b5191e1eb5711084d2968d78ee7"
+  }
+]

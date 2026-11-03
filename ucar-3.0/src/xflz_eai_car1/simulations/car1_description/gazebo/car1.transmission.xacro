@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+    <!-- Transmission 宏定义 -->
+    <xacro:macro name="gazebo_transmission" params="name">
+        <transmission name="${name}_trans">
+            <type>transmission_interface/SimpleTransmission</type>
+            <joint name="${name}">
+                <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+            </joint>
+            <actuator name="${name}_motor">
+                <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+                <mechanicalReduction>1</mechanicalReduction>
+            </actuator>
+        </transmission>
+    </xacro:macro>
+
+    <!-- 应用到所有关节 -->
+    <xacro:macro name="car1_transmission" params="prefix">
+        <xacro:gazebo_transmission name="${prefix}arm_joint1"/>
+        <xacro:gazebo_transmission name="${prefix}arm_joint2"/>
+        <xacro:gazebo_transmission name="${prefix}arm_joint3"/>
+        <xacro:gazebo_transmission name="${prefix}arm_joint4"/>
+        <xacro:gazebo_transmission name="${prefix}arm_joint5"/>
+        <xacro:gazebo_transmission name="${prefix}r_joint"/>
+    </xacro:macro>
+</robot>

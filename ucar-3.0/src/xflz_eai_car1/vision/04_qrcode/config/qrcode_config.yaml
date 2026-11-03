@@ -1,0 +1,26 @@
+# 实验 04 — 二维码生成与识别 配置
+
+generate:
+  version: 1                # 1-40；1 最小（fit=True 时自动扩版）
+  error_correction: M       # L/M/Q/H；**勿用 H**——板端实测 cv2.QRCodeDetector 解不了 H+中文 UTF-8（M/Q 正常）
+  box_size: 5               # 每格像素数
+  border: 4                 # 边框格数（标准最小 4）
+  fill_color: [0, 0, 0]     # 前景色 RGB
+  back_color: [255, 255, 255]  # 背景色 RGB
+
+detect:
+  scale: 0.5                # 检测前缩放（大图提速；0.5=半分辨率）
+
+
+source:
+  ros:
+    rgb_topic: /ascamera_hp60c/camera_publisher/rgb0/image   # ascamera HP60C 原生话题（勿 remap）
+    timeout: 5.0                                             # 首帧等待秒数
+camera:
+  index: 0
+  width: 640
+  height: 480
+
+display:
+  show: false               # 本地窗口（板上置 false 走 MJPEG）
+  window_name: qrcode
