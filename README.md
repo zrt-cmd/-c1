@@ -7,7 +7,7 @@
 第一次在另一台电脑运行
 
 ```bash
-git clone https://gitee.com/zrt-cmd/intelligent-life-robot-car-c1.git
+git clone https://github.com/zrt-cmd/-c1.git intelligent-life-robot-car-c1
 cd intelligent-life-robot-car-c1
 ```
 
@@ -21,6 +21,15 @@ git push
 ```
 
 两台电脑都以本仓库为工作目录。请让另一边的 Codex 先阅读 `PROJECT_STATUS.md`，再核对本地配置。对话的关键进度保存在该文件中。
+
+如果另一台电脑已经从 Gitee 克隆过本项目，在原仓库目录切换远程地址后拉取即可。
+
+```bash
+git remote set-url origin https://github.com/zrt-cmd/-c1.git
+git pull --ff-only origin main
+```
+
+GitHub 作为后续开发主仓库。原 Gitee 仓库保留为备用，本机远程名称为 `gitee`。需要同步备份时运行 `git push gitee main`。
 
 ## 目录
 
