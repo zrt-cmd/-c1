@@ -41,9 +41,11 @@ bt["error_code_names"] = ["compute_path_error_code", "follow_path_error_code"]
 # 3. AMCL: start exactly at G
 amcl = data["amcl"]["ros__parameters"]
 amcl["initial_pose"] = {"x": 0.15, "y": 1.70, "z": 0.0, "yaw": 0.0}
-amcl["initial_cov_xx"] = 0.0025
-amcl["initial_cov_yy"] = 0.0025
-amcl["initial_cov_aa"] = 0.01
+# Jazzy AMCL does not declare these keys. Use initialize_localization.py to
+# publish the known start and covariance through /initialpose when precision matters.
+for key in ("initial_cov_xx", "initial_cov_yy", "initial_cov_aa"):
+    amcl.pop(key, None)
+amcl["robot_model_type"] = "nav2_amcl::OmniMotionModel"
 amcl["set_initial_pose"] = True
 amcl["scan_topic"] = "/scan"
 

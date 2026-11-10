@@ -1,0 +1,13 @@
+{
+  "truth": {
+    "mean_endpoint_map_distance": 0.00546218487394958,
+    "occupied_endpoint_fraction": 0.5378151260504201,
+    "approx_likelihood_field_score": 61.42774852454469
+  },
+  "tf_pose": {
+    "mean_endpoint_map_distance": 0.0032773109243697486,
+    "occupied_endpoint_fraction": 0.7983193277310925,
+    "approx_likelihood_field_score": 63.12965573038203
+  },
+  "note": "Diagnostic approximation of likelihood_field; higher score is preferred. Free-space visibility and ray occlusion are not scored by this endpoint model."
+}
