@@ -1,0 +1,13 @@
+{
+  "status": "reached_C",
+  "pose": [
+    -1.7999433233823987,
+    1.1942486498061042,
+    -4.23877890959197e-05
+  ],
+  "sim_seconds": 68.244,
+  "path_length_m": 10.180770083988644,
+  "min_envelope_clearance_m": 0.039950759157581894,
+  "completed_waypoints": 12,
+  "collision_measurement": "geometric envelope only; no physical contact sensor"
+}
