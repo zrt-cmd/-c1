@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
 """Generate a Nav2 occupancy map (.pgm + .yaml) from math_room.sdf walls."""
 from pathlib import Path
+import argparse
 import numpy as np
 from PIL import Image
 
-RES = 0.05
+parser = argparse.ArgumentParser()
+parser.add_argument('--resolution', type=float, default=.05)
+parser.add_argument('--output', type=Path, default=Path(__file__).resolve().parent / 'ucar-3.0/src/xflz_eai_car1/slam/car1_slam/maps/math_room.pgm')
+args = parser.parse_args()
+RES = args.resolution
 X_MIN, X_MAX = -2.7, 2.7
 Y_MIN, Y_MAX = -2.0, 2.0
 W = int(round((X_MAX - X_MIN) / RES))
@@ -41,11 +46,12 @@ for name, cx, cy, sx, sy in walls:
     if mx.any() and my.any():
         img[np.ix_(my, mx)] = 0  # occupied
 
-out_pgm = str(Path(__file__).resolve().parent / "ucar-3.0/src/xflz_eai_car1/slam/car1_slam/maps/math_room.pgm")
+args.output.parent.mkdir(parents=True, exist_ok=True)
+out_pgm = str(args.output)
 Image.fromarray(img, mode="L").save(out_pgm)
 
 with open(out_pgm.replace(".pgm", ".yaml"), "w") as f:
-    f.write("image: math_room.pgm\n")
+    f.write(f"image: {args.output.name}\n")
     f.write("mode: trinary\n")
     f.write(f"resolution: {RES}\n")
     f.write(f"origin: [{X_MIN}, {Y_MIN}, 0.0]\n")

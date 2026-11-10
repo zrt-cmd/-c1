@@ -1,0 +1,15 @@
+{
+  "status": "partial_complete",
+  "pose": [
+    0.7644253098240048,
+    1.7378988182060555,
+    0.01552307787117091
+  ],
+  "sim_seconds": 6.9959999999999996,
+  "path_length_m": 0.6169578898431777,
+  "min_envelope_clearance_m": 0.03996782110678096,
+  "completed_waypoints": 1,
+  "pose_source": "amcl_tf",
+  "max_localization_error_m": 0.04221547120218388,
+  "collision_measurement": "geometric envelope only; no physical contact sensor"
+}

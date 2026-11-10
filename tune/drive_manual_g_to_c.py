@@ -14,6 +14,7 @@ parser.add_argument('--world', type=Path, required=True)
 parser.add_argument('--out', type=Path, required=True)
 parser.add_argument('--speed', type=float, default=.20)
 parser.add_argument('--use-amcl', action='store_true', help='Control from map->base TF; truth is for measurement and stop guard only')
+parser.add_argument('--max-waypoints', type=int, default=12)
 args = parser.parse_args()
 args.out.mkdir(parents=True, exist_ok=True)
 route = [(0.15,1.70),(.775,1.70),(.775,1.15),(1.325,1.15),
@@ -80,18 +81,18 @@ if args.use_amcl:
     from tf2_ros import Buffer, TransformListener, TransformException
     rclpy.init()
     ros_node=rclpy.create_node('reference_tracking_probe', parameter_overrides=[rclpy.parameter.Parameter('use_sim_time',value=True)])
-    tf_buffer=Buffer(); tf_listener=TransformListener(tf_buffer,ros_node)
+    tf_buffer=Buffer(); tf_listener=TransformListener(tf_buffer,ros_node,spin_thread=True)
     deadline=time.monotonic()+60
     while time.monotonic()<deadline:
-        rclpy.spin_once(ros_node,timeout_sec=.1)
+        time.sleep(.01)
         if tf_buffer.can_transform('map','base_footprint',rclpy.time.Time()): break
     else: raise RuntimeError('No AMCL map->base transform')
-fields=['sim_time','stage','x','y','yaw','cmd_vx','cmd_vy','cmd_wz','body_clearance','nearest_wall','scan_min','odom_x','odom_y','estimated_x','estimated_y','localization_error']
+fields=['sim_time','stage','x','y','yaw','cmd_vx','cmd_vy','cmd_wz','body_clearance','nearest_wall','scan_min','odom_x','odom_y','estimated_x','estimated_y','localization_error','tf_age_seconds']
 try:
     with (args.out/'telemetry.csv').open('w',newline='') as f:
         writer=csv.writer(f); writer.writerow(fields)
         stage_start=state['t']; last_pose=state['pose']
-        while index<len(route):
+        while index<len(route) and index<=args.max_waypoints:
             t=state['t']; x,y,yaw=state['pose']; dt=max(0,min(t-last_t,.2)); last_t=t
             if time.monotonic()-state['received']>2: raise RuntimeError('Pose stream stale')
             gap,wall=clearance(x,y,yaw); min_gap=min(min_gap,gap)
@@ -99,9 +100,12 @@ try:
             if abs(yaw)>.10: raise RuntimeError('Unexpected heading drift')
             if t-stage_start>90: raise RuntimeError('Waypoint timed out')
             cx,cy,cyaw=x,y,yaw
+            tf_age=0.
             if args.use_amcl:
-                rclpy.spin_once(ros_node,timeout_sec=0)
-                transform=tf_buffer.lookup_transform('map','base_footprint',rclpy.time.Time()).transform
+                stamped=tf_buffer.lookup_transform('map','base_footprint',rclpy.time.Time())
+                tf_age=ros_node.get_clock().now().nanoseconds/1e9-(stamped.header.stamp.sec+stamped.header.stamp.nanosec/1e9)
+                if tf_age>.15: raise RuntimeError(f'TF is stale by {tf_age:.3f} simulation seconds')
+                transform=stamped.transform
                 cx,cy=transform.translation.x,transform.translation.y
                 q=transform.rotation
                 cyaw=math.atan2(2*(q.w*q.z+q.x*q.y),1-2*(q.y*q.y+q.z*q.z))
@@ -120,9 +124,10 @@ try:
             length+=math.hypot(x-last_pose[0],y-last_pose[1]); last_pose=(x,y,yaw)
             if t-last_log>=.1:
                 ox,oy=state['odom'] or (None,None)
-                writer.writerow([t-start_time,index,x,y,yaw,*cmd,gap,wall,state['scan'],ox,oy,cx,cy,loc_error]); f.flush(); last_log=t
+                writer.writerow([t-start_time,index,x,y,yaw,*cmd,gap,wall,state['scan'],ox,oy,cx,cy,loc_error,tf_age]); f.flush(); last_log=t
             time.sleep(.025)
-        status='reached_C' if math.hypot(state['pose'][0]+1.8,state['pose'][1]-1.2)<.03 else 'estimated_C_only'
+        status=('partial_complete' if args.max_waypoints<12 else
+                ('reached_C' if math.hypot(state['pose'][0]+1.8,state['pose'][1]-1.2)<.03 else 'estimated_C_only'))
 except BaseException as exc:
     status=str(exc)
     raise
@@ -134,3 +139,6 @@ finally:
             'collision_measurement':'geometric envelope only; no physical contact sensor'}
     (args.out/'summary.json').write_text(json.dumps(result,indent=2))
     print(json.dumps(result),flush=True)
+    if args.use_amcl:
+        ros_node.destroy_node()
+        rclpy.shutdown()
