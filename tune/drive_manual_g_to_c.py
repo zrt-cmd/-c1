@@ -140,5 +140,7 @@ finally:
     (args.out/'summary.json').write_text(json.dumps(result,indent=2))
     print(json.dumps(result),flush=True)
     if args.use_amcl:
+        tf_listener.executor.shutdown()
+        tf_listener.dedicated_listener_thread.join(timeout=5)
         ros_node.destroy_node()
         rclpy.shutdown()

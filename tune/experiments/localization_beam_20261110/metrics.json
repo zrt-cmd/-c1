@@ -1,0 +1,12 @@
+{
+  "full_status": "reached_C",
+  "sim_seconds": 98.604,
+  "path_length_m": 10.190868507247194,
+  "max_localization_error_m": 0.019768902958067113,
+  "sampled_localization_error_p95_m": 0.009875307420959416,
+  "sampled_localization_error_median_m": 0.006084103056095287,
+  "min_envelope_clearance_m": 0.035998935042511476,
+  "endpoint_error_m": 0.003214092552836518,
+  "max_sampled_tf_age_seconds": 0.020000000000010232,
+  "telemetry_rows": 742
+}
