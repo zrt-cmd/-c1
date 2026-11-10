@@ -1,0 +1,13 @@
+{
+  "planner_points": 138,
+  "path_length_m": 7.406108296032408,
+  "minimum_fixed_heading_envelope_clearance": [
+    -0.11833339648942126,
+    "u_top",
+    1.5383333964894212,
+    1.5383333860586086
+  ],
+  "overlapping_samples": 1134,
+  "sample_count": 1614,
+  "note": "Fixed yaw=0 rectangular 0.36 x 0.32 m envelope; geometric overlap is not measured physical contact"
+}

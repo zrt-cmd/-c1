@@ -13,6 +13,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--world', type=Path, required=True)
 parser.add_argument('--out', type=Path, required=True)
 parser.add_argument('--speed', type=float, default=.20)
+parser.add_argument('--use-amcl', action='store_true', help='Control from map->base TF; truth is for measurement and stop guard only')
 args = parser.parse_args()
 args.out.mkdir(parents=True, exist_ok=True)
 route = [(0.15,1.70),(.775,1.70),(.775,1.15),(1.325,1.15),
@@ -73,7 +74,19 @@ if math.hypot(state['pose'][0]-.15,state['pose'][1]-1.7)>.05:
     raise RuntimeError('Robot is not at G; refusing to move')
 start_time=state['t']; last_t=start_time; previous=(0,0); length=0; min_gap=100
 status='running'; index=1; cmd=[0.,0.,0.]; last_log=-1
-fields=['sim_time','stage','x','y','yaw','cmd_vx','cmd_vy','cmd_wz','body_clearance','nearest_wall','scan_min','odom_x','odom_y']
+max_localization_error=0.
+if args.use_amcl:
+    import rclpy
+    from tf2_ros import Buffer, TransformListener, TransformException
+    rclpy.init()
+    ros_node=rclpy.create_node('reference_tracking_probe', parameter_overrides=[rclpy.parameter.Parameter('use_sim_time',value=True)])
+    tf_buffer=Buffer(); tf_listener=TransformListener(tf_buffer,ros_node)
+    deadline=time.monotonic()+60
+    while time.monotonic()<deadline:
+        rclpy.spin_once(ros_node,timeout_sec=.1)
+        if tf_buffer.can_transform('map','base_footprint',rclpy.time.Time()): break
+    else: raise RuntimeError('No AMCL map->base transform')
+fields=['sim_time','stage','x','y','yaw','cmd_vx','cmd_vy','cmd_wz','body_clearance','nearest_wall','scan_min','odom_x','odom_y','estimated_x','estimated_y','localization_error']
 try:
     with (args.out/'telemetry.csv').open('w',newline='') as f:
         writer=csv.writer(f); writer.writerow(fields)
@@ -85,23 +98,31 @@ try:
             if gap<.008: raise RuntimeError(f'Clearance guard stopped at {gap:.4f} m near {wall}')
             if abs(yaw)>.10: raise RuntimeError('Unexpected heading drift')
             if t-stage_start>90: raise RuntimeError('Waypoint timed out')
-            gx,gy=route[index]; ex,ey=gx-x,gy-y; distance=math.hypot(ex,ey)
+            cx,cy,cyaw=x,y,yaw
+            if args.use_amcl:
+                rclpy.spin_once(ros_node,timeout_sec=0)
+                transform=tf_buffer.lookup_transform('map','base_footprint',rclpy.time.Time()).transform
+                cx,cy=transform.translation.x,transform.translation.y
+                q=transform.rotation
+                cyaw=math.atan2(2*(q.w*q.z+q.x*q.y),1-2*(q.y*q.y+q.z*q.z))
+            loc_error=math.hypot(cx-x,cy-y); max_localization_error=max(max_localization_error,loc_error)
+            gx,gy=route[index]; ex,ey=gx-cx,gy-cy; distance=math.hypot(ex,ey)
             if distance<.006:
                 print(json.dumps({'reached':index,'x':x,'y':y,'clearance':gap,'sim_time':t-start_time}),flush=True)
                 index+=1; stage_start=t; publisher.publish(Twist()); cmd=[0.,0.,0.]
                 continue
             speed=min(args.speed,1.6*distance)
             wx,wy=speed*ex/distance,speed*ey/distance
-            target=[math.cos(yaw)*wx+math.sin(yaw)*wy,-math.sin(yaw)*wx+math.cos(yaw)*wy]
+            target=[math.cos(cyaw)*wx+math.sin(cyaw)*wy,-math.sin(cyaw)*wx+math.cos(cyaw)*wy]
             for j in range(2): cmd[j]+=max(-.4*dt,min(.4*dt,target[j]-cmd[j]))
-            cmd[2]=max(-.08,min(.08,-.8*yaw))
+            cmd[2]=max(-.08,min(.08,-.8*cyaw))
             m=Twist(); m.linear.x,m.linear.y,m.angular.z=cmd; publisher.publish(m)
             length+=math.hypot(x-last_pose[0],y-last_pose[1]); last_pose=(x,y,yaw)
             if t-last_log>=.1:
                 ox,oy=state['odom'] or (None,None)
-                writer.writerow([t-start_time,index,x,y,yaw,*cmd,gap,wall,state['scan'],ox,oy]); f.flush(); last_log=t
+                writer.writerow([t-start_time,index,x,y,yaw,*cmd,gap,wall,state['scan'],ox,oy,cx,cy,loc_error]); f.flush(); last_log=t
             time.sleep(.025)
-        status='reached_C'
+        status='reached_C' if math.hypot(state['pose'][0]+1.8,state['pose'][1]-1.2)<.03 else 'estimated_C_only'
 except BaseException as exc:
     status=str(exc)
     raise
@@ -109,6 +130,7 @@ finally:
     for _ in range(5): publisher.publish(Twist()); time.sleep(.03)
     result={'status':status,'pose':state['pose'],'sim_seconds':state['t']-start_time,
             'path_length_m':length,'min_envelope_clearance_m':min_gap,'completed_waypoints':index-1,
+            'pose_source':'amcl_tf' if args.use_amcl else 'gazebo_truth','max_localization_error_m':max_localization_error,
             'collision_measurement':'geometric envelope only; no physical contact sensor'}
     (args.out/'summary.json').write_text(json.dumps(result,indent=2))
     print(json.dumps(result),flush=True)

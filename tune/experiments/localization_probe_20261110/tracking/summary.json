@@ -1,0 +1,15 @@
+{
+  "status": "Clearance guard stopped at 0.0076 m near upper_vertical_right",
+  "pose": [
+    0.8100154475709719,
+    1.7362161667478846,
+    0.014230170166700638
+  ],
+  "sim_seconds": 6.3359999999999985,
+  "path_length_m": 0.6600577159002146,
+  "min_envelope_clearance_m": 0.007588035702131346,
+  "completed_waypoints": 0,
+  "pose_source": "amcl_tf",
+  "max_localization_error_m": 0.16795812430905718,
+  "collision_measurement": "geometric envelope only; no physical contact sensor"
+}
