@@ -1,0 +1,15 @@
+{
+  "status": "reached_C",
+  "pose": [
+    -1.7979958608219335,
+    1.200142618246577,
+    -0.0002640912470401846
+  ],
+  "sim_seconds": 98.80199999999999,
+  "path_length_m": 10.192187610114804,
+  "min_envelope_clearance_m": 0.03573049203969462,
+  "completed_waypoints": 12,
+  "pose_source": "amcl_tf",
+  "max_localization_error_m": 0.013964760550192728,
+  "collision_measurement": "geometric envelope only; no physical contact sensor"
+}
