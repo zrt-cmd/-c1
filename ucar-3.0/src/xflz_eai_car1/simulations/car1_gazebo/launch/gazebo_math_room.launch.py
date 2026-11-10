@@ -1,5 +1,6 @@
 import os
 import tempfile
+import sys
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, RegisterEventHandler, IncludeLaunchDescription, OpaqueFunction
@@ -26,6 +27,9 @@ def process_urdf(context, *args, **kwargs):
     fd, urdf_temp = tempfile.mkstemp(suffix='.urdf', text=True)
     with os.fdopen(fd, 'w') as f:
         f.write(urdf_content)
+    sys.path.insert(0, os.path.join(car1_gazebo_path, 'launch'))
+    from mecanum_sdf import build_mecanum_sdf
+    sdf_file = build_mecanum_sdf(urdf_temp)
 
     world_file = os.path.join(car1_gazebo_path, 'worlds', 'math_room.sdf')
     gazebo = IncludeLaunchDescription(
@@ -77,11 +81,11 @@ def process_urdf(context, *args, **kwargs):
         executable='create',
         output='screen',
         arguments=[
-            '-topic', 'robot_description',
+            '-file', sdf_file,
             '-name', 'car1',
             '-allow_renaming', 'true',
-            '-x', '0.15',
-            '-y', '1.7',
+            '-x', LaunchConfiguration('spawn_x'),
+            '-y', LaunchConfiguration('spawn_y'),
             '-z', '0.1',
             '-Y', '0.0'
         ],
@@ -142,5 +146,7 @@ def process_urdf(context, *args, **kwargs):
 def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument('use_sim_time', default_value='true'),
+        DeclareLaunchArgument('spawn_x', default_value='0.15'),
+        DeclareLaunchArgument('spawn_y', default_value='1.7'),
         OpaqueFunction(function=process_urdf)
     ])

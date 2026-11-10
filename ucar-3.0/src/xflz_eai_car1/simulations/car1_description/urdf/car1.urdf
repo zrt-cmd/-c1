@@ -85,8 +85,7 @@
         xyz="0 0 0"
         rpy="0 0 0" />
       <geometry>
-        <mesh
-          filename="package://car1_description/meshes/wheel_lf_link.STL" />
+        <sphere radius="0.0488" />
       </geometry>
     </collision>
   </link>
@@ -102,6 +101,7 @@
       link="wheel_lf_link" />
     <axis
       xyz="0 1 0" />
+    <limit effort="20" velocity="30" />
   </joint>
   <link
     name="wheel_rf_link">
@@ -138,8 +138,7 @@
         xyz="0 0 0"
         rpy="0 0 0" />
       <geometry>
-        <mesh
-          filename="package://car1_description/meshes/wheel_rf_link.STL" />
+        <sphere radius="0.0488" />
       </geometry>
     </collision>
   </link>
@@ -154,7 +153,8 @@
     <child
       link="wheel_rf_link" />
     <axis
-      xyz="0 -1 0" />
+      xyz="0 1 0" />
+    <limit effort="20" velocity="30" />
   </joint>
   <link
     name="wheel_lb_link">
@@ -191,8 +191,7 @@
         xyz="0 0 0"
         rpy="0 0 0" />
       <geometry>
-        <mesh
-          filename="package://car1_description/meshes/wheel_lb_link.STL" />
+        <sphere radius="0.0488" />
       </geometry>
     </collision>
   </link>
@@ -208,6 +207,7 @@
       link="wheel_lb_link" />
     <axis
       xyz="0 1 0" />
+    <limit effort="20" velocity="30" />
   </joint>
   <link
     name="wheel_rb_link">
@@ -244,8 +244,7 @@
         xyz="0 0 0"
         rpy="0 0 0" />
       <geometry>
-        <mesh
-          filename="package://car1_description/meshes/wheel_rb_link.STL" />
+        <sphere radius="0.0488" />
       </geometry>
     </collision>
   </link>
@@ -260,7 +259,8 @@
     <child
       link="wheel_rb_link" />
     <axis
-      xyz="0 -1 0" />
+      xyz="0 1 0" />
+    <limit effort="20" velocity="30" />
   </joint>
   <link
     name="laser_link">

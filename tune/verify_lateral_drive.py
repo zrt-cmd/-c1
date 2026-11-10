@@ -15,12 +15,19 @@ import xml.etree.ElementTree as ET
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--body-frame", action="store_true")
+    model = parser.add_mutually_exclusive_group()
+    model.add_argument("--production", action="store_true",
+                       help="Use the production Xacro and SDF helper (default)")
+    model.add_argument("--fixture", action="store_true",
+                       help="Run the old fixture without the body-frame fix")
+    model.add_argument("--body-frame", action="store_true",
+                       help="Run the old fixture with the body-frame fix")
     parser.add_argument("--visual", action="store_true")
     parser.add_argument("--capture-dir", type=Path)
     parser.add_argument("--workspace", type=Path,
                         default=Path(os.environ.get("CAR1_WS", str(Path.home() / "ros2_ws"))))
     args = parser.parse_args()
+    args.production = args.production or not (args.fixture or args.body_frame)
     if args.visual:
         os.environ["DISPLAY"] = ":0"
         os.environ["GALLIUM_DRIVER"] = "d3d12"
@@ -42,7 +49,28 @@ def main():
     output_directory = script_directory / "results"
     output_directory.mkdir(exist_ok=True)
     source = workspace / "src/xflz_eai_car1/simulations"
-    robot = ET.parse(script_directory / "fixtures/car1_lateral_current.sdf").getroot().find("model")
+    if args.production:
+        import sys
+        sys.path.insert(0, str(source / "car1_gazebo/launch"))
+        from mecanum_sdf import build_mecanum_sdf
+        xacro_file = source / "car1_gazebo/urdf/car1.gazebo.xacro"
+        urdf_content = subprocess.check_output(["xacro", str(xacro_file)]).decode()
+        urdf_content = urdf_content.replace(
+            "package://car1_description/meshes/",
+            "file://" + str(workspace / "install/car1_description/share/car1_description/meshes") + "/",
+        )
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".urdf", delete=False) as urdf_file:
+            urdf_file.write(urdf_content)
+            urdf_path = urdf_file.name
+        try:
+            sdf_path = build_mecanum_sdf(urdf_path)
+            robot = ET.parse(sdf_path).getroot().find("model")
+        finally:
+            os.unlink(urdf_path)
+            if 'sdf_path' in locals():
+                os.unlink(sdf_path)
+    else:
+        robot = ET.parse(script_directory / "fixtures/car1_lateral_current.sdf").getroot().find("model")
     if robot.find("pose") is None:
         ET.SubElement(robot, "pose")
     robot.find("pose").text = "-1.8 -1.0 0.1 0 0 0"
@@ -55,7 +83,7 @@ def main():
     for uri in robot.iter("uri"):
         if uri.text.startswith("model://car1_description/"):
             uri.text = "file://" + str(workspace / "install/car1_description/share/car1_description" / uri.text.removeprefix("model://car1_description/"))
-    if args.body_frame:
+    if args.body_frame and not args.production:
         ET.register_namespace("gz", "http://gazebosim.org/schema")
         for link in robot.findall("link"):
             if link.get("name", "").startswith("wheel_"):
@@ -133,7 +161,8 @@ def main():
             gui_text = gui_text.replace("<camera_pose>-6 0 6 0 0.5 0</camera_pose>", "<camera_pose>-1.7 -0.9 1.8 0 1.5707963 0</camera_pose>")
             gui_file.write_text(gui_text)
             command = ["gz", "sim", "-r", str(world_file), "--render-engine-gui", "ogre", "--gui-config", str(gui_file)]
-        log_path = output_directory / ("lateral_body_frame.log" if args.body_frame else "lateral_current.log")
+        result_name = "lateral_production" if args.production else ("lateral_body_frame" if args.body_frame else "lateral_current")
+        log_path = output_directory / (result_name + ".log")
         with log_path.open("w") as log:
             process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
             try:
@@ -173,10 +202,25 @@ def main():
                 except subprocess.TimeoutExpired:
                     os.killpg(process.pid, signal.SIGKILL)
                     process.wait(timeout=5)
-    output = output_directory / ("lateral_body_frame.json" if args.body_frame else "lateral_current.json")
+    output = output_directory / (result_name + ".json")
     output.write_text(json.dumps(results, indent=2) + "\n")
     if args.capture_dir is not None:
         (args.capture_dir / "measurements.json").write_text(json.dumps(results, indent=2) + "\n")
+    if args.production:
+        forward, left, right, rotate = results
+        if not (
+            0.17 < forward["body_x_m"] < 0.23
+            and abs(forward["body_y_m"]) < 0.02
+            and 0.17 < left["body_y_m"] < 0.23
+            and abs(left["body_x_m"]) < 0.02
+            and -0.23 < right["body_y_m"] < -0.17
+            and abs(right["body_x_m"]) < 0.02
+            and all(abs(row["yaw_deg"]) < 2 for row in (forward, left, right))
+            and 20 < rotate["yaw_deg"] < 27
+            and rotate["actual_distance_m"] < 0.02
+            and all(abs(row["actual_distance_m"] - row["odom_distance_m"]) < 0.03 for row in (forward, left, right))
+        ):
+            raise RuntimeError("Production mecanum motion or odometry failed validation")
 
 
 if __name__ == "__main__":

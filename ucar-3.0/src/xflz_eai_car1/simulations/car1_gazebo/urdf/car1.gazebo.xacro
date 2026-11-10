@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<robot name="car1" xmlns:xacro="http://ros.org/wiki/xacro">
+<robot name="car1" xmlns:xacro="http://ros.org/wiki/xacro" xmlns:gz="http://gazebosim.org/schema">
     <xacro:arg name="prefix" default=""/>
 
     <!-- 引入基础 URDF -->
@@ -35,17 +35,17 @@
             <topic>joint_states</topic>
         </plugin>
 
-        <!-- 仿真底盘驱动（差速模型：左轮 lf/lb，右轮 rf/rb） -->
-        <plugin filename="gz-sim-diff-drive-system"
-                name="gz::sim::systems::DiffDrive">
-            <left_joint>wheel_lf_joint</left_joint>
-            <left_joint>wheel_lb_joint</left_joint>
-            <right_joint>wheel_rf_joint</right_joint>
-            <right_joint>wheel_rb_joint</right_joint>
+        <!-- 四轮麦轮驱动，支持车体横移。 -->
+        <plugin filename="gz-sim-mecanum-drive-system"
+                name="gz::sim::systems::MecanumDrive">
+            <front_left_joint>wheel_lf_joint</front_left_joint>
+            <front_right_joint>wheel_rf_joint</front_right_joint>
+            <back_left_joint>wheel_lb_joint</back_left_joint>
+            <back_right_joint>wheel_rb_joint</back_right_joint>
             <wheel_separation>0.216</wheel_separation>
-            <wheel_radius>0.04675</wheel_radius>
-            <max_linear_acceleration>2.5</max_linear_acceleration>
-            <max_angular_acceleration>3.2</max_angular_acceleration>
+            <wheelbase>0.1946</wheelbase>
+            <!-- Match the wheel collision sphere used by Gazebo physics. -->
+            <wheel_radius>0.0488</wheel_radius>
             <topic>/cmd_vel</topic>
             <odom_topic>/odom</odom_topic>
             <tf_topic>/tf</tf_topic>
@@ -53,6 +53,24 @@
             <child_frame_id>base_footprint</child_frame_id>
             <odom_publish_frequency>50</odom_publish_frequency>
         </plugin>
+    </gazebo>
+
+    <!-- The URDF-to-SDF converter drops expressed_in; launch/mecanum_sdf.py restores it. -->
+    <gazebo reference="wheel_lf_link">
+        <mu1>1.0</mu1><mu2>0.0</mu2>
+        <fdir1 gz:expressed_in="base_footprint">1 -1 0</fdir1>
+    </gazebo>
+    <gazebo reference="wheel_lb_link">
+        <mu1>1.0</mu1><mu2>0.0</mu2>
+        <fdir1 gz:expressed_in="base_footprint">1 1 0</fdir1>
+    </gazebo>
+    <gazebo reference="wheel_rf_link">
+        <mu1>1.0</mu1><mu2>0.0</mu2>
+        <fdir1 gz:expressed_in="base_footprint">1 1 0</fdir1>
+    </gazebo>
+    <gazebo reference="wheel_rb_link">
+        <mu1>1.0</mu1><mu2>0.0</mu2>
+        <fdir1 gz:expressed_in="base_footprint">1 -1 0</fdir1>
     </gazebo>
 
     <!-- 保留相机相关的 fixed joint，防止 Gazebo 合并 link -->

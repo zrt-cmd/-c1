@@ -1,5 +1,6 @@
 import os
 import tempfile
+import sys
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import (
@@ -32,6 +33,9 @@ def launch_setup(context, *args, **kwargs):
     fd, urdf_temp = tempfile.mkstemp(suffix='.urdf', text=True)
     with os.fdopen(fd, 'w') as f:
         f.write(urdf_content)
+    sys.path.insert(0, os.path.join(car1_gazebo_path, 'launch'))
+    from mecanum_sdf import build_mecanum_sdf
+    sdf_file = build_mecanum_sdf(urdf_temp)
 
     # --- Gazebo headless server ---
     world_file = os.path.join(car1_gazebo_path, 'worlds', 'math_room.sdf')
@@ -91,7 +95,7 @@ def launch_setup(context, *args, **kwargs):
                       '-name', 'car1', '-allow_renaming', 'true',
                       '-x', '0.15', '-y', '1.70', '-z', '0.0', '-Y', '0.0']
     else:
-        spawn_args = ['-topic', 'robot_description', '-name', 'car1',
+        spawn_args = ['-file', sdf_file, '-name', 'car1',
                       '-allow_renaming', 'true', '-x', '0.15', '-y', '1.70',
                       '-z', '0.1', '-Y', '0.0']
 
