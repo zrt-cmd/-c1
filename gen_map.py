@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Generate a Nav2 occupancy map (.pgm + .yaml) from math_room.sdf walls."""
+from pathlib import Path
 import numpy as np
 from PIL import Image
 
@@ -26,7 +27,7 @@ walls = [
     ("u_left", 1.60, 1.20, 0.1, 0.50),
     ("u_top", 1.875, 1.45, 0.55, 0.1),
     ("u_right", 2.15, 1.20, 0.1, 0.50),
-    ("short_vertical", 0.15, 0.625, 0.1, 0.45),
+    ("short_vertical", -0.05, 0.625, 0.1, 0.45),
 ]
 
 img = np.full((H, W), 254, dtype=np.uint8)  # free
@@ -40,7 +41,7 @@ for name, cx, cy, sx, sy in walls:
     if mx.any() and my.any():
         img[np.ix_(my, mx)] = 0  # occupied
 
-out_pgm = "/mnt/c/Users/ZRT/Desktop/小车/ucar-3.0/src/xflz_eai_car1/slam/car1_slam/maps/math_room.pgm"
+out_pgm = str(Path(__file__).resolve().parent / "ucar-3.0/src/xflz_eai_car1/slam/car1_slam/maps/math_room.pgm")
 Image.fromarray(img, mode="L").save(out_pgm)
 
 with open(out_pgm.replace(".pgm", ".yaml"), "w") as f:
