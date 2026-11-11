@@ -1,0 +1,44 @@
+{
+  "status": "reached_goal",
+  "success": true,
+  "route_source": "theta_star",
+  "completed_actions": 27,
+  "contact_sensor_check": {
+    "wall": "wall_south_right",
+    "sim_time": 0.002,
+    "collision_1": "wall_south_right::link::collision",
+    "collision_2": "contact_check_box::body::box"
+  },
+  "planner_action_status": 4,
+  "planner_error_code": 0,
+  "planner_error_message": "",
+  "requested_goal": [
+    -1.8,
+    1.2
+  ],
+  "planned_start": [
+    0.14499993640929443,
+    1.694999917410314
+  ],
+  "planner_used_explicit_start": false,
+  "planned_waypoints": 28,
+  "path_actions": 27,
+  "planned_min_envelope_clearance_m": 0.034999917410314135,
+  "action_status": 4,
+  "error_code": 0,
+  "error_message": "",
+  "pose": [
+    -1.7792646638924539,
+    1.2002603321175984,
+    0.0017028785687489714
+  ],
+  "endpoint_error_m": 0.020736970277848255,
+  "sim_seconds": 87.84599999999999,
+  "path_length_m": 9.315683084582,
+  "min_envelope_clearance_m": 0.0245189181557819,
+  "nearest_wall": "upper_vertical_right",
+  "peak_lateral_command_mps": 0.12,
+  "wall_contacts": [],
+  "wall_contact_messages": 0,
+  "instrumented_walls": 19
+}

@@ -1,0 +1,16 @@
+{
+  "status": "planning_failed",
+  "success": false,
+  "route_source": "theta_star",
+  "completed_actions": 0,
+  "contact_sensor_check": {
+    "wall": "wall_south_right",
+    "sim_time": 0.002,
+    "collision_1": "wall_south_right::link::collision",
+    "collision_2": "contact_check_box::body::box"
+  },
+  "planner_action_status": 4,
+  "planner_error_code": 0,
+  "planner_error_message": "",
+  "error": "ThetaStar path crosses the footprint limit at vertex 656"
+}
