@@ -1,0 +1,81 @@
+controller_server:
+  ros__parameters:
+    use_sim_time: true
+    enable_stamped_cmd_vel: false
+    controller_frequency: 10.0
+    costmap_update_timeout: 1.0
+    odom_topic: /odom
+    min_x_velocity_threshold: 0.001
+    min_y_velocity_threshold: 0.001
+    min_theta_velocity_threshold: 0.001
+    failure_tolerance: 1.0
+    progress_checker_plugins: [progress_checker]
+    goal_checker_plugins: [goal_checker]
+    controller_plugins: [FollowPath]
+    progress_checker:
+      plugin: nav2_controller::SimpleProgressChecker
+      required_movement_radius: 0.025
+      movement_time_allowance: 15.0
+    goal_checker:
+      plugin: nav2_controller::SimpleGoalChecker
+      xy_goal_tolerance: 0.03
+      yaw_goal_tolerance: 0.12
+      stateful: false
+    FollowPath:
+      plugin: dwb_core::DWBLocalPlanner
+      min_vel_x: -0.12
+      max_vel_x: 0.12
+      min_vel_y: -0.12
+      max_vel_y: 0.12
+      max_vel_theta: 0.08
+      min_speed_xy: 0.0
+      max_speed_xy: 0.12
+      min_speed_theta: 0.0
+      acc_lim_x: 0.4
+      acc_lim_y: 0.4
+      acc_lim_theta: 0.4
+      decel_lim_x: -0.4
+      decel_lim_y: -0.4
+      decel_lim_theta: -0.4
+      vx_samples: 9
+      vy_samples: 9
+      vtheta_samples: 5
+      sim_time: 0.9
+      linear_granularity: 0.01
+      angular_granularity: 0.02
+      transform_tolerance: 0.2
+      prune_distance: 0.18
+      forward_prune_distance: 0.45
+      shorten_transformed_plan: true
+      short_circuit_trajectory_evaluation: true
+      critics: [ObstacleFootprint, BaseObstacle, PathDist, GoalDist, Twirling]
+      ObstacleFootprint.scale: 0.03
+      BaseObstacle.scale: 0.01
+      PathDist.scale: 4.0
+      GoalDist.scale: 0.8
+      Twirling.scale: 80.0
+
+local_costmap:
+  local_costmap:
+    ros__parameters:
+      use_sim_time: true
+      global_frame: map
+      robot_base_frame: base_footprint
+      rolling_window: true
+      width: 2
+      height: 2
+      resolution: 0.01
+      footprint: "[[0.18, 0.16], [0.18, -0.16], [-0.18, -0.16], [-0.18, 0.16]]"
+      footprint_padding: 0.005
+      update_frequency: 10.0
+      publish_frequency: 2.0
+      transform_tolerance: 0.2
+      track_unknown_space: true
+      plugins: [static_layer, inflation_layer]
+      static_layer:
+        plugin: nav2_costmap_2d::StaticLayer
+        map_subscribe_transient_local: true
+      inflation_layer:
+        plugin: nav2_costmap_2d::InflationLayer
+        inflation_radius: 0.20
+        cost_scaling_factor: 15.0

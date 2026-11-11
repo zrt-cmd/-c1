@@ -1,0 +1,24 @@
+{
+  "status": "clearance_guard",
+  "success": false,
+  "contact_sensor_check": {
+    "wall": "wall_south_right",
+    "sim_time": 0.002,
+    "collision_1": "wall_south_right::link::collision",
+    "collision_2": "contact_check_box::body::box"
+  },
+  "pose": [
+    0.8122057013168605,
+    1.21831881542427,
+    -0.00010248356053104025
+  ],
+  "endpoint_error_m": 2.612269933408655,
+  "sim_seconds": 9.372,
+  "path_length_m": 1.0582844519516614,
+  "min_envelope_clearance_m": 0.007777902258742475,
+  "nearest_wall": "upper_vertical_right",
+  "peak_lateral_command_mps": 0.12,
+  "wall_contacts": [],
+  "wall_contact_messages": 0,
+  "instrumented_walls": 19
+}

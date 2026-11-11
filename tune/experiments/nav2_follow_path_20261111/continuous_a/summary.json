@@ -1,0 +1,27 @@
+{
+  "status": "controller_failed",
+  "success": false,
+  "contact_sensor_check": {
+    "wall": "wall_south_right",
+    "sim_time": 0.003,
+    "collision_1": "wall_south_right::link::collision",
+    "collision_2": "contact_check_box::body::box"
+  },
+  "action_status": 6,
+  "error_code": 105,
+  "error_message": "",
+  "pose": [
+    0.9763875944877057,
+    1.1812889407055298,
+    0.0023583290388952817
+  ],
+  "endpoint_error_m": 2.7764506439994845,
+  "sim_seconds": 30.887999999999998,
+  "path_length_m": 1.8394013356613501,
+  "min_envelope_clearance_m": 0.01943292841603618,
+  "nearest_wall": "upper_vertical_right",
+  "peak_lateral_command_mps": 0.12,
+  "wall_contacts": [],
+  "wall_contact_messages": 0,
+  "instrumented_walls": 19
+}

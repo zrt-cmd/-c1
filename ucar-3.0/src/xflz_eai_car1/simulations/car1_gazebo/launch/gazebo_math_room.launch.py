@@ -31,13 +31,15 @@ def process_urdf(context, *args, **kwargs):
     from mecanum_sdf import build_mecanum_sdf
     sdf_file = build_mecanum_sdf(urdf_temp)
 
-    world_file = os.path.join(car1_gazebo_path, 'worlds', 'math_room.sdf')
+    world_file = LaunchConfiguration('world_file').perform(context)
+    headless = LaunchConfiguration('headless').perform(context) == 'true'
+    gz_args = f'-s -r "{world_file}"' if headless else f'-r "{world_file}" --render-engine-gui ogre'
     gazebo = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([
             os.path.join(get_package_share_directory('ros_gz_sim'), 'launch', 'gz_sim.launch.py')
         ]),
         launch_arguments={
-            'gz_args': f'-r {world_file} --render-engine-gui ogre'
+            'gz_args': gz_args
         }.items()
     )
 
@@ -148,5 +150,8 @@ def generate_launch_description():
         DeclareLaunchArgument('use_sim_time', default_value='true'),
         DeclareLaunchArgument('spawn_x', default_value='0.15'),
         DeclareLaunchArgument('spawn_y', default_value='1.7'),
+        DeclareLaunchArgument('headless', default_value='false'),
+        DeclareLaunchArgument('world_file', default_value=os.path.join(
+            get_package_share_directory('car1_gazebo'), 'worlds', 'math_room.sdf')),
         OpaqueFunction(function=process_urdf)
     ])
