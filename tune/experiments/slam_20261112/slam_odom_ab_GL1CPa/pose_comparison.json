@@ -1,0 +1,111 @@
+{
+  "/odom:outbound": {
+    "samples": 4057,
+    "position_median_m": 0.0012356048202357497,
+    "position_p95_m": 0.0020397966190746145,
+    "yaw_bias_deg": 0.002417737404839387,
+    "yaw_abs_p95_deg": 0.03617607123066296,
+    "last_xy_error_m": 0.0020618524347034576
+  },
+  "/odom:return": {
+    "samples": 4098,
+    "position_median_m": 0.07359566169085494,
+    "position_p95_m": 0.13520356501967618,
+    "yaw_bias_deg": 1.8370576248725776,
+    "yaw_abs_p95_deg": 1.8637254539920294,
+    "last_xy_error_m": 0.06358931170253389
+  },
+  "/odom:return_heading_error_runs": [],
+  "/wheel/pose:outbound": {
+    "samples": 136,
+    "position_median_m": 0.01972102433917791,
+    "position_p95_m": 0.027269190301824626,
+    "yaw_bias_deg": 0.19892501977259822,
+    "yaw_abs_p95_deg": 1.3311887273975032,
+    "last_xy_error_m": 0.03343709670819965
+  },
+  "/wheel/pose:return": {
+    "samples": 133,
+    "position_median_m": 0.029080326630041824,
+    "position_p95_m": 0.16008158571881267,
+    "yaw_bias_deg": -0.1981172912439125,
+    "yaw_abs_p95_deg": 16.77699321345735,
+    "last_xy_error_m": 0.19778976322898054
+  },
+  "/wheel/pose:return_heading_error_runs": [
+    {
+      "start_sim_s": 152.2,
+      "end_sim_s": 159.92,
+      "start_world_xy": [
+        1.28,
+        1.159
+      ],
+      "end_world_xy": [
+        0.542,
+        1.692
+      ],
+      "peak_yaw_deg": 30.02,
+      "peak_position_cm": 15.73
+    },
+    {
+      "start_sim_s": 160.71,
+      "end_sim_s": 164.28,
+      "start_world_xy": [
+        0.352,
+        1.695
+      ],
+      "end_world_xy": [
+        0.069,
+        1.7
+      ],
+      "peak_yaw_deg": 14.92,
+      "peak_position_cm": 19.78
+    }
+  ],
+  "/truth/pose:outbound": {
+    "samples": 136,
+    "position_median_m": 0.020518856525606435,
+    "position_p95_m": 0.028044028375622178,
+    "yaw_bias_deg": 0.19996227050065707,
+    "yaw_abs_p95_deg": 1.3997358935046085,
+    "last_xy_error_m": 0.036242732029542875
+  },
+  "/truth/pose:return": {
+    "samples": 133,
+    "position_median_m": 0.026155610956365764,
+    "position_p95_m": 0.15497166347318395,
+    "yaw_bias_deg": -0.4380446958034725,
+    "yaw_abs_p95_deg": 21.31178602025554,
+    "last_xy_error_m": 0.2048380779028642
+  },
+  "/truth/pose:return_heading_error_runs": [
+    {
+      "start_sim_s": 152.2,
+      "end_sim_s": 159.52,
+      "start_world_xy": [
+        1.28,
+        1.159
+      ],
+      "end_world_xy": [
+        0.637,
+        1.691
+      ],
+      "peak_yaw_deg": 34.35,
+      "peak_position_cm": 14.94
+    },
+    {
+      "start_sim_s": 160.31,
+      "end_sim_s": 164.28,
+      "start_world_xy": [
+        0.447,
+        1.693
+      ],
+      "end_world_xy": [
+        0.069,
+        1.7
+      ],
+      "peak_yaw_deg": 25.91,
+      "peak_position_cm": 20.87
+    }
+  ]
+}

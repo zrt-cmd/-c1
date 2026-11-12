@@ -1,0 +1,61 @@
+{
+  "aligned_pose": [
+    0.11855851686640331,
+    1.6821338864798348,
+    0.007154999668899254
+  ],
+  "occupied_cell_wall_error_median_m": 0.017594069991408445,
+  "occupied_cell_wall_error_p95_m": 0.0626458196563968,
+  "expected_free_area_known_fraction": 0.7907403162961265,
+  "expected_free_area_marked_free_fraction": 0.7580411032164412,
+  "passage_widths": [
+    {
+      "location": "G lane",
+      "world_m": 0.45,
+      "slam_m": 0.402,
+      "valid_transects": 3
+    },
+    {
+      "location": "Upper right lane",
+      "world_m": 0.45,
+      "slam_m": 0.342,
+      "valid_transects": 3
+    },
+    {
+      "location": "East lane",
+      "world_m": 0.45,
+      "slam_m": 0.422,
+      "valid_transects": 3
+    },
+    {
+      "location": "U pocket",
+      "world_m": 0.45,
+      "slam_m": 0.442,
+      "valid_transects": 3
+    },
+    {
+      "location": "West pocket",
+      "world_m": 0.45,
+      "slam_m": 0.422,
+      "valid_transects": 3
+    },
+    {
+      "location": "Divider lane",
+      "world_m": 0.45,
+      "slam_m": 0.422,
+      "valid_transects": 3
+    }
+  ],
+  "fixed_heading_grid_connectivity": {
+    "bare_footprint": {
+      "G_clear": false,
+      "C_clear": true,
+      "G_to_C_connected": false
+    },
+    "with_2p5cm_margin": {
+      "G_clear": false,
+      "C_clear": true,
+      "G_to_C_connected": false
+    }
+  }
+}

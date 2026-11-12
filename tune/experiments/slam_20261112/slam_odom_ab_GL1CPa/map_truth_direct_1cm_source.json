@@ -1,0 +1,11 @@
+{
+  "accepted_scans": 269,
+  "projected_scans": 269,
+  "laser_offset_m": [
+    0.146213088049965,
+    0.0,
+    0.1164000000000005
+  ],
+  "angle_min_deg": -120.00000333930423,
+  "angle_max_deg": 120.00000333930423
+}

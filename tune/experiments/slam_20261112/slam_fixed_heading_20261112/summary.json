@@ -1,0 +1,15 @@
+{
+  "status": "running",
+  "pose": [
+    2.424812555807975,
+    0.6443654122090562,
+    0.00016627730607877468
+  ],
+  "sim_seconds": 26.994,
+  "path_length_m": 4.8606412006835535,
+  "min_envelope_clearance_m": 0.035411674878260135,
+  "completed_waypoints": 6,
+  "pose_source": "gazebo_truth",
+  "max_localization_error_m": 0.0,
+  "collision_measurement": "geometric envelope only; no physical contact sensor"
+}

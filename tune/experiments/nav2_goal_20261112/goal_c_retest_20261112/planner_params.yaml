@@ -1,0 +1,34 @@
+planner_server:
+  ros__parameters:
+    use_sim_time: true
+    expected_planner_frequency: 1.0
+    planner_plugins: [FootprintThetaStar]
+    FootprintThetaStar:
+      plugin: nav2_theta_star_planner::ThetaStarPlanner
+      allow_unknown: false
+      how_many_corners: 4
+      w_euc_cost: 1.0
+      w_traversal_cost: 16.0
+
+global_costmap:
+  global_costmap:
+    ros__parameters:
+      use_sim_time: true
+      global_frame: map
+      robot_base_frame: base_footprint
+      resolution: 0.01
+      rolling_window: false
+      robot_radius: 0.001
+      footprint_padding: 0.0
+      track_unknown_space: true
+      update_frequency: 2.0
+      publish_frequency: 1.0
+      plugins: [static_layer, inflation_layer]
+      static_layer:
+        plugin: nav2_costmap_2d::StaticLayer
+        map_topic: /planning_map
+        map_subscribe_transient_local: true
+      inflation_layer:
+        plugin: nav2_costmap_2d::InflationLayer
+        inflation_radius: 0.18
+        cost_scaling_factor: 8.0
